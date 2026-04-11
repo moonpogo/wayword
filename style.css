@@ -1130,7 +1130,13 @@ html[data-theme="dark"] .result-support{
   border-top:1px solid var(--line);
   opacity:.9;
 }
-
+.restart-hint{
+  margin-top:10px;
+  font-size:12px;
+  letter-spacing:.04em;
+  color:var(--muted);
+  opacity:.9;
+}
 /* sidebar */
 
 .compact-status{
