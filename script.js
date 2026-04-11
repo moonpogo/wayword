@@ -1375,21 +1375,20 @@ function submitWriting(fromTimer = false) {
   const result = buildRunResult(analysis, fromTimer);
   const fb = $("feedbackBox");
   if (fb) {
-    fb.className = "result-card";
-    fb.innerHTML = `
-      <div class="result-headline">${result.headline}</div>
-      <div class="result-support">
-        <div>score ${analysis.score}</div>
-        <div>${analysis.totalWords} words</div>
-        <div>${analysis.uniqueCount} unique</div>
-        <div>${Math.round(analysis.uniqueRatio * 100)}% variety</div>
-        <div>${analysis.avgSentenceLength.toFixed(1)} avg length</div>
-      </div>
-      <div class="result-direction">${result.direction}</div>
-    `;
-  }
-
-  if (!hasProfileSignal()) {
+  fb.className = "result-card";
+  fb.innerHTML = `
+    <div class="result-headline">${result.headline}</div>
+    <div class="result-support">
+      <div>score ${analysis.score}</div>
+      <div>${analysis.totalWords} words</div>
+      <div>${analysis.uniqueCount} unique</div>
+      <div>${Math.round(analysis.uniqueRatio * 100)}% variety</div>
+      <div>${analysis.avgSentenceLength.toFixed(1)} avg length</div>
+    </div>
+    <div class="result-direction">${result.direction}</div>
+    <div class="restart-hint">Press Enter to begin a new run</div>
+  `;
+}  if (!hasProfileSignal()) {
     const remaining = CALIBRATION_THRESHOLD - completedRuns();
     showToast(`${remaining} ${remaining === 1 ? "round" : "rounds"} to profile`);
   } else {
