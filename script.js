@@ -608,7 +608,7 @@ function renderHighlight() {
   syncScroll();
 }
 
-function showEditorOverlay(message = "Submitted") {
+function showEditorOverlay(message = "Submitted", persist = false) {
   const overlay = $("editorOverlay");
   const card = $("editorOverlayCard");
   if (!overlay || !card) return;
@@ -616,9 +616,11 @@ function showEditorOverlay(message = "Submitted") {
   card.textContent = message;
   overlay.classList.remove("hidden");
 
-  setTimeout(() => {
-    overlay.classList.add("hidden");
-  }, 900);
+  if (!persist) {
+    setTimeout(() => {
+      overlay.classList.add("hidden");
+    }, 900);
+  }
 }
 
 function setActiveModeButton(containerId, attribute, value) {
@@ -1247,6 +1249,7 @@ function clearExerciseIfCompleted(text) {
 function startWriting() {
   state.active = true;
   state.submitted = false;
+  $("editorOverlay")?.classList.add("hidden");
   state.prompt = generatePrompt();
   editorInput.value = "";
 
@@ -1338,6 +1341,12 @@ function submitWriting(fromTimer = false) {
   completeWordmark();
   showEditorOverlay("Submitted");
 
+  setTimeout(() => {
+    if (state.submitted) {
+      showEditorOverlay("Press Enter to begin a new run", true);
+    }
+  }, 950);
+
   const starterExamplesMap = {};
   analysis.starterExampleList.forEach(item => {
     if (!starterExamplesMap[item.starter]) starterExamplesMap[item.starter] = item.excerpt;
@@ -1388,8 +1397,7 @@ function submitWriting(fromTimer = false) {
     <div>${analysis.avgSentenceLength.toFixed(1)} avg length</div>
   </div>
   <div class="result-direction">${result.direction} Press Enter to begin a new run.</div>
-  <div class="restart-hint" style="font-size:24px;color:red;background:yellow;">RESTART HINT TEST</div>
-`;
+  `;
   }  if (!hasProfileSignal()) {
     const remaining = CALIBRATION_THRESHOLD - completedRuns();
     showToast(`${remaining} ${remaining === 1 ? "round" : "rounds"} to profile`);
