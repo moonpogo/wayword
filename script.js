@@ -1387,8 +1387,8 @@ function submitWriting(fromTimer = false) {
     <div>${Math.round(analysis.uniqueRatio * 100)}% variety</div>
     <div>${analysis.avgSentenceLength.toFixed(1)} avg length</div>
   </div>
-  <div class="result-direction">${result.direction}</div>
-  <div class="restart-hint">Press Enter to begin a new run</div>
+  <div class="result-direction">${result.direction} Press Enter to begin a new run.</div>
+  <div class="restart-hint" style="font-size:24px;color:red;background:yellow;">RESTART HINT TEST</div>
 `;
   }  if (!hasProfileSignal()) {
     const remaining = CALIBRATION_THRESHOLD - completedRuns();
