@@ -98,6 +98,8 @@ const state = {
   pendingTimerSeconds: 0,
 };
 
+const input = document.querySelector('.editor-input');
+
 const editorInput = $("editorInput");
 const highlightLayer = $("highlightLayer");
 const wordmark = $("wordmark");
@@ -1394,6 +1396,12 @@ function submitWriting(fromTimer = false) {
   } else {
     showToast("Saved");
   }
+  setTimeout(() => {
+  if (input) {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+}, 0);
 }
 
 function showProfile(show = true) {
