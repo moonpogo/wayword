@@ -825,14 +825,10 @@ function renderWritingState() {
   const isLocked = !state.active || state.submitted;
 
   if (isLocked) {
-    editorInput.readOnly = true;
     editorInput.setAttribute("readonly", "readonly");
   } else {
-    editorInput.readOnly = false;
     editorInput.removeAttribute("readonly");
   }
-
-  editorInput.disabled = false;
 
   editorInput.placeholder = state.active && !state.submitted && !editorInput.value.trim()
     ? "Start typing here..."
@@ -1379,6 +1375,7 @@ function startWriting() {
   startTimer();
   updateEnterButtonVisibility();
   showToast("Writing");
+  editorInput.removeAttribute("readonly");
 
   requestAnimationFrame(() => {
     editorInput.focus();
