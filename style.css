@@ -691,7 +691,7 @@ html[data-theme="dark"] .theme-moon{
 
 .layout{
   display:grid;
-  grid-template-columns:minmax(0,1.3fr) minmax(290px,.7fr);
+  grid-template-columns:minmax(0,1.45fr) minmax(260px,.55fr);
   gap:16px;
 }
 
@@ -1837,9 +1837,10 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 .enter-submit-btn.hidden{
   display:none !important;
 }
+
 /* responsive */
+
 @media (max-width:860px){
-  .layout,
   .profile-main-grid,
   .profile-support-grid,
   .zen-body{
@@ -1886,6 +1887,12 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 
   .snapshot-strip{
     grid-template-columns:repeat(2,1fr);
+  }
+}
+
+@media (max-width:720px){
+  .layout{
+    grid-template-columns:1fr;
   }
 }
 
