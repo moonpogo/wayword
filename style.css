@@ -846,6 +846,9 @@ html[data-theme="dark"] .theme-moon{
   caret-color:var(--ink);
   z-index:3;
   overflow:auto;
+  pointer-events:auto;
+  -webkit-user-select:text;
+  user-select:text;
 }
 
 .editor-overlay {
