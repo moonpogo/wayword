@@ -690,21 +690,6 @@ html[data-theme="dark"] .theme-moon{
 /* layout */
 
 .layout{
-  display:grid !important;
-  grid-template-columns:2fr 320px !important;
-  gap:16px !important;
-  outline:4px solid red !important;
-}
-
-.main-column{
-  outline:4px solid lime !important;
-}
-
-.side-column{
-  outline:4px solid blue !important;
-}
-
-.layout{
   display:grid;
   grid-template-columns:minmax(0,1.45fr) minmax(260px,.55fr);
   gap:16px;
