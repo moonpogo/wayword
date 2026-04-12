@@ -695,9 +695,8 @@ html[data-theme="dark"] .theme-moon{
   gap:16px;
 }
 
-.main-column{min-width:0}
-
 .side-column{
+  min-width:0;
   display:flex;
   flex-direction:column;
   gap:12px;
@@ -1040,7 +1039,7 @@ html[data-theme="dark"] .progress-marker{
   align-items:center;
   gap:8px;
   margin-top:8px;
-  min-height:6px;
+  min-height:8px;
 }
 
 .dot{
