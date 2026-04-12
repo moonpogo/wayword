@@ -72,6 +72,7 @@ const punctuationMarks = {
 const WORD_PRESETS = [60, 75, 90];
 const TIME_PRESETS = [0, 60, 180, 300];
 const CALIBRATION_THRESHOLD = 5;
+const PROMPT_REROLL_LIMIT = 2;
 
 const $ = (id) => document.getElementById(id);
 
@@ -99,6 +100,7 @@ const state = {
   optionsOpen: false,
   pendingTargetWords: 60,
   pendingTimerSeconds: 0,
+  promptRerollsUsed: 0,
 };
 
 const input = document.querySelector('.editor-input');
@@ -378,6 +380,47 @@ function updateEnterButtonVisibility() {
   const canShow = state.active && !state.submitted;
 
   btn.classList.toggle("hidden", !(hasText && canShow));
+}
+
+function canRerollPrompt() {
+  return (
+    state.active &&
+    !state.submitted &&
+    !editorInput?.value.trim() &&
+    state.promptRerollsUsed < PROMPT_REROLL_LIMIT
+  );
+}
+
+function rerollPrompt() {
+  if (!canRerollPrompt()) return;
+
+  state.prompt = generatePrompt();
+  state.promptRerollsUsed += 1;
+  renderMeta();
+
+  const remaining = PROMPT_REROLL_LIMIT - state.promptRerollsUsed;
+  showToast(remaining > 0 ? `New prompt · ${remaining} left` : "Prompt locked", 900);
+}
+
+function ensurePromptRerollButton() {
+  const promptCard = $("promptCard");
+  const promptText = $("promptText");
+  if (!promptCard || !promptText || $("promptRerollBtn")) return;
+
+  promptCard.classList.add("has-reroll");
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = "promptRerollBtn";
+  btn.className = "prompt-reroll-btn";
+  btn.setAttribute("aria-label", "Get a different prompt");
+  btn.innerHTML = `
+    <span class="prompt-reroll-icon">↻</span>
+    <span id="promptRerollBadge" class="prompt-reroll-badge">2</span>
+  `;
+
+  btn.addEventListener("click", rerollPrompt);
+  promptCard.appendChild(btn);
 }
 
 /* -----------------------------
@@ -713,7 +756,20 @@ function renderMeta() {
   updateWordProgress();
   updateTimeFill();
   updateEnterButtonVisibility();
+
+  const rerollBtn = $("promptRerollBtn");
+  const rerollBadge = $("promptRerollBadge");
+
+  if (rerollBtn && rerollBadge) {
+    const remaining = Math.max(0, PROMPT_REROLL_LIMIT - state.promptRerollsUsed);
+    const locked = !canRerollPrompt();
+
+    rerollBtn.disabled = locked;
+    rerollBtn.classList.toggle("locked", locked);
+    rerollBadge.textContent = remaining > 0 ? String(remaining) : "•";
+  }
 }
+
 function renderCalibration() {
   const runs = completedRuns();
   const progress = Math.min(runs, CALIBRATION_THRESHOLD);
@@ -1181,6 +1237,7 @@ function restartRunWithCurrentSettings() {
   if (!state.active) return;
 
   state.submitted = false;
+  state.promptRerollsUsed = 0;
   state.prompt = generatePrompt();
   editorInput.value = "";
 
@@ -1272,6 +1329,7 @@ function clearExerciseIfCompleted(text) {
 function startWriting() {
   state.active = true;
   state.submitted = false;
+  state.promptRerollsUsed = 0;
   $("editorOverlay")?.classList.add("hidden");
   state.prompt = generatePrompt();
   editorInput.value = "";
@@ -1620,6 +1678,7 @@ $("saveBannedBtnPanel")?.addEventListener("click", () => {
 ----------------------------- */
 
 applyTheme(state.theme);
+ensurePromptRerollButton();
 renderMeta();
 renderWritingState();
 renderHighlight();
