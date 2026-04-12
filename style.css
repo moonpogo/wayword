@@ -1838,8 +1838,7 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   display:none !important;
 }
 /* responsive */
-
-@media (max-width:980px){
+@media (max-width:860px){
   .layout,
   .profile-main-grid,
   .profile-support-grid,
