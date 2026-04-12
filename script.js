@@ -630,7 +630,7 @@ function syncScroll() {
 function renderHighlight() {
   if (!highlightLayer || !editorInput) return;
 
-  const text = editorInput.value;
+  const text = editorInput.value || "";
   const counts = countWords(tokenize(text));
   const pieces = text.match(/[^\s]+|\s+/g) || [];
   const repeatedStarterIndices = buildStarterIndexSet(text);
@@ -645,31 +645,27 @@ function renderHighlight() {
     const norm = normalizeWord(piece);
     const dots = [];
 
-    if (norm && state.exerciseWord && norm === state.exerciseWord) {
-      dots.push("dot-blue");
-    } else if (norm && state.banned.includes(norm)) {
-      dots.push("dot-red");
-    }
+    const isExercise = !!(norm && state.exerciseWord && norm === state.exerciseWord);
+    const isBanned = !!(norm && state.banned.includes(norm) && !isExercise);
+    const isRepeat = !!(norm && !exemptWords.has(norm) && (counts[norm] || 0) > state.repeatLimit);
+    const isStarterRepeat = repeatedStarterIndices.has(wordIndex);
 
-    if (norm && !exemptWords.has(norm) && (counts[norm] || 0) > state.repeatLimit) {
-      dots.push("dot-yellow");
-    }
+    if (isExercise) dots.push("dot-blue");
+    else if (isBanned) dots.push("dot-red");
 
-    if (repeatedStarterIndices.has(wordIndex)) {
-      dots.push("dot-purple");
-    }
+    if (isRepeat) dots.push("dot-yellow");
+    if (isStarterRepeat) dots.push("dot-purple");
 
     wordIndex += 1;
 
-    if (!dots.length) {
-      return escapeHtml(piece);
-    }
+    const dotsHtml = dots.length
+      ? `<span class="token-dots">${dots.map(cls => `<span class="dot ${cls}"></span>`).join("")}</span>`
+      : "";
 
-    const dotsHtml = dots.map(cls => `<span class="dot ${cls}"></span>`).join("");
-    return `<span class="token"><span class="token-text">${escapeHtml(piece)}</span><span class="token-dots">${dotsHtml}</span></span>`;
+    return `<span class="token"><span class="token-text">${escapeHtml(piece)}</span>${dotsHtml}</span>`;
   }).join("");
 
-  highlightLayer.innerHTML = html + "\n";
+  highlightLayer.innerHTML = html;
   syncScroll();
 }
 
