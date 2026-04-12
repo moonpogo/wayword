@@ -1017,14 +1017,13 @@ html[data-theme="dark"] .progress-marker{
   gap:10px;
   align-items:center;
 }
-
 /* highlights */
 
 .highlight-layer,
 .editor-input{
   margin:0;
   padding:20px 28px 34px 28px;
-  font:18px/1.72 Georgia,"Times New Roman",serif;
+  font:18px/1.95 Georgia,"Times New Roman",serif;
   tab-size:4;
   white-space:pre-wrap;
   word-wrap:break-word;
@@ -1058,7 +1057,11 @@ html[data-theme="dark"] .progress-marker{
   position:relative;
   display:inline-block;
   vertical-align:baseline;
-  padding-bottom:10px;
+  padding-bottom:0.42em;
+}
+
+.token-plain{
+  padding-bottom:0;
 }
 
 .token-text{
@@ -1069,20 +1072,20 @@ html[data-theme="dark"] .progress-marker{
 .token-dots{
   position:absolute;
   left:50%;
-  bottom:1px;
+  bottom:0.02em;
   transform:translateX(-50%);
-  display:flex;
+  display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:5px;
+  gap:0.24em;
   line-height:1;
   white-space:nowrap;
   pointer-events:none;
 }
 
 .dot{
-  width:5px;
-  height:5px;
+  width:0.28em;
+  height:0.28em;
   border-radius:999px;
   flex:0 0 auto;
 }
@@ -1902,6 +1905,12 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     gap:8px;
   }
 
+  .highlight-layer,
+  .editor-input{
+    padding:16px 18px 30px 18px;
+    font:17px/1.9 Georgia,"Times New Roman",serif;
+  }
+
   .style-tab{
     position:relative;
     z-index:10;
@@ -1913,12 +1922,6 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     justify-content:flex-end;
   }
 
-  .highlight-layer,
-  .editor-input{
-    padding:16px 18px 30px 18px;
-    font:17px/1.68 Georgia,"Times New Roman",serif;
-  }
-  
   .editor-shell,
   .editor-input{
     min-height:280px;
