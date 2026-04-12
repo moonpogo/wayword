@@ -918,14 +918,18 @@ function renderProfileLocked() {
 }
 
 function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters) {
-  if (topWords[0] && topWords[0][1] >= 4) {
+  if (
+    topWords[0] &&
+    topWords[0][1] >= 4 &&
+    !state.completedChallenges.has(topWords[0][0])
+  ) {
     return {
       headline: "Repetition is one of your clearest signatures.",
       support: `Your most repeated word so far is "${topWords[0][0]}".`,
       direction: "",
       exerciseWord: topWords[0][0]
     };
-  }
+}
 
   if (topStarters[0] && topStarters[0][1] >= 3) {
     return {
