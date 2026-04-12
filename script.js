@@ -665,12 +665,8 @@ function renderHighlight() {
       return escapeHtml(piece);
     }
 
-    return `
-      <span class="token">
-        <span class="token-text">${escapeHtml(piece)}</span>
-        <span class="token-dots">${dots.map(cls => `<span class="dot ${cls}"></span>`).join("")}</span>
-      </span>
-    `;
+    const dotsHtml = dots.map(cls => `<span class="dot ${cls}"></span>`).join("");
+    return `<span class="token"><span class="token-text">${escapeHtml(piece)}</span><span class="token-dots">${dotsHtml}</span></span>`;
   }).join("");
 
   highlightLayer.innerHTML = html + "\n";
