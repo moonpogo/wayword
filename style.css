@@ -1024,7 +1024,7 @@ html[data-theme="dark"] .progress-marker{
   display:inline-flex;
   flex-direction:column;
   align-items:center;
-  vertical-align:top;
+  vertical-align:baseline;
 }
 
 .token-text{
@@ -1037,14 +1037,15 @@ html[data-theme="dark"] .progress-marker{
   display:flex;
   justify-content:center;
   align-items:center;
-  gap:8px;
-  margin-top:8px;
-  min-height:8px;
+  gap:6px;
+  margin-top:3px;
+  min-height:5px;
+  line-height:1;
 }
 
 .dot{
-  width:6px;
-  height:6px;
+  width:5px;
+  height:5px;
   border-radius:999px;
   flex:0 0 auto;
 }
