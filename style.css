@@ -712,13 +712,14 @@ html[data-theme="dark"] .theme-moon{
 .card.compact{
   padding:13px;
 }
+
 /* prompt */
 
 .prompt-card{
   position:relative;
   border-top:2px solid var(--ink);
   border-bottom:1px solid var(--line);
-  padding:8px 34px 10px 0;
+  padding:8px 34px 10px 0; /* reserve space for button */
   margin-bottom:10px;
 }
 
@@ -730,6 +731,8 @@ html[data-theme="dark"] .theme-moon{
   font-size:25px;
   line-height:1.22;
 }
+
+/* reroll button — anchored, stable */
 
 .prompt-reroll-btn{
   position:absolute;
@@ -744,14 +747,15 @@ html[data-theme="dark"] .theme-moon{
 
   background:none;
   border:none;
-  color:var(--muted);
 
-  display:inline-flex;
+  color:var(--muted);
+  display:flex;
   align-items:center;
   justify-content:center;
 
   cursor:pointer;
   opacity:0.62;
+
   transition:opacity 0.15s ease, color 0.15s ease;
 }
 
@@ -771,11 +775,15 @@ html[data-theme="dark"] .theme-moon{
   display:none !important;
 }
 
+/* icon */
+
 .prompt-reroll-icon{
   font-size:18px;
   line-height:1;
   display:block;
 }
+
+/* badge */
 
 .prompt-reroll-badge{
   position:absolute;
@@ -799,9 +807,7 @@ html[data-theme="dark"] .theme-moon{
   display:none !important;
 }
 
-.setup-stack{
-  display:none;
-}
+/* responsive */
 
 @media (max-width:430px){
   .prompt-card{
