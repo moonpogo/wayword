@@ -826,14 +826,7 @@ html[data-theme="dark"] .theme-moon{
 }
 
 .highlight-layer{
-  position:absolute;
-  inset:0;
-  overflow:auto;
-  pointer-events:none;
-  user-select:none;
-  -webkit-user-select:none;
-  z-index:2;
-  color:transparent;
+  display:none !important;
 }
 
 .editor-input{
