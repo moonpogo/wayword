@@ -643,31 +643,32 @@ function renderHighlight() {
     }
 
     const norm = normalizeWord(piece);
-    const dotClasses = [];
+    const dots = [];
 
-    const isExercise = !!(norm && state.exerciseWord && norm === state.exerciseWord);
-    const isBanned = !!(norm && state.banned.includes(norm) && !isExercise);
-    const isRepeat = !!(norm && !exemptWords.has(norm) && (counts[norm] || 0) > state.repeatLimit);
-    const isStarterRepeat = repeatedStarterIndices.has(wordIndex);
+    if (norm && state.exerciseWord && norm === state.exerciseWord) {
+      dots.push("dot-blue");
+    } else if (norm && state.banned.includes(norm)) {
+      dots.push("dot-red");
+    }
 
-    if (isExercise) dotClasses.push("dot-blue");
-    else if (isBanned) dotClasses.push("dot-red");
+    if (norm && !exemptWords.has(norm) && (counts[norm] || 0) > state.repeatLimit) {
+      dots.push("dot-yellow");
+    }
 
-    if (isRepeat) dotClasses.push("dot-yellow");
-    if (isStarterRepeat) dotClasses.push("dot-purple");
+    if (repeatedStarterIndices.has(wordIndex)) {
+      dots.push("dot-purple");
+    }
 
     wordIndex += 1;
 
-    if (!dotClasses.length) {
-      return `<span class="token"><span class="token-text">${escapeHtml(piece)}</span></span>`;
+    if (!dots.length) {
+      return escapeHtml(piece);
     }
 
     return `
       <span class="token">
         <span class="token-text">${escapeHtml(piece)}</span>
-        <span class="token-dots">
-          ${dotClasses.map(cls => `<span class="dot ${cls}"></span>`).join("")}
-        </span>
+        <span class="token-dots">${dots.map(cls => `<span class="dot ${cls}"></span>`).join("")}</span>
       </span>
     `;
   }).join("");
