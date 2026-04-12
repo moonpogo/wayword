@@ -1010,7 +1010,6 @@ html[data-theme="dark"] .progress-marker{
   gap:10px;
   align-items:center;
 }
-
 /* highlights */
 
 .mark-bad,
@@ -1018,15 +1017,6 @@ html[data-theme="dark"] .progress-marker{
 .mark-warn,
 .mark-purple{
   position:relative;
-}
-
-/* base fills only */
-.mark-bad{
-  background:var(--bad-bg);
-}
-
-.mark-exercise{
-  background:var(--blue-bg);
 }
 
 /* reset dot pseudo */
@@ -1064,49 +1054,49 @@ html[data-theme="dark"] .progress-marker{
 /* two-dot states */
 .mark-bad.mark-warn::after{
   background:var(--bad);
-  transform:translateX(-8px);
-  box-shadow:16px 0 0 var(--warn);
+  transform:translateX(-6px);
+  box-shadow:12px 0 0 var(--warn);
 }
 
 .mark-bad.mark-purple::after{
   background:var(--bad);
-  transform:translateX(-8px);
-  box-shadow:16px 0 0 var(--purple);
+  transform:translateX(-6px);
+  box-shadow:12px 0 0 var(--purple);
 }
 
 .mark-exercise.mark-warn::after{
   background:var(--blue);
-  transform:translateX(-8px);
-  box-shadow:16px 0 0 var(--warn);
+  transform:translateX(-6px);
+  box-shadow:12px 0 0 var(--warn);
 }
 
 .mark-exercise.mark-purple::after{
   background:var(--blue);
-  transform:translateX(-8px);
-  box-shadow:16px 0 0 var(--purple);
+  transform:translateX(-6px);
+  box-shadow:12px 0 0 var(--purple);
 }
 
 .mark-warn.mark-purple::after{
   background:var(--warn);
-  transform:translateX(-8px);
-  box-shadow:16px 0 0 var(--purple);
+  transform:translateX(-6px);
+  box-shadow:12px 0 0 var(--purple);
 }
 
 /* three-dot states */
 .mark-bad.mark-warn.mark-purple::after{
   background:var(--bad);
-  transform:translateX(-16px);
+  transform:translateX(-12px);
   box-shadow:
-    16px 0 0 var(--warn),
-    32px 0 0 var(--purple);
+    12px 0 0 var(--warn),
+    24px 0 0 var(--purple);
 }
 
 .mark-exercise.mark-warn.mark-purple::after{
   background:var(--blue);
-  transform:translateX(-16px);
+  transform:translateX(-12px);
   box-shadow:
-    16px 0 0 var(--warn),
-    32px 0 0 var(--purple);
+    12px 0 0 var(--warn),
+    24px 0 0 var(--purple);
 }
 
 /* legend + chips */
