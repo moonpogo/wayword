@@ -396,6 +396,7 @@ function rerollPrompt() {
 
   state.prompt = generatePrompt();
   state.promptRerollsUsed += 1;
+
   renderMeta();
 
   const remaining = PROMPT_REROLL_LIMIT - state.promptRerollsUsed;
@@ -404,10 +405,9 @@ function rerollPrompt() {
 
 function ensurePromptRerollButton() {
   const promptCard = $("promptCard");
-  const promptLine = promptCard?.querySelector(".prompt-line");
   let btn = $("promptRerollBtn");
 
-  if (!promptCard || !promptLine) return;
+  if (!promptCard) return;
 
   promptCard.classList.add("has-reroll");
 
@@ -421,14 +421,16 @@ function ensurePromptRerollButton() {
       <span class="prompt-reroll-icon">↻</span>
       <span id="promptRerollBadge" class="prompt-reroll-badge">2</span>
     `;
-    promptLine.appendChild(btn);
+    promptCard.appendChild(btn);
   }
 
   if (!btn.dataset.bound) {
     btn.addEventListener("click", rerollPrompt);
     btn.dataset.bound = "true";
   }
-}/* -----------------------------
+}
+
+/* -----------------------------
    progress + timer UI
 ----------------------------- */
 
@@ -729,7 +731,6 @@ function renderExerciseBanner() {
 function updateSubmitButtonState() {
   updateEnterButtonVisibility();
 }
-
 function renderMeta() {
   const promptCard = $("promptCard");
   const promptText = $("promptText");
@@ -771,6 +772,7 @@ function renderMeta() {
 
     rerollBtn.disabled = locked;
     rerollBtn.classList.toggle("locked", locked);
+    rerollBtn.classList.toggle("hidden", remaining === 0);
 
     rerollBadge.textContent = String(remaining);
     rerollBadge.classList.toggle("hidden", remaining === 0);
