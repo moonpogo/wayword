@@ -716,6 +716,69 @@ html[data-theme="dark"] .theme-moon{
 /* prompt */
 
 .prompt-card{
+  position:relative;
+}
+
+.prompt-card.has-reroll{
+  padding-right:48px;
+}
+
+.prompt-reroll-btn{
+  position:absolute;
+  top:8px;
+  right:0;
+  width:34px;
+  height:34px;
+  padding:0;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--panel);
+  color:var(--ink);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+.prompt-reroll-btn.locked,
+.prompt-reroll-btn:disabled{
+  opacity:0.42;
+  cursor:default;
+}
+
+.prompt-reroll-icon{
+  font-size:14px;
+  line-height:1;
+}
+
+.prompt-reroll-badge{
+  position:absolute;
+  right:-4px;
+  bottom:-4px;
+  min-width:14px;
+  height:14px;
+  padding:0 3px;
+  border-radius:999px;
+  background:var(--ink);
+  color:var(--paper);
+  font-size:9px;
+  line-height:14px;
+  text-align:center;
+}
+
+@media (max-width:430px){
+  .prompt-card.has-reroll{
+    padding-right:42px;
+  }
+
+  .prompt-reroll-btn{
+    width:30px;
+    height:30px;
+    top:6px;
+  }
+}
+
+.prompt-card{
   border-top:2px solid var(--ink);
   border-bottom:1px solid var(--line);
   padding:8px 0 10px;
@@ -946,60 +1009,101 @@ html[data-theme="dark"] .progress-marker{
 }
 
 /* highlights */
+.mark-bad,
+.mark-exercise,
+.mark-warn,
+.mark-purple{
+  position:relative;
+  display:inline-block;
+  padding-bottom:0.24em;
+}
 
 .mark-bad{
   background:var(--bad-bg);
-  box-shadow: inset 0 -2px 0 var(--bad);
 }
 
 .mark-exercise{
   background:var(--blue-bg);
-  box-shadow: inset 0 -2px 0 var(--blue);
 }
 
-.mark-warn{
-  background:none;
+.mark-bad::after,
+.mark-exercise::after,
+.mark-warn::after,
+.mark-purple::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:-0.10em;
+  width:5px;
+  height:5px;
+  border-radius:999px;
+  transform:translateX(-50%);
 }
 
-.mark-purple{
-  background:none;
+/* single-dot states */
+.mark-bad::after{
+  background:var(--bad);
 }
 
-/* red/blue fill + yellow underline */
-.mark-bad.mark-warn,
-.mark-exercise.mark-warn{
+.mark-exercise::after{
+  background:var(--blue);
+}
+
+.mark-warn::after{
+  background:var(--warn);
+}
+
+.mark-purple::after{
+  background:var(--purple);
+}
+
+/* two-dot states */
+.mark-bad.mark-warn::after{
+  background:var(--bad);
+  transform:translateX(-7px);
+  box-shadow:14px 0 0 var(--warn);
+}
+
+.mark-bad.mark-purple::after{
+  background:var(--bad);
+  transform:translateX(-7px);
+  box-shadow:14px 0 0 var(--purple);
+}
+
+.mark-exercise.mark-warn::after{
+  background:var(--blue);
+  transform:translateX(-7px);
+  box-shadow:14px 0 0 var(--warn);
+}
+
+.mark-exercise.mark-purple::after{
+  background:var(--blue);
+  transform:translateX(-7px);
+  box-shadow:14px 0 0 var(--purple);
+}
+
+.mark-warn.mark-purple::after{
+  background:var(--warn);
+  transform:translateX(-7px);
+  box-shadow:14px 0 0 var(--purple);
+}
+
+/* three-dot states */
+.mark-bad.mark-warn.mark-purple::after{
+  background:var(--bad);
+  transform:translateX(-14px);
   box-shadow:
-    inset 0 -2px 0 currentColor,
-    inset 0 -5px 0 var(--warn);
+    14px 0 0 var(--warn),
+    28px 0 0 var(--purple);
 }
 
-/* red/blue fill + purple underline */
-.mark-bad.mark-purple,
-.mark-exercise.mark-purple{
+.mark-exercise.mark-warn.mark-purple::after{
+  background:var(--blue);
+  transform:translateX(-14px);
   box-shadow:
-    inset 0 -2px 0 currentColor,
-    inset 0 -5px 0 var(--purple);
-}
-
-/* red/blue fill + yellow + purple underlines */
-.mark-bad.mark-warn.mark-purple,
-.mark-exercise.mark-warn.mark-purple{
-  box-shadow:
-    inset 0 -2px 0 currentColor,
-    inset 0 -5px 0 var(--warn),
-    inset 0 -8px 0 var(--purple);
-}
-
-/* make currentColor resolve correctly for base fill classes */
-.mark-bad{
-  color:var(--bad);
-}
-
-.mark-exercise{
-  color:var(--blue);
-}
-
-/* legend + chips */
+    14px 0 0 var(--warn),
+    28px 0 0 var(--purple);
+}/* legend + chips */
 
 .legend-pill{
   display:inline-flex;
