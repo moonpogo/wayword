@@ -404,26 +404,31 @@ function rerollPrompt() {
 
 function ensurePromptRerollButton() {
   const promptCard = $("promptCard");
-  const promptText = $("promptText");
-  if (!promptCard || !promptText || $("promptRerollBtn")) return;
+  const promptLine = promptCard?.querySelector(".prompt-line");
+  let btn = $("promptRerollBtn");
+
+  if (!promptCard || !promptLine) return;
 
   promptCard.classList.add("has-reroll");
 
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.id = "promptRerollBtn";
-  btn.className = "prompt-reroll-btn";
-  btn.setAttribute("aria-label", "Get a different prompt");
-  btn.innerHTML = `
-    <span class="prompt-reroll-icon">↻</span>
-    <span id="promptRerollBadge" class="prompt-reroll-badge">2</span>
-  `;
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "promptRerollBtn";
+    btn.className = "prompt-reroll-btn";
+    btn.setAttribute("aria-label", "Get a different prompt");
+    btn.innerHTML = `
+      <span class="prompt-reroll-icon">↻</span>
+      <span id="promptRerollBadge" class="prompt-reroll-badge">2</span>
+    `;
+    promptLine.appendChild(btn);
+  }
 
-  btn.addEventListener("click", rerollPrompt);
-  const promptLine = promptCard.querySelector(".prompt-line");
-  if (promptLine) promptLine.appendChild(btn);}
-
-/* -----------------------------
+  if (!btn.dataset.bound) {
+    btn.addEventListener("click", rerollPrompt);
+    btn.dataset.bound = "true";
+  }
+}/* -----------------------------
    progress + timer UI
 ----------------------------- */
 
