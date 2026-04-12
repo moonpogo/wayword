@@ -814,6 +814,7 @@ html[data-theme="dark"] .theme-moon{
   overflow:visible;
   border-radius:24px;
 }
+
 .highlight-layer,
 .editor-input{
   margin:0;
@@ -1017,13 +1018,14 @@ html[data-theme="dark"] .progress-marker{
   gap:10px;
   align-items:center;
 }
+
 /* highlights */
 
 .highlight-layer,
 .editor-input{
   margin:0;
   padding:20px 28px 34px 28px;
-  font:18px/1.95 Georgia,"Times New Roman",serif;
+  font:18px/1.9 Georgia,"Times New Roman",serif;
   tab-size:4;
   white-space:pre-wrap;
   word-wrap:break-word;
@@ -1057,11 +1059,7 @@ html[data-theme="dark"] .progress-marker{
   position:relative;
   display:inline-block;
   vertical-align:baseline;
-  padding-bottom:6px;
-}
-
-.token-plain{
-  padding-bottom:0;
+  padding-bottom:0.38em;
 }
 
 .token-text{
@@ -1072,7 +1070,7 @@ html[data-theme="dark"] .progress-marker{
 .token-dots{
   position:absolute;
   left:50%;
-  bottom:0;
+  bottom:0.02em;
   transform:translateX(-50%);
   display:flex;
   align-items:center;
@@ -1084,8 +1082,8 @@ html[data-theme="dark"] .progress-marker{
 }
 
 .dot{
-  width:4px;
-  height:4px;
+  width:5px;
+  height:5px;
   border-radius:999px;
   flex:0 0 auto;
 }
@@ -1105,6 +1103,7 @@ html[data-theme="dark"] .progress-marker{
 .dot-blue{
   background:var(--blue);
 }
+
 
 /* legend + chips */
 
@@ -1908,7 +1907,7 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   .highlight-layer,
   .editor-input{
     padding:16px 18px 30px 18px;
-    font:17px/1.72 Georgia,"Times New Roman",serif;
+    font:17px/1.82 Georgia,"Times New Roman",serif;
   }
 
   .style-tab{
