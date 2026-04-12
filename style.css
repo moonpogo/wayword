@@ -949,22 +949,54 @@ html[data-theme="dark"] .progress-marker{
 
 .mark-bad{
   background:var(--bad-bg);
-  border-bottom:2px solid var(--bad);
-}
-
-.mark-warn{
-  background:var(--warn-bg);
-  border-bottom:2px solid var(--warn);
-}
-
-.mark-purple{
-  background:var(--purple-bg);
-  border-bottom:2px solid var(--purple);
+  box-shadow: inset 0 -2px 0 var(--bad);
 }
 
 .mark-exercise{
   background:var(--blue-bg);
-  border-bottom:2px solid var(--blue);
+  box-shadow: inset 0 -2px 0 var(--blue);
+}
+
+.mark-warn{
+  background:none;
+}
+
+.mark-purple{
+  background:none;
+}
+
+/* red/blue fill + yellow underline */
+.mark-bad.mark-warn,
+.mark-exercise.mark-warn{
+  box-shadow:
+    inset 0 -2px 0 currentColor,
+    inset 0 -5px 0 var(--warn);
+}
+
+/* red/blue fill + purple underline */
+.mark-bad.mark-purple,
+.mark-exercise.mark-purple{
+  box-shadow:
+    inset 0 -2px 0 currentColor,
+    inset 0 -5px 0 var(--purple);
+}
+
+/* red/blue fill + yellow + purple underlines */
+.mark-bad.mark-warn.mark-purple,
+.mark-exercise.mark-warn.mark-purple{
+  box-shadow:
+    inset 0 -2px 0 currentColor,
+    inset 0 -5px 0 var(--warn),
+    inset 0 -8px 0 var(--purple);
+}
+
+/* make currentColor resolve correctly for base fill classes */
+.mark-bad{
+  color:var(--bad);
+}
+
+.mark-exercise{
+  color:var(--blue);
 }
 
 /* legend + chips */
