@@ -824,9 +824,13 @@ function renderWritingState() {
 
   const isLocked = !state.active || state.submitted;
 
+  editorInput.disabled = false;
+
   if (isLocked) {
+    editorInput.readOnly = true;
     editorInput.setAttribute("readonly", "readonly");
   } else {
+    editorInput.readOnly = false;
     editorInput.removeAttribute("readonly");
   }
 
@@ -1367,6 +1371,7 @@ function startWriting() {
   editorInput.disabled = false;
   editorInput.readOnly = false;
   editorInput.removeAttribute("readonly");
+  editorInput.blur();
 
   renderMeta();
   renderWritingState();
@@ -1375,13 +1380,18 @@ function startWriting() {
   startTimer();
   updateEnterButtonVisibility();
   showToast("Writing");
-  editorInput.removeAttribute("readonly");
 
-  requestAnimationFrame(() => {
-    editorInput.focus();
-    editorInput.click();
-    editorInput.setSelectionRange(0, 0);
-  });
+  setTimeout(() => {
+    editorInput.disabled = false;
+    editorInput.readOnly = false;
+    editorInput.removeAttribute("readonly");
+    editorInput.focus({ preventScroll: true });
+
+    const end = editorInput.value.length;
+    try {
+      editorInput.setSelectionRange(end, end);
+    } catch (e) {}
+  }, 50);
 }
 
 function buildRunResult(analysis, fromTimer) {
@@ -1590,6 +1600,29 @@ if (editorInput) {
     }
   });
 }
+
+const editorShell = document.querySelector(".editor-shell");
+
+editorShell?.addEventListener("pointerdown", (e) => {
+  const blocked =
+    e.target.closest("#optionsTrigger") ||
+    e.target.closest("#editorOptionsPanel") ||
+    e.target.closest("#enterSubmitBtn") ||
+    e.target.closest("#editorOverlay");
+
+  if (blocked) return;
+  if (!state.active || state.submitted) return;
+
+  editorInput.disabled = false;
+  editorInput.readOnly = false;
+  editorInput.removeAttribute("readonly");
+  editorInput.focus({ preventScroll: true });
+
+  const end = editorInput.value.length;
+  try {
+    editorInput.setSelectionRange(end, end);
+  } catch (err) {}
+});
 
 $("beginBtn")?.addEventListener("click", enterAppState);
 $("themeToggleInPanel")?.addEventListener("click", toggleTheme);
