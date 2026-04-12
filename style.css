@@ -712,32 +712,46 @@ html[data-theme="dark"] .theme-moon{
 .card.compact{
   padding:13px;
 }
-
 /* prompt */
 
 .prompt-card{
-  position:relative;
+  border-top:2px solid var(--ink);
+  border-bottom:1px solid var(--line);
+  padding:8px 0 10px;
+  margin-bottom:10px;
 }
 
 .prompt-card.has-reroll{
-  padding-right:48px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 36px;
+  gap:10px;
+  align-items:start;
+}
+
+.prompt-main{
+  min-width:0;
+}
+
+.prompt-text{
+  font-size:25px;
+  line-height:1.22;
 }
 
 .prompt-reroll-btn{
-  position:absolute;
-  top:8px;
-  right:0;
-  width:34px;
-  height:34px;
+  width:36px;
+  height:36px;
   padding:0;
+  margin-top:2px;
   border:1px solid var(--line);
   border-radius:999px;
   background:var(--panel);
   color:var(--ink);
-  display:flex;
+  display:inline-flex;
   align-items:center;
   justify-content:center;
   cursor:pointer;
+  position:relative;
+  flex:0 0 36px;
 }
 
 .prompt-reroll-btn.locked,
@@ -766,32 +780,21 @@ html[data-theme="dark"] .theme-moon{
   text-align:center;
 }
 
+.setup-stack{
+  display:none;
+}
+
 @media (max-width:430px){
   .prompt-card.has-reroll{
-    padding-right:42px;
+    grid-template-columns:minmax(0,1fr) 32px;
+    gap:8px;
   }
 
   .prompt-reroll-btn{
-    width:30px;
-    height:30px;
-    top:6px;
+    width:32px;
+    height:32px;
+    flex-basis:32px;
   }
-}
-
-.prompt-card{
-  border-top:2px solid var(--ink);
-  border-bottom:1px solid var(--line);
-  padding:8px 0 10px;
-  margin-bottom:10px;
-}
-
-.prompt-text{
-  font-size:25px;
-  line-height:1.22;
-}
-
-.setup-stack{
-  display:none;
 }
 
 /* editor */
@@ -1009,15 +1012,15 @@ html[data-theme="dark"] .progress-marker{
 }
 
 /* highlights */
+
 .mark-bad,
 .mark-exercise,
 .mark-warn,
 .mark-purple{
   position:relative;
-  display:inline-block;
-  padding-bottom:0.24em;
 }
 
+/* base fills only */
 .mark-bad{
   background:var(--bad-bg);
 }
@@ -1026,6 +1029,7 @@ html[data-theme="dark"] .progress-marker{
   background:var(--blue-bg);
 }
 
+/* reset dot pseudo */
 .mark-bad::after,
 .mark-exercise::after,
 .mark-warn::after,
@@ -1033,9 +1037,9 @@ html[data-theme="dark"] .progress-marker{
   content:"";
   position:absolute;
   left:50%;
-  bottom:-0.10em;
-  width:5px;
-  height:5px;
+  bottom:-0.42em;
+  width:6px;
+  height:6px;
   border-radius:999px;
   transform:translateX(-50%);
 }
@@ -1060,50 +1064,52 @@ html[data-theme="dark"] .progress-marker{
 /* two-dot states */
 .mark-bad.mark-warn::after{
   background:var(--bad);
-  transform:translateX(-7px);
-  box-shadow:14px 0 0 var(--warn);
+  transform:translateX(-8px);
+  box-shadow:16px 0 0 var(--warn);
 }
 
 .mark-bad.mark-purple::after{
   background:var(--bad);
-  transform:translateX(-7px);
-  box-shadow:14px 0 0 var(--purple);
+  transform:translateX(-8px);
+  box-shadow:16px 0 0 var(--purple);
 }
 
 .mark-exercise.mark-warn::after{
   background:var(--blue);
-  transform:translateX(-7px);
-  box-shadow:14px 0 0 var(--warn);
+  transform:translateX(-8px);
+  box-shadow:16px 0 0 var(--warn);
 }
 
 .mark-exercise.mark-purple::after{
   background:var(--blue);
-  transform:translateX(-7px);
-  box-shadow:14px 0 0 var(--purple);
+  transform:translateX(-8px);
+  box-shadow:16px 0 0 var(--purple);
 }
 
 .mark-warn.mark-purple::after{
   background:var(--warn);
-  transform:translateX(-7px);
-  box-shadow:14px 0 0 var(--purple);
+  transform:translateX(-8px);
+  box-shadow:16px 0 0 var(--purple);
 }
 
 /* three-dot states */
 .mark-bad.mark-warn.mark-purple::after{
   background:var(--bad);
-  transform:translateX(-14px);
+  transform:translateX(-16px);
   box-shadow:
-    14px 0 0 var(--warn),
-    28px 0 0 var(--purple);
+    16px 0 0 var(--warn),
+    32px 0 0 var(--purple);
 }
 
 .mark-exercise.mark-warn.mark-purple::after{
   background:var(--blue);
-  transform:translateX(-14px);
+  transform:translateX(-16px);
   box-shadow:
-    14px 0 0 var(--warn),
-    28px 0 0 var(--purple);
-}/* legend + chips */
+    16px 0 0 var(--warn),
+    32px 0 0 var(--purple);
+}
+
+/* legend + chips */
 
 .legend-pill{
   display:inline-flex;
