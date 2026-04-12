@@ -771,7 +771,9 @@ function renderMeta() {
 
     rerollBtn.disabled = locked;
     rerollBtn.classList.toggle("locked", locked);
-    rerollBadge.textContent = remaining > 0 ? String(remaining) : "•";
+
+    rerollBadge.textContent = String(remaining);
+    rerollBadge.classList.toggle("hidden", remaining === 0);
   }
 }
 
