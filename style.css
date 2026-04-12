@@ -714,7 +714,6 @@ html[data-theme="dark"] .theme-moon{
 }
 
 /* prompt */
-
 .prompt-card{
   border-top:2px solid var(--ink);
   border-bottom:1px solid var(--line);
@@ -727,10 +726,7 @@ html[data-theme="dark"] .theme-moon{
 }
 
 .prompt-line{
-  display:flex;
-  align-items:flex-start;
-  gap:8px;
-  flex-wrap:wrap;
+  display:block;
 }
 
 .prompt-text{
@@ -739,11 +735,16 @@ html[data-theme="dark"] .theme-moon{
   display:inline;
 }
 
+.prompt-reroll-wrap{
+  display:inline-block;
+  white-space:nowrap;
+  margin-left:8px;
+}
+
 .prompt-reroll-btn{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:0;
   position:relative;
 
   background:none;
@@ -756,9 +757,9 @@ html[data-theme="dark"] .theme-moon{
   opacity:0.62;
   transition:opacity 0.15s ease, color 0.15s ease;
 
-  flex:0 0 auto;
-  min-width:22px;
-  height:22px;
+  width:20px;
+  height:20px;
+  vertical-align:baseline;
 }
 
 .prompt-reroll-btn:hover{
@@ -768,7 +769,7 @@ html[data-theme="dark"] .theme-moon{
 
 .prompt-reroll-btn.locked,
 .prompt-reroll-btn:disabled{
-  opacity:0.32;
+  opacity:0.28;
   cursor:default;
   color:var(--muted);
 }
@@ -797,17 +798,21 @@ html[data-theme="dark"] .theme-moon{
   text-align:center;
 }
 
+.prompt-reroll-badge.hidden{
+  display:none !important;
+}
+
 .setup-stack{
   display:none;
 }
 
 @media (max-width:430px){
-  .prompt-line{
-    gap:6px;
-  }
-
   .prompt-text{
     font-size:20px;
+  }
+
+  .prompt-reroll-wrap{
+    margin-left:6px;
   }
 
   .prompt-reroll-icon{
