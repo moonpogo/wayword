@@ -420,8 +420,8 @@ function ensurePromptRerollButton() {
   `;
 
   btn.addEventListener("click", rerollPrompt);
-  promptCard.appendChild(btn);
-}
+  const promptLine = promptCard.querySelector(".prompt-line");
+  if (promptLine) promptLine.appendChild(btn);}
 
 /* -----------------------------
    progress + timer UI
