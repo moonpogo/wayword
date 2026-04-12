@@ -1018,93 +1018,52 @@ html[data-theme="dark"] .progress-marker{
   gap:10px;
   align-items:center;
 }
+
 /* highlights */
 
-.mark-bad,
-.mark-exercise,
-.mark-warn,
-.mark-purple{
-  position:relative;
+.token{
+  display:inline-flex;
+  flex-direction:column;
+  align-items:center;
+  vertical-align:top;
 }
 
-/* reset dot pseudo */
-.mark-bad::after,
-.mark-exercise::after,
-.mark-warn::after,
-.mark-purple::after{
-  content:"";
-  position:absolute;
-  left:50%;
-  bottom:-0.42em;
+.token-text{
+  display:inline-block;
+  white-space:nowrap;
+  text-align:center;
+}
+
+.token-dots{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:8px;
+  margin-top:8px;
+  min-height:6px;
+}
+
+.dot{
   width:6px;
   height:6px;
   border-radius:999px;
-  transform:translateX(-50%);
+  flex:0 0 auto;
 }
 
-/* single-dot states */
-.mark-bad::after{
+.dot-red{
   background:var(--bad);
 }
 
-.mark-exercise::after{
-  background:var(--blue);
-}
-
-.mark-warn::after{
+.dot-yellow{
   background:var(--warn);
 }
 
-.mark-purple::after{
+.dot-purple{
   background:var(--purple);
 }
 
-/* two-dot states */
-.mark-bad.mark-warn::after{
-  background:var(--bad);
-  transform:translateX(-6px);
-  box-shadow:12px 0 0 var(--warn);
-}
-
-.mark-bad.mark-purple::after{
-  background:var(--bad);
-  transform:translateX(-6px);
-  box-shadow:12px 0 0 var(--purple);
-}
-
-.mark-exercise.mark-warn::after{
+.dot-blue{
   background:var(--blue);
-  transform:translateX(-6px);
-  box-shadow:12px 0 0 var(--warn);
-}
-
-.mark-exercise.mark-purple::after{
-  background:var(--blue);
-  transform:translateX(-6px);
-  box-shadow:12px 0 0 var(--purple);
-}
-
-.mark-warn.mark-purple::after{
-  background:var(--warn);
-  transform:translateX(-6px);
-  box-shadow:12px 0 0 var(--purple);
-}
-
-/* three-dot states */
-.mark-bad.mark-warn.mark-purple::after{
-  background:var(--bad);
-  transform:translateX(-12px);
-  box-shadow:
-    12px 0 0 var(--warn),
-    24px 0 0 var(--purple);
-}
-
-.mark-exercise.mark-warn.mark-purple::after{
-  background:var(--blue);
-  transform:translateX(-12px);
-  box-shadow:
-    12px 0 0 var(--warn),
-    24px 0 0 var(--purple);
 }
 
 /* legend + chips */
