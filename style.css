@@ -774,6 +774,10 @@ html[data-theme="dark"] .theme-moon{
   overflow:auto;
 }
 
+.editor-overlay {
+  cursor: pointer;
+}
+
 .editor-input::placeholder{
   color:transparent;
 }
@@ -909,7 +913,7 @@ html[data-theme="dark"] .progress-marker{
   display:flex;
   align-items:center;
   justify-content:center;
-  pointer-events:none;
+  pointer-events:auto;
   z-index:7;
   background:rgba(0,0,0,0.10);
   border-radius:24px;
