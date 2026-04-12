@@ -823,7 +823,17 @@ function renderWritingState() {
   if (!editorInput) return;
 
   const isLocked = !state.active || state.submitted;
-  editorInput.readOnly = isLocked;
+
+  if (isLocked) {
+    editorInput.readOnly = true;
+    editorInput.setAttribute("readonly", "readonly");
+  } else {
+    editorInput.readOnly = false;
+    editorInput.removeAttribute("readonly");
+  }
+
+  editorInput.disabled = false;
+
   editorInput.placeholder = state.active && !state.submitted && !editorInput.value.trim()
     ? "Start typing here..."
     : "";
@@ -833,6 +843,7 @@ function renderWritingState() {
   updateWordProgress();
   updateTimeFill();
 }
+
 function renderLegend(analysis) {
   const bluePill = $("exerciseLegendPill");
 
@@ -1341,7 +1352,9 @@ function startWriting() {
   state.active = true;
   state.submitted = false;
   state.promptRerollsUsed = 0;
+
   $("editorOverlay")?.classList.add("hidden");
+
   state.prompt = generatePrompt();
   editorInput.value = "";
 
@@ -1354,6 +1367,11 @@ function startWriting() {
   setBannedEditorOpen(false);
   setOptionsOpen(false);
   showProfile(false);
+
+  editorInput.disabled = false;
+  editorInput.readOnly = false;
+  editorInput.removeAttribute("readonly");
+
   renderMeta();
   renderWritingState();
   renderHighlight();
@@ -1364,7 +1382,8 @@ function startWriting() {
 
   requestAnimationFrame(() => {
     editorInput.focus();
-    editorInput.setSelectionRange(editorInput.value.length, editorInput.value.length);
+    editorInput.click();
+    editorInput.setSelectionRange(0, 0);
   });
 }
 
