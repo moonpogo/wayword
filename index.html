@@ -1,43 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-
-  <head>
-    <meta charset="UTF-8">
-    <title>Wayword — Write. See what emerges.</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="/style.css">
-  </head>
-
-  <body>
-    <!DOCTYPE html>
-<html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <title>Wayword — Write. See what emerges.</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wayword</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <div class="app-shell">
 
     <section id="landingView" class="landing-view">
       <div class="landing-gate">
-<h1 class="landing-wordmark" aria-label="Wayword">
-  <span class="wm wm-w1">W</span><span class="wm wm-a">a</span><span class="wm wm-y">y</span><span class="wm wm-w2">w</span><span class="wm wm-o">o</span><span class="wm wm-r">r</span><span class="wm wm-d">d</span>
-</h1>
+        <h1 class="landing-wordmark" aria-label="Wayword">
+          <span class="wm wm-w1">W</span><span class="wm wm-a">a</span><span class="wm wm-y">y</span><span class="wm wm-w2">w</span><span class="wm wm-o">o</span><span class="wm wm-r">r</span><span class="wm wm-d">d</span>
+        </h1>
 
-<div class="landing-copy">
-  <p>Most tools try to fix writing.<br>Wayword shows how you actually write.</p>
-  <p>Write in short constrained runs.<br>Then see what repeats, softens, and surfaces.</p>
-</div>
+        <div class="landing-copy">
+          <p>Most tools try to fix writing.<br>Wayword shows how you actually write.</p>
+          <p>Write in short constrained runs.<br>Then see what repeats, softens, and surfaces.</p>
+        </div>
 
-<button id="beginBtn" class="landing-enter-btn primary" type="button" aria-label="Enter Wayword">
-  <span>Write</span>
-  <span class="landing-enter-arrow" aria-hidden="true">→</span>
-</button>
+        <button id="beginBtn" class="landing-enter-btn primary" type="button" aria-label="Enter Wayword">
+          <span>Write</span>
+          <span class="landing-enter-arrow" aria-hidden="true">→</span>
+        </button>
       </div>
     </section>
 
     <div id="appView" class="app hidden">
       <div id="editorOptionsBackdrop" class="editor-options-backdrop hidden"></div>
+
       <div id="zenGarden" class="zen-overlay hidden">
         <div class="zen-shell">
           <div class="zen-topbar">
@@ -180,7 +172,7 @@
       <section id="writeView">
         <div class="layout">
           <section class="main-column">
-            
+
             <div id="promptCard" class="prompt-card">
               <div class="prompt-main">
                 <div class="prompt-topline" id="promptFamilyLabel">Prompt</div>
@@ -192,9 +184,7 @@
                 <span id="promptRerollBadge" class="prompt-reroll-badge">2</span>
               </button>
             </div>
-              </div>
-            </div>        
-            
+
             <div class="setup-stack hidden">
               <div class="control-row">
                 <div class="control-group">
@@ -301,12 +291,14 @@
 
               <div id="editorTimeFill" class="editor-time-fill" aria-hidden="true"></div>
               <div id="editorTimer" class="editor-timer hidden"></div>
-<div class="editor-progress" aria-hidden="true">
-  <div class="editor-progress-track">
-    <div id="editorProgressMarkers" class="editor-progress-markers"></div>
-    <div id="editorProgressFill" class="editor-progress-fill"></div>
-  </div>
-</div>
+
+              <div class="editor-progress" aria-hidden="true">
+                <div class="editor-progress-track">
+                  <div id="editorProgressMarkers" class="editor-progress-markers"></div>
+                  <div id="editorProgressFill" class="editor-progress-fill"></div>
+                </div>
+              </div>
+
               <div class="editor-overlay hidden" id="editorOverlay">
                 <div class="editor-overlay-card" id="editorOverlayCard">Submitted</div>
               </div>
@@ -424,10 +416,7 @@
       </section>
     </div>
   </div>
+
+  <script src="/script.js"></script>
 </body>
-</html>
-
-    <script src="/script.js"></script>
-  </body>
-
 </html>
