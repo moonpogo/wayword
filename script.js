@@ -585,25 +585,38 @@ function renderHighlight() {
   const pieces = text.match(/[^\s]+|\s+/g) || [];
   const repeatedStarterIndices = buildStarterIndexSet(text);
 
-  let wordIndex = 0;
+let wordIndex = 0;
 
-  const html = pieces.map(piece => {
-    if (/^\s+$/.test(piece)) return escapeHtml(piece);
+const html = pieces.map(piece => {
+  if (/^\s+$/.test(piece)) return escapeHtml(piece);
 
-    const norm = normalizeWord(piece);
-    let cls = "";
+  const norm = normalizeWord(piece);
+  const classes = [];
 
-    if (norm && state.exerciseWord && norm === state.exerciseWord) {
-      cls = "mark-exercise";
-    } else if (norm && state.banned.includes(norm)) {
-      cls = "mark-bad";
-    } else if (repeatedStarterIndices.has(wordIndex)) {
-      cls = "mark-purple";
-    } else if (norm && !exemptWords.has(norm) && (counts[norm] || 0) > state.repeatLimit) {
-      cls = "mark-warn";
-    }
+  // base fill: mutually exclusive
+  if (norm && state.exerciseWord && norm === state.exerciseWord) {
+    classes.push("mark-exercise"); // blue fill
+  } else if (norm && state.banned.includes(norm)) {
+    classes.push("mark-bad"); // red fill
+  }
 
-    wordIndex += 1;
+  // stacked underline signals
+  if (norm && !exemptWords.has(norm) && (counts[norm] || 0) > state.repeatLimit) {
+    classes.push("mark-warn"); // yellow underline
+  }
+
+  if (repeatedStarterIndices.has(wordIndex)) {
+    classes.push("mark-purple"); // purple underline
+  }
+
+  wordIndex += 1;
+
+  return classes.length
+    ? `<span class="${classes.join(" ")}">${escapeHtml(piece)}</span>`
+    : escapeHtml(piece);
+}).join("");
+  
+  wordIndex += 1;
     return cls ? `<span class="${cls}">${escapeHtml(piece)}</span>` : escapeHtml(piece);
   }).join("");
 
