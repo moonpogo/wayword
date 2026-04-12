@@ -92,6 +92,9 @@ const state = {
   history: JSON.parse(localStorage.getItem("wayword-history") || "[]"),
   savedRunIds: new Set(JSON.parse(localStorage.getItem("wayword-runids") || "[]")),
   exerciseWord: localStorage.getItem("wayword-exercise-word") || "",
+  completedChallenges: new Set(
+  JSON.parse(localStorage.getItem("wayword-completed-challenges") || "[]")
+),
   bannedEditorOpen: false,
   optionsOpen: false,
   pendingTargetWords: 60,
@@ -1133,13 +1136,13 @@ function renderProfile() {
     $("profileActionArea").innerHTML = callouts.exerciseWord
       ? `
         <div class="exercise-card">
-          <div class="challenge-title">Suggested exercise</div>
+          <div class="challenge-title">Suggested challenge</div>
           <div class="challenge-copy">
             Start one run without using the word <strong>${escapeHtml(callouts.exerciseWord)}</strong>.
           </div>
           <button id="startExerciseBtn" class="exercise-btn" type="button">
             <span class="exercise-dot"></span>
-            Start exercise
+            Begin challenge
           </button>
         </div>
       `
@@ -1240,8 +1243,17 @@ function startExerciseRun(word) {
 
 function clearExerciseIfCompleted(text) {
   if (!state.exerciseWord) return;
+
   const tokens = tokenize(text);
+
   if (tokens.includes(state.exerciseWord)) return;
+
+  state.completedChallenges.add(state.exerciseWord);
+  localStorage.setItem(
+    "wayword-completed-challenges",
+    JSON.stringify(Array.from(state.completedChallenges))
+  );
+
   localStorage.removeItem("wayword-exercise-word");
   state.exerciseWord = "";
 }
