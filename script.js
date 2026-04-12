@@ -1343,7 +1343,7 @@ function submitWriting(fromTimer = false) {
 
   setTimeout(() => {
     if (state.submitted) {
-      showEditorOverlay("Press Enter to begin a new run", true);
+      showEditorOverlay("Begin again", true);
     }
   }, 950);
 
@@ -1446,6 +1446,12 @@ function initZenGarden() {
     if (e.target === overlay) closeGarden();
   });
 
+  $("editorOverlay")?.addEventListener("click", () => {
+  if (state.submitted) {
+    startWriting();
+  }
+});
+  
   $("zenClearBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
   $("zenRandomBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
   $("zenSaveBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
