@@ -658,11 +658,16 @@ function renderHighlight() {
 
     wordIndex += 1;
 
-    const dotsHtml = dots.length
-      ? `<span class="token-dots">${dots.map(cls => `<span class="dot ${cls}"></span>`).join("")}</span>`
-      : "";
+    if (!dots.length) {
+      return `<span class="token token-plain"><span class="token-text">${escapeHtml(piece)}</span></span>`;
+    }
 
-    return `<span class="token"><span class="token-text">${escapeHtml(piece)}</span>${dotsHtml}</span>`;
+    return `
+      <span class="token">
+        <span class="token-text">${escapeHtml(piece)}</span>
+        <span class="token-dots">${dots.map(cls => `<span class="dot ${cls}"></span>`).join("")}</span>
+      </span>
+    `;
   }).join("");
 
   highlightLayer.innerHTML = html;
