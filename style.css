@@ -1020,17 +1020,50 @@ html[data-theme="dark"] .progress-marker{
 
 /* highlights */
 
+.highlight-layer,
+.editor-input{
+  margin:0;
+  padding:20px 28px 34px 28px;
+  font:18px/1.72 Georgia,"Times New Roman",serif;
+  tab-size:4;
+  white-space:pre-wrap;
+  word-wrap:break-word;
+  overflow-wrap:break-word;
+}
+
+.highlight-layer{
+  position:absolute;
+  inset:0;
+  overflow:auto;
+  pointer-events:none;
+  z-index:2;
+  color:transparent;
+}
+
+.editor-input{
+  position:relative;
+  width:100%;
+  min-height:320px;
+  resize:vertical;
+  border:0;
+  outline:none;
+  background:transparent;
+  color:var(--ink);
+  caret-color:var(--ink);
+  z-index:3;
+  overflow:auto;
+}
+
 .token{
-  position: relative;
-  display:inline-flex;
+  position:relative;
+  display:inline-block;
   vertical-align:baseline;
   padding-bottom:10px;
 }
 
 .token-text{
-  display:inline-block;
-  white-space:nowrap;
-  text-align:center;
+  display:inline;
+  white-space:pre-wrap;
 }
 
 .token-dots{
@@ -1039,12 +1072,12 @@ html[data-theme="dark"] .progress-marker{
   bottom:1px;
   transform:translateX(-50%);
   display:flex;
-  justify-content:center;
   align-items:center;
+  justify-content:center;
   gap:5px;
   line-height:1;
-  pointer-events:none;
   white-space:nowrap;
+  pointer-events:none;
 }
 
 .dot{
@@ -1883,9 +1916,9 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   .highlight-layer,
   .editor-input{
     padding:16px 18px 30px 18px;
-    font:17px/1.7 Georgia,"Times New Roman",serif;
+    font:17px/1.68 Georgia,"Times New Roman",serif;
   }
-
+  
   .editor-shell,
   .editor-input{
     min-height:280px;
