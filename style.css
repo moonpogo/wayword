@@ -722,8 +722,8 @@ html[data-theme="dark"] .theme-moon{
   margin-bottom:10px;
 
   display:grid;
-  grid-template-columns:minmax(0,1fr) 34px;
-  gap:10px;
+  grid-template-columns:minmax(0,1fr) 40px;
+  gap:12px;
   align-items:center;
 }
 
@@ -749,7 +749,7 @@ html[data-theme="dark"] .theme-moon{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  justify-self:end;
+  justify-self:center;
 
   cursor:pointer;
   opacity:0.62;
@@ -781,19 +781,19 @@ html[data-theme="dark"] .theme-moon{
 
 .prompt-reroll-badge{
   position:absolute;
-  right:-2px;
-  top:-2px;
+  right:-1px;
+  top:-1px;
 
-  min-width:13px;
-  height:13px;
-  padding:0 3px;
+  min-width:12px;
+  height:12px;
+  padding:0 2px;
 
   border-radius:999px;
   background:var(--ink);
   color:var(--paper);
 
   font-size:8px;
-  line-height:13px;
+  line-height:12px;
   text-align:center;
 }
 
@@ -803,26 +803,6 @@ html[data-theme="dark"] .theme-moon{
 
 .setup-stack{
   display:none;
-}
-
-@media (max-width:430px){
-  .prompt-card{
-    grid-template-columns:minmax(0,1fr) 30px;
-    gap:8px;
-  }
-
-  .prompt-text{
-    font-size:20px;
-  }
-
-  .prompt-reroll-btn{
-    width:24px;
-    height:24px;
-  }
-
-  .prompt-reroll-icon{
-    font-size:16px;
-  }
 }
 
 /* editor */
@@ -1857,7 +1837,6 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 .enter-submit-btn.hidden{
   display:none !important;
 }
-
 /* responsive */
 
 @media (max-width:980px){
@@ -1910,9 +1889,8 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     grid-template-columns:repeat(2,1fr);
   }
 }
+
 @media (max-width:680px){
-  .editor-options-panel{
-    @media (max-width:680px){
   .header-actions{
     position:relative;
     z-index:10;
@@ -2053,6 +2031,24 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 }
 
 @media (max-width:430px){
+  .prompt-card{
+    grid-template-columns:minmax(0,1fr) 30px;
+    gap:8px;
+  }
+
+  .prompt-text{
+    font-size:20px;
+  }
+
+  .prompt-reroll-btn{
+    width:24px;
+    height:24px;
+  }
+
+  .prompt-reroll-icon{
+    font-size:16px;
+  }
+
   .editor-options-panel{
     width:calc(100vw - 16px);
     padding:10px 10px 12px;
