@@ -1032,13 +1032,11 @@ html[data-theme="dark"] .progress-marker{
 /* highlights */
 
 .token{
-  display:inline-flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
+  position:relative;
+  display:inline-block;
   vertical-align:baseline;
   line-height:inherit;
-  padding-bottom:0.24em;
+  padding-bottom:0.18em;
 }
 
 .token-plain{
@@ -1046,25 +1044,27 @@ html[data-theme="dark"] .progress-marker{
 }
 
 .token-text{
-  display:block;
+  display:inline;
   white-space:pre-wrap;
 }
 
 .token-dots{
+  position:absolute;
+  left:50%;
+  bottom:-0.06em;
+  transform:translateX(-50%);
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:0.22em;
-  margin-top:0.06em;
+  gap:0.16em;
   line-height:1;
   white-space:nowrap;
   pointer-events:none;
-  min-width:100%;
 }
 
 .dot{
-  width:0.24em;
-  height:0.24em;
+  width:0.16em;
+  height:0.16em;
   border-radius:999px;
   flex:0 0 auto;
 }
