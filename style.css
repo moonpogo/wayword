@@ -813,6 +813,10 @@ html[data-theme="dark"] .theme-moon{
 }
 
 .highlight-layer{
+  color:transparent;
+}
+
+.highlight-layer .token-text{
   color:var(--ink);
 }
 
