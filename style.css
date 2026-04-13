@@ -806,6 +806,16 @@ html[data-theme="dark"] .theme-moon{
 
 /* editor */
 
+.editor-input{
+  color:transparent;
+  -webkit-text-fill-color:transparent;
+  caret-color:var(--ink);
+}
+
+.highlight-layer{
+  color:var(--ink);
+}
+
 .editor-shell{
   position:relative;
   border:1px solid var(--ink);
@@ -1056,15 +1066,15 @@ html[data-theme="dark"] .progress-marker{
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:0.16em;
+  gap:0.14em;
   line-height:1;
   white-space:nowrap;
   pointer-events:none;
 }
 
 .dot{
-  width:0.16em;
-  height:0.16em;
+  width:0.14em;
+  height:0.14em;
   border-radius:999px;
   flex:0 0 auto;
 }
