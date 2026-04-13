@@ -110,6 +110,37 @@ const highlightLayer = $("highlightLayer");
 const wordmark = $("wordmark");
 const statusToast = $("statusToast");
 
+function getViewportHeight() {
+  if (window.visualViewport && window.visualViewport.height) {
+    return Math.round(window.visualViewport.height);
+  }
+  return window.innerHeight;
+}
+
+function syncViewportHeightVar() {
+  document.documentElement.style.setProperty("--vvh", `${getViewportHeight()}px`);
+}
+
+function isMobileViewport() {
+  return window.matchMedia("(max-width: 720px)").matches;
+}
+
+function setFocusMode(enabled) {
+  const shouldEnable = Boolean(enabled) && isMobileViewport();
+  document.body.classList.toggle("focus-mode", shouldEnable);
+}
+
+let viewportSyncRaf = null;
+
+function queueViewportSync() {
+  if (viewportSyncRaf !== null) return;
+  viewportSyncRaf = requestAnimationFrame(() => {
+    viewportSyncRaf = null;
+    syncViewportHeightVar();
+    if (!isMobileViewport()) setFocusMode(false);
+  });
+}
+
 let liftCurrent = 0;
 let liftTarget = 0;
 let liftVelocity = 0;
@@ -1594,6 +1625,16 @@ function initZenGarden() {
 ----------------------------- */
 
 if (editorInput) {
+  editorInput.addEventListener("focus", () => {
+    setFocusMode(true);
+    queueViewportSync();
+  });
+
+  editorInput.addEventListener("blur", () => {
+    setFocusMode(false);
+    queueViewportSync();
+  });
+
   editorInput.addEventListener("input", () => {
     if (!state.active || state.submitted) return;
     pulseWordmark();
@@ -1697,6 +1738,19 @@ document.addEventListener("click", (e) => {
   }
 });
 
+document.addEventListener("pointerdown", (e) => {
+  if (!editorInput) return;
+  if (!isMobileViewport()) return;
+  if (!document.body.classList.contains("focus-mode")) return;
+  if (document.activeElement !== editorInput) return;
+
+  const insideEditor = e.target.closest(".editor-shell");
+  const insideOptions = e.target.closest("#editorOptionsPanel") || e.target.closest("#optionsTrigger");
+  if (insideEditor || insideOptions) return;
+
+  editorInput.blur();
+});
+
 /* -----------------------------
    panel control wiring
 ----------------------------- */
@@ -1743,6 +1797,13 @@ $("saveBannedBtnPanel")?.addEventListener("click", () => {
    boot
 ----------------------------- */
 
+window.addEventListener("resize", queueViewportSync);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", queueViewportSync);
+  window.visualViewport.addEventListener("scroll", queueViewportSync);
+}
+
+syncViewportHeightVar();
 applyTheme(state.theme);
 ensurePromptRerollButton();
 renderMeta();

@@ -1,4 +1,5 @@
 :root{
+  --vvh:100vh;
   --paper:#f6f4ee;
   --ink:#121212;
   --muted:#6a6a6a;
@@ -60,7 +61,7 @@ button,input,textarea{
 .hidden{display:none !important}
 
 .app-shell{
-  min-height:100vh;
+  min-height:var(--vvh, 100vh);
 }
 
 .app{
@@ -719,15 +720,18 @@ html[data-theme="dark"] .theme-moon{
   border-bottom:1px solid var(--line);
   padding:8px 0 10px;
   margin-bottom:10px;
-
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 40px;
-  gap:12px;
-  align-items:center;
 }
 
 .prompt-main{
   min-width:0;
+}
+
+.prompt-meta-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:4px;
 }
 
 .prompt-text{
@@ -748,7 +752,7 @@ html[data-theme="dark"] .theme-moon{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  justify-self:center;
+  flex:0 0 auto;
 
   cursor:pointer;
   opacity:0.62;
@@ -1884,6 +1888,258 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   .layout{
     grid-template-columns:1fr;
   }
+
+  body.focus-mode{
+    overflow:hidden;
+  }
+
+  body.focus-mode .app-shell,
+  body.focus-mode #appView,
+  body.focus-mode #writeView{
+    height:var(--vvh, 100vh);
+    min-height:var(--vvh, 100vh);
+  }
+
+  body.focus-mode .app{
+    height:100%;
+    min-height:0;
+    overflow:hidden;
+    padding-top:10px;
+    padding-bottom:10px;
+  }
+
+  body.focus-mode #writeView{
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+
+  body.focus-mode .header{
+    display:none;
+  }
+
+  body.focus-mode #writeView > .layout{
+    display:flex;
+    flex-direction:column;
+    flex:1 1 auto;
+    min-height:0;
+    gap:8px;
+  }
+
+  body.focus-mode .main-column{
+    display:flex;
+    flex-direction:column;
+    flex:1 1 auto;
+    min-height:0;
+    gap:12px;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom));
+  }
+
+  body.focus-mode .prompt-card{
+    margin-bottom:6px;
+    padding:6px 0 8px;
+  }
+
+  body.focus-mode .prompt-text{
+    font-size:21px;
+    line-height:1.16;
+  }
+
+  body.focus-mode .editor-shell{
+    flex:1 1 auto;
+    min-height:0;
+    height:auto;
+  }
+
+  body.focus-mode .highlight-layer,
+  body.focus-mode .editor-input{
+    min-height:100%;
+    height:100%;
+  }
+
+  body.focus-mode .below-editor-stack{
+    flex:0 0 auto;
+    margin-top:auto;
+    gap:6px;
+    padding-bottom:calc(6px + env(safe-area-inset-bottom));
+  }
+
+  body.focus-mode .result-headline{
+    font-size:18px;
+    margin-bottom:6px;
+  }
+
+  body.focus-mode .result-support{
+    padding:8px 10px;
+    gap:8px 12px;
+  }
+
+  body.focus-mode .result-support > div{
+    font-size:12px;
+  }
+
+  body.focus-mode .result-direction{
+    margin-top:6px;
+    padding-top:6px;
+  }
+
+  body.focus-mode .side-column{
+    display:none;
+  }
+
+  body.focus-mode .editor-options-panel{
+    top:8px;
+    left:8px;
+    right:8px;
+    transform:none;
+    width:auto;
+    max-height:calc(var(--vvh, 100vh) - 16px);
+    overflow:auto;
+  }
+}
+
+@media (max-width:720px) and (max-height:760px){
+  body.focus-mode .app{
+    padding-top:8px;
+    padding-bottom:8px;
+  }
+
+  body.focus-mode .wordmark{
+    margin:0;
+    font-size:34px;
+  }
+
+  body.focus-mode .subhed{
+    font-size:13px;
+  }
+
+  body.focus-mode .prompt-card{
+    margin-bottom:4px;
+    padding:4px 0 6px;
+  }
+
+  body.focus-mode .prompt-topline{
+    margin-bottom:2px;
+    font-size:10px;
+  }
+
+  body.focus-mode .prompt-text{
+    font-size:18px;
+    line-height:1.12;
+  }
+
+  body.focus-mode .editor-shell{
+    min-height:160px;
+  }
+
+  body.focus-mode .highlight-layer,
+  body.focus-mode .editor-input{
+    padding:12px 14px 24px 14px;
+    font:16px/1.55 Georgia,"Times New Roman",serif;
+  }
+
+  body.focus-mode .editor-progress{
+    bottom:10px;
+    min-width:140px;
+    width:66%;
+  }
+
+  body.focus-mode .editor-timer{
+    bottom:40px;
+    right:14px;
+    font-size:12px;
+  }
+
+  body.focus-mode .below-editor-stack{
+    margin-top:auto;
+    gap:4px;
+  }
+
+  body.focus-mode .legend-pill{
+    padding:5px 6px;
+    font-size:10px;
+    gap:4px;
+  }
+
+  body.focus-mode .legend-swatch{
+    width:7px;
+    height:7px;
+  }
+
+  body.focus-mode .result-headline{
+    font-size:16px;
+    margin-bottom:4px;
+  }
+
+  body.focus-mode .result-support{
+    padding:6px 8px;
+    gap:6px 10px;
+  }
+
+  body.focus-mode .result-support > div{
+    font-size:11px;
+  }
+
+  body.focus-mode .result-direction{
+    margin-top:4px;
+    padding-top:4px;
+    font-size:12px;
+    line-height:1.35;
+  }
+}
+
+@media (max-width:720px) and (max-height:680px){
+  body.focus-mode .app{
+    padding-top:6px;
+    padding-bottom:6px;
+  }
+
+  body.focus-mode .wordmark{
+    font-size:30px;
+  }
+
+  body.focus-mode .subhed{
+    font-size:12px;
+  }
+
+  body.focus-mode .prompt-text{
+    font-size:16px;
+  }
+
+  body.focus-mode .editor-shell{
+    min-height:130px;
+  }
+
+  body.focus-mode .highlight-layer,
+  body.focus-mode .editor-input{
+    padding:10px 12px 20px 12px;
+    font:15px/1.45 Georgia,"Times New Roman",serif;
+  }
+
+  body.focus-mode .below-editor-stack{
+    margin-top:2px;
+    gap:3px;
+  }
+
+  body.focus-mode .result-headline{
+    font-size:14px;
+    margin-bottom:3px;
+  }
+
+  body.focus-mode .result-support{
+    padding:5px 7px;
+    gap:5px 8px;
+  }
+
+  body.focus-mode .result-support > div{
+    font-size:10px;
+  }
+
+  body.focus-mode .result-direction{
+    margin-top:3px;
+    padding-top:3px;
+    font-size:11px;
+  }
 }
 
 @media (max-width:680px){
@@ -2032,8 +2288,10 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   }
 
   .legend-row{
+    display:flex;
     flex-wrap:nowrap;
     justify-content:center;
+    align-items:center;
     gap:6px;
   }
 
