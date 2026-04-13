@@ -101,6 +101,7 @@ const state = {
   pendingTargetWords: 60,
   pendingTimerSeconds: 0,
   promptRerollsUsed: 0,
+  pendingRecentDrawerExpand: false,
 };
 
 const input = document.querySelector('.editor-input');
@@ -128,6 +129,7 @@ function isMobileViewport() {
 function setFocusMode(enabled) {
   const shouldEnable = Boolean(enabled) && isMobileViewport();
   document.body.classList.toggle("focus-mode", shouldEnable);
+  if (shouldEnable) setRecentDrawerOpen(false);
 }
 
 let viewportSyncRaf = null;
@@ -934,62 +936,230 @@ if ($("legendYellowCount")) $("legendYellowCount").textContent = repeatedWordCou
 }
 
 function renderSidebar() {
-  const thisRunCard = $("thisRunCard");
+  renderLegend(state.active ? analyze(getEditorText()) : null);
+}
 
-  if (!state.active || !state.submitted) {
-    if (thisRunCard) thisRunCard.classList.add("hidden");
-    renderLegend(state.active ? analyze(getEditorText()) : null);
-    return;
-  }
+function promptExcerpt(prompt, maxLen = 120) {
+  const text = (prompt || "").replace(/\r/g, "");
+  const firstLine = text.split("\n").map(l => l.trim()).find(Boolean) || "";
+  const compact = firstLine.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLen) return compact;
+  return `${compact.slice(0, Math.max(0, maxLen - 1)).trim()}…`;
+}
 
-  if (thisRunCard) thisRunCard.classList.remove("hidden");
+function formatRelativeTime(ts) {
+  if (!ts || typeof ts !== "number") return "";
+  const diffMs = Date.now() - ts;
+  const sec = Math.max(0, Math.floor(diffMs / 1000));
+  if (sec < 45) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d ago`;
+  return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
-  const analysis = analyze(getEditorText());
+function formatRunDetailHtml(run) {
+  const repeated = Array.isArray(run.repeatedWords) ? run.repeatedWords : [];
+  const banned = Array.isArray(run.bannedHits) ? run.bannedHits : [];
+  const starters = Array.isArray(run.repeatedStarters) ? run.repeatedStarters : [];
 
-  if ($("repeatedWordsList")) {
-    $("repeatedWordsList").innerHTML = analysis.repeated.length
-      ? analysis.repeated.map(([w, c]) => `<span class="chip warn">${escapeHtml(w)} ${c} times</span>`).join("")
-      : '<span class="chip">none</span>';
-  }
+  const repeatedHtml = repeated.length
+    ? repeated
+        .map(
+          ([w, c]) =>
+            `<span class="chip warn">${escapeHtml(w)} ${escapeHtml(String(c))} times</span>`
+        )
+        .join("")
+    : '<span class="chip">none</span>';
 
-  if ($("bannedWordsList")) {
-    $("bannedWordsList").innerHTML = analysis.bannedHits.length
-      ? analysis.bannedHits.map(item => {
+  const bannedHtml = banned.length
+    ? banned
+        .map(item => {
           const cls = item.isExercise ? "exercise-chip" : "chip bad";
           const prefix = item.isExercise ? '<span class="exercise-dot"></span>' : '';
-          return `<span class="${cls}">${prefix}${escapeHtml(item.word)} ${item.count} times</span>`;
-        }).join("")
-      : '<span class="chip">none</span>';
-  }
+          return `<span class="${cls}">${prefix}${escapeHtml(item.word)} ${escapeHtml(String(item.count))} times</span>`;
+        })
+        .join("")
+    : '<span class="chip">none</span>';
 
-  if ($("starterWarningsList")) {
-    $("starterWarningsList").innerHTML = analysis.repeatedStarters.length
-      ? analysis.repeatedStarters.map(([w, c]) => `<span class="chip purple">${escapeHtml(w)} ${c} times</span>`).join("")
-      : '<span class="chip">none</span>';
-  }
+  const startersHtml = starters.length
+    ? starters
+        .map(
+          ([w, c]) =>
+            `<span class="chip purple">${escapeHtml(w)} ${escapeHtml(String(c))} times</span>`
+        )
+        .join("")
+    : '<span class="chip">none</span>';
 
-  renderLegend(analysis);
+  const unique =
+    typeof run.unique === "number"
+      ? `${run.unique} unique`
+      : typeof run.uniqueRatio === "number"
+        ? `${Math.round(run.uniqueRatio * 100)}% variety`
+        : "";
+
+  const avgLen =
+    typeof run.avgSentenceLength === "number" && Number.isFinite(run.avgSentenceLength)
+      ? `${run.avgSentenceLength.toFixed(1)} avg sentence`
+      : "";
+
+  const extraBits = [unique, avgLen].filter(Boolean).join(" · ");
+
+  return `
+    <div class="recent-run-detail">
+      <div class="recent-run-detail-block">
+        <div class="recent-run-detail-label">Repeated words</div>
+        <div class="word-list">${repeatedHtml}</div>
+      </div>
+      <div class="recent-run-detail-block">
+        <div class="recent-run-detail-label">Banned / filler</div>
+        <div class="word-list">${bannedHtml}</div>
+      </div>
+      <div class="recent-run-detail-block">
+        <div class="recent-run-detail-label">Repeated starters</div>
+        <div class="word-list">${startersHtml}</div>
+      </div>
+      ${
+        extraBits
+          ? `<div class="recent-run-detail-meta">${escapeHtml(extraBits)}</div>`
+          : `<div class="recent-run-detail-meta">More session details can land here later.</div>`
+      }
+    </div>
+  `;
 }
 
 function renderHistory() {
-  const historyEl = $("history");
-  if (!historyEl) return;
+  const drawerList = $("recentDrawerList");
+  const trigger = $("recentWritingTrigger");
 
-const section = $("recentWritingSection");
+  if (!state.history.length) {
+    if (drawerList) drawerList.innerHTML = "";
+    const drawerOpen = $("recentDrawer") && !$("recentDrawer").classList.contains("hidden");
+    if (drawerList) {
+      drawerList.innerHTML = drawerOpen ? `<div class="recent-drawer-empty">No runs yet.</div>` : "";
+    }
+    if (trigger) {
+      trigger.disabled = false;
+      trigger.setAttribute("aria-disabled", "false");
+    }
+    return;
+  }
 
-if (!state.history.length) {
-  section?.classList.add("hidden");
-  historyEl.innerHTML = "";
-  return;
+  const items = state.history.slice().reverse().slice(0, 5);
+
+  if (drawerList) {
+    drawerList.innerHTML = items
+      .map((item, idx) => {
+        const excerpt = promptExcerpt(item.prompt);
+        const when = formatRelativeTime(item.savedAt);
+        const meta = when ? `<div class="recent-entry-meta">${escapeHtml(when)}</div>` : "";
+        const detail = formatRunDetailHtml(item);
+        return `
+          <button class="recent-entry" type="button" data-recent-index="${idx}">
+            <div class="recent-entry-compact">
+              <div class="recent-entry-excerpt">${escapeHtml(excerpt || "Run")}</div>
+              ${meta}
+            </div>
+            <div class="recent-entry-expanded" hidden>
+              <div class="recent-entry-prompt">${escapeHtml((item.text || "").trim() || "Writing text wasn’t saved for this run.")}</div>
+              <div class="recent-entry-stats">Score ${item.score} · ${item.words} words</div>
+              <div class="recent-entry-detail">${detail}</div>
+              <div class="recent-entry-future-meta" aria-hidden="true"></div>
+            </div>
+          </button>
+        `;
+      })
+      .join("");
+  }
+
+  if (trigger) {
+    trigger.disabled = false;
+    trigger.setAttribute("aria-disabled", "false");
+  }
 }
 
-section?.classList.remove("hidden");
-  historyEl.innerHTML = state.history.slice().reverse().slice(0, 5).map(item => `
-    <div class="history-item">
-      <strong>${item.score}</strong> · ${item.words}w
-      <div class="kicker" style="margin-top:4px;">${escapeHtml(item.prompt)}</div>
-    </div>
-  `).join("");
+function setRecentDrawerOpen(open, options = {}) {
+  const backdrop = $("recentDrawerBackdrop");
+  const drawer = $("recentDrawer");
+  const trigger = $("recentWritingTrigger");
+
+  const shouldOpen = Boolean(open);
+  const skipHistory = Boolean(options.skipHistory);
+  const skipFocus = Boolean(options.skipFocus);
+  const afterOpen = typeof options.afterOpen === "function" ? options.afterOpen : null;
+
+  if (shouldOpen) {
+    editorInput?.blur();
+  }
+  backdrop?.classList.toggle("hidden", !shouldOpen);
+  drawer?.classList.toggle("hidden", !shouldOpen);
+
+  backdrop?.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
+  drawer?.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
+  trigger?.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+
+  document.body.classList.toggle("recent-drawer-open", shouldOpen);
+
+  queueViewportSync();
+
+  if (shouldOpen) {
+    if (!skipHistory) renderHistory();
+    const shouldAutoExpand = Boolean(state.pendingRecentDrawerExpand);
+    if (!skipFocus && !shouldAutoExpand) $("recentDrawerCloseBtn")?.focus();
+    requestAnimationFrame(() => {
+      afterOpen?.();
+      if (shouldAutoExpand) {
+        state.pendingRecentDrawerExpand = false;
+        expandFirstRecentDrawerEntry({ focusClose: true });
+      }
+      queueViewportSync();
+    });
+  } else {
+    state.pendingRecentDrawerExpand = false;
+    if (!skipFocus) trigger?.focus();
+    requestAnimationFrame(() => queueViewportSync());
+  }
+}
+
+function toggleRecentEntry(button) {
+  const expanded = button.querySelector(".recent-entry-expanded");
+  if (!expanded) return;
+
+  const isOpen = button.classList.contains("is-open");
+  document.querySelectorAll(".recent-entry.is-open").forEach(el => {
+    if (el === button) return;
+    el.classList.remove("is-open");
+    const other = el.querySelector(".recent-entry-expanded");
+    if (other) other.hidden = true;
+  });
+
+  button.classList.toggle("is-open", !isOpen);
+  expanded.hidden = isOpen;
+}
+
+function expandFirstRecentDrawerEntry({ focusClose = false } = {}) {
+  const list = $("recentDrawerList");
+  if (!list) return;
+
+  list.scrollTop = 0;
+
+  const first = list.querySelector(".recent-entry");
+  if (!first) return;
+
+  document.querySelectorAll(".recent-entry.is-open").forEach(el => {
+    el.classList.remove("is-open");
+    const other = el.querySelector(".recent-entry-expanded");
+    if (other) other.hidden = true;
+  });
+
+  first.classList.add("is-open");
+  const expanded = first.querySelector(".recent-entry-expanded");
+  if (expanded) expanded.hidden = false;
+
+  if (focusClose) $("recentDrawerCloseBtn")?.focus();
 }
 
 function aggregateProfile() {
@@ -1056,7 +1226,15 @@ function renderProfileLocked() {
       if (el) el.innerHTML = lockedHtml;
     });
 
-  if ($("profileHeroSummary")) $("profileHeroSummary").innerHTML = lockedHtml;
+  if ($("profileHeroSummary")) {
+    const hero = $("profileHeroSummary");
+    if (runs) {
+      const agg = aggregateProfile();
+      hero.textContent = `Runs ${agg.totalRuns} · Words ${agg.totalWords}`;
+    } else {
+      hero.textContent = "";
+    }
+  }
   if ($("profileActionArea")) $("profileActionArea").innerHTML = "";
 }
 
@@ -1156,27 +1334,8 @@ if (!runs) {
 
 section?.classList.remove("hidden");
   const agg = aggregateProfile();
-  const avgUniqueRatio = agg.totalUniqueRatio / runs;
-  const avgSentenceLength = agg.avgSentenceLength / runs;
 
-  el.innerHTML = `
-    <div class="snapshot-tile">
-      <div class="snapshot-label">Runs</div>
-      <div class="snapshot-value">${agg.totalRuns}</div>
-    </div>
-    <div class="snapshot-tile">
-      <div class="snapshot-label">Words</div>
-      <div class="snapshot-value">${agg.totalWords}</div>
-    </div>
-    <div class="snapshot-tile">
-      <div class="snapshot-label">Unique</div>
-      <div class="snapshot-value">${(avgUniqueRatio * 100).toFixed(0)}%</div>
-    </div>
-    <div class="snapshot-tile">
-      <div class="snapshot-label">Avg sentence</div>
-      <div class="snapshot-value">${avgSentenceLength.toFixed(1)}</div>
-    </div>
-  `;
+  el.textContent = `Runs ${agg.totalRuns} · Words ${agg.totalWords}`;
 }
 
 function renderProfile() {
@@ -1192,24 +1351,7 @@ function renderProfile() {
   const avgFiller = agg.fillerHits / runs;
 
   if ($("profileHeroSummary")) {
-    $("profileHeroSummary").innerHTML = `
-      <div class="snapshot-tile">
-        <div class="snapshot-label">Runs</div>
-        <div class="snapshot-value">${agg.totalRuns}</div>
-      </div>
-      <div class="snapshot-tile">
-        <div class="snapshot-label">Words</div>
-        <div class="snapshot-value">${agg.totalWords}</div>
-      </div>
-      <div class="snapshot-tile">
-        <div class="snapshot-label">Unique ratio</div>
-        <div class="snapshot-value">${(avgUniqueRatio * 100).toFixed(0)}%</div>
-      </div>
-      <div class="snapshot-tile">
-        <div class="snapshot-label">Sentence length</div>
-        <div class="snapshot-value">${avgSentenceLength.toFixed(1)}</div>
-      </div>
-    `;
+    $("profileHeroSummary").textContent = `Runs ${agg.totalRuns} · Words ${agg.totalWords}`;
   }
 
   const topWords = Object.entries(agg.wordFreq)
@@ -1409,6 +1551,7 @@ function startWriting() {
   state.active = true;
   state.submitted = false;
   state.promptRerollsUsed = 0;
+  state.pendingRecentDrawerExpand = false;
 
   $("editorOverlay")?.classList.add("hidden");
 
@@ -1438,52 +1581,6 @@ function startWriting() {
   }, 50);
 }
 
-function buildRunResult(analysis, fromTimer) {
-  const strongestRepeat = analysis.repeated[0];
-  const strongestStarter = analysis.repeatedStarters[0];
-  const strongestBanned = [...analysis.bannedHits].sort((a, b) => b.count - a.count)[0];
-
-  if (strongestBanned) {
-    return {
-      headline: fromTimer ? "Time exposed your filler habits." : "You relied on a prohibited word.",
-      direction: "Try another run with cleaner substitutions."
-    };
-  }
-
-  if (analysis.targetDelta > 6) {
-    return {
-      headline: "You ran past the target.",
-      direction: "Try stopping closer to the mark next round."
-    };
-  }
-
-  if (analysis.targetDelta < -6) {
-    return {
-      headline: "You stopped short of the target.",
-      direction: "Push further next round and feel the constraint tighten."
-    };
-  }
-
-  if (strongestStarter) {
-    return {
-      headline: "Your sentences enter through the same door.",
-      direction: "Change how you begin sentences before you change their content."
-    };
-  }
-
-  if (strongestRepeat) {
-    return {
-      headline: "You repeat more than you think.",
-      direction: "Try one tighter pass next."
-    };
-  }
-
-  return {
-    headline: "The writing stayed relatively controlled.",
-    direction: "Try another pass under different pressure and compare what shifts."
-  };
-}
-
 function submitWriting(fromTimer = false) {
   if (!state.active) return;
 
@@ -1502,13 +1599,7 @@ function submitWriting(fromTimer = false) {
   updateEnterButtonVisibility();
   stopTimer();
   completeWordmark();
-  showEditorOverlay("Submitted");
-
-  setTimeout(() => {
-    if (state.submitted) {
-      showEditorOverlay("Begin again", true);
-    }
-  }, 950);
+  showEditorOverlay("Begin again", true);
 
   const starterExamplesMap = {};
   analysis.starterExampleList.forEach(item => {
@@ -1517,7 +1608,12 @@ function submitWriting(fromTimer = false) {
 
   const run = {
     runId: makeRunId(),
+    savedAt: Date.now(),
+    text: currentText,
     prompt: state.prompt,
+    repeatedWords: analysis.repeated,
+    bannedHits: analysis.bannedHits,
+    repeatedStarters: analysis.repeatedStarters,
     score: analysis.score,
     words: analysis.totalWords,
     unique: analysis.uniqueCount,
@@ -1535,6 +1631,7 @@ function submitWriting(fromTimer = false) {
   if (!state.savedRunIds.has(run.runId)) {
     state.history.push({ ...run });
     state.savedRunIds.add(run.runId);
+    state.pendingRecentDrawerExpand = true;
     persist();
     renderHistory();
     renderProfile();
@@ -1546,32 +1643,13 @@ function submitWriting(fromTimer = false) {
   renderMeta();
   renderSidebar();
 
-  const result = buildRunResult(analysis, fromTimer);
   const fb = $("feedbackBox");
   if (fb) {
-  fb.className = "result-card";
-  fb.innerHTML = `
-  <div class="result-headline">${result.headline}</div>
-  <div class="result-support">
-    <div class="result-score">score ${analysis.score}</div>
-    <div>${analysis.totalWords} words</div>
-    <div>${analysis.uniqueCount} unique</div>
-    <div>${Math.round(analysis.uniqueRatio * 100)}% variety</div>
-    <div>${analysis.avgSentenceLength.toFixed(1)} avg length</div>
-  </div>
-  <div class="result-direction">${result.direction} Press Enter to begin a new run.</div>
-  `;
-  }  if (!hasProfileSignal()) {
-    const remaining = CALIBRATION_THRESHOLD - completedRuns();
-    showToast(`${remaining} ${remaining === 1 ? "round" : "rounds"} to profile`);
-  } else {
-    showToast("Saved");
+    fb.className = "result-card empty";
+    fb.innerHTML = "";
   }
-    setTimeout(() => {
-    if (editorInput) {
-      focusEditorToEnd();
-    }
-  }, 0);
+
+  queueViewportSync();
 }
 
 function showProfile(show = true) {
@@ -1649,6 +1727,10 @@ if (editorInput) {
   editorInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      if (state.submitted) {
+        startWriting();
+        return;
+      }
       if (getEditorText().trim().length === 0) return;
       submitWriting(false);
     }
@@ -1662,7 +1744,10 @@ editorShell?.addEventListener("pointerdown", (e) => {
     e.target.closest("#optionsTrigger") ||
     e.target.closest("#editorOptionsPanel") ||
     e.target.closest("#enterSubmitBtn") ||
-    e.target.closest("#editorOverlay");
+    e.target.closest("#editorOverlay") ||
+    e.target.closest("#recentWritingTrigger") ||
+    e.target.closest("#recentDrawer") ||
+    e.target.closest("#recentDrawerBackdrop");
 
   if (blocked) return;
   if (!state.active || state.submitted) return;
@@ -1670,6 +1755,31 @@ editorShell?.addEventListener("pointerdown", (e) => {
   requestAnimationFrame(() => {
     focusEditorToEnd();
   });
+});
+
+$("recentWritingTrigger")?.addEventListener("click", () => {
+  setRecentDrawerOpen(true);
+});
+
+$("recentDrawerCloseBtn")?.addEventListener("click", () => {
+  setRecentDrawerOpen(false);
+});
+
+$("recentDrawerBackdrop")?.addEventListener("click", () => {
+  setRecentDrawerOpen(false);
+});
+
+$("recentDrawerList")?.addEventListener("click", (e) => {
+  const entry = e.target.closest(".recent-entry");
+  if (!entry) return;
+  toggleRecentEntry(entry);
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if ($("recentDrawer") && !$("recentDrawer").classList.contains("hidden")) {
+    setRecentDrawerOpen(false);
+  }
 });
 
 $("beginBtn")?.addEventListener("click", enterAppState);
@@ -1744,9 +1854,16 @@ document.addEventListener("pointerdown", (e) => {
   if (!document.body.classList.contains("focus-mode")) return;
   if (document.activeElement !== editorInput) return;
 
+  const interactiveControl = e.target.closest(
+    "button,a,input,textarea,select,[role='button']"
+  );
+  if (interactiveControl) return;
+
   const insideEditor = e.target.closest(".editor-shell");
   const insideOptions = e.target.closest("#editorOptionsPanel") || e.target.closest("#optionsTrigger");
-  if (insideEditor || insideOptions) return;
+  const insideRecent =
+    e.target.closest("#recentDrawer") || e.target.closest("#recentDrawerBackdrop");
+  if (insideEditor || insideOptions || insideRecent) return;
 
   editorInput.blur();
 });

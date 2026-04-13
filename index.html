@@ -169,6 +169,15 @@
 
       <div id="statusToast" class="status-toast hidden" aria-live="polite"></div>
 
+      <div id="recentDrawerBackdrop" class="recent-drawer-backdrop hidden" aria-hidden="true"></div>
+      <div id="recentDrawer" class="recent-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="recentDrawerTitle">
+        <div class="recent-drawer-header">
+          <div id="recentDrawerTitle" class="recent-drawer-title">Recent writing</div>
+          <button id="recentDrawerCloseBtn" class="recent-drawer-close" type="button" aria-label="Close recent writing">✕</button>
+        </div>
+        <div id="recentDrawerList" class="recent-drawer-list"></div>
+      </div>
+
       <section id="writeView">
         <div class="layout">
           <section class="main-column">
@@ -341,6 +350,21 @@
                 </div>
               </div>
 
+              <section id="profileSummarySection" class="soft-strip-section hidden">
+                <div id="profileSummary" class="run-stats-inline"></div>
+              </section>
+
+              <button
+                id="recentWritingTrigger"
+                class="recent-writing-trigger"
+                type="button"
+                aria-haspopup="dialog"
+                aria-controls="recentDrawer"
+                aria-expanded="false"
+              >
+                Recent writing
+              </button>
+
               <div id="feedbackBox" class="result-card empty"></div>
             </div>
           </section>
@@ -359,33 +383,6 @@
               </div>
             </section>
 
-            <section id="profileSummarySection" class="soft-strip-section hidden">
-              <div id="profileSummary" class="snapshot-strip"></div>
-            </section>
-
-            <section id="thisRunCard" class="card compact hidden">
-              <div class="section-title card-section-title">This run</div>
-
-              <div class="mini-section">
-                <div class="mini-label">Repeated words</div>
-                <div id="repeatedWordsList" class="word-list"></div>
-              </div>
-
-              <div class="mini-section">
-                <div class="mini-label">Banned / filler</div>
-                <div id="bannedWordsList" class="word-list"></div>
-              </div>
-
-              <div class="mini-section">
-                <div class="mini-label">Repeated starters</div>
-                <div id="starterWarningsList" class="word-list"></div>
-              </div>
-            </section>
-
-            <section id="recentWritingSection" class="recent-writing hidden">
-              <div class="section-title card-section-title">Recent writing</div>
-              <div id="history" class="history-scroll"></div>
-            </section>
           </aside>
         </div>
       </section>
@@ -396,7 +393,7 @@
             <div class="section-title card-section-title">What stands out</div>
             <div id="patternCallouts" class="profile-hero-copy"></div>
             <div id="profileActionArea" class="profile-hero-action"></div>
-            <div id="profileHeroSummary" class="snapshot-strip profile-hero-strip"></div>
+            <div id="profileHeroSummary" class="run-stats-inline profile-hero-strip"></div>
           </section>
 
           <div class="profile-main-grid">
