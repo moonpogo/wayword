@@ -122,6 +122,41 @@ let settleTimer = null;
    landing/app state
 ----------------------------- */
 
+function getEditorText() {
+  return editorInput ? editorInput.innerText.replace(/\r/g, "") : "";
+}
+
+function setEditorText(text) {
+  if (!editorInput) return;
+  editorInput.innerText = text || "";
+}
+
+function focusEditorToEnd() {
+  if (!editorInput) return;
+
+  editorInput.focus({ preventScroll: true });
+
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(editorInput);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function focusEditorToStart() {
+  if (!editorInput) return;
+
+  editorInput.focus({ preventScroll: true });
+
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(editorInput);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 function enterLandingState() {
   $("landingView")?.classList.remove("hidden");
   $("appView")?.classList.add("hidden");
@@ -376,7 +411,7 @@ function updateEnterButtonVisibility() {
   const btn = $("enterSubmitBtn");
   if (!btn || !editorInput) return;
 
-  const hasText = editorInput.value.trim().length > 0;
+  const hasText = getEditorText().trim().length > 0;
   const canShow = state.active && !state.submitted;
 
   btn.classList.toggle("hidden", !(hasText && canShow));
@@ -386,7 +421,7 @@ function canRerollPrompt() {
   return (
     state.active &&
     !state.submitted &&
-    !editorInput?.value.trim() &&
+    !getEditorText().trim() &&
     state.promptRerollsUsed < PROMPT_REROLL_LIMIT
   );
 }
@@ -454,37 +489,35 @@ function renderTimer() {
     timerEl.textContent = `${state.timeRemaining}s`;
   }
 }
+
 function updateWordProgress() {
   const fill = $("editorProgressFill");
   const markers = $("editorProgressMarkers");
   if (!fill) return;
 
-  const words = state.active ? tokenize(editorInput?.value || "").length : 0;
+  const words = state.active ? tokenize(getEditorText()).length : 0;
   const target = state.targetWords || 1;
-
-  const progress = Math.min(words / target, 1);
-  const over = words > target;
 
   const clampedPercent = Math.min((words / target) * 100, 100);
   fill.style.width = `calc(${clampedPercent}% - 6px)`;
+
   const atTarget = words >= target;
+  fill.style.background = atTarget ? "var(--success)" : "var(--ink)";
 
-fill.style.background = atTarget ? "var(--success)" : "var(--ink)";
-
-  // === build 15-word markers ===
   if (!markers) return;
 
   const step = 15;
   let html = "";
 
   for (let i = step; i < target; i += step) {
-      const percent = (i / target) * 100;
-      const isFilled = words >= i;
+    const percent = (i / target) * 100;
+    const isFilled = words >= i;
+    html += `<div class="progress-marker ${isFilled ? "filled" : ""}" style="left:${percent}%"></div>`;
+  }
 
-      html += `<div class="progress-marker ${isFilled ? "filled" : ""}" style="left:${percent}%"></div>`;
-}
   markers.innerHTML = html;
 }
+
 function updateTimeFill() {
   const fill = $("editorTimeFill");
   if (!fill) return;
@@ -630,7 +663,7 @@ function syncScroll() {
 function renderHighlight() {
   if (!highlightLayer || !editorInput) return;
 
-  const text = editorInput.value || "";
+  const text = getEditorText();
   const counts = countWords(tokenize(text));
   const pieces = text.match(/[^\s]+|\s+/g) || [];
   const repeatedStarterIndices = buildStarterIndexSet(text);
@@ -639,7 +672,7 @@ function renderHighlight() {
 
   const html = pieces.map(piece => {
     if (/^\s+$/.test(piece)) {
-      return escapeHtml(piece);
+      return escapeHtml(piece).replace(/\n/g, "<br>");
     }
 
     const norm = normalizeWord(piece);
@@ -666,7 +699,7 @@ function renderHighlight() {
     return `<span class="token"><span class="token-text">${escapeHtml(piece)}</span><span class="token-dots">${dotsHtml}</span></span>`;
   }).join("");
 
-  highlightLayer.innerHTML = html;
+  highlightLayer.innerHTML = html.replace(/\n/g, "<br>");
   syncScroll();
 }
 
@@ -824,19 +857,13 @@ function renderWritingState() {
 
   const isLocked = !state.active || state.submitted;
 
-  editorInput.disabled = false;
-
-  if (isLocked) {
-    editorInput.readOnly = true;
-    editorInput.setAttribute("readonly", "readonly");
-  } else {
-    editorInput.readOnly = false;
-    editorInput.removeAttribute("readonly");
-  }
-
-  editorInput.placeholder = state.active && !state.submitted && !editorInput.value.trim()
-    ? "Start typing here..."
-    : "";
+  editorInput.setAttribute("contenteditable", isLocked ? "false" : "true");
+  editorInput.setAttribute(
+    "data-placeholder",
+    state.active && !state.submitted && !getEditorText().trim()
+      ? "Start typing here..."
+      : ""
+  );
 
   updateSubmitButtonState();
   renderTimer();
@@ -880,13 +907,13 @@ function renderSidebar() {
 
   if (!state.active || !state.submitted) {
     if (thisRunCard) thisRunCard.classList.add("hidden");
-    renderLegend(state.active ? analyze(editorInput.value) : null);
+    renderLegend(state.active ? analyze(getEditorText()) : null);
     return;
   }
 
   if (thisRunCard) thisRunCard.classList.remove("hidden");
 
-  const analysis = analyze(editorInput.value);
+  const analysis = analyze(getEditorText());
 
   if ($("repeatedWordsList")) {
     $("repeatedWordsList").innerHTML = analysis.repeated.length
@@ -1261,7 +1288,7 @@ function restartRunWithCurrentSettings() {
   state.submitted = false;
   state.promptRerollsUsed = 0;
   state.prompt = generatePrompt();
-  editorInput.value = "";
+  setEditorText("");
 
   const fb = $("feedbackBox");
   if (fb) {
@@ -1280,8 +1307,7 @@ function restartRunWithCurrentSettings() {
   updateEnterButtonVisibility();
 
   requestAnimationFrame(() => {
-    editorInput.focus();
-    editorInput.setSelectionRange(0, 0);
+    focusEditorToStart();
   });
 
   showToast("New prompt loaded");
@@ -1356,7 +1382,7 @@ function startWriting() {
   $("editorOverlay")?.classList.add("hidden");
 
   state.prompt = generatePrompt();
-  editorInput.value = "";
+  setEditorText("");
 
   const fb = $("feedbackBox");
   if (fb) {
@@ -1368,11 +1394,6 @@ function startWriting() {
   setOptionsOpen(false);
   showProfile(false);
 
-  editorInput.disabled = false;
-  editorInput.readOnly = false;
-  editorInput.removeAttribute("readonly");
-  editorInput.blur();
-
   renderMeta();
   renderWritingState();
   renderHighlight();
@@ -1382,15 +1403,7 @@ function startWriting() {
   showToast("Writing");
 
   setTimeout(() => {
-    editorInput.disabled = false;
-    editorInput.readOnly = false;
-    editorInput.removeAttribute("readonly");
-    editorInput.focus({ preventScroll: true });
-
-    const end = editorInput.value.length;
-    try {
-      editorInput.setSelectionRange(end, end);
-    } catch (e) {}
+    focusEditorToEnd();
   }, 50);
 }
 
@@ -1448,8 +1461,9 @@ function submitWriting(fromTimer = false) {
     return;
   }
 
-  const analysis = analyze(editorInput.value);
-  clearExerciseIfCompleted(editorInput.value);
+  const currentText = getEditorText();
+  const analysis = analyze(currentText);
+  clearExerciseIfCompleted(currentText);
 
   if (analysis.totalWords === 0) return;
 
@@ -1522,12 +1536,11 @@ function submitWriting(fromTimer = false) {
   } else {
     showToast("Saved");
   }
-  setTimeout(() => {
-  if (input) {
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
-  }
-}, 0);
+    setTimeout(() => {
+    if (editorInput) {
+      focusEditorToEnd();
+    }
+  }, 0);
 }
 
 function showProfile(show = true) {
@@ -1595,7 +1608,7 @@ if (editorInput) {
   editorInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (editorInput.value.trim().length === 0) return;
+      if (getEditorText().trim().length === 0) return;
       submitWriting(false);
     }
   });
@@ -1613,15 +1626,9 @@ editorShell?.addEventListener("pointerdown", (e) => {
   if (blocked) return;
   if (!state.active || state.submitted) return;
 
-  editorInput.disabled = false;
-  editorInput.readOnly = false;
-  editorInput.removeAttribute("readonly");
-  editorInput.focus({ preventScroll: true });
-
-  const end = editorInput.value.length;
-  try {
-    editorInput.setSelectionRange(end, end);
-  } catch (err) {}
+  requestAnimationFrame(() => {
+    focusEditorToEnd();
+  });
 });
 
 $("beginBtn")?.addEventListener("click", enterAppState);
@@ -1638,10 +1645,9 @@ $("styleTab")?.addEventListener("click", () => {
 $("shuffleBtn")?.addEventListener("click", triggerShuffle);
 $("repeatLimitPill")?.addEventListener("click", cycleRepeatLimit);
 $("enterSubmitBtn")?.addEventListener("click", () => {
-  if (!editorInput || editorInput.value.trim().length === 0) return;
+  if (!editorInput || getEditorText().trim().length === 0) return;
   submitWriting(false);
 });
-
 $("bannedPill")?.addEventListener("click", () => {
   setBannedEditorOpen(!state.bannedEditorOpen);
 });
