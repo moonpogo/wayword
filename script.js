@@ -526,6 +526,7 @@ function renderTimer() {
 function updateWordProgress() {
   const fill = $("editorProgressFill");
   const markers = $("editorProgressMarkers");
+  const progressRoot = fill?.closest(".editor-progress");
   if (!fill) return;
 
   const words = state.active ? tokenize(getEditorText()).length : 0;
@@ -537,15 +538,25 @@ function updateWordProgress() {
   const atTarget = words >= target;
   fill.style.background = atTarget ? "var(--success)" : "var(--ink)";
 
+  const w1 = Math.ceil(target / 3);
+  const w2 = Math.ceil((2 * target) / 3);
+  let phase = "early";
+  if (atTarget) phase = "done";
+  else if (w1 < w2) {
+    if (words >= w2) phase = "late";
+    else if (words >= w1) phase = "mid";
+  }
+  progressRoot?.setAttribute("data-phase", phase);
+
   if (!markers) return;
 
-  const step = 15;
+  const clampMarkerPct = (p) => Math.min(99.2, Math.max(0.8, p));
   let html = "";
-
-  for (let i = step; i < target; i += step) {
-    const percent = (i / target) * 100;
-    const isFilled = words >= i;
-    html += `<div class="progress-marker ${isFilled ? "filled" : ""}" style="left:${percent}%"></div>`;
+  if (w1 < w2) {
+    const p1 = clampMarkerPct((w1 / target) * 100);
+    const p2 = clampMarkerPct((w2 / target) * 100);
+    html += `<div class="progress-marker${words >= w1 ? " filled" : ""}" style="left:${p1}%"></div>`;
+    html += `<div class="progress-marker${words >= w2 ? " filled" : ""}" style="left:${p2}%"></div>`;
   }
 
   markers.innerHTML = html;
