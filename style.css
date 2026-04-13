@@ -1068,8 +1068,8 @@ html[data-theme="dark"] .progress-marker{
 }
 
 .dot{
-  width:0.14em;
-  height:0.14em;
+  width:0.17em;
+  height:0.17em;
   border-radius:999px;
   flex:0 0 auto;
 }
