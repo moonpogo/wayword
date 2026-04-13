@@ -1251,6 +1251,13 @@ html[data-theme="dark"] .result-support{
   opacity:0.92;
 }
 
+.result-score{
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:.01em;
+  margin-right:4px;
+}
+
 .result-direction{
   margin-top:9px;
   padding-top:9px;

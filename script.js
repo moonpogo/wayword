@@ -1522,7 +1522,7 @@ function submitWriting(fromTimer = false) {
   fb.innerHTML = `
   <div class="result-headline">${result.headline}</div>
   <div class="result-support">
-    <div>score ${analysis.score}</div>
+    <div class="result-score">score ${analysis.score}</div>
     <div>${analysis.totalWords} words</div>
     <div>${analysis.uniqueCount} unique</div>
     <div>${Math.round(analysis.uniqueRatio * 100)}% variety</div>
