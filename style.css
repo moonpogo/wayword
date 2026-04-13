@@ -806,20 +806,6 @@ html[data-theme="dark"] .theme-moon{
 
 /* editor */
 
-.editor-input{
-  color:transparent;
-  -webkit-text-fill-color:transparent;
-  caret-color:var(--ink);
-}
-
-.highlight-layer{
-  color:transparent;
-}
-
-.highlight-layer .token-text{
-  color:var(--ink);
-}
-
 .editor-shell{
   position:relative;
   border:1px solid var(--ink);
@@ -848,7 +834,11 @@ html[data-theme="dark"] .theme-moon{
   user-select:none;
   -webkit-user-select:none;
   z-index:2;
-  color:transparent;
+  color:var(--ink);
+}
+
+.highlight-layer .token-text{
+  color:inherit;
 }
 
 .editor-input{
@@ -858,7 +848,8 @@ html[data-theme="dark"] .theme-moon{
   border:0;
   outline:none;
   background:transparent;
-  color:var(--ink);
+  color:transparent;
+  -webkit-text-fill-color:transparent;
   caret-color:var(--ink);
   z-index:3;
   overflow:auto;
@@ -989,7 +980,7 @@ html[data-theme="dark"] .editor-time-fill{
   left:3px;
   top:3px;
   bottom:3px;
-  width:calc(0% - 6px);
+  width:calc(100% - 6px);
   max-width:calc(100% - 6px);
   background:var(--ink);
   border-radius:999px;
