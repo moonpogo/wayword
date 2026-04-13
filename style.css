@@ -811,7 +811,7 @@ html[data-theme="dark"] .theme-moon{
   border:1px solid var(--ink);
   min-height:320px;
   background:var(--panel);
-  overflow:visible;
+  overflow:hidden;
   border-radius:24px;
 }
 
@@ -823,17 +823,24 @@ html[data-theme="dark"] .theme-moon{
   tab-size:4;
   white-space:pre-wrap;
   word-wrap:break-word;
+  overflow-wrap:break-word;
 }
 
 .highlight-layer{
-  display:none !important;
+  position:absolute;
+  inset:0;
+  overflow:auto;
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-select:none;
+  z-index:2;
+  color:transparent;
 }
 
 .editor-input{
   position:relative;
   width:100%;
   min-height:320px;
-  resize:vertical;
   border:0;
   outline:none;
   background:transparent;
@@ -848,12 +855,40 @@ html[data-theme="dark"] .theme-moon{
   appearance:none;
 }
 
-.editor-overlay {
-  cursor: pointer;
+.editor-input[contenteditable="false"]{
+  cursor:default;
 }
 
-.editor-input::placeholder{
-  color:transparent;
+.editor-input:empty::before{
+  content:attr(data-placeholder);
+  color:var(--muted);
+  opacity:0.55;
+  pointer-events:none;
+}
+
+.editor-overlay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:auto;
+  z-index:7;
+  background:rgba(0,0,0,0.10);
+  border-radius:24px;
+  cursor:pointer;
+}
+
+.editor-overlay-card{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--ink);
+  padding:12px 18px;
+  border-radius:999px;
+  font-size:14px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  box-shadow:0 10px 30px rgba(0,0,0,0.14);
 }
 
 .editor-gear-btn{
@@ -908,7 +943,6 @@ html[data-theme="dark"] .editor-time-fill{
 .editor-progress{
   position:absolute;
   left:50%;
-  right:auto;
   transform:translateX(-50%);
   bottom:16px;
   width:68%;
@@ -981,30 +1015,6 @@ html[data-theme="dark"] .progress-marker{
   background:rgba(255,255,255,0.25);
 }
 
-.editor-overlay{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  pointer-events:auto;
-  z-index:7;
-  background:rgba(0,0,0,0.10);
-  border-radius:24px;
-}
-
-.editor-overlay-card{
-  background:var(--panel);
-  color:var(--ink);
-  border:1px solid var(--ink);
-  padding:12px 18px;
-  border-radius:999px;
-  font-size:14px;
-  letter-spacing:.06em;
-  text-transform:uppercase;
-  box-shadow:0 10px 30px rgba(0,0,0,0.14);
-}
-
 .below-editor-stack{
   display:flex;
   flex-direction:column;
@@ -1021,45 +1031,16 @@ html[data-theme="dark"] .progress-marker{
 
 /* highlights */
 
-.highlight-layer,
-.editor-input{
-  margin:0;
-  padding:20px 28px 34px 28px;
-  font:18px/1.9 Georgia,"Times New Roman",serif;
-  tab-size:4;
-  white-space:pre-wrap;
-  word-wrap:break-word;
-  overflow-wrap:break-word;
-}
-
-.highlight-layer{
-  position:absolute;
-  inset:0;
-  overflow:auto;
-  pointer-events:none;
-  z-index:2;
-  color:transparent;
-}
-
-.editor-input{
-  position:relative;
-  width:100%;
-  min-height:320px;
-  resize:vertical;
-  border:0;
-  outline:none;
-  background:transparent;
-  color:var(--ink);
-  caret-color:var(--ink);
-  z-index:3;
-  overflow:auto;
-}
 .token{
   position:relative;
   display:inline-block;
   vertical-align:baseline;
   line-height:inherit;
   padding-bottom:0.18em;
+}
+
+.token-plain{
+  padding-bottom:0;
 }
 
 .token-text{
@@ -1906,7 +1887,7 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   .highlight-layer,
   .editor-input{
     padding:16px 18px 30px 18px;
-    font:17px/1.68 Georgia,"Times New Roman",serif;
+    font:17px/172 Georgia,"Times New Roman",serif;
   }
 
   .style-tab{
