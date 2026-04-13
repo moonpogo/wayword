@@ -2030,6 +2030,26 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     padding:0 12px;
     justify-content:center;
   }
+
+  .legend-row{
+    flex-wrap:nowrap;
+    justify-content:center;
+    gap:6px;
+  }
+
+  .legend-pill{
+    flex:1 1 0;
+    min-width:0;
+    justify-content:center;
+    padding:7px 8px;
+    font-size:11px;
+    gap:5px;
+  }
+
+  .legend-text,
+  .legend-count{
+    white-space:nowrap;
+  }
 }
 @media (max-width:430px){
   .prompt-card{
@@ -2074,5 +2094,20 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 
   .editor-options-panel .editor-options-input{
     font-size:13px;
+  }
+
+  .legend-row{
+    gap:4px;
+  }
+
+  .legend-pill{
+    padding:6px 6px;
+    font-size:10px;
+    gap:4px;
+  }
+
+  .legend-swatch{
+    width:7px;
+    height:7px;
   }
 }
