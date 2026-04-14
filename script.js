@@ -101,7 +101,8 @@ const state = {
   toastTimeout: null,
   history: JSON.parse(localStorage.getItem("wayword-history") || "[]"),
   savedRunIds: new Set(JSON.parse(localStorage.getItem("wayword-runids") || "[]")),
-  exerciseWord: localStorage.getItem("wayword-exercise-word") || "",
+  exerciseWords: [],
+  patternSelectedWords: [],
   completedChallenges: new Set(
   JSON.parse(localStorage.getItem("wayword-completed-challenges") || "[]")
 ),
@@ -115,6 +116,55 @@ const state = {
 };
 
 let editorSurfaceComposing = false;
+
+function normalizeExerciseWords(words) {
+  const list = Array.isArray(words) ? words : [];
+  const seen = new Set();
+  const out = [];
+  for (const word of list) {
+    const normalized = normalizeWord(word);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function setExerciseWords(words) {
+  state.exerciseWords = normalizeExerciseWords(words);
+  if (state.exerciseWords.length) {
+    localStorage.setItem("wayword-exercise-words", JSON.stringify(state.exerciseWords));
+    localStorage.setItem("wayword-exercise-word", state.exerciseWords[0]);
+  } else {
+    localStorage.removeItem("wayword-exercise-words");
+    localStorage.removeItem("wayword-exercise-word");
+  }
+}
+
+function loadPersistedPatternSelectedWords() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("wayword-pattern-selected-words") || "[]");
+    return normalizeExerciseWords(stored);
+  } catch (_) {
+    return [];
+  }
+}
+
+function setPatternSelectedWords(words) {
+  state.patternSelectedWords = normalizeExerciseWords(words);
+  if (state.patternSelectedWords.length) {
+    localStorage.setItem("wayword-pattern-selected-words", JSON.stringify(state.patternSelectedWords));
+  } else {
+    localStorage.removeItem("wayword-pattern-selected-words");
+  }
+}
+
+// Active challenge is intentionally session/run-scoped.
+// Never restore from previous sessions.
+state.exerciseWords = [];
+localStorage.removeItem("wayword-exercise-words");
+localStorage.removeItem("wayword-exercise-word");
+state.patternSelectedWords = loadPersistedPatternSelectedWords();
 
 /** Selection snapshot before annotation slot takes focus away from the editor (canonical offsets). */
 let annotationRowPendingEditorSel = null;
@@ -1169,12 +1219,11 @@ function analyze(text) {
     .filter(([word, count]) => !exemptWords.has(word) && count > state.repeatLimit)
     .sort((a, b) => b[1] - a[1]);
 
-  const effectiveBanned = state.exerciseWord
-    ? [...new Set([...state.banned, state.exerciseWord])]
-    : [...state.banned];
+  const exerciseWordsSet = new Set(state.exerciseWords);
+  const effectiveBanned = [...new Set([...state.banned, ...state.exerciseWords])];
 
   const bannedHits = effectiveBanned
-    .map(word => ({ word, count: counts[word] || 0, isExercise: word === state.exerciseWord }))
+    .map(word => ({ word, count: counts[word] || 0, isExercise: exerciseWordsSet.has(word) }))
     .filter(item => item.count > 0);
 
   const starters = sentenceStarters(text);
@@ -1881,7 +1930,7 @@ function renderExerciseBanner() {
   bannedPill.textContent = `avoid: ${bannedText}`;
 
   if (exercisePill) {
-    if (state.exerciseWord) {
+    if (state.exerciseWords.length) {
       exercisePill.classList.remove("hidden");
       $("legendBlueCount").textContent = "0";
     } else {
@@ -2019,7 +2068,7 @@ function renderLegend(analysis) {
     setSemanticLegendPillState(repetitionPill, 0);
     setSemanticLegendPillState(openingPill, 0);
     if ($("legendBlueCount")) $("legendBlueCount").textContent = "0";
-    if (bluePill && !state.exerciseWord) bluePill.classList.add("hidden");
+    if (bluePill && !state.exerciseWords.length) bluePill.classList.add("hidden");
     return;
   }
 
@@ -2032,7 +2081,7 @@ function renderLegend(analysis) {
   if ($("legendBlueCount")) $("legendBlueCount").textContent = blueCount;
 
   if (bluePill) {
-    if (state.exerciseWord) bluePill.classList.remove("hidden");
+    if (state.exerciseWords.length) bluePill.classList.remove("hidden");
     else bluePill.classList.add("hidden");
   }
 }
@@ -2808,7 +2857,7 @@ function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStart
       headline: "Repetition is one of your clearest signatures.",
       support: `Your most repeated word so far is "${topWords[0][0]}".`,
       direction: "",
-      exerciseWord: topWords[0][0]
+      suggestedExerciseWord: topWords[0][0]
     };
 }
 
@@ -2817,7 +2866,7 @@ function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStart
       headline: "Your sentences tend to enter the same way.",
       support: `You most often begin with "${topStarters[0][0]}".`,
       direction: "Try changing how you start sentences before you change their content.",
-      exerciseWord: ""
+      suggestedExerciseWord: ""
     };
   }
 
@@ -2826,7 +2875,7 @@ function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStart
       headline: "You use filler to keep movement going.",
       support: "The writing moves, but some of that movement is padded by softening words.",
       direction: "Try a stricter run and let silence force a cleaner next word.",
-      exerciseWord: ""
+      suggestedExerciseWord: ""
     };
   }
 
@@ -2835,7 +2884,7 @@ function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStart
       headline: "Your vocabulary spread stays relatively open.",
       support: "You are not writing with a tiny palette.",
       direction: "Watch whether variety sharpens precision or hides repetition.",
-      exerciseWord: ""
+      suggestedExerciseWord: ""
     };
   }
 
@@ -2843,8 +2892,17 @@ function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStart
     headline: "Your pattern is still forming.",
     support: "There is enough structure to continue, but not enough yet for a sharper read.",
     direction: "Do a few more runs under pressure and the profile will start to speak more clearly.",
-    exerciseWord: ""
+    suggestedExerciseWord: ""
   };
+}
+
+function buildChallengeCopy(words) {
+  if (!words.length) return "";
+  if (words.length === 1) {
+    return `Start one run without using the word <strong>${escapeHtml(words[0])}</strong>.`;
+  }
+  const wordsText = words.map((word) => `<strong>${escapeHtml(word)}</strong>`).join(", ");
+  return `Start one run without using these words: ${wordsText}.`;
 }
 
 function renderPunctuationChart(punctuationData) {
@@ -2919,18 +2977,53 @@ function renderProfile() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
 
-  if ($("topWordsProfile")) {
-    $("topWordsProfile").innerHTML = topWords.length
-      ? `<div class="word-cloud">
-          ${topWords.map(([w, c]) => `<div class="word-bubble" style="font-size:${12 + Math.min(c * 2, 18)}px">${escapeHtml(w)}</div>`).join("")}
-         </div>`
-      : '<div class="history-item">No repeated words yet.</div>';
-  }
-
   const topStarters = Object.entries(agg.starterFreq)
     .filter(([, c]) => c > 1)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
+
+  const calloutsWithStarters = buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters);
+  const suggestedChallengeWord = calloutsWithStarters.suggestedExerciseWord || "";
+  const topRepeatedWords = topWords.map(([word]) => word);
+  const topRepeatedWordsSet = new Set(topRepeatedWords);
+  const selectedChallengeWords = state.patternSelectedWords.filter((word) => topRepeatedWordsSet.has(word));
+  if (selectedChallengeWords.length !== state.patternSelectedWords.length) {
+    setPatternSelectedWords(selectedChallengeWords);
+  }
+  const selectedChallengeSet = new Set(selectedChallengeWords);
+  const suggestedChallengeWords = suggestedChallengeWord && topRepeatedWordsSet.has(suggestedChallengeWord)
+    ? [suggestedChallengeWord]
+    : [];
+  const draftChallengeWords = selectedChallengeWords.length ? selectedChallengeWords : suggestedChallengeWords;
+
+  if ($("topWordsProfile")) {
+    $("topWordsProfile").innerHTML = topWords.length
+      ? `<div class="word-cloud">
+          ${topWords.map(([w, c]) => `
+            <button
+              type="button"
+              class="word-bubble word-bubble-btn ${selectedChallengeSet.has(w) ? "is-selected" : ""}"
+              data-challenge-word="${escapeHtml(w)}"
+              aria-pressed="${selectedChallengeSet.has(w) ? "true" : "false"}"
+              style="font-size:${12 + Math.min(c * 2, 18)}px"
+            >${escapeHtml(w)}</button>
+          `).join("")}
+         </div>`
+      : '<div class="history-item">No repeated words yet.</div>';
+
+    const challengeWordButtons = $("topWordsProfile").querySelectorAll("[data-challenge-word]");
+    challengeWordButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const word = normalizeWord(btn.getAttribute("data-challenge-word") || "");
+        if (!word) return;
+        const nextWords = state.patternSelectedWords.includes(word)
+          ? state.patternSelectedWords.filter((w) => w !== word)
+          : [...state.patternSelectedWords, word];
+        setPatternSelectedWords(nextWords);
+        renderProfile();
+      });
+    });
+  }
 
   if ($("startersProfile")) {
     $("startersProfile").innerHTML = topStarters.length
@@ -2971,23 +3064,21 @@ function renderProfile() {
       : '<div class="history-item">No stance data yet.</div>';
   }
 
-  const callouts = buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters);
-
   if ($("patternCallouts")) {
     $("patternCallouts").innerHTML = `
-      <div class="history-item"><strong>${callouts.headline}</strong></div>
-      <div class="history-item">${callouts.support}</div>
-      ${callouts.direction ? `<div class="history-item">${callouts.direction}</div>` : ""}
+      <div class="history-item"><strong>${calloutsWithStarters.headline}</strong></div>
+      <div class="history-item">${calloutsWithStarters.support}</div>
+      ${calloutsWithStarters.direction ? `<div class="history-item">${calloutsWithStarters.direction}</div>` : ""}
     `;
   }
 
   if ($("profileActionArea")) {
-    $("profileActionArea").innerHTML = callouts.exerciseWord
+    $("profileActionArea").innerHTML = draftChallengeWords.length
       ? `
         <div class="exercise-card">
           <div class="challenge-title">Suggested challenge</div>
           <div class="challenge-copy">
-            Start one run without using the word <strong>${escapeHtml(callouts.exerciseWord)}</strong>.
+            ${buildChallengeCopy(draftChallengeWords)}
           </div>
           <button id="startExerciseBtn" class="exercise-btn" type="button">
             <span class="exercise-dot"></span>
@@ -2998,7 +3089,7 @@ function renderProfile() {
       : "";
 
     const btn = $("startExerciseBtn");
-    if (btn) btn.addEventListener("click", () => startExerciseRun(callouts.exerciseWord));
+    if (btn) btn.addEventListener("click", () => startExerciseRun(draftChallengeWords));
   }
 }
 
@@ -3098,35 +3189,42 @@ function triggerShuffle() {
   );
 }
 
-function startExerciseRun(word) {
-  if (!word) return;
-  state.exerciseWord = word;
-  localStorage.setItem("wayword-exercise-word", word);
-  startWriting();
+function startExerciseRun(wordsOrWord) {
+  const words = Array.isArray(wordsOrWord)
+    ? wordsOrWord
+    : [wordsOrWord];
+  const normalizedWords = normalizeExerciseWords(words);
+  if (!normalizedWords.length) return;
+  setExerciseWords(normalizedWords);
+  startWriting({ preserveActiveChallenge: true });
   renderMeta();
   renderHighlight();
   renderSidebar();
-  showToast(`Challenge: avoid "${word}"`);
+  const challengeLabel = normalizedWords.length === 1
+    ? `"${normalizedWords[0]}"`
+    : `${normalizedWords.length} selected words`;
+  showToast(`Challenge: avoid ${challengeLabel}`);
 }
 
 function clearExerciseIfCompleted(text) {
-  if (!state.exerciseWord) return;
+  if (!state.exerciseWords.length) return;
 
   const tokens = tokenize(text);
-
-  if (tokens.includes(state.exerciseWord)) return;
-
-  state.completedChallenges.add(state.exerciseWord);
+  if (state.exerciseWords.some((word) => tokens.includes(word))) return;
+  state.exerciseWords.forEach((word) => state.completedChallenges.add(word));
   localStorage.setItem(
     "wayword-completed-challenges",
     JSON.stringify(Array.from(state.completedChallenges))
   );
 
-  localStorage.removeItem("wayword-exercise-word");
-  state.exerciseWord = "";
+  setExerciseWords([]);
 }
 
-function startWriting() {
+function startWriting(options = {}) {
+  const { preserveActiveChallenge = false } = options;
+  if (!preserveActiveChallenge) {
+    setExerciseWords([]);
+  }
   state.active = true;
   state.submitted = false;
   state.promptRerollsUsed = 0;
@@ -3183,9 +3281,10 @@ function submitWriting(fromTimer = false) {
   const timerConfigured = Boolean(state.timerSeconds);
   const activeTimerSecondsForRun = timerConfigured ? state.timerSeconds : null;
 
-  const challengeActive = Boolean(state.exerciseWord);
+  const challengeWordsSnapshot = [...state.exerciseWords];
+  const challengeActive = challengeWordsSnapshot.length > 0;
   clearExerciseIfCompleted(currentText);
-  const challengeCompleted = challengeActive && !state.exerciseWord;
+  const challengeCompleted = challengeActive && state.exerciseWords.length === 0;
 
   state.submitted = true;
   updateEnterButtonVisibility();
@@ -3227,6 +3326,7 @@ function submitWriting(fromTimer = false) {
     scoreBreakdown,
     challengeActive,
     challengeCompleted,
+    challengeWords: challengeWordsSnapshot,
     wasSuccessful,
     activeTargetWords,
     activeTimerSeconds: activeTimerSecondsForRun,

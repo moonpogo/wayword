@@ -620,10 +620,10 @@ button,input,textarea{
 
 .wordmark .wm-w1{ transform:translateY(calc(-0.03em * var(--lift))) rotate(calc(-0.2deg * var(--lift))); }
 .wordmark .wm-a{  transform:translateY(calc(-0.05em * var(--lift))) rotate(calc(-0.35deg * var(--lift))); }
-.wordmark .wm-y{  transform:translateY(calc(-0.01em + (-0.08em * var(--lift)))) rotate(calc(-0.2deg + (-0.55deg * var(--lift)))); }
-.wordmark .wm-w2{ transform:translateY(calc(-0.02em + (-0.12em * var(--lift)))) rotate(calc(-0.4deg + (-0.9deg * var(--lift)))); }
-.wordmark .wm-o{  transform:translateY(calc(-0.05em + (-0.18em * var(--lift)))) rotate(calc(-0.9deg + (-2.2deg * var(--lift)))); }
-.wordmark .wm-r{  transform:translateY(calc(-0.02em + (-0.10em * var(--lift)))) rotate(calc(0.35deg + (0.75deg * var(--lift)))); }
+.wordmark .wm-y{  transform:translateY(calc(-0.08em * var(--lift))) rotate(calc(-0.55deg * var(--lift))); }
+.wordmark .wm-w2{ transform:translateY(calc(-0.12em * var(--lift))) rotate(calc(-0.9deg * var(--lift))); }
+.wordmark .wm-o{  transform:translateY(calc(-0.18em * var(--lift))) rotate(calc(-2.2deg * var(--lift))); }
+.wordmark .wm-r{  transform:translateY(calc(-0.10em * var(--lift))) rotate(calc(0.75deg * var(--lift))); }
 .wordmark .wm-d{  transform:translateY(calc(-0.06em * var(--lift))) rotate(calc(0.4deg * var(--lift))); }
 
 .subhed{
@@ -2265,6 +2265,17 @@ html[data-theme="dark"] .profile-support-panel{
   border-radius:999px;
   padding:6px 10px;
   line-height:1;
+}
+
+.word-bubble-btn{
+  cursor:pointer;
+  background:var(--panel);
+  color:var(--ink);
+}
+
+.word-bubble-btn.is-selected{
+  border-color:var(--blue);
+  background:var(--blue-bg);
 }
 
 .opening-row{
