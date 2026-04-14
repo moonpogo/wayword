@@ -74,6 +74,14 @@ const TIME_PRESETS = [0, 60, 180, 300];
 const CALIBRATION_THRESHOLD = 5;
 const PROMPT_REROLL_LIMIT = 2;
 
+const PROGRESSION_LEVELS = [
+  { level: 1, targetWords: 60, timerSeconds: 0 },
+  { level: 2, targetWords: 75, timerSeconds: 120 },
+  { level: 3, targetWords: 90, timerSeconds: 90 }
+];
+const PROGRESSION_LEVEL_KEY = "wayword-progression-level";
+const INACTIVITY_EASE_RUN_KEY = "wayword-inactivity-eased-for-run";
+
 const $ = (id) => document.getElementById(id);
 
 const state = {
@@ -84,6 +92,7 @@ const state = {
   timerSeconds: 0,
   timeRemaining: 0,
   timerId: null,
+  progressionLevel: 1,
   banned: [...bannedSets[0]],
   prompt: "",
   promptFamily: "",
@@ -345,6 +354,97 @@ function hasProfileSignal() {
 function persist() {
   localStorage.setItem("wayword-history", JSON.stringify(state.history));
   localStorage.setItem("wayword-runids", JSON.stringify(Array.from(state.savedRunIds)));
+}
+
+function clampProgressionLevel(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 1;
+  return Math.min(3, Math.max(1, Math.floor(x)));
+}
+
+function loadStoredProgressionLevel() {
+  return clampProgressionLevel(Number(localStorage.getItem(PROGRESSION_LEVEL_KEY)) || 1);
+}
+
+function persistProgressionLevel() {
+  localStorage.setItem(PROGRESSION_LEVEL_KEY, String(state.progressionLevel));
+}
+
+function getProgressionConfig(level) {
+  return PROGRESSION_LEVELS[clampProgressionLevel(level) - 1];
+}
+
+function applyProgressionToState() {
+  const cfg = getProgressionConfig(state.progressionLevel);
+  state.targetWords = cfg.targetWords;
+  state.timerSeconds = cfg.timerSeconds;
+  state.pendingTargetWords = cfg.targetWords;
+  state.pendingTimerSeconds = cfg.timerSeconds;
+}
+
+function formatTimerToastLabel(timerSeconds) {
+  const t = Number(timerSeconds) || 0;
+  if (!t) return "off";
+  const m = Math.floor(t / 60);
+  const s = t % 60;
+  return s ? `${m}:${String(s).padStart(2, "0")}` : `${m}m`;
+}
+
+function recomputeProgressionLevel(options = {}) {
+  const sessionInit = Boolean(options.sessionInit);
+  const afterRun = Boolean(options.afterRun);
+  let level = clampProgressionLevel(state.progressionLevel);
+
+  const runs = state.history
+    .slice()
+    .sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
+
+  if (sessionInit && runs.length) {
+    const newest = runs[runs.length - 1];
+    const age = Date.now() - (newest.savedAt || 0);
+    if (age > 7 * 86400000) {
+      const marker = localStorage.getItem(INACTIVITY_EASE_RUN_KEY);
+      if (marker !== newest.runId) {
+        level = Math.max(1, level - 1);
+        localStorage.setItem(INACTIVITY_EASE_RUN_KEY, newest.runId);
+      }
+    }
+  }
+
+  if (afterRun) {
+    const last5 = runs.slice(-5);
+    if (last5.length === 5) {
+      const succ5 = last5.filter((r) => r.wasSuccessful === true).length;
+      if (succ5 < 2) level = Math.max(1, level - 1);
+    }
+
+    const last8 = runs.slice(-8);
+    const succ8 = last8.filter((r) => r.wasSuccessful === true).length;
+    if (succ8 >= 5 && level < 3) level = Math.min(3, level + 1);
+  }
+
+  const prev = state.progressionLevel;
+  state.progressionLevel = clampProgressionLevel(level);
+  persistProgressionLevel();
+
+  return { changed: prev !== state.progressionLevel, prevLevel: prev };
+}
+
+function maybeToastProgressionConditionChanges(prevLevel) {
+  const prevCfg = getProgressionConfig(prevLevel);
+  const nextCfg = getProgressionConfig(state.progressionLevel);
+  if (nextCfg.targetWords !== prevCfg.targetWords) {
+    showToast(`New target: ${nextCfg.targetWords} words`, 1800);
+  }
+  const prevT = prevCfg.timerSeconds || 0;
+  const nextT = nextCfg.timerSeconds || 0;
+  if (prevT !== nextT) {
+    if (nextT) {
+      showToast(`Timer enabled: ${formatTimerToastLabel(nextT)}`, 1800);
+    } else {
+      showToast("Timer off", 1400);
+    }
+  }
 }
 
 function escapeHtml(str) {
@@ -614,7 +714,7 @@ function startTimer() {
 ----------------------------- */
 
 function getActiveTargetWordsForScoring() {
-  return state.targetWords;
+  return getProgressionConfig(state.progressionLevel).targetWords;
 }
 
 function scoreDeductionFromIncidentCount(n) {
@@ -1574,6 +1674,7 @@ function restartRunWithCurrentSettings() {
 
   state.submitted = false;
   state.promptRerollsUsed = 0;
+  applyProgressionToState();
   state.prompt = generatePrompt();
   setEditorText("");
 
@@ -1617,9 +1718,8 @@ function saveBannedInline() {
 }
 
 function triggerShuffle() {
-  state.targetWords = WORD_PRESETS[Math.floor(Math.random() * WORD_PRESETS.length)];
-  state.timerSeconds = TIME_PRESETS[Math.floor(Math.random() * TIME_PRESETS.length)];
   state.banned = [...bannedSets[Math.floor(Math.random() * bannedSets.length)]];
+  applyProgressionToState();
   stopTimer();
   renderMeta();
   renderHighlight();
@@ -1630,7 +1730,10 @@ function triggerShuffle() {
     renderWritingState();
   }
 
-  showToast(`Shuffled · ${state.targetWords} words · ${state.timerSeconds ? state.timerSeconds / 60 + "m" : "off"}`);
+  showToast(
+    `Shuffled · ${state.targetWords} words · ${state.timerSeconds ? formatTimerToastLabel(state.timerSeconds) : "off"}`,
+    1600
+  );
 }
 
 function startExerciseRun(word) {
@@ -1669,6 +1772,7 @@ function startWriting() {
 
   $("editorOverlay")?.classList.add("hidden");
 
+  applyProgressionToState();
   state.prompt = generatePrompt();
   setEditorText("");
 
@@ -1708,6 +1812,10 @@ function submitWriting(fromTimer = false) {
 
   if (analysis.totalWords === 0) return;
 
+  const timeRemainingSnapshot = state.timeRemaining;
+  const timerConfigured = Boolean(state.timerSeconds);
+  const activeTimerSecondsForRun = timerConfigured ? state.timerSeconds : null;
+
   const challengeActive = Boolean(state.exerciseWord);
   clearExerciseIfCompleted(currentText);
   const challengeCompleted = challengeActive && !state.exerciseWord;
@@ -1730,9 +1838,17 @@ function submitWriting(fromTimer = false) {
     activeTargetWords
   );
 
+  const finishedWithinTime = !timerConfigured || !fromTimer;
+  const wasSuccessful =
+    analysis.totalWords >= activeTargetWords &&
+    runScore >= 70 &&
+    finishedWithinTime;
+
+  const now = Date.now();
   const run = {
     runId: makeRunId(),
-    savedAt: Date.now(),
+    savedAt: now,
+    timestamp: now,
     text: currentText,
     prompt: state.prompt,
     repeatedWords: analysis.repeated,
@@ -1743,7 +1859,11 @@ function submitWriting(fromTimer = false) {
     scoreBreakdown,
     challengeActive,
     challengeCompleted,
+    wasSuccessful,
     activeTargetWords,
+    activeTimerSeconds: activeTimerSecondsForRun,
+    finishedWithinTime,
+    timeRemaining: timerConfigured ? timeRemainingSnapshot : null,
     wordCount: analysis.totalWords,
     repeatLimitAtRun: state.repeatLimit,
     words: analysis.totalWords,
@@ -1763,11 +1883,19 @@ function submitWriting(fromTimer = false) {
     state.history.push({ ...run });
     state.savedRunIds.add(run.runId);
     state.pendingRecentDrawerExpand = true;
+    localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
     persist();
     renderHistory();
-    renderProfile();
     renderCalibration();
     renderProfileSummaryStrip();
+
+    const prevLevel = state.progressionLevel;
+    const { changed } = recomputeProgressionLevel({ afterRun: true });
+    if (changed) {
+      maybeToastProgressionConditionChanges(prevLevel);
+    }
+    applyProgressionToState();
+    renderProfile();
   }
 
   renderWritingState();
@@ -2028,8 +2156,7 @@ $("saveBannedBtnPanel")?.addEventListener("click", () => {
     .map(normalizeWord)
     .filter(Boolean);
 
-  state.targetWords = state.pendingTargetWords;
-  state.timerSeconds = state.pendingTimerSeconds;
+  applyProgressionToState();
 
   if (state.active && !state.submitted) {
     restartRunWithCurrentSettings();
@@ -2053,6 +2180,9 @@ if (window.visualViewport) {
 
 syncViewportHeightVar();
 applyTheme(state.theme);
+state.progressionLevel = loadStoredProgressionLevel();
+recomputeProgressionLevel({ sessionInit: true });
+applyProgressionToState();
 ensurePromptRerollButton();
 renderMeta();
 renderWritingState();
