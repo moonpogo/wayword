@@ -2063,21 +2063,414 @@ function renderRunScoreStrip() {
   section.classList.remove("hidden");
 }
 
+function getRecentEntries() {
+  return state.history.map((entry) => ({ text: String(entry?.text || "") }));
+}
+
+function analyzeText(text) {
+  const raw = String(text || "");
+  const sentenceParts = raw
+    .split(/[.!?]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const wordMatches = raw.match(/\b\w+\b/g) || [];
+  const totalWords = wordMatches.length;
+  let sentenceWordTotal = 0;
+
+  for (const sentence of sentenceParts) {
+    const words = sentence.match(/\b\w+\b/g) || [];
+    sentenceWordTotal += words.length;
+  }
+
+  const avgSentenceLength = sentenceParts.length
+    ? sentenceWordTotal / sentenceParts.length
+    : totalWords;
+
+  const units = raw
+    .split(/\n|(?<=[.!?])/)
+    .map((unit) => unit.trim())
+    .filter(Boolean);
+  let fragmentCount = 0;
+  for (const unit of units) {
+    const endsWithPunctuation = /[.!?]\s*$/.test(unit);
+    const unitWordCount = (unit.match(/\b\w+\b/g) || []).length;
+    if (!endsWithPunctuation && unitWordCount < 8) {
+      fragmentCount += 1;
+    }
+  }
+
+  const repetitions = Object.create(null);
+  const repetitionWords = raw.toLowerCase().match(/\b\w{4,}\b/g) || [];
+  for (const word of repetitionWords) {
+    repetitions[word] = (repetitions[word] || 0) + 1;
+  }
+  let repetitionCount = 0;
+  for (const count of Object.values(repetitions)) {
+    if (count > 1) repetitionCount += 1;
+  }
+
+  return {
+    avgSentenceLength,
+    fragmentCount,
+    repetitionCount
+  };
+}
+
+function buildBaseline(entries) {
+  const source = Array.isArray(entries) ? entries : [];
+  if (source.length < 2) {
+    return {
+      avgSentenceLength: 0,
+      fragmentCount: 0,
+      repetitionCount: 0,
+      sampleSize: 0
+    };
+  }
+
+  let totalAvgSentenceLength = 0;
+  let totalFragmentCount = 0;
+  let totalRepetitionCount = 0;
+
+  for (const entry of source) {
+    const metrics = analyzeText(String(entry?.text || ""));
+    totalAvgSentenceLength += metrics.avgSentenceLength;
+    totalFragmentCount += metrics.fragmentCount;
+    totalRepetitionCount += metrics.repetitionCount;
+  }
+
+  return {
+    avgSentenceLength: totalAvgSentenceLength / source.length,
+    fragmentCount: totalFragmentCount / source.length,
+    repetitionCount: totalRepetitionCount / source.length,
+    sampleSize: source.length
+  };
+}
+
+function selectReflection(current, baseline) {
+  if (!baseline || baseline.sampleSize < 2) return "";
+
+  if (current.fragmentCount > baseline.fragmentCount * 1.4) {
+    return "This is more fragmented than your recent writing.";
+  }
+  if (current.fragmentCount < baseline.fragmentCount * 0.6) {
+    return "This is more continuous than your recent writing.";
+  }
+
+  if (current.avgSentenceLength > baseline.avgSentenceLength * 1.4) {
+    return "You wrote longer sentences than usual.";
+  }
+  if (current.avgSentenceLength < baseline.avgSentenceLength * 0.6) {
+    return "You kept sentences shorter than usual.";
+  }
+
+  if (
+    current.repetitionCount > baseline.repetitionCount * 1.5 &&
+    current.repetitionCount >= 2
+  ) {
+    return "One word appears more than usual.";
+  }
+
+  const isWithinTwentyPercent = (value, base) => {
+    if (base === 0) return value === 0;
+    return Math.abs(value - base) <= Math.abs(base) * 0.2;
+  };
+
+  if (
+    isWithinTwentyPercent(current.fragmentCount, baseline.fragmentCount) &&
+    isWithinTwentyPercent(current.avgSentenceLength, baseline.avgSentenceLength) &&
+    isWithinTwentyPercent(current.repetitionCount, baseline.repetitionCount)
+  ) {
+    return "No strong structural change from recent entries.";
+  }
+
+  return "";
+}
+
+function renderReflection(text) {
+  const el = document.getElementById("reflection-line");
+
+  if (!el) return;
+
+  if (!text) {
+    el.textContent = "";
+    el.style.opacity = "0";
+    el.setAttribute("aria-hidden", "true");
+    return;
+  }
+
+  el.textContent = text;
+  el.style.opacity = "1";
+  el.setAttribute("aria-hidden", "false");
+}
+
+function handleRunCompleted(text) {
+  try {
+    const current = analyzeText(text);
+    const entries = getRecentEntries();
+    const baseline = buildBaseline(entries);
+    const reflection = selectReflection(current, baseline);
+    renderReflection(reflection);
+  } catch (e) {
+    renderReflection("");
+  }
+}
+
+const METRIC_EXPLAINER_KEYS = new Set(["filler", "repetition", "openings"]);
+
+const METRIC_EXPLAINER_COPY = {
+  filler: {
+    title: "Filler",
+    body: "Common words or phrases used unnecessarily.",
+    example: 'Example: "like, just, really"'
+  },
+  repetition: {
+    title: "Repetition",
+    body: "Words used multiple times in close proximity.",
+    example: 'Example: "time, time, time"'
+  },
+  openings: {
+    title: "Openings",
+    body: "Repeated ways of starting sentences.",
+    example: 'Example: "You… You… You…"'
+  }
+};
+
+let metricExplainerHideTimer = null;
+let metricExplainerAnchorEl = null;
+let metricExplainerOpenKey = null;
+
+function hideMetricExplainer() {
+  clearTimeout(metricExplainerHideTimer);
+  metricExplainerHideTimer = null;
+  const pop = $("metricExplainerPopover");
+  if (pop) {
+    pop.classList.add("hidden");
+    pop.style.left = "";
+    pop.style.top = "";
+  }
+  metricExplainerAnchorEl = null;
+  metricExplainerOpenKey = null;
+}
+
+function ensureMetricExplainerPopover() {
+  let pop = $("metricExplainerPopover");
+  if (pop) return pop;
+  pop = document.createElement("div");
+  pop.id = "metricExplainerPopover";
+  pop.className = "metric-explainer hidden";
+  pop.setAttribute("role", "tooltip");
+  pop.innerHTML = `
+    <div class="metric-explainer-title" id="metricExplainerTitle"></div>
+    <p class="metric-explainer-body" id="metricExplainerBody"></p>
+    <p class="metric-explainer-example" id="metricExplainerExample"></p>
+  `;
+  document.body.appendChild(pop);
+  pop.addEventListener("mouseenter", () => {
+    clearTimeout(metricExplainerHideTimer);
+    metricExplainerHideTimer = null;
+  });
+  pop.addEventListener("mouseleave", () => {
+    if (!metricExplainerIsCoarsePointer()) {
+      metricExplainerHideTimer = setTimeout(hideMetricExplainer, 140);
+    }
+  });
+  return pop;
+}
+
+function metricExplainerIsCoarsePointer() {
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
+function positionMetricExplainer(anchorEl, popEl) {
+  const pad = 10;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const ar = anchorEl.getBoundingClientRect();
+      const pr = popEl.getBoundingClientRect();
+      let left = ar.left + ar.width / 2 - pr.width / 2;
+      left = Math.max(pad, Math.min(left, window.innerWidth - pr.width - pad));
+      let top = ar.bottom + pad;
+      if (top + pr.height > window.innerHeight - pad) {
+        top = Math.max(pad, ar.top - pr.height - pad);
+      }
+      popEl.style.position = "fixed";
+      popEl.style.left = `${Math.round(left)}px`;
+      popEl.style.top = `${Math.round(top)}px`;
+    });
+  });
+}
+
+function showMetricExplainer(key, anchorEl) {
+  const copy = METRIC_EXPLAINER_COPY[key];
+  if (!copy || !anchorEl) return;
+  const drawer = $("recentDrawer");
+  if (!drawer || drawer.classList.contains("hidden")) return;
+
+  const pop = ensureMetricExplainerPopover();
+  const titleEl = $("metricExplainerTitle");
+  const bodyEl = $("metricExplainerBody");
+  const exampleEl = $("metricExplainerExample");
+  if (titleEl) titleEl.textContent = copy.title;
+  if (bodyEl) bodyEl.textContent = copy.body;
+  if (exampleEl) exampleEl.textContent = copy.example;
+  pop.classList.remove("hidden");
+  positionMetricExplainer(anchorEl, pop);
+}
+
+function bindMetricExplainerDelegation() {
+  const list = $("recentDrawerList");
+  if (!list || list.dataset.metricExplainerBound === "1") return;
+  list.dataset.metricExplainerBound = "1";
+
+  list.addEventListener(
+    "pointerdown",
+    (e) => {
+      const anchor = e.target.closest("[data-metric-explainer]");
+      if (!anchor || !list.contains(anchor)) return;
+      const key = anchor.getAttribute("data-metric-explainer");
+      if (!METRIC_EXPLAINER_KEYS.has(key)) return;
+      e.stopPropagation();
+    },
+    true
+  );
+
+  list.addEventListener(
+    "click",
+    (e) => {
+      const anchor = e.target.closest("[data-metric-explainer]");
+      if (!anchor || !list.contains(anchor)) return;
+      const key = anchor.getAttribute("data-metric-explainer");
+      if (!METRIC_EXPLAINER_KEYS.has(key)) return;
+      e.stopPropagation();
+      if (!metricExplainerIsCoarsePointer()) return;
+      const pop = $("metricExplainerPopover");
+      if (
+        pop &&
+        !pop.classList.contains("hidden") &&
+        metricExplainerOpenKey === key &&
+        metricExplainerAnchorEl === anchor
+      ) {
+        hideMetricExplainer();
+      } else {
+        metricExplainerAnchorEl = anchor;
+        metricExplainerOpenKey = key;
+        showMetricExplainer(key, anchor);
+      }
+    },
+    true
+  );
+
+  list.addEventListener("mouseover", (e) => {
+    if (metricExplainerIsCoarsePointer()) return;
+    const anchor = e.target.closest("[data-metric-explainer]");
+    if (!anchor || !list.contains(anchor)) return;
+    const key = anchor.getAttribute("data-metric-explainer");
+    if (!METRIC_EXPLAINER_KEYS.has(key)) return;
+    clearTimeout(metricExplainerHideTimer);
+    metricExplainerHideTimer = null;
+    metricExplainerAnchorEl = anchor;
+    metricExplainerOpenKey = key;
+    showMetricExplainer(key, anchor);
+  });
+
+  list.addEventListener("mouseout", (e) => {
+    if (metricExplainerIsCoarsePointer()) return;
+    const anchor = e.target.closest("[data-metric-explainer]");
+    if (!anchor || !list.contains(anchor)) return;
+    const rel = e.relatedTarget;
+    const pop = $("metricExplainerPopover");
+    if (rel && (anchor.contains(rel) || pop?.contains(rel))) return;
+    metricExplainerHideTimer = setTimeout(hideMetricExplainer, 160);
+  });
+
+  list.addEventListener("scroll", hideMetricExplainer, { passive: true });
+
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (metricExplainerIsCoarsePointer()) return;
+      const pop = $("metricExplainerPopover");
+      if (!pop || pop.classList.contains("hidden")) return;
+      if (pop.contains(e.target)) return;
+      if (e.target.closest("[data-metric-explainer]")) return;
+      hideMetricExplainer();
+    },
+    true
+  );
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!metricExplainerIsCoarsePointer()) return;
+      const pop = $("metricExplainerPopover");
+      if (!pop || pop.classList.contains("hidden")) return;
+      if (pop.contains(e.target)) return;
+      const onExplainer = e.target.closest("[data-metric-explainer]");
+      if (onExplainer && list.contains(onExplainer)) return;
+      hideMetricExplainer();
+    },
+    true
+  );
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const pop = $("metricExplainerPopover");
+    if (pop && !pop.classList.contains("hidden")) {
+      hideMetricExplainer();
+      e.preventDefault();
+    }
+  });
+}
+
+function recentEntryScoreMeterHtml(label, value, max = 25, explainerKey = null) {
+  const v = Math.max(0, Math.min(max, Math.round(Number(value) || 0)));
+  const dash = Math.round((v / max) * 1000) / 10;
+  const d = "M 4 16 A 16 16 0 0 1 36 16";
+  const aria = `${label}, ${v} out of ${max}`;
+  const maxClass = v === max ? " recent-entry-meter--max" : "";
+  const explainerAttr =
+    explainerKey && METRIC_EXPLAINER_KEYS.has(explainerKey)
+      ? ` data-metric-explainer="${explainerKey}" tabindex="0"`
+      : "";
+  return `
+    <div class="recent-entry-meter${maxClass}" role="img" aria-label="${escapeHtml(aria)}" title="${escapeHtml(`${label} ${v} / ${max}`)}"${explainerAttr}>
+      <svg class="recent-entry-meter-svg" viewBox="-4 -6 48 28" aria-hidden="true" focusable="false">
+        <path class="recent-entry-meter-track" pathLength="100" d="${d}" fill="none" stroke-linecap="round" />
+        <path
+          class="recent-entry-meter-fill"
+          pathLength="100"
+          d="${d}"
+          fill="none"
+          stroke-linecap="round"
+          stroke-dasharray="${dash} 100"
+        />
+      </svg>
+      <span class="recent-entry-meter-value">${escapeHtml(String(v))}</span>
+      <span class="recent-entry-meter-label">${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
 function formatRecentEntryScoreBlock(item) {
   const total = item.runScore ?? item.score ?? 0;
   const words = item.wordCount ?? item.words ?? 0;
+  const wordsLabel = Number(words) === 1 ? "word" : "words";
   const sb = item.scoreBreakdown;
-  let html = `<div class="recent-entry-stats">Run score: ${escapeHtml(String(total))} · ${escapeHtml(String(words))} words</div>`;
+  let html = `<div class="recent-entry-stats">
+    <div class="recent-entry-stats-label">Run score</div>
+    <div class="recent-entry-stats-row">
+      <span class="recent-entry-stats-score">${escapeHtml(String(total))}</span>
+      <span class="recent-entry-stats-words">${escapeHtml(String(words))} ${wordsLabel}</span>
+    </div>
+  </div>`;
   if (sb && typeof sb === "object") {
     const v = (k) => (typeof sb[k] === "number" && Number.isFinite(sb[k]) ? sb[k] : 0);
-    html += '<div class="recent-entry-score-breakdown">';
-    html += `<div class="recent-entry-score-row">Completion: ${v("completion")} / 25</div>`;
-    if (typeof sb.completionMultiplier === "number" && Number.isFinite(sb.completionMultiplier)) {
-      html += `<div class="recent-entry-score-row">Completion multiplier: ${sb.completionMultiplier.toFixed(2)}</div>`;
-    }
-    html += `<div class="recent-entry-score-row">Filler: ${v("filler")} / 25</div>`;
-    html += `<div class="recent-entry-score-row">Repetition: ${v("repetition")} / 25</div>`;
-    html += `<div class="recent-entry-score-row">Openings: ${v("openings")} / 25</div>`;
+    html += `<div class="recent-entry-score-meters">`;
+    html += recentEntryScoreMeterHtml("Completion", v("completion"), 25, null);
+    html += recentEntryScoreMeterHtml("Filler", v("filler"), 25, "filler");
+    html += recentEntryScoreMeterHtml("Repetition", v("repetition"), 25, "repetition");
+    html += recentEntryScoreMeterHtml("Openings", v("openings"), 25, "openings");
     html += "</div>";
   }
   return html;
@@ -2110,33 +2503,46 @@ function formatRunDetailHtml(run) {
   const banned = Array.isArray(run.bannedHits) ? run.bannedHits : [];
   const starters = Array.isArray(run.repeatedStarters) ? run.repeatedStarters : [];
 
+  const REPEAT_CHIP_CAP = 5;
+  const STARTER_CHIP_CAP = 4;
+
+  const repeatedShown = repeated.slice(0, REPEAT_CHIP_CAP);
+  const repeatedOverflow = repeated.length - repeatedShown.length;
   const repeatedHtml = repeated.length
-    ? repeated
+    ? repeatedShown
         .map(
           ([w, c]) =>
-            `<span class="chip warn">${escapeHtml(w)} ${escapeHtml(String(c))} times</span>`
+            `<span class="chip chip--compact warn">${escapeHtml(w)} ×${escapeHtml(String(c))}</span>`
         )
-        .join("")
-    : '<span class="chip">none</span>';
+        .join("") +
+      (repeatedOverflow > 0
+        ? `<span class="chip chip--compact">+${escapeHtml(String(repeatedOverflow))}</span>`
+        : "")
+    : '<span class="chip chip--compact">none</span>';
 
   const bannedHtml = banned.length
     ? banned
-        .map(item => {
-          const cls = item.isExercise ? "exercise-chip" : "chip bad";
-          const prefix = item.isExercise ? '<span class="exercise-dot"></span>' : '';
-          return `<span class="${cls}">${prefix}${escapeHtml(item.word)} ${escapeHtml(String(item.count))} times</span>`;
+        .map((item) => {
+          const cls = item.isExercise ? "exercise-chip chip--compact" : "chip chip--compact bad";
+          const prefix = item.isExercise ? '<span class="exercise-dot"></span>' : "";
+          return `<span class="${cls}">${prefix}${escapeHtml(item.word)} ×${escapeHtml(String(item.count))}</span>`;
         })
         .join("")
-    : '<span class="chip">none</span>';
+    : '<span class="chip chip--compact">none</span>';
 
+  const startersShown = starters.slice(0, STARTER_CHIP_CAP);
+  const startersOverflow = starters.length - startersShown.length;
   const startersHtml = starters.length
-    ? starters
+    ? startersShown
         .map(
           ([w, c]) =>
-            `<span class="chip purple">${escapeHtml(w)} ${escapeHtml(String(c))} times</span>`
+            `<span class="chip chip--compact purple">${escapeHtml(w)} ×${escapeHtml(String(c))}</span>`
         )
-        .join("")
-    : '<span class="chip">none</span>';
+        .join("") +
+      (startersOverflow > 0
+        ? `<span class="chip chip--compact">+${escapeHtml(String(startersOverflow))}</span>`
+        : "")
+    : '<span class="chip chip--compact">none</span>';
 
   const unique =
     typeof run.unique === "number"
@@ -2150,27 +2556,33 @@ function formatRunDetailHtml(run) {
       ? `${run.avgSentenceLength.toFixed(1)} avg sentence`
       : "";
 
-  const extraBits = [unique, avgLen].filter(Boolean).join(" · ");
+  const statTokens = [];
+  if (unique) statTokens.push(`<span class="recent-run-stat-token">${escapeHtml(unique)}</span>`);
+  if (avgLen) statTokens.push(`<span class="recent-run-stat-token">${escapeHtml(avgLen)}</span>`);
+  const statsFoot =
+    statTokens.length > 0
+      ? `<div class="recent-run-detail-foot">${statTokens.join(
+          '<span class="recent-run-stats-join" aria-hidden="true">·</span>'
+        )}</div>`
+      : "";
 
   return `
-    <div class="recent-run-detail">
-      <div class="recent-run-detail-block">
-        <div class="recent-run-detail-label">Repeated words</div>
-        <div class="word-list">${repeatedHtml}</div>
+    <div class="recent-run-detail recent-run-detail--compact">
+      <div class="recent-run-detail-inline">
+        <span class="recent-run-inline-cluster" data-metric-explainer="filler" tabindex="0">
+          <span class="recent-run-inline-kicker">Filler</span>
+          <span class="word-list word-list--inline">${bannedHtml}</span>
+        </span>
+        <span class="recent-run-inline-cluster" data-metric-explainer="repetition" tabindex="0">
+          <span class="recent-run-inline-kicker">Repetition</span>
+          <span class="word-list word-list--inline">${repeatedHtml}</span>
+        </span>
+        <span class="recent-run-inline-cluster" data-metric-explainer="openings" tabindex="0">
+          <span class="recent-run-inline-kicker">Openings</span>
+          <span class="word-list word-list--inline">${startersHtml}</span>
+        </span>
       </div>
-      <div class="recent-run-detail-block">
-        <div class="recent-run-detail-label">Banned / filler</div>
-        <div class="word-list">${bannedHtml}</div>
-      </div>
-      <div class="recent-run-detail-block">
-        <div class="recent-run-detail-label">Repeated starters</div>
-        <div class="word-list">${startersHtml}</div>
-      </div>
-      ${
-        extraBits
-          ? `<div class="recent-run-detail-meta">${escapeHtml(extraBits)}</div>`
-          : `<div class="recent-run-detail-meta">More session details can land here later.</div>`
-      }
+      ${statsFoot}
     </div>
   `;
 }
@@ -2210,8 +2622,10 @@ function renderHistory() {
             </div>
             <div class="recent-entry-expanded" hidden>
               <div class="recent-entry-prompt">${escapeHtml((item.text || "").trim() || "Writing text wasn’t saved for this run.")}</div>
-              ${scoreBlock}
-              <div class="recent-entry-detail">${detail}</div>
+              <div class="recent-entry-results">
+                ${scoreBlock}
+                <div class="recent-entry-detail">${detail}</div>
+              </div>
               <div class="recent-entry-future-meta" aria-hidden="true"></div>
             </div>
           </button>
@@ -2264,6 +2678,7 @@ function setRecentDrawerOpen(open, options = {}) {
     });
   } else {
     state.pendingRecentDrawerExpand = false;
+    hideMetricExplainer();
     if (!skipFocus) trigger?.focus();
     requestAnimationFrame(() => queueViewportSync());
   }
@@ -2619,6 +3034,7 @@ function restartRunWithCurrentSettings() {
     fb.className = "result-card empty";
     fb.innerHTML = "";
   }
+  renderReflection("");
 
   stopTimer();
   startTimer();
@@ -2727,6 +3143,7 @@ function startWriting() {
     fb.className = "result-card empty";
     fb.innerHTML = "";
   }
+  renderReflection("");
 
   setBannedEditorOpen(false);
   setOptionsOpen(false);
@@ -2775,6 +3192,7 @@ function submitWriting(fromTimer = false) {
   stopTimer();
   completeWordmark();
   showEditorOverlay("Begin again", true);
+  handleRunCompleted(currentText);
 
   const starterExamplesMap = {};
   analysis.starterExampleList.forEach(item => {
@@ -2862,6 +3280,10 @@ function submitWriting(fromTimer = false) {
 }
 
 function showProfile(show = true) {
+  if (show) {
+    editorInput?.blur();
+    setFocusMode(false);
+  }
   $("writeView")?.classList.toggle("hidden", show);
   $("profileView")?.classList.toggle("hidden", !show);
   renderProfile();
@@ -3193,6 +3615,7 @@ enterLandingState();
 initZenGarden();
 bindAnnotationRowFlagInteraction();
 bindEditorSemanticPicker();
+bindMetricExplainerDelegation();
 
 state.pendingTargetWords = state.targetWords;
 state.pendingTimerSeconds = state.timerSeconds;
