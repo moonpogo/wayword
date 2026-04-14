@@ -1193,6 +1193,9 @@ html[data-theme="dark"] .editor-progress-track{
   opacity:0.34;
   z-index:3;
   mix-blend-mode:difference;
+  background-size:calc(100% - 2px) 100%;
+  background-position:left top;
+  background-repeat:no-repeat;
   background-image:repeating-linear-gradient(
     to right,
     transparent 0 calc((100% / 6) - 1.2px),
@@ -1268,7 +1271,7 @@ html[data-theme="dark"] .progress-marker.filled::before{
   display:flex;
   flex-direction:column;
   gap:8px;
-  margin-top:12px;
+  margin-top:4px;
 }
 
 /* Phase 2: read-only token slots (writeDoc only; no contenteditable; not a text source) */
@@ -1925,12 +1928,14 @@ html[data-theme="dark"] .recent-drawer{
 
 @media (hover:hover){
   .recent-entry:hover{
-    background:color-mix(in srgb, var(--ink) 4%, transparent);
+    background:transparent;
+    opacity:0.96;
   }
 }
 
 .recent-entry:active{
-  background:color-mix(in srgb, var(--ink) 7%, transparent);
+  background:transparent;
+  opacity:0.9;
 }
 
 .recent-entry-prompt{
@@ -3384,21 +3389,21 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 }
 
 #reflection-line{
+  display:none;
   font-size:14px;
   line-height:1.55;
   letter-spacing:0.012em;
   color:var(--muted);
   color:color-mix(in srgb, var(--ink) 32%, var(--muted));
-  margin-top:8px;
-  margin-bottom:8px;
+  margin:0;
   transition:opacity 200ms ease-out;
   opacity:0;
 }
 
-#reflection-line:empty{
-  display:none;
-  margin:0;
-  padding:0;
+#reflection-line:not(:empty){
+  display:block;
+  margin:0 0 6px;
+  opacity:0.92;
 }
 
 [data-metric-explainer]{

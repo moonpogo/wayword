@@ -2264,13 +2264,13 @@ function renderReflection(text) {
 
   if (!text) {
     el.textContent = "";
-    el.style.opacity = "0";
+    el.style.opacity = "";
     el.setAttribute("aria-hidden", "true");
     return;
   }
 
   el.textContent = text;
-  el.style.opacity = "1";
+  el.style.opacity = "";
   el.setAttribute("aria-hidden", "false");
 }
 
