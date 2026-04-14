@@ -112,7 +112,9 @@ const state = {
   pendingTimerSeconds: 0,
   promptRerollsUsed: 0,
   pendingRecentDrawerExpand: false,
-  writeDoc: { lines: [{ tokens: [], trailingSpace: false }] }
+  writeDoc: { lines: [{ tokens: [], trailingSpace: false }] },
+  lastRunFeedback: "",
+  completedUiActive: false
 };
 
 let editorSurfaceComposing = false;
@@ -242,6 +244,7 @@ function queueViewportSync() {
     syncViewportHeightVar();
     if (!isMobileViewport()) setFocusMode(false);
     syncPatternsLayoutMode();
+    renderHistory();
     scheduleEditorDotOverlaySync();
   });
 }
@@ -1915,6 +1918,23 @@ function showEditorOverlay(message = "Submitted", persist = false) {
   }
 }
 
+function beginAgainFromCompletedState() {
+  if (!state.submitted) return;
+  startWriting();
+}
+
+function initEditorCompletedFlow() {
+  const overlay = $("editorOverlay");
+  const card = $("editorOverlayCard");
+  if (!overlay || !card) return;
+  if (overlay.dataset.completedFlowBound === "1") return;
+  overlay.dataset.completedFlowBound = "1";
+
+  overlay.addEventListener("click", () => {
+    beginAgainFromCompletedState();
+  });
+}
+
 function setActiveModeButton(containerId, attribute, value) {
   const container = $(containerId);
   if (!container) return;
@@ -2068,6 +2088,7 @@ function renderWritingState() {
   updateWordProgress();
   updateTimeFill();
   renderAnnotationRow();
+  renderReflection(state.submitted ? state.lastRunFeedback : "");
 }
 
 function setSemanticLegendPillState(pillEl, count) {
@@ -2218,7 +2239,9 @@ function buildBaseline(entries) {
 }
 
 function selectReflection(current, baseline) {
-  if (!baseline || baseline.sampleSize < 2) return "";
+  if (!baseline || baseline.sampleSize < 2) {
+    return "Not enough recent writing yet to compare.";
+  }
 
   if (current.fragmentCount > baseline.fragmentCount * 1.4) {
     return "This is more fragmented than your recent writing.";
@@ -2254,7 +2277,7 @@ function selectReflection(current, baseline) {
     return "No strong structural change from recent entries.";
   }
 
-  return "";
+  return "Similar rhythm to your recent writing.";
 }
 
 function renderReflection(text) {
@@ -2262,27 +2285,28 @@ function renderReflection(text) {
 
   if (!el) return;
 
-  if (!text) {
+  const trimmed = String(text || "").trim();
+
+  if (!trimmed) {
     el.textContent = "";
-    el.style.opacity = "";
+    el.classList.add("reflection-line--hidden");
     el.setAttribute("aria-hidden", "true");
     return;
   }
 
-  el.textContent = text;
-  el.style.opacity = "";
+  el.textContent = trimmed;
+  el.classList.remove("reflection-line--hidden");
   el.setAttribute("aria-hidden", "false");
 }
 
-function handleRunCompleted(text) {
+function handleRunCompleted(text, priorEntries) {
   try {
     const current = analyzeText(text);
-    const entries = getRecentEntries();
-    const baseline = buildBaseline(entries);
-    const reflection = selectReflection(current, baseline);
-    renderReflection(reflection);
+    const baseline = buildBaseline(priorEntries);
+    const reflection = String(selectReflection(current, baseline) || "").trim();
+    state.lastRunFeedback = reflection;
   } catch (e) {
-    renderReflection("");
+    state.lastRunFeedback = "";
   }
 }
 
@@ -3146,6 +3170,7 @@ function restartRunWithCurrentSettings() {
   if (!state.active) return;
 
   state.submitted = false;
+  state.completedUiActive = false;
   state.promptRerollsUsed = 0;
   applyProgressionToState();
   state.prompt = generatePrompt();
@@ -3156,6 +3181,7 @@ function restartRunWithCurrentSettings() {
     fb.className = "result-card empty";
     fb.innerHTML = "";
   }
+  state.lastRunFeedback = "";
   renderReflection("");
 
   stopTimer();
@@ -3258,6 +3284,7 @@ function startWriting(options = {}) {
   }
   state.active = true;
   state.submitted = false;
+  state.completedUiActive = false;
   state.promptRerollsUsed = 0;
   state.pendingRecentDrawerExpand = false;
 
@@ -3272,6 +3299,7 @@ function startWriting(options = {}) {
     fb.className = "result-card empty";
     fb.innerHTML = "";
   }
+  state.lastRunFeedback = "";
   renderReflection("");
 
   setBannedEditorOpen(false);
@@ -3295,7 +3323,7 @@ function submitWriting(fromTimer = false) {
   if (!state.active) return;
 
   if (state.submitted) {
-    startWriting();
+    beginAgainFromCompletedState();
     return;
   }
 
@@ -3318,11 +3346,11 @@ function submitWriting(fromTimer = false) {
   const challengeCompleted = challengeActive && state.exerciseWords.length === 0;
 
   state.submitted = true;
+  state.completedUiActive = true;
   updateEnterButtonVisibility();
   stopTimer();
   completeWordmark();
   showEditorOverlay("Begin again", true);
-  handleRunCompleted(currentText);
 
   const starterExamplesMap = {};
   analysis.starterExampleList.forEach(item => {
@@ -3378,6 +3406,8 @@ function submitWriting(fromTimer = false) {
     perspective: analysis.perspective
   };
 
+  const priorEntries = getRecentEntries();
+
   if (!state.savedRunIds.has(run.runId)) {
     state.history.push({ ...run });
     state.savedRunIds.add(run.runId);
@@ -3396,6 +3426,8 @@ function submitWriting(fromTimer = false) {
     applyProgressionToState();
     renderProfile();
   }
+
+  handleRunCompleted(currentText, priorEntries);
 
   renderWritingState();
   renderMeta();
@@ -3448,12 +3480,6 @@ function initZenGarden() {
     if (e.target === overlay) closeGarden();
   });
 
-  $("editorOverlay")?.addEventListener("click", () => {
-  if (state.submitted) {
-    startWriting();
-  }
-});
-  
   $("zenClearBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
   $("zenRandomBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
   $("zenSaveBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
@@ -3514,7 +3540,9 @@ if (editorInput) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (state.submitted) {
-        startWriting();
+        if (state.completedUiActive) {
+          beginAgainFromCompletedState();
+        }
         return;
       }
       if (getEditorText().trim().length === 0) return;
@@ -3575,6 +3603,32 @@ $("recentRailList")?.addEventListener("click", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  if (
+    e.key === "Enter" &&
+    state.submitted &&
+    state.completedUiActive &&
+    !e.shiftKey &&
+    !e.metaKey &&
+    !e.ctrlKey &&
+    !e.altKey
+  ) {
+    if (e.target && e.target.closest && e.target.closest("#editorInput")) {
+      return;
+    }
+    const target = e.target;
+    const editable =
+      target &&
+      (target.closest("input,textarea,select,[contenteditable='true']") ||
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT");
+    if (!editable) {
+      e.preventDefault();
+      beginAgainFromCompletedState();
+      return;
+    }
+  }
+
   if (e.key !== "Escape") return;
   if ($("recentDrawer") && !$("recentDrawer").classList.contains("hidden")) {
     setRecentDrawerOpen(false);
@@ -3757,6 +3811,7 @@ try {
 
 enterLandingState();
 initZenGarden();
+initEditorCompletedFlow();
 bindAnnotationRowFlagInteraction();
 bindEditorSemanticPicker();
 bindMetricExplainerDelegation("recentDrawerList");
