@@ -165,7 +165,16 @@
           <div class="subhed">Write. See what emerges.</div>
         </div>
 
-        <div id="styleTab" class="style-tab hidden">Patterns</div>
+        <div
+          id="styleTab"
+          class="style-tab hidden"
+          role="button"
+          tabindex="0"
+          aria-controls="profileView"
+          aria-expanded="false"
+        >
+          Patterns
+        </div>
       </header>
 
       <div id="statusToast" class="status-toast hidden" aria-live="polite"></div>
@@ -357,6 +366,10 @@
               </div>
             </div>
 
+            <section id="profileSummarySection" class="soft-strip-section hidden">
+              <div id="profileSummary" class="run-stats-inline"></div>
+            </section>
+
             <div id="reflection-line"></div>
 
             <div class="below-editor-stack">
@@ -397,10 +410,6 @@
                 <div id="runScoreSummary" class="run-stats-inline" aria-live="polite"></div>
               </section>
 
-              <section id="profileSummarySection" class="soft-strip-section hidden">
-                <div id="profileSummary" class="run-stats-inline"></div>
-              </section>
-
               <button
                 id="recentWritingTrigger"
                 class="recent-writing-trigger"
@@ -417,18 +426,27 @@
           </section>
 
           <aside class="side-column">
-            <section id="profileStatusCard" class="compact-status">
-              <div id="calibrationBox" class="calibration-box">
-                <div class="calibration-topline">
-                  <span id="calibrationLabel">Profile forming</span>
-                  <span id="calibrationCount">0 / 5</span>
+            <div id="desktopRailDefault" class="desktop-rail-default">
+              <section id="profileStatusCard" class="compact-status">
+                <div id="calibrationBox" class="calibration-box">
+                  <div class="calibration-topline">
+                    <span id="calibrationLabel">Profile forming</span>
+                    <span id="calibrationCount">0 / 5</span>
+                  </div>
+                  <div class="calibration-bar">
+                    <div id="calibrationFill" class="calibration-fill"></div>
+                  </div>
+                  <div id="calibrationNote" class="calibration-note">Complete 5 rounds for your first reliable read.</div>
                 </div>
-                <div class="calibration-bar">
-                  <div id="calibrationFill" class="calibration-fill"></div>
+              </section>
+
+              <section class="desktop-rail-panel" aria-label="Recent writing">
+                <div class="desktop-rail-panel-head">
+                  <div class="desktop-rail-panel-title">Recent writing</div>
                 </div>
-                <div id="calibrationNote" class="calibration-note">Complete 5 rounds for your first reliable read.</div>
-              </div>
-            </section>
+                <div id="recentRailList" class="recent-drawer-list recent-rail-list"></div>
+              </section>
+            </div>
 
           </aside>
         </div>

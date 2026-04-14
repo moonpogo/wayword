@@ -193,6 +193,40 @@ function isMobileViewport() {
   return window.matchMedia("(max-width: 720px)").matches;
 }
 
+function isDesktopPatternsViewport() {
+  return window.matchMedia("(min-width: 981px)").matches;
+}
+
+function syncPatternsLayoutMode() {
+  const appView = $("appView");
+  const writeView = $("writeView");
+  const profileView = $("profileView");
+  const sideColumn = document.querySelector("#writeView .side-column");
+  const defaultRail = $("desktopRailDefault");
+  const styleTab = $("styleTab");
+  if (!writeView || !profileView) return;
+
+  const useDesktopRail = isDesktopPatternsViewport();
+  const profileVisible = !profileView.classList.contains("hidden");
+  const useDesktopPatterns = profileVisible && useDesktopRail;
+
+  if (useDesktopRail && sideColumn && profileView.parentElement !== sideColumn) {
+    sideColumn.appendChild(profileView);
+  } else if (!useDesktopRail && appView && profileView.parentElement !== appView) {
+    appView.appendChild(profileView);
+  }
+
+  writeView.classList.toggle("hidden", profileVisible && !useDesktopRail);
+  appView?.classList.toggle("desktop-patterns-open", useDesktopPatterns);
+  sideColumn?.classList.toggle("rail-mode-patterns", useDesktopPatterns);
+  if (defaultRail) defaultRail.classList.toggle("hidden", useDesktopPatterns);
+
+  if (styleTab) {
+    styleTab.classList.toggle("is-active", profileVisible);
+    styleTab.setAttribute("aria-expanded", profileVisible ? "true" : "false");
+  }
+}
+
 function setFocusMode(enabled) {
   const shouldEnable = Boolean(enabled) && isMobileViewport();
   document.body.classList.toggle("focus-mode", shouldEnable);
@@ -207,6 +241,7 @@ function queueViewportSync() {
     viewportSyncRaf = null;
     syncViewportHeightVar();
     if (!isMobileViewport()) setFocusMode(false);
+    syncPatternsLayoutMode();
     scheduleEditorDotOverlaySync();
   });
 }
@@ -1052,7 +1087,6 @@ function renderTimer() {
 
 function updateWordProgress() {
   const fill = $("editorProgressFill");
-  const markers = $("editorProgressMarkers");
   const progressRoot = fill?.closest(".editor-progress");
   if (!fill) return;
 
@@ -1060,7 +1094,7 @@ function updateWordProgress() {
   const target = state.targetWords || 1;
 
   const clampedPercent = Math.min((words / target) * 100, 100);
-  fill.style.width = `calc(${clampedPercent}% - 6px)`;
+  fill.style.width = `${clampedPercent}%`;
 
   const atTarget = words >= target;
   fill.style.background = atTarget ? "var(--success)" : "var(--ink)";
@@ -1074,19 +1108,6 @@ function updateWordProgress() {
     else if (words >= w1) phase = "mid";
   }
   progressRoot?.setAttribute("data-phase", phase);
-
-  if (!markers) return;
-
-  const clampMarkerPct = (p) => Math.min(99.2, Math.max(0.8, p));
-  let html = "";
-  if (w1 < w2) {
-    const p1 = clampMarkerPct((w1 / target) * 100);
-    const p2 = clampMarkerPct((w2 / target) * 100);
-    html += `<div class="progress-marker${words >= w1 ? " filled" : ""}" style="left:${p1}%"></div>`;
-    html += `<div class="progress-marker${words >= w2 ? " filled" : ""}" style="left:${p2}%"></div>`;
-  }
-
-  markers.innerHTML = html;
 }
 
 function updateTimeFill() {
@@ -2354,7 +2375,10 @@ function showMetricExplainer(key, anchorEl) {
   const copy = METRIC_EXPLAINER_COPY[key];
   if (!copy || !anchorEl) return;
   const drawer = $("recentDrawer");
-  if (!drawer || drawer.classList.contains("hidden")) return;
+  const drawerVisible = drawer && !drawer.classList.contains("hidden");
+  const rail = $("recentRailList");
+  const railVisible = rail && isDesktopPatternsViewport() && rail.closest(".hidden") === null;
+  if (!drawerVisible && !railVisible) return;
 
   const pop = ensureMetricExplainerPopover();
   const titleEl = $("metricExplainerTitle");
@@ -2367,8 +2391,8 @@ function showMetricExplainer(key, anchorEl) {
   positionMetricExplainer(anchorEl, pop);
 }
 
-function bindMetricExplainerDelegation() {
-  const list = $("recentDrawerList");
+function bindMetricExplainerDelegation(listId = "recentDrawerList") {
+  const list = $(listId);
   if (!list || list.dataset.metricExplainerBound === "1") return;
   list.dataset.metricExplainerBound = "1";
 
@@ -2638,25 +2662,12 @@ function formatRunDetailHtml(run) {
 
 function renderHistory() {
   const drawerList = $("recentDrawerList");
+  const railList = $("recentRailList");
   const trigger = $("recentWritingTrigger");
+  const allLists = [drawerList, railList].filter(Boolean);
 
-  if (!state.history.length) {
-    if (drawerList) drawerList.innerHTML = "";
-    const drawerOpen = $("recentDrawer") && !$("recentDrawer").classList.contains("hidden");
-    if (drawerList) {
-      drawerList.innerHTML = drawerOpen ? `<div class="recent-drawer-empty">No runs yet.</div>` : "";
-    }
-    if (trigger) {
-      trigger.disabled = false;
-      trigger.setAttribute("aria-disabled", "false");
-    }
-    return;
-  }
-
-  const items = state.history.slice().reverse().slice(0, 5);
-
-  if (drawerList) {
-    drawerList.innerHTML = items
+  function buildRecentEntries(items) {
+    return items
       .map((item, idx) => {
         const excerpt = promptExcerpt(item.prompt);
         const when = formatRelativeTime(item.savedAt);
@@ -2682,6 +2693,26 @@ function renderHistory() {
       })
       .join("");
   }
+
+  if (!state.history.length) {
+    const drawerOpen = $("recentDrawer") && !$("recentDrawer").classList.contains("hidden");
+    allLists.forEach((list) => {
+      const isDrawer = list.id === "recentDrawerList";
+      const showEmpty = isDrawer ? drawerOpen : isDesktopPatternsViewport();
+      list.innerHTML = showEmpty ? `<div class="recent-drawer-empty">No runs yet.</div>` : "";
+    });
+    if (trigger) {
+      trigger.disabled = false;
+      trigger.setAttribute("aria-disabled", "false");
+    }
+    return;
+  }
+
+  const items = state.history.slice().reverse().slice(0, 5);
+  const html = buildRecentEntries(items);
+  allLists.forEach((list) => {
+    list.innerHTML = html;
+  });
 
   if (trigger) {
     trigger.disabled = false;
@@ -3380,12 +3411,12 @@ function submitWriting(fromTimer = false) {
 }
 
 function showProfile(show = true) {
-  if (show) {
+  if (show && !isDesktopPatternsViewport()) {
     editorInput?.blur();
     setFocusMode(false);
   }
-  $("writeView")?.classList.toggle("hidden", show);
   $("profileView")?.classList.toggle("hidden", !show);
+  syncPatternsLayoutMode();
   renderProfile();
 }
 
@@ -3537,6 +3568,11 @@ $("recentDrawerList")?.addEventListener("click", (e) => {
   if (!entry) return;
   toggleRecentEntry(entry);
 });
+$("recentRailList")?.addEventListener("click", (e) => {
+  const entry = e.target.closest(".recent-entry");
+  if (!entry) return;
+  toggleRecentEntry(entry);
+});
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
@@ -3552,6 +3588,13 @@ $("beginBtn")?.addEventListener("click", () => {
   startWriting();
 });
 $("styleTab")?.addEventListener("click", () => {
+  const profileView = $("profileView");
+  const isShowingProfile = profileView && !profileView.classList.contains("hidden");
+  showProfile(!isShowingProfile);
+});
+$("styleTab")?.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  e.preventDefault();
   const profileView = $("profileView");
   const isShowingProfile = profileView && !profileView.classList.contains("hidden");
   showProfile(!isShowingProfile);
@@ -3696,6 +3739,7 @@ scheduleEditorDotOverlaySync();
 renderSidebar();
 renderHistory();
 renderProfile();
+syncPatternsLayoutMode();
 renderCalibration();
 renderProfileSummaryStrip();
 updateEnterButtonVisibility();
@@ -3715,7 +3759,8 @@ enterLandingState();
 initZenGarden();
 bindAnnotationRowFlagInteraction();
 bindEditorSemanticPicker();
-bindMetricExplainerDelegation();
+bindMetricExplainerDelegation("recentDrawerList");
+bindMetricExplainerDelegation("recentRailList");
 
 state.pendingTargetWords = state.targetWords;
 state.pendingTimerSeconds = state.timerSeconds;
