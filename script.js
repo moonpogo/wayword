@@ -613,6 +613,75 @@ function startTimer() {
    analysis
 ----------------------------- */
 
+function getActiveTargetWordsForScoring() {
+  return state.targetWords;
+}
+
+function scoreDeductionFromIncidentCount(n) {
+  const c = Math.max(0, Math.floor(Number(n)) || 0);
+  if (c <= 0) return 25;
+  if (c === 1) return 22;
+  if (c === 2) return 19;
+  if (c === 3) return 16;
+  if (c === 4) return 13;
+  return 10;
+}
+
+function scoreCompletionFromTargetRatio(totalWords, activeTargetWords) {
+  const words = Math.max(0, Number(totalWords) || 0);
+  const target = Math.max(1, Number(activeTargetWords) || 1);
+  const ratio = words / target;
+  if (ratio >= 1) return { completion: 25, completionMultiplier: 1.0 };
+  if (ratio >= 0.75) return { completion: 20, completionMultiplier: 0.85 };
+  if (ratio >= 0.5) return { completion: 15, completionMultiplier: 0.6 };
+  if (ratio >= 0.25) return { completion: 10, completionMultiplier: 0.35 };
+  return { completion: 5, completionMultiplier: 0.1 };
+}
+
+function runScoreSampleCapFromWordCount(totalWords) {
+  const w = Math.max(0, Math.floor(Number(totalWords) || 0));
+  if (w <= 4) return 5;
+  if (w <= 9) return 10;
+  if (w <= 14) return 15;
+  return 100;
+}
+
+function computeRunScoreV1(analysis, repeatLimit, activeTargetWords) {
+  const limit = Math.max(1, Number(repeatLimit) || 1);
+  const targetForScore = Math.max(1, Number(activeTargetWords) || 1);
+
+  const fillerIncidents = analysis.bannedHits
+    .filter((item) => !item.isExercise)
+    .reduce((sum, item) => sum + item.count, 0);
+  const repetitionIncidents = analysis.repeated.reduce(
+    (sum, [, count]) => sum + Math.max(0, count - limit),
+    0
+  );
+  const openingsIncidents = analysis.repeatedStarters.reduce(
+    (sum, [, count]) => sum + Math.max(0, count - 1),
+    0
+  );
+
+  const { completion, completionMultiplier } = scoreCompletionFromTargetRatio(
+    analysis.totalWords,
+    targetForScore
+  );
+  const filler = scoreDeductionFromIncidentCount(fillerIncidents);
+  const repetition = scoreDeductionFromIncidentCount(repetitionIncidents);
+  const openings = scoreDeductionFromIncidentCount(openingsIncidents);
+  const constraintRaw = filler + repetition + openings;
+  const runScorePreCap = Math.min(100, completion + Math.round(completionMultiplier * constraintRaw));
+  const runScore = Math.min(runScorePreCap, runScoreSampleCapFromWordCount(analysis.totalWords));
+  const scoreBreakdown = {
+    completion,
+    filler,
+    repetition,
+    openings,
+    completionMultiplier
+  };
+  return { runScore, scoreBreakdown };
+}
+
 function analyze(text) {
   const tokens = tokenize(text);
   const counts = countWords(tokens);
@@ -638,13 +707,6 @@ function analyze(text) {
     .sort((a, b) => b[1] - a[1]);
 
   const targetDelta = totalWords - state.targetWords;
-  const underPenalty = targetDelta < 0 ? Math.ceil(Math.abs(targetDelta) * 0.6) : 0;
-  const overPenalty = targetDelta > 0 ? Math.ceil(targetDelta * 1.6) : 0;
-
-  const bannedPenalty = bannedHits.reduce((sum, item) => sum + item.count * 6, 0);
-  const repeatPenalty = repeated.reduce((sum, [, count]) => sum + (count - state.repeatLimit) * 4, 0);
-  const starterPenalty = repeatedStarters.reduce((sum, [, count]) => sum + (count - 1) * 2, 0);
-  const score = Math.max(0, 100 - bannedPenalty - repeatPenalty - starterPenalty - underPenalty - overPenalty);
 
   const uniqueRatio = totalWords ? uniqueCount / totalWords : 0;
   const sentences = String(text || "").split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
@@ -662,7 +724,6 @@ function analyze(text) {
     bannedHits,
     repeatedStarters,
     targetDelta,
-    score,
     starterCounts,
     uniqueRatio,
     avgSentenceLength,
@@ -928,15 +989,14 @@ function renderLegend(analysis) {
   }
 
   const redCount = analysis.bannedHits.filter(i => !i.isExercise).reduce((sum, item) => sum + item.count, 0);
-  const targetPressure = Math.abs(analysis.targetDelta);
   const repeatedWordCount = analysis.repeated.reduce((sum, [, count]) => {
-  return sum + (count - state.repeatLimit);
-}, 0);
+    return sum + (count - state.repeatLimit);
+  }, 0);
   const purpleCount = analysis.repeatedStarters.reduce((sum, [, count]) => sum + (count - 1), 0);
   const blueCount = analysis.bannedHits.filter(i => i.isExercise).reduce((sum, item) => sum + item.count, 0);
 
   if ($("legendRedCount")) $("legendRedCount").textContent = redCount;
-if ($("legendYellowCount")) $("legendYellowCount").textContent = repeatedWordCount;
+  if ($("legendYellowCount")) $("legendYellowCount").textContent = repeatedWordCount;
   if ($("legendPurpleCount")) $("legendPurpleCount").textContent = purpleCount;
   if ($("legendBlueCount")) $("legendBlueCount").textContent = blueCount;
 
@@ -948,6 +1008,48 @@ if ($("legendYellowCount")) $("legendYellowCount").textContent = repeatedWordCou
 
 function renderSidebar() {
   renderLegend(state.active ? analyze(getEditorText()) : null);
+  renderRunScoreStrip();
+}
+
+function renderRunScoreStrip() {
+  const section = $("runScoreSection");
+  const el = $("runScoreSummary");
+  if (!section || !el) return;
+
+  if (!state.active || !state.submitted) {
+    section.classList.add("hidden");
+    el.textContent = "";
+    return;
+  }
+
+  const analysis = analyze(getEditorText());
+  const { runScore } = computeRunScoreV1(
+    analysis,
+    state.repeatLimit,
+    getActiveTargetWordsForScoring()
+  );
+  el.textContent = `Run score: ${runScore}`;
+  section.classList.remove("hidden");
+}
+
+function formatRecentEntryScoreBlock(item) {
+  const total = item.runScore ?? item.score ?? 0;
+  const words = item.wordCount ?? item.words ?? 0;
+  const sb = item.scoreBreakdown;
+  let html = `<div class="recent-entry-stats">Run score: ${escapeHtml(String(total))} · ${escapeHtml(String(words))} words</div>`;
+  if (sb && typeof sb === "object") {
+    const v = (k) => (typeof sb[k] === "number" && Number.isFinite(sb[k]) ? sb[k] : 0);
+    html += '<div class="recent-entry-score-breakdown">';
+    html += `<div class="recent-entry-score-row">Completion: ${v("completion")} / 25</div>`;
+    if (typeof sb.completionMultiplier === "number" && Number.isFinite(sb.completionMultiplier)) {
+      html += `<div class="recent-entry-score-row">Completion multiplier: ${sb.completionMultiplier.toFixed(2)}</div>`;
+    }
+    html += `<div class="recent-entry-score-row">Filler: ${v("filler")} / 25</div>`;
+    html += `<div class="recent-entry-score-row">Repetition: ${v("repetition")} / 25</div>`;
+    html += `<div class="recent-entry-score-row">Openings: ${v("openings")} / 25</div>`;
+    html += "</div>";
+  }
+  return html;
 }
 
 function promptExcerpt(prompt, maxLen = 120) {
@@ -1068,6 +1170,7 @@ function renderHistory() {
         const when = formatRelativeTime(item.savedAt);
         const meta = when ? `<div class="recent-entry-meta">${escapeHtml(when)}</div>` : "";
         const detail = formatRunDetailHtml(item);
+        const scoreBlock = formatRecentEntryScoreBlock(item);
         return `
           <button class="recent-entry" type="button" data-recent-index="${idx}">
             <div class="recent-entry-compact">
@@ -1076,7 +1179,7 @@ function renderHistory() {
             </div>
             <div class="recent-entry-expanded" hidden>
               <div class="recent-entry-prompt">${escapeHtml((item.text || "").trim() || "Writing text wasn’t saved for this run.")}</div>
-              <div class="recent-entry-stats">Score ${item.score} · ${item.words} words</div>
+              ${scoreBlock}
               <div class="recent-entry-detail">${detail}</div>
               <div class="recent-entry-future-meta" aria-hidden="true"></div>
             </div>
@@ -1189,7 +1292,7 @@ function aggregateProfile() {
   };
 
   state.history.forEach(run => {
-    agg.totalWords += run.words;
+    agg.totalWords += run.wordCount ?? run.words ?? 0;
     agg.totalUniqueRatio += run.uniqueRatio || 0;
     agg.avgSentenceLength += run.avgSentenceLength || 0;
     agg.repetitionPressure += run.repeatedCount || 0;
@@ -1602,9 +1705,12 @@ function submitWriting(fromTimer = false) {
 
   const currentText = getEditorText();
   const analysis = analyze(currentText);
-  clearExerciseIfCompleted(currentText);
 
   if (analysis.totalWords === 0) return;
+
+  const challengeActive = Boolean(state.exerciseWord);
+  clearExerciseIfCompleted(currentText);
+  const challengeCompleted = challengeActive && !state.exerciseWord;
 
   state.submitted = true;
   updateEnterButtonVisibility();
@@ -1617,6 +1723,13 @@ function submitWriting(fromTimer = false) {
     if (!starterExamplesMap[item.starter]) starterExamplesMap[item.starter] = item.excerpt;
   });
 
+  const activeTargetWords = getActiveTargetWordsForScoring();
+  const { runScore, scoreBreakdown } = computeRunScoreV1(
+    analysis,
+    state.repeatLimit,
+    activeTargetWords
+  );
+
   const run = {
     runId: makeRunId(),
     savedAt: Date.now(),
@@ -1625,7 +1738,14 @@ function submitWriting(fromTimer = false) {
     repeatedWords: analysis.repeated,
     bannedHits: analysis.bannedHits,
     repeatedStarters: analysis.repeatedStarters,
-    score: analysis.score,
+    score: runScore,
+    runScore,
+    scoreBreakdown,
+    challengeActive,
+    challengeCompleted,
+    activeTargetWords,
+    wordCount: analysis.totalWords,
+    repeatLimitAtRun: state.repeatLimit,
     words: analysis.totalWords,
     unique: analysis.uniqueCount,
     uniqueRatio: analysis.uniqueRatio,

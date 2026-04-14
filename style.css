@@ -1516,6 +1516,20 @@ html[data-theme="dark"] .recent-drawer{
   color:var(--muted);
 }
 
+.recent-entry-score-breakdown{
+  margin-top:6px;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  font-size:12px;
+  line-height:1.35;
+  color:var(--muted);
+}
+
+.recent-entry-score-row{
+  padding:0;
+}
+
 .recent-entry-detail{
   margin-top:10px;
 }
