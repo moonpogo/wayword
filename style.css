@@ -822,8 +822,8 @@ html[data-theme="dark"] .theme-moon{
 .highlight-layer,
 .editor-input{
   margin:0;
-  padding:20px 28px 34px 28px;
-  font:18px/1.72 Georgia,"Times New Roman",serif;
+  padding:20px 28px 42px 28px;
+  font:18px/1.88 Georgia,"Times New Roman",serif;
   tab-size:4;
   white-space:pre-wrap;
   word-wrap:break-word;
@@ -841,6 +841,10 @@ html[data-theme="dark"] .theme-moon{
   color:var(--ink);
 }
 
+.highlight-layer.hidden{
+  display:none !important;
+}
+
 .highlight-layer .token-text{
   color:inherit;
 }
@@ -852,8 +856,7 @@ html[data-theme="dark"] .theme-moon{
   border:0;
   outline:none;
   background:transparent;
-  color:transparent;
-  -webkit-text-fill-color:transparent;
+  color:var(--ink);
   caret-color:var(--ink);
   z-index:3;
   overflow:auto;
@@ -868,7 +871,139 @@ html[data-theme="dark"] .theme-moon{
   cursor:default;
 }
 
-.editor-input:empty::before{
+/* Phase 2 step 5: geometry-only token dots (pointer-events none; not text, not selection). */
+.editor-dot-overlay{
+  position:absolute;
+  pointer-events:none;
+  z-index:4;
+  overflow:visible;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+/* Center of the flex row sits on token anchor (translateX(-50%) on group). */
+.editor-token-dot-group{
+  position:absolute;
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  transform:translateX(-50%);
+  pointer-events:none;
+}
+
+.editor-token-dot-group .editor-token-dot{
+  position:relative;
+  left:auto;
+  top:auto;
+  transform:none;
+  flex-shrink:0;
+  min-width:6px;
+  min-height:6px;
+}
+
+.editor-token-dot{
+  position:absolute;
+  width:6px;
+  height:6px;
+  margin:0;
+  padding:0;
+  border-radius:50%;
+  transform:translateX(-50%);
+  background:color-mix(in srgb, var(--muted) 50%, var(--ink));
+  opacity:0.58;
+  box-sizing:border-box;
+}
+
+html[data-theme="dark"] .editor-token-dot{
+  background:color-mix(in srgb, var(--muted) 38%, var(--ink));
+  opacity:0.52;
+}
+
+.editor-token-dot--filler{
+  background:color-mix(in srgb, var(--bad) 78%, var(--ink));
+  opacity:0.62;
+}
+
+.editor-token-dot--repetition{
+  background:color-mix(in srgb, var(--warn) 78%, var(--ink));
+  opacity:0.62;
+}
+
+.editor-token-dot--opening{
+  background:color-mix(in srgb, var(--purple) 78%, var(--ink));
+  opacity:0.62;
+}
+
+html[data-theme="dark"] .editor-token-dot--filler{
+  background:color-mix(in srgb, var(--bad) 72%, var(--paper));
+  opacity:0.58;
+}
+
+html[data-theme="dark"] .editor-token-dot--repetition{
+  background:color-mix(in srgb, var(--warn) 72%, var(--paper));
+  opacity:0.58;
+}
+
+html[data-theme="dark"] .editor-token-dot--opening{
+  background:color-mix(in srgb, var(--purple) 72%, var(--paper));
+  opacity:0.58;
+}
+
+/* Phase 3 Step 2: minimal in-editor semantic picker (writeDoc-only apply; not a text layer). */
+.editor-semantic-picker{
+  position:absolute;
+  z-index:8;
+  display:flex;
+  flex-direction:row;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:4px;
+  max-width:min(100%, 280px);
+  padding:5px 7px;
+  border-radius:10px;
+  border:1px solid color-mix(in srgb, var(--line) 65%, var(--ink));
+  background:color-mix(in srgb, var(--panel) 94%, var(--soft));
+  box-shadow:0 4px 14px rgba(0, 0, 0, 0.12);
+  pointer-events:auto;
+}
+
+.editor-semantic-picker.hidden{
+  display:none !important;
+}
+
+html[data-theme="dark"] .editor-semantic-picker{
+  border-color:color-mix(in srgb, var(--line) 50%, var(--ink));
+  background:color-mix(in srgb, var(--panel) 92%, var(--soft));
+  box-shadow:0 3px 12px rgba(0, 0, 0, 0.22);
+}
+
+.editor-semantic-picker-btn{
+  margin:0;
+  padding:3px 8px;
+  border-radius:6px;
+  border:1px solid color-mix(in srgb, var(--line) 70%, var(--soft));
+  background:color-mix(in srgb, var(--panel) 88%, var(--soft));
+  color:var(--ink);
+  font-size:11px;
+  letter-spacing:0.03em;
+  line-height:1.2;
+  cursor:pointer;
+  white-space:nowrap;
+  touch-action:manipulation;
+}
+
+.editor-semantic-picker-btn:hover{
+  border-color:color-mix(in srgb, var(--ink) 22%, var(--line));
+}
+
+.editor-semantic-picker-btn--clear{
+  border-color:color-mix(in srgb, var(--muted) 55%, var(--line));
+  color:var(--muted);
+}
+
+.editor-input.is-empty::before{
   content:attr(data-placeholder);
   color:var(--muted);
   opacity:0.55;
@@ -900,18 +1035,61 @@ html[data-theme="dark"] .theme-moon{
   box-shadow:0 10px 30px rgba(0,0,0,0.14);
 }
 
-.editor-gear-btn{
+/*
+ * Bottom strip: symmetric side lanes (gear / enter counterweight) + centered progress.
+ * Enter stays its own absolute control (z-index above); right lane reserves matching width.
+ */
+.editor-bottom-chrome{
   position:absolute;
-  top:14px;
-  right:14px;
+  left:10px;
+  right:10px;
+  bottom:15px;
+  z-index:6;
+  display:grid;
+  grid-template-columns:minmax(44px, 52px) minmax(0, 1fr) minmax(44px, 52px);
+  align-items:center;
+  column-gap:12px;
+  pointer-events:none;
+}
+
+.editor-bottom-chrome-left{
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  min-width:0;
+  /* Nudge into the shell’s rounded corner so the gear reads as corner chrome, not mid-edge */
+  padding:0 0 2px 5px;
+  margin-left:1px;
+  margin-bottom:1px;
+  pointer-events:none;
+}
+
+.editor-bottom-chrome-left .editor-gear-btn{
+  position:relative;
+  inset:auto;
+  pointer-events:auto;
+}
+
+.editor-bottom-chrome-center{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-width:0;
+}
+
+.editor-bottom-chrome-right{
+  min-width:0;
+  pointer-events:none;
+}
+
+.editor-gear-btn{
   background:none;
   border:none;
   padding:4px;
   color:var(--ink);
-  opacity:0.35;
+  opacity:0.32;
   cursor:pointer;
   transition:opacity 0.2s ease, transform 0.2s ease;
-  z-index:6;
 }
 
 .editor-gear-btn:hover{
@@ -949,16 +1127,29 @@ html[data-theme="dark"] .editor-time-fill{
   z-index:6;
 }
 
-.editor-progress{
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  bottom:16px;
-  width:68%;
-  max-width:420px;
-  min-width:220px;
+.editor-bottom-chrome-center .editor-progress{
+  position:relative;
+  inset:auto;
+  flex:0 1 auto;
+  width:min(420px, 100%);
+  max-width:100%;
   height:18px;
-  z-index:6;
+  pointer-events:auto;
+}
+
+@media (min-width:720px){
+  .editor-bottom-chrome{
+    left:14px;
+    right:14px;
+    bottom:16px;
+    column-gap:14px;
+    grid-template-columns:minmax(48px, 58px) minmax(0, 1fr) minmax(48px, 58px);
+  }
+
+  .editor-bottom-chrome-left{
+    padding:0 0 2px 8px;
+    margin-left:2px;
+  }
 }
 
 .editor-progress-track{
@@ -1067,11 +1258,179 @@ html[data-theme="dark"] .progress-marker.filled::before{
   margin-top:12px;
 }
 
+/* Phase 2: read-only token slots (writeDoc only; no contenteditable; not a text source) */
+.annotation-row{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:4px 6px;
+  max-height:52px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:4px 2px 2px;
+  margin:-4px 0 0;
+  font-size:11px;
+  letter-spacing:0.04em;
+  color:var(--muted);
+  border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.annotation-row.hidden{
+  display:none !important;
+}
+
+/* Shown only with ?annotationRow=1 — reads as dev scaffolding, not main chrome */
+.annotation-row.annotation-row--debug-scaffold{
+  border-top-style:dashed;
+  opacity:0.88;
+}
+
+.annotation-slot{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  flex:0 0 auto;
+  max-width:7.5rem;
+  min-height:1.25em;
+  padding:2px 7px;
+  border-radius:6px;
+  border:1px solid color-mix(in srgb, var(--line) 70%, var(--soft));
+  background:color-mix(in srgb, var(--panel) 88%, var(--soft));
+  overflow:hidden;
+  line-height:1.25;
+}
+
+.annotation-slot--toggle{
+  pointer-events:auto;
+  cursor:pointer;
+}
+
+.annotation-slot--toggle:focus{
+  outline:1px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  outline-offset:1px;
+}
+
+.annotation-slot--toggle:focus:not(:focus-visible){
+  outline:none;
+}
+
+.annotation-slot-dots{
+  display:inline-flex;
+  flex-direction:row;
+  align-items:center;
+  gap:2px;
+  flex-shrink:0;
+}
+
+.annotation-slot-text{
+  min-width:0;
+  flex:1 1 auto;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.annotation-dot{
+  width:5px;
+  height:5px;
+  min-width:5px;
+  min-height:5px;
+  flex-shrink:0;
+  border-radius:50%;
+  background:color-mix(in srgb, var(--muted) 55%, var(--ink));
+  opacity:0.55;
+}
+
+html[data-theme="dark"] .annotation-dot{
+  background:color-mix(in srgb, var(--muted) 40%, var(--ink));
+  opacity:0.5;
+}
+
+.annotation-dot--filler{
+  background:color-mix(in srgb, var(--bad) 75%, var(--ink));
+  opacity:0.58;
+}
+
+.annotation-dot--repetition{
+  background:color-mix(in srgb, var(--warn) 75%, var(--ink));
+  opacity:0.58;
+}
+
+.annotation-dot--opening{
+  background:color-mix(in srgb, var(--purple) 75%, var(--ink));
+  opacity:0.58;
+}
+
+html[data-theme="dark"] .annotation-dot--filler{
+  background:color-mix(in srgb, var(--bad) 70%, var(--paper));
+  opacity:0.54;
+}
+
+html[data-theme="dark"] .annotation-dot--repetition{
+  background:color-mix(in srgb, var(--warn) 70%, var(--paper));
+  opacity:0.54;
+}
+
+html[data-theme="dark"] .annotation-dot--opening{
+  background:color-mix(in srgb, var(--purple) 70%, var(--paper));
+  opacity:0.54;
+}
+
+.annotation-slot--filler{
+  border-left:2px solid color-mix(in srgb, var(--bad) 55%, var(--line));
+}
+
+.annotation-slot--repetition{
+  border-left:2px solid color-mix(in srgb, var(--warn) 55%, var(--line));
+}
+
+.annotation-slot--opening{
+  border-left:2px solid color-mix(in srgb, var(--purple) 55%, var(--line));
+}
+
+.annotation-line-gap{
+  flex:0 0 auto;
+  padding:0 1px;
+  opacity:0.5;
+  font-size:10px;
+}
+
 .legend-row{
   display:flex;
   flex-wrap:wrap;
   gap:10px;
   align-items:center;
+}
+
+/* Phase 3: calm readout under editor — matches dot colors; counts from writeDoc flags (no mirrored text). */
+.semantic-status-bar{
+  margin-top:2px;
+  max-width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+
+.semantic-status-bar::-webkit-scrollbar{
+  display:none;
+}
+
+.legend-pill--inactive{
+  opacity:0.48;
+  border-color:color-mix(in srgb, var(--line) 88%, var(--soft));
+  background:color-mix(in srgb, var(--panel) 94%, var(--soft));
+}
+
+.legend-pill--inactive .legend-swatch{
+  opacity:0.65;
+}
+
+.legend-pill--inactive .legend-count{
+  font-weight:600;
+  color:var(--muted);
 }
 
 /* highlights */
@@ -2253,14 +2612,21 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 
   body.focus-mode .highlight-layer,
   body.focus-mode .editor-input{
-    padding:12px 14px 24px 14px;
-    font:16px/1.55 Georgia,"Times New Roman",serif;
+    padding:12px 14px 27px 14px;
+    font:16px/1.70 Georgia,"Times New Roman",serif;
   }
 
-  body.focus-mode .editor-progress{
+  body.focus-mode .editor-bottom-chrome{
     bottom:10px;
+    left:8px;
+    right:8px;
+    column-gap:8px;
+    grid-template-columns:minmax(40px, 48px) minmax(0, 1fr) minmax(40px, 48px);
+  }
+
+  body.focus-mode .editor-bottom-chrome-center .editor-progress{
     min-width:140px;
-    width:66%;
+    width:min(420px, 100%);
   }
 
   body.focus-mode .editor-timer{
@@ -2331,8 +2697,8 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 
   body.focus-mode .highlight-layer,
   body.focus-mode .editor-input{
-    padding:10px 12px 20px 12px;
-    font:15px/1.45 Georgia,"Times New Roman",serif;
+    padding:10px 12px 23px 12px;
+    font:15px/1.60 Georgia,"Times New Roman",serif;
   }
 
   body.focus-mode .below-editor-stack{
@@ -2373,8 +2739,8 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 
   .highlight-layer,
   .editor-input{
-    padding:16px 18px 30px 18px;
-    font:17px/1.68 Georgia,"Times New Roman",serif;
+    padding:16px 18px 38px 18px;
+    font:17px/1.82 Georgia,"Times New Roman",serif;
   }
 
   .style-tab{
@@ -2399,14 +2765,22 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     height:100%;
   }
 
-  .editor-progress{
-    left:50%;
-    right:auto;
-    transform:translateX(-50%);
-    width:72%;
-    max-width:360px;
-    min-width:180px;
+  .editor-bottom-chrome{
+    left:8px;
+    right:8px;
     bottom:14px;
+    column-gap:8px;
+    grid-template-columns:minmax(40px, 48px) minmax(0, 1fr) minmax(40px, 48px);
+  }
+
+  .editor-bottom-chrome-center .editor-progress{
+    width:min(360px, 100%);
+    min-width:min(160px, 42vw);
+  }
+
+  .editor-bottom-chrome-left{
+    padding:0 0 1px 3px;
+    margin-left:0;
   }
 
   .editor-timer{

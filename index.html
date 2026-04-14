@@ -241,13 +241,6 @@
             </div>
 
             <div class="editor-shell">
-              <button id="optionsTrigger" class="editor-gear-btn" type="button" aria-label="Options" title="Options">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.4 1z"></path>
-                </svg>
-              </button>
-
               <div id="editorOptionsPanel" class="editor-options-panel hidden">
                 <div class="editor-options-toprow">
                   <div class="editor-options-section editor-options-utility">
@@ -290,7 +283,7 @@
                 </div>
               </div>
               
-              <div id="highlightLayer" class="highlight-layer" aria-hidden="true"></div>
+              <div id="highlightLayer" class="highlight-layer hidden" aria-hidden="true"></div>
               
               <div
                 id="editorInput"
@@ -302,6 +295,33 @@
                 data-placeholder=""
               ></div>
 
+              <div id="editorDotOverlay" class="editor-dot-overlay" aria-hidden="true"></div>
+
+              <div
+                id="editorSemanticPicker"
+                class="editor-semantic-picker hidden"
+                role="group"
+                aria-label="Semantic tags for selected word (toggle each)"
+              >
+                <button type="button" class="editor-semantic-picker-btn" data-semantic-choice="filler" title="Toggle filler tag">
+                  Filler
+                </button>
+                <button type="button" class="editor-semantic-picker-btn" data-semantic-choice="repetition" title="Toggle repetition tag">
+                  Rep
+                </button>
+                <button type="button" class="editor-semantic-picker-btn" data-semantic-choice="opening" title="Toggle opening tag">
+                  Open
+                </button>
+                <button
+                  type="button"
+                  class="editor-semantic-picker-btn editor-semantic-picker-btn--clear"
+                  data-semantic-choice="clear"
+                  title="Clear all tags on this word"
+                >
+                  Clear
+                </button>
+              </div>
+
               <button id="enterSubmitBtn" class="enter-submit-btn hidden" type="button" aria-label="Submit">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <polyline points="9 10 4 15 9 20"></polyline>
@@ -312,11 +332,24 @@
               <div id="editorTimeFill" class="editor-time-fill" aria-hidden="true"></div>
               <div id="editorTimer" class="editor-timer hidden"></div>
 
-              <div class="editor-progress" aria-hidden="true">
-                <div class="editor-progress-track">
-                  <div id="editorProgressMarkers" class="editor-progress-markers"></div>
-                  <div id="editorProgressFill" class="editor-progress-fill"></div>
+              <div class="editor-bottom-chrome">
+                <div class="editor-bottom-chrome-left">
+                  <button id="optionsTrigger" class="editor-gear-btn" type="button" aria-label="Options" title="Options">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.4 1z"></path>
+                    </svg>
+                  </button>
                 </div>
+                <div class="editor-bottom-chrome-center">
+                  <div class="editor-progress" aria-hidden="true">
+                    <div class="editor-progress-track">
+                      <div id="editorProgressMarkers" class="editor-progress-markers"></div>
+                      <div id="editorProgressFill" class="editor-progress-fill"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="editor-bottom-chrome-right" aria-hidden="true"></div>
               </div>
 
               <div class="editor-overlay hidden" id="editorOverlay">
@@ -325,27 +358,34 @@
             </div>
 
             <div class="below-editor-stack">
-              <div class="legend-row">
-                <div class="legend-pill legend-red-pill">
-                  <span class="legend-swatch legend-red-swatch"></span>
+              <!-- Debug scaffolding: add ?annotationRow=1 to URL to show token row under editor -->
+              <div id="annotationRow" class="annotation-row hidden"></div>
+              <div
+                id="editorSemanticStatusBar"
+                class="legend-row semantic-status-bar"
+                role="group"
+                aria-label="Semantic highlights in this draft"
+              >
+                <div id="legendPillFiller" class="legend-pill legend-red-pill legend-pill--inactive">
+                  <span class="legend-swatch legend-red-swatch" aria-hidden="true"></span>
                   <span class="legend-text">Filler</span>
                   <span id="legendRedCount" class="legend-count">0</span>
                 </div>
 
-                <div class="legend-pill legend-yellow-pill">
-                  <span class="legend-swatch legend-yellow-swatch"></span>
+                <div id="legendPillRepetition" class="legend-pill legend-yellow-pill legend-pill--inactive">
+                  <span class="legend-swatch legend-yellow-swatch" aria-hidden="true"></span>
                   <span class="legend-text">Repetition</span>
                   <span id="legendYellowCount" class="legend-count">0</span>
                 </div>
 
-                <div class="legend-pill legend-purple-pill">
-                  <span class="legend-swatch legend-purple-swatch"></span>
+                <div id="legendPillOpening" class="legend-pill legend-purple-pill legend-pill--inactive">
+                  <span class="legend-swatch legend-purple-swatch" aria-hidden="true"></span>
                   <span class="legend-text">Openings</span>
                   <span id="legendPurpleCount" class="legend-count">0</span>
                 </div>
 
                 <div id="exerciseLegendPill" class="legend-pill legend-blue-pill hidden">
-                  <span class="legend-swatch legend-blue-swatch"></span>
+                  <span class="legend-swatch legend-blue-swatch" aria-hidden="true"></span>
                   <span class="legend-text">Challenge</span>
                   <span id="legendBlueCount" class="legend-count">0</span>
                 </div>

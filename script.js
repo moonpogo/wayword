@@ -111,11 +111,19 @@ const state = {
   pendingTimerSeconds: 0,
   promptRerollsUsed: 0,
   pendingRecentDrawerExpand: false,
+  writeDoc: { lines: [{ tokens: [], trailingSpace: false }] }
 };
+
+let editorSurfaceComposing = false;
+
+/** Selection snapshot before annotation slot takes focus away from the editor (canonical offsets). */
+let annotationRowPendingEditorSel = null;
 
 const input = document.querySelector('.editor-input');
 
 const editorInput = $("editorInput");
+const editorDotOverlay = $("editorDotOverlay");
+const editorSemanticPicker = $("editorSemanticPicker");
 const highlightLayer = $("highlightLayer");
 const wordmark = $("wordmark");
 const statusToast = $("statusToast");
@@ -149,6 +157,7 @@ function queueViewportSync() {
     viewportSyncRaf = null;
     syncViewportHeightVar();
     if (!isMobileViewport()) setFocusMode(false);
+    scheduleEditorDotOverlaySync();
   });
 }
 
@@ -164,13 +173,375 @@ let settleTimer = null;
    landing/app state
 ----------------------------- */
 
+function emptyWriteDoc() {
+  return { lines: [{ tokens: [], trailingSpace: false }] };
+}
+
+/** One line’s contribution to `serializeWriteDoc` (no newline). Single source for segment length / walks. */
+function writeDocLineSegmentString(line) {
+  const body = (line.tokens || []).map((t) => t.text).join(" ");
+  return line.trailingSpace ? `${body} ` : body;
+}
+
+function serializeWriteDoc(doc) {
+  if (!doc || !Array.isArray(doc.lines) || !doc.lines.length) return "";
+  return doc.lines.map(writeDocLineSegmentString).join("\n");
+}
+
+/** Supported semantic ids; stable merge / render order. */
+const SEMANTIC_FLAG_IDS = ["filler", "repetition", "opening"];
+
+/** Deduped subset of SEMANTIC_FLAG_IDS in canonical order (not serialized into text). */
+function normalizeSemanticFlagsArray(flags) {
+  if (!Array.isArray(flags)) return [];
+  const out = [];
+  for (const id of SEMANTIC_FLAG_IDS) {
+    if (flags.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+function getOrderedSemanticFlagsForToken(token) {
+  return normalizeSemanticFlagsArray(Array.isArray(token?.flags) ? token.flags : []);
+}
+
+/** Per-category token membership: a token with k flags increments k categories (matches inline dots). */
+function countWriteDocSemanticFlagsOnTokens() {
+  const n = { filler: 0, repetition: 0, opening: 0 };
+  for (const line of state.writeDoc?.lines || []) {
+    for (const token of line.tokens || []) {
+      for (const id of getOrderedSemanticFlagsForToken(token)) {
+        if (id === "filler") n.filler += 1;
+        else if (id === "repetition") n.repetition += 1;
+        else if (id === "opening") n.opening += 1;
+      }
+    }
+  }
+  return n;
+}
+
+function writeDocCanonicalLength(doc) {
+  return serializeWriteDoc(doc).length;
+}
+
+/**
+ * Phase 2 step 1: canonical string offset ↔ logical position (pure; matches serialize only).
+ * DOM must not be consulted. Geometry will use rects later, not these helpers.
+ *
+ * Position kinds:
+ * - token: inside a word token (offsetInToken 0..text.length inclusive for caret endpoints)
+ * - join: on the single inter-word space after tokens[afterTokenIndex]
+ * - trailing: on the line’s single trailing space when line.trailingSpace
+ * - newline: on the \n after line `afterLineIndex`
+ * - lineEnd: immediately after this line’s segment (same canonical offset as end of trailing space +1, or after last body char)
+ * - eof: empty / degenerate doc (offset clipped)
+ */
+function offsetToLogicalPos(writeDoc, offset) {
+  const lines = writeDoc?.lines;
+  const total = writeDocCanonicalLength(writeDoc);
+  const o = Math.max(0, Math.min(offset, total));
+  if (!lines?.length) return { kind: "eof", offset: o };
+
+  let cursor = 0;
+  for (let li = 0; li < lines.length; li++) {
+    const seg = writeDocLineSegmentString(lines[li]);
+    const segLen = seg.length;
+    if (o < cursor + segLen) {
+      return offsetToLogicalPosWithinLine(lines[li], li, o - cursor);
+    }
+    if (o === cursor + segLen && li < lines.length - 1) {
+      return { kind: "newline", afterLineIndex: li };
+    }
+    cursor += segLen;
+    if (li < lines.length - 1) {
+      if (o === cursor) {
+        return { kind: "newline", afterLineIndex: li };
+      }
+      cursor += 1;
+    }
+  }
+  return { kind: "lineEnd", lineIndex: lines.length - 1 };
+}
+
+function offsetToLogicalPosWithinLine(line, lineIndex, o) {
+  const tokens = line.tokens || [];
+  let cur = 0;
+  for (let ti = 0; ti < tokens.length; ti++) {
+    const w = tokens[ti].text;
+    const wlen = w.length;
+    if (o < cur + wlen) {
+      return { kind: "token", lineIndex, tokenIndex: ti, offsetInToken: o - cur };
+    }
+    cur += wlen;
+    if (ti < tokens.length - 1) {
+      if (o === cur) {
+        return { kind: "join", lineIndex, afterTokenIndex: ti };
+      }
+      cur += 1;
+    }
+  }
+  if (line.trailingSpace && o === cur) {
+    return { kind: "trailing", lineIndex };
+  }
+  if (o === cur) {
+    return { kind: "lineEnd", lineIndex };
+  }
+  return { kind: "lineEnd", lineIndex };
+}
+
+function offsetAtLineStart(writeDoc, lineIndex) {
+  let c = 0;
+  const lines = writeDoc.lines;
+  for (let li = 0; li < lineIndex; li++) {
+    c += writeDocLineSegmentString(lines[li]).length + 1;
+  }
+  return c;
+}
+
+function logicalPosToOffset(writeDoc, pos) {
+  const lines = writeDoc?.lines;
+  if (!lines?.length) {
+    const total = writeDocCanonicalLength(writeDoc);
+    return Math.min(Math.max(0, pos.offset ?? 0), total);
+  }
+
+  if (pos.kind === "eof") {
+    return Math.min(Math.max(0, pos.offset ?? 0), writeDocCanonicalLength(writeDoc));
+  }
+  if (pos.kind === "newline") {
+    const li = pos.afterLineIndex;
+    return offsetAtLineStart(writeDoc, li) + writeDocLineSegmentString(lines[li]).length;
+  }
+  if (pos.kind === "lineEnd") {
+    const li = pos.lineIndex;
+    return offsetAtLineStart(writeDoc, li) + writeDocLineSegmentString(lines[li]).length;
+  }
+
+  const base = offsetAtLineStart(writeDoc, pos.lineIndex);
+  const line = lines[pos.lineIndex];
+  const tokens = line.tokens || [];
+
+  if (pos.kind === "trailing") {
+    const segLen = writeDocLineSegmentString(line).length;
+    if (!line.trailingSpace || segLen === 0) return base;
+    return base + segLen - 1;
+  }
+  if (pos.kind === "join") {
+    let cur = 0;
+    for (let ti = 0; ti <= pos.afterTokenIndex; ti++) {
+      cur += tokens[ti].text.length;
+      if (ti < pos.afterTokenIndex) cur += 1;
+    }
+    return base + cur;
+  }
+  if (pos.kind === "token") {
+    let cur = 0;
+    for (let ti = 0; ti < pos.tokenIndex; ti++) {
+      cur += tokens[ti].text.length;
+      if (ti < tokens.length - 1) cur += 1;
+    }
+    return base + cur + pos.offsetInToken;
+  }
+  return 0;
+}
+
+/** Half-open [start, end) canonical offsets for one word token; matches serialize layout only. */
+function tokenCanonicalCharRangeHalfOpen(writeDoc, lineIndex, tokenIndex) {
+  const token = writeDoc?.lines?.[lineIndex]?.tokens?.[tokenIndex];
+  if (!token || !token.text) return null;
+  const start = logicalPosToOffset(writeDoc, {
+    kind: "token",
+    lineIndex,
+    tokenIndex,
+    offsetInToken: 0
+  });
+  const end = logicalPosToOffset(writeDoc, {
+    kind: "token",
+    lineIndex,
+    tokenIndex,
+    offsetInToken: token.text.length
+  });
+  if (start < 0 || end < start) return null;
+  return { start, end };
+}
+
+/** Half-open [start,end) equals exactly one word token span in writeDoc, or null. */
+function findExactSingleTokenForCanonicalRange(writeDoc, start, end) {
+  if (start >= end) return null;
+  const lines = writeDoc?.lines;
+  if (!lines?.length) return null;
+  for (let li = 0; li < lines.length; li++) {
+    const tokens = lines[li].tokens || [];
+    for (let ti = 0; ti < tokens.length; ti++) {
+      const range = tokenCanonicalCharRangeHalfOpen(writeDoc, li, ti);
+      if (range && range.start === start && range.end === end) {
+        return { lineIndex: li, tokenIndex: ti, start, end };
+      }
+    }
+  }
+  return null;
+}
+
+/** Dev-only: `?writeDocMapping=1` runs round-trip checks vs serializeWriteDoc. */
+function verifyWriteDocCanonicalMappingSelfTest() {
+  const samples = [
+    "",
+    "a",
+    "a b",
+    "maybe like maybe",
+    "maybe ",
+    "maybe like ",
+    "a\nb",
+    "\n",
+    "a\n\nb",
+    "word ",
+    "  leading collapsed in parse",
+    "x"
+  ];
+  for (const s of samples) {
+    const doc = parseRawToWriteDoc(s);
+    const canon = serializeWriteDoc(doc);
+    const n = canon.length;
+    for (let o = 0; o <= n; o++) {
+      const p = offsetToLogicalPos(doc, o);
+      const o2 = logicalPosToOffset(doc, p);
+      if (o2 !== o) {
+        console.error("writeDoc mapping mismatch", { s, canon, o, p, o2 });
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/** DOM read for flush: must match actual text nodes (preserves trailing spaces). `innerText` strips trailing whitespace and breaks the token round-trip. */
+function getEditorSurfaceRawText(root) {
+  if (!root) return "";
+  return String(root.textContent ?? "").replace(/\r/g, "");
+}
+
+/** When `previousWriteDoc` is provided (flush path), copies flags for tokens where line index, token index, and text all match the previous doc — keeps flags across re-parse without changing canonical text. */
+function parseRawToWriteDoc(raw, previousWriteDoc) {
+  const s = String(raw ?? "").replace(/\r/g, "");
+  if (s === "") return emptyWriteDoc();
+  const prev = previousWriteDoc === undefined ? null : previousWriteDoc;
+  const parts = s.split("\n");
+  const lines = [];
+  let globalIndex = 0;
+  for (const lineStr of parts) {
+    const pieces = lineStr.match(/[^\s]+/g) || [];
+    const lineIndex = lines.length;
+    const tokens = pieces.map((text, ti) => {
+      const prevTok = prev?.lines?.[lineIndex]?.tokens?.[ti];
+      const rawPrev =
+        prevTok && prevTok.text === text && Array.isArray(prevTok.flags) ? [...prevTok.flags] : [];
+      const flags = normalizeSemanticFlagsArray(rawPrev);
+      return {
+        text,
+        flags,
+        index: globalIndex++
+      };
+    });
+    const trailingSpace = lineStr.length > 0 && /\s$/.test(lineStr);
+    lines.push({ tokens, trailingSpace });
+  }
+  return { lines };
+}
+
+function getOffsetInEditorRoot(root, node, offsetInNode) {
+  if (!root) return 0;
+  if (node === root) {
+    let total = 0;
+    for (let i = 0; i < Math.min(offsetInNode, root.childNodes.length); i++) {
+      const c = root.childNodes[i];
+      if (c && c.nodeType === Node.TEXT_NODE) total += c.textContent.length;
+    }
+    return total;
+  }
+  let total = 0;
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  let n;
+  while ((n = walk.nextNode())) {
+    const len = n.textContent.length;
+    if (n === node) return total + Math.min(Math.max(0, offsetInNode), len);
+    total += len;
+  }
+  return total;
+}
+
+function getSelectionOffsetsForEditorRoot(root) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !root.contains(sel.anchorNode)) {
+    const len = getEditorSurfaceRawText(root).length;
+    return { anchor: len, focus: len, backward: false };
+  }
+  const anchor = getOffsetInEditorRoot(root, sel.anchorNode, sel.anchorOffset);
+  const focus = getOffsetInEditorRoot(root, sel.focusNode, sel.focusOffset);
+  const backward =
+    focus < anchor || (focus === anchor && String(sel.direction || "") === "backward");
+  return { anchor, focus, backward };
+}
+
+function setSelectionOffsetsForEditorRoot(root, anchor, focus, backward) {
+  const sel = window.getSelection();
+  const tn = root.firstChild;
+  if (!tn || tn.nodeType !== Node.TEXT_NODE) return;
+  const len = tn.textContent.length;
+  const a = Math.max(0, Math.min(anchor, len));
+  const f = Math.max(0, Math.min(focus, len));
+  const range = document.createRange();
+  if (backward && a !== f) {
+    range.setStart(tn, f);
+    range.setEnd(tn, a);
+  } else {
+    range.setStart(tn, a);
+    range.setEnd(tn, f);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function projectWriteDocToEditorFromState(anchor, focus, backward) {
+  if (!editorInput) return;
+  const canonical = serializeWriteDoc(state.writeDoc);
+  editorInput.replaceChildren(document.createTextNode(canonical));
+  if (typeof anchor === "number" && typeof focus === "number") {
+    setSelectionOffsetsForEditorRoot(editorInput, anchor, focus, Boolean(backward));
+  }
+  editorInput.classList.toggle("is-empty", !canonical.trim());
+}
+
+function flushEditorSurfaceIntoWriteDocOnce() {
+  if (!editorInput || !state.active || state.submitted) return;
+  if (editorSurfaceComposing) return;
+
+  const raw = getEditorSurfaceRawText(editorInput);
+  const { anchor, focus, backward } = getSelectionOffsetsForEditorRoot(editorInput);
+
+  const previousWriteDoc = state.writeDoc;
+  state.writeDoc = parseRawToWriteDoc(raw, previousWriteDoc);
+  applyWriteDocSemanticFlagsFromAnalysis();
+  const canonical = serializeWriteDoc(state.writeDoc);
+
+  const a = Math.min(anchor, canonical.length);
+  const f = Math.min(focus, canonical.length);
+  projectWriteDocToEditorFromState(a, f, backward);
+  renderAnnotationRow();
+  scheduleEditorDotOverlaySync();
+}
+
 function getEditorText() {
-  return editorInput ? editorInput.innerText.replace(/\r/g, "") : "";
+  return serializeWriteDoc(state.writeDoc);
 }
 
 function setEditorText(text) {
   if (!editorInput) return;
-  editorInput.innerText = text || "";
+  const raw = String(text ?? "").replace(/\r/g, "");
+  state.writeDoc = parseRawToWriteDoc(raw, null);
+  applyWriteDocSemanticFlagsFromAnalysis();
+  projectWriteDocToEditorFromState(0, 0, false);
+  renderAnnotationRow();
+  scheduleEditorDotOverlaySync();
 }
 
 function focusEditorToEnd() {
@@ -178,10 +549,13 @@ function focusEditorToEnd() {
 
   editorInput.focus({ preventScroll: true });
 
+  const tn = editorInput.firstChild;
+  if (!tn || tn.nodeType !== Node.TEXT_NODE) return;
+
   const selection = window.getSelection();
   const range = document.createRange();
-  range.selectNodeContents(editorInput);
-  range.collapse(false);
+  range.setStart(tn, tn.textContent.length);
+  range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
 }
@@ -191,9 +565,12 @@ function focusEditorToStart() {
 
   editorInput.focus({ preventScroll: true });
 
+  const tn = editorInput.firstChild;
+  if (!tn || tn.nodeType !== Node.TEXT_NODE) return;
+
   const selection = window.getSelection();
   const range = document.createRange();
-  range.selectNodeContents(editorInput);
+  range.setStart(tn, 0);
   range.collapse(true);
   selection.removeAllRanges();
   selection.addRange(range);
@@ -833,6 +1210,66 @@ function analyze(text) {
   };
 }
 
+/**
+ * Global word indices (same order as `tokenize(text)` / writeDoc tokens line-major) for the first
+ * word of a sentence when that sentence starter has already opened a sentence before — matches
+ * openings incident counting (repeated starters) without re-parsing differently from `analyze`.
+ */
+function computeOpeningRepeatedStarterFirstWordIndices(text) {
+  const parts = String(text || "")
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const seen = Object.create(null);
+  const indices = new Set();
+  let g = 0;
+  for (const sent of parts) {
+    const words = sent.match(/[^\s]+/g) || [];
+    if (words.length) {
+      const st = normalizeWord(words[0]);
+      if (st) {
+        seen[st] = (seen[st] || 0) + 1;
+        if (seen[st] > 1) indices.add(g);
+      }
+    }
+    g += words.length;
+  }
+  return indices;
+}
+
+/**
+ * Phase 3 Step 4 + 7: set each token's semantic flags from `analyze(serializeWriteDoc)` heuristics only.
+ * Canonical text unchanged; a token may hold any subset of filler | repetition | opening (stable order).
+ */
+function applyWriteDocSemanticFlagsFromAnalysis() {
+  if (!state.active || state.submitted) return;
+  const lines = state.writeDoc?.lines;
+  if (!lines?.length) return;
+
+  const text = serializeWriteDoc(state.writeDoc);
+  const analysis = analyze(text);
+
+  const bannedSet = new Set((state.banned || []).map((w) => normalizeWord(w)).filter(Boolean));
+  const repeatedSet = new Set(analysis.repeated.map(([w]) => w));
+  const openingIndices = computeOpeningRepeatedStarterFirstWordIndices(text);
+
+  let g = 0;
+  const newLines = lines.map((line) => {
+    const tokens = line.tokens || [];
+    const newTokens = tokens.map((token) => {
+      const norm = normalizeWord(token.text);
+      const raw = [];
+      if (norm && bannedSet.has(norm)) raw.push("filler");
+      if (norm && repeatedSet.has(norm)) raw.push("repetition");
+      if (openingIndices.has(g)) raw.push("opening");
+      g += 1;
+      return { ...token, flags: normalizeSemanticFlagsArray(raw) };
+    });
+    return { ...line, tokens: newTokens };
+  });
+  state.writeDoc = { ...state.writeDoc, lines: newLines };
+}
+
 function buildStarterIndexSet(text) {
   const sentenceParts = String(text || "").match(/[^.!?]+[.!?]?\s*/g) || [];
   const startersSeen = {};
@@ -861,51 +1298,536 @@ function buildStarterIndexSet(text) {
 
 function syncScroll() {
   if (!highlightLayer || !editorInput) return;
+  if (highlightLayer.classList.contains("hidden")) return;
   highlightLayer.scrollTop = editorInput.scrollTop;
   highlightLayer.scrollLeft = editorInput.scrollLeft;
 }
 
 function renderHighlight() {
-  if (!highlightLayer || !editorInput) return;
-
-  const text = getEditorText();
-  const counts = countWords(tokenize(text));
-  const pieces = text.match(/[^\s]+|\s+/g) || [];
-  const repeatedStarterIndices = buildStarterIndexSet(text);
-
-  let wordIndex = 0;
-
-  const html = pieces.map(piece => {
-    if (/^\s+$/.test(piece)) {
-      return escapeHtml(piece).replace(/\n/g, "<br>");
-    }
-
-    const norm = normalizeWord(piece);
-    const dots = [];
-
-    const isExercise = !!(norm && state.exerciseWord && norm === state.exerciseWord);
-    const isBanned = !!(norm && state.banned.includes(norm) && !isExercise);
-    const isRepeat = !!(norm && !exemptWords.has(norm) && (counts[norm] || 0) > state.repeatLimit);
-    const isStarterRepeat = repeatedStarterIndices.has(wordIndex);
-
-    if (isExercise) dots.push("dot-blue");
-    else if (isBanned) dots.push("dot-red");
-
-    if (isRepeat) dots.push("dot-yellow");
-    if (isStarterRepeat) dots.push("dot-purple");
-
-    wordIndex += 1;
-
-    if (!dots.length) {
-      return `<span class="token token-plain"><span class="token-text">${escapeHtml(piece)}</span></span>`;
-    }
-
-    const dotsHtml = dots.map(cls => `<span class="dot ${cls}"></span>`).join("");
-    return `<span class="token"><span class="token-text">${escapeHtml(piece)}</span><span class="token-dots">${dotsHtml}</span></span>`;
-  }).join("");
-
-  highlightLayer.innerHTML = html.replace(/\n/g, "<br>");
+  if (highlightLayer) highlightLayer.innerHTML = "";
   syncScroll();
+}
+
+let editorDotOverlayRaf = null;
+
+/** Coalesced geometry pass: writeDoc + Range rects only; never mutates text or writeDoc. */
+function scheduleEditorDotOverlaySync() {
+  if (editorDotOverlayRaf !== null) return;
+  editorDotOverlayRaf = requestAnimationFrame(() => {
+    editorDotOverlayRaf = null;
+    syncEditorDotOverlay();
+  });
+}
+
+/**
+ * Deterministic anchor for dot placement from Range.getClientRects():
+ * choose the rect with greatest width (reads as the main “body” of a wrapped token);
+ * ties: smaller top, then smaller left. No DOM text semantics.
+ */
+function pickDotAnchorRectFromClientRects(rects) {
+  const list = Array.from(rects).filter((r) => r.width > 0.5 && r.height > 0.5);
+  if (!list.length) return null;
+  let best = list[0];
+  for (let i = 1; i < list.length; i++) {
+    const r = list[i];
+    if (r.width > best.width + 0.5) {
+      best = r;
+      continue;
+    }
+    if (Math.abs(r.width - best.width) <= 0.5) {
+      if (r.top < best.top - 0.5) best = r;
+      else if (Math.abs(r.top - best.top) <= 0.5 && r.left < best.left) best = r;
+    }
+  }
+  return best;
+}
+
+/** Must match `.editor-token-dot` width and `.editor-token-dot-group` gap in CSS. */
+const EDITOR_SEMANTIC_DOT_PX = 6;
+const EDITOR_SEMANTIC_DOT_GAP_PX = 4;
+
+function editorSemanticDotGroupHalfWidthPx(flagCount) {
+  const n = Math.max(0, Math.floor(Number(flagCount)) || 0);
+  if (n <= 0) return 0;
+  return (n * EDITOR_SEMANTIC_DOT_PX + Math.max(0, n - 1) * EDITOR_SEMANTIC_DOT_GAP_PX) / 2;
+}
+
+/**
+ * Phase 2 step 5 + Phase 3 step 7: grouped dots per token (1–3), geometry only; group centered on anchor when it fits.
+ */
+function syncEditorDotOverlay() {
+  const overlay = editorDotOverlay;
+  if (!overlay || !editorInput) {
+    return;
+  }
+
+  if (!state.active || state.submitted) {
+    overlay.replaceChildren();
+    return;
+  }
+
+  if (editorInput) {
+    overlay.style.left = `${editorInput.offsetLeft}px`;
+    overlay.style.top = `${editorInput.offsetTop}px`;
+    overlay.style.width = `${editorInput.offsetWidth}px`;
+    overlay.style.height = `${editorInput.offsetHeight}px`;
+  }
+
+  const tn = editorInput.firstChild;
+  if (!tn || tn.nodeType !== Node.TEXT_NODE) {
+    overlay.replaceChildren();
+    return;
+  }
+
+  const live = tn.textContent;
+  const canon = serializeWriteDoc(state.writeDoc);
+  if (live !== canon) {
+    overlay.replaceChildren();
+    return;
+  }
+
+  const lines = state.writeDoc?.lines;
+  if (!lines?.length) {
+    overlay.replaceChildren();
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  const oRect = overlay.getBoundingClientRect();
+  const overlayW = oRect.width;
+  const overlayH = oRect.height;
+  const bottomReservePx = EDITOR_SEMANTIC_DOT_PX + 7;
+
+  for (let li = 0; li < lines.length; li++) {
+    const tokens = lines[li].tokens || [];
+    for (let ti = 0; ti < tokens.length; ti++) {
+      const token = tokens[ti];
+      const sems = getOrderedSemanticFlagsForToken(token);
+      if (!sems.length) continue;
+
+      const range = tokenCanonicalCharRangeHalfOpen(state.writeDoc, li, ti);
+      if (!range || range.end > live.length) continue;
+
+      try {
+        const domRange = document.createRange();
+        domRange.setStart(tn, range.start);
+        domRange.setEnd(tn, range.end);
+        const rects = domRange.getClientRects();
+        const r = pickDotAnchorRectFromClientRects(rects);
+        if (!r) continue;
+
+        const gapBelowAnchorPx = 5;
+        const cxIdeal = r.left + r.width / 2 - oRect.left;
+        const top = r.bottom - oRect.top + gapBelowAnchorPx;
+        const halfW = editorSemanticDotGroupHalfWidthPx(sems.length);
+        const edgePad = 2;
+        let cx = cxIdeal;
+        if (overlayW > 0 && halfW > 0) {
+          if (overlayW <= halfW * 2 + edgePad * 2) {
+            cx = overlayW / 2;
+          } else {
+            cx = Math.max(halfW + edgePad, Math.min(overlayW - halfW - edgePad, cxIdeal));
+          }
+        } else {
+          cx = Math.max(0, Math.min(overlayW, cxIdeal));
+        }
+        const topClamped = Math.max(0, Math.min(overlayH - bottomReservePx, top));
+
+        const group = document.createElement("span");
+        group.className = "editor-token-dot-group";
+        group.setAttribute("aria-hidden", "true");
+        group.style.left = `${cx}px`;
+        group.style.top = `${topClamped}px`;
+
+        for (const id of sems) {
+          const dot = document.createElement("span");
+          dot.className = `editor-token-dot editor-token-dot--${id}`;
+          group.appendChild(dot);
+        }
+
+        frag.appendChild(group);
+      } catch {
+        /* transient range errors — skip dot */
+      }
+    }
+  }
+
+  overlay.replaceChildren(frag);
+}
+
+/**
+ * writeDoc-first (debug row): add next missing flag in filler → repetition → opening order, or clear when full.
+ * Canonical text unchanged; preserves multi-flag state until full then resets.
+ */
+function cycleAnnotationSemanticFlag(lineIndex, tokenIndex) {
+  const lines = state.writeDoc?.lines;
+  if (!lines?.length) return;
+  if (lineIndex < 0 || lineIndex >= lines.length) return;
+  const tokens = lines[lineIndex].tokens || [];
+  if (tokenIndex < 0 || tokenIndex >= tokens.length) return;
+
+  const token = tokens[tokenIndex];
+  const cur = getOrderedSemanticFlagsForToken(token);
+  const have = new Set(cur);
+  for (const id of SEMANTIC_FLAG_IDS) {
+    if (!have.has(id)) {
+      setSemanticFlagsOnToken(lineIndex, tokenIndex, [...cur, id]);
+      return;
+    }
+  }
+  setSemanticFlagsOnToken(lineIndex, tokenIndex, []);
+}
+
+/** writeDoc-only semantic assignment; canonical text unchanged; no editor re-project. */
+function setSemanticFlagsOnToken(lineIndex, tokenIndex, rawFlags) {
+  const flags = !rawFlags || rawFlags.length === 0 ? [] : normalizeSemanticFlagsArray(rawFlags);
+  const lines = state.writeDoc?.lines;
+  if (!lines?.length) return;
+  if (lineIndex < 0 || lineIndex >= lines.length) return;
+  const tokens = lines[lineIndex].tokens || [];
+  if (tokenIndex < 0 || tokenIndex >= tokens.length) return;
+
+  const newLines = lines.map((line, li) => {
+    if (li !== lineIndex) return line;
+    return {
+      ...line,
+      tokens: line.tokens.map((t, ti) => {
+        if (ti !== tokenIndex) return t;
+        return { ...t, flags: [...flags] };
+      })
+    };
+  });
+  state.writeDoc = { ...state.writeDoc, lines: newLines };
+}
+
+let semanticPickerRaf = null;
+
+function scheduleSemanticPickerFromSelection() {
+  if (semanticPickerRaf !== null) return;
+  semanticPickerRaf = requestAnimationFrame(() => {
+    semanticPickerRaf = null;
+    updateEditorSemanticPickerFromSelection();
+  });
+}
+
+function hideEditorSemanticPicker() {
+  editorSemanticPicker?.classList.add("hidden");
+}
+
+/**
+ * Phase 3 Step 2: show a minimal picker when selection is exactly one token (canonical offsets).
+ * Geometry from Range only; semantics from writeDoc mapping only.
+ */
+function updateEditorSemanticPickerFromSelection() {
+  const picker = editorSemanticPicker;
+  if (!picker || !editorInput) return;
+
+  if (!state.active || state.submitted || editorSurfaceComposing) {
+    picker.classList.add("hidden");
+    return;
+  }
+
+  const tn = editorInput.firstChild;
+  if (!tn || tn.nodeType !== Node.TEXT_NODE) {
+    picker.classList.add("hidden");
+    return;
+  }
+
+  if (tn.textContent !== serializeWriteDoc(state.writeDoc)) {
+    picker.classList.add("hidden");
+    return;
+  }
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !editorInput.contains(sel.anchorNode)) {
+    picker.classList.add("hidden");
+    return;
+  }
+
+  const { anchor, focus } = getSelectionOffsetsForEditorRoot(editorInput);
+  const start = Math.min(anchor, focus);
+  const end = Math.max(anchor, focus);
+  if (end <= start) {
+    picker.classList.add("hidden");
+    return;
+  }
+
+  const hit = findExactSingleTokenForCanonicalRange(state.writeDoc, start, end);
+  if (!hit) {
+    picker.classList.add("hidden");
+    return;
+  }
+
+  const shell = document.querySelector(".editor-shell");
+  if (!shell) {
+    picker.classList.add("hidden");
+    return;
+  }
+
+  try {
+    const domRange = document.createRange();
+    domRange.setStart(tn, start);
+    domRange.setEnd(tn, end);
+    const rect = domRange.getBoundingClientRect();
+    if (rect.width < 1 && rect.height < 1) {
+      picker.classList.add("hidden");
+      return;
+    }
+
+    picker.dataset.lineIndex = String(hit.lineIndex);
+    picker.dataset.tokenIndex = String(hit.tokenIndex);
+    picker.classList.remove("hidden");
+
+    const shellRect = shell.getBoundingClientRect();
+    const shellW = shell.clientWidth;
+    const shellH = shell.clientHeight;
+    const pw = picker.offsetWidth;
+    const ph = picker.offsetHeight;
+    const margin = 6;
+
+    let left = rect.left - shellRect.left + rect.width / 2 - pw / 2;
+    left = Math.max(margin, Math.min(left, shellW - pw - margin));
+
+    let top = rect.bottom - shellRect.top + 5;
+    if (top + ph > shellH - margin) {
+      top = rect.top - shellRect.top - ph - 5;
+    }
+    top = Math.max(margin, Math.min(top, shellH - ph - margin));
+
+    picker.style.left = `${left}px`;
+    picker.style.top = `${top}px`;
+  } catch {
+    picker.classList.add("hidden");
+  }
+}
+
+function bindEditorSemanticPicker() {
+  const picker = editorSemanticPicker;
+  if (!picker || picker.dataset.semanticPickerBound === "1") return;
+  picker.dataset.semanticPickerBound = "1";
+
+  picker.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+  });
+
+  picker.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-semantic-choice]");
+    if (!btn) return;
+    e.stopPropagation();
+    const choice = btn.getAttribute("data-semantic-choice");
+    const li = Number(picker.dataset.lineIndex);
+    const ti = Number(picker.dataset.tokenIndex);
+    if (!Number.isInteger(li) || !Number.isInteger(ti)) return;
+    const tokensRow = state.writeDoc?.lines?.[li]?.tokens;
+    const tok = tokensRow?.[ti];
+    if (!tok) return;
+
+    if (choice === "clear") {
+      setSemanticFlagsOnToken(li, ti, []);
+    } else if (SEMANTIC_FLAG_IDS.includes(choice)) {
+      const cur = getOrderedSemanticFlagsForToken(tok);
+      const nextSet = new Set(cur);
+      if (nextSet.has(choice)) nextSet.delete(choice);
+      else nextSet.add(choice);
+      const next = SEMANTIC_FLAG_IDS.filter((id) => nextSet.has(id));
+      setSemanticFlagsOnToken(li, ti, next);
+    } else {
+      return;
+    }
+    hideEditorSemanticPicker();
+    scheduleEditorDotOverlaySync();
+    renderAnnotationRow();
+    renderSidebar();
+  });
+
+  document.addEventListener("selectionchange", () => {
+    scheduleSemanticPickerFromSelection();
+  });
+}
+
+/** Dev-only: `?annotationDots=1` shows sample dots without mutating writeDoc (display path only). */
+function annotationDotsDebugEnabled() {
+  try {
+    return new URLSearchParams(window.location.search).get("annotationDots") === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Dev-only: `?annotationRow=1` shows the token annotation row (Phase 3 debug/scaffolding; not primary UI). */
+function annotationRowDebugEnabled() {
+  try {
+    return new URLSearchParams(window.location.search).get("annotationRow") === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Effective flags for annotation visuals only. Never used for serialize/score/submit.
+ * Uses normalized semantic flags when set; otherwise optional debug samples (no state mutation).
+ */
+function annotationRowEffectiveFlags(token, lineIndex, tokenIndex) {
+  const ordered = getOrderedSemanticFlagsForToken(token);
+  if (ordered.length) return ordered;
+  if (!annotationDotsDebugEnabled()) return [];
+  if (
+    (lineIndex === 0 && tokenIndex === 0) ||
+    (lineIndex === 0 && tokenIndex === 1) ||
+    (lineIndex === 1 && tokenIndex === 0)
+  ) {
+    return ["filler"];
+  }
+  return [];
+}
+
+/**
+ * Debug / scaffolding row only when `?annotationRow=1`. Primary semantics: editor selection picker + inline dots.
+ * Row-only DOM; no editor re-project.
+ */
+function renderAnnotationRow() {
+  const row = $("annotationRow");
+  if (!row) return;
+
+  if (!state.active || state.submitted) {
+    row.classList.add("hidden");
+    row.classList.remove("annotation-row--debug-scaffold");
+    row.replaceChildren();
+    scheduleEditorDotOverlaySync();
+    return;
+  }
+
+  if (!annotationRowDebugEnabled()) {
+    row.classList.add("hidden");
+    row.classList.remove("annotation-row--debug-scaffold");
+    row.replaceChildren();
+    scheduleEditorDotOverlaySync();
+    return;
+  }
+
+  row.classList.remove("hidden");
+  row.classList.add("annotation-row--debug-scaffold");
+  const lines = state.writeDoc?.lines || [];
+  const frag = document.createDocumentFragment();
+
+  for (let li = 0; li < lines.length; li++) {
+    const tokens = lines[li].tokens || [];
+    if (li > 0) {
+      const gap = document.createElement("span");
+      gap.className = "annotation-line-gap";
+      gap.setAttribute("aria-hidden", "true");
+      gap.textContent = "↵";
+      frag.appendChild(gap);
+    }
+    for (let ti = 0; ti < tokens.length; ti++) {
+      const token = tokens[ti];
+      const slot = document.createElement("span");
+      slot.className = "annotation-slot annotation-slot--toggle";
+      slot.dataset.lineIndex = String(li);
+      slot.dataset.tokenIndex = String(ti);
+      slot.setAttribute("role", "button");
+      const effective = annotationRowEffectiveFlags(token, li, ti);
+      const displayLabel = effective.length ? effective.join(", ") : "none";
+      const displaySem = effective[0] || null;
+      slot.setAttribute("aria-pressed", effective.length ? "true" : "false");
+      slot.setAttribute(
+        "aria-label",
+        `Cycle annotation on «${token.text || "·"}», line ${li + 1}. Current: ${displayLabel}. Adds next flag in order or clears when all set.`
+      );
+      if (displaySem && SEMANTIC_FLAG_IDS.includes(displaySem)) {
+        slot.classList.add(`annotation-slot--${displaySem}`);
+      }
+
+      if (effective.length) {
+        const dotWrap = document.createElement("span");
+        dotWrap.className = "annotation-slot-dots";
+        dotWrap.setAttribute("aria-hidden", "true");
+        for (const id of effective) {
+          const dot = document.createElement("span");
+          dot.className = `annotation-dot annotation-dot--${id}`;
+          dotWrap.appendChild(dot);
+        }
+        slot.appendChild(dotWrap);
+      }
+
+      const label = document.createElement("span");
+      label.className = "annotation-slot-text";
+      label.setAttribute("aria-hidden", "true");
+      label.textContent = token.text || "·";
+      slot.appendChild(label);
+
+      slot.title = `Click: add filler → repetition → opening in order; clears after all three. Now: ${displayLabel} · line ${li + 1} · ${token.text || "·"}`;
+
+      frag.appendChild(slot);
+    }
+  }
+
+  if (frag.childNodes.length === 0) {
+    const ph = document.createElement("span");
+    ph.className = "annotation-slot";
+    ph.setAttribute("aria-hidden", "true");
+    ph.title = "No word tokens yet";
+    ph.textContent = "—";
+    frag.appendChild(ph);
+  }
+
+  row.replaceChildren(frag);
+  scheduleEditorDotOverlaySync();
+}
+
+function bindAnnotationRowFlagInteraction() {
+  const row = $("annotationRow");
+  if (!row || row.dataset.flagInteractionBound === "1") return;
+  row.dataset.flagInteractionBound = "1";
+
+  /* Capture on the row only — never document-level — so editor pointer paths stay native. */
+  row.addEventListener(
+    "pointerdown",
+    (e) => {
+      const slot = e.target.closest(".annotation-slot[data-line-index]");
+      if (!slot || !state.active || state.submitted) return;
+      if (editorSurfaceComposing) return;
+      if (editorInput && document.activeElement === editorInput) {
+        annotationRowPendingEditorSel = getSelectionOffsetsForEditorRoot(editorInput);
+      } else {
+        annotationRowPendingEditorSel = null;
+      }
+    },
+    true
+  );
+
+  function finishToggleFromSlot(slot) {
+    if (!slot || editorSurfaceComposing) return;
+    const li = Number(slot.dataset.lineIndex);
+    const ti = Number(slot.dataset.tokenIndex);
+    if (!Number.isInteger(li) || !Number.isInteger(ti)) return;
+    const pending = annotationRowPendingEditorSel;
+    annotationRowPendingEditorSel = null;
+    cycleAnnotationSemanticFlag(li, ti);
+    renderAnnotationRow();
+    if (editorInput) {
+      editorInput.focus({ preventScroll: true });
+      if (pending) {
+        setSelectionOffsetsForEditorRoot(
+          editorInput,
+          pending.anchor,
+          pending.focus,
+          pending.backward
+        );
+      }
+    }
+    scheduleEditorDotOverlaySync();
+    scheduleSemanticPickerFromSelection();
+    renderSidebar();
+  }
+
+  row.addEventListener("click", (e) => {
+    const slot = e.target.closest(".annotation-slot[data-line-index]");
+    if (!slot || !state.active || state.submitted) return;
+    if (editorSurfaceComposing) return;
+    e.preventDefault();
+    finishToggleFromSlot(slot);
+  });
 }
 
 function showEditorOverlay(message = "Submitted", persist = false) {
@@ -1069,35 +1991,44 @@ function renderWritingState() {
       ? "Start typing here..."
       : ""
   );
+  editorInput.classList.toggle("is-empty", !getEditorText().trim());
 
   updateSubmitButtonState();
   renderTimer();
   updateWordProgress();
   updateTimeFill();
+  renderAnnotationRow();
+}
+
+function setSemanticLegendPillState(pillEl, count) {
+  if (!pillEl) return;
+  const c = Math.max(0, Math.floor(Number(count)) || 0);
+  const countEl = pillEl.querySelector(".legend-count");
+  if (countEl) countEl.textContent = String(c);
+  pillEl.classList.toggle("legend-pill--inactive", c === 0);
 }
 
 function renderLegend(analysis) {
   const bluePill = $("exerciseLegendPill");
+  const fillerPill = $("legendPillFiller");
+  const repetitionPill = $("legendPillRepetition");
+  const openingPill = $("legendPillOpening");
 
   if (!state.active || !analysis) {
-    if ($("legendRedCount")) $("legendRedCount").textContent = "0";
-    if ($("legendYellowCount")) $("legendYellowCount").textContent = "0";
-    if ($("legendPurpleCount")) $("legendPurpleCount").textContent = "0";
+    setSemanticLegendPillState(fillerPill, 0);
+    setSemanticLegendPillState(repetitionPill, 0);
+    setSemanticLegendPillState(openingPill, 0);
     if ($("legendBlueCount")) $("legendBlueCount").textContent = "0";
     if (bluePill && !state.exerciseWord) bluePill.classList.add("hidden");
     return;
   }
 
-  const redCount = analysis.bannedHits.filter(i => !i.isExercise).reduce((sum, item) => sum + item.count, 0);
-  const repeatedWordCount = analysis.repeated.reduce((sum, [, count]) => {
-    return sum + (count - state.repeatLimit);
-  }, 0);
-  const purpleCount = analysis.repeatedStarters.reduce((sum, [, count]) => sum + (count - 1), 0);
-  const blueCount = analysis.bannedHits.filter(i => i.isExercise).reduce((sum, item) => sum + item.count, 0);
+  const sem = countWriteDocSemanticFlagsOnTokens();
+  setSemanticLegendPillState(fillerPill, sem.filler);
+  setSemanticLegendPillState(repetitionPill, sem.repetition);
+  setSemanticLegendPillState(openingPill, sem.opening);
 
-  if ($("legendRedCount")) $("legendRedCount").textContent = redCount;
-  if ($("legendYellowCount")) $("legendYellowCount").textContent = repeatedWordCount;
-  if ($("legendPurpleCount")) $("legendPurpleCount").textContent = purpleCount;
+  const blueCount = analysis.bannedHits.filter(i => i.isExercise).reduce((sum, item) => sum + item.count, 0);
   if ($("legendBlueCount")) $("legendBlueCount").textContent = blueCount;
 
   if (bluePill) {
@@ -1663,6 +2594,11 @@ function renderProfile() {
 function cycleRepeatLimit() {
   const next = state.repeatLimit >= 4 ? 1 : state.repeatLimit + 1;
   state.repeatLimit = next;
+  if (state.active && !state.submitted) {
+    applyWriteDocSemanticFlagsFromAnalysis();
+    scheduleEditorDotOverlaySync();
+    renderAnnotationRow();
+  }
   renderMeta();
   renderHighlight();
   renderSidebar();
@@ -1711,6 +2647,11 @@ function saveBannedInline() {
     .filter(Boolean);
 
   setBannedEditorOpen(false);
+  if (state.active && !state.submitted) {
+    applyWriteDocSemanticFlagsFromAnalysis();
+    scheduleEditorDotOverlaySync();
+    renderAnnotationRow();
+  }
   renderMeta();
   renderHighlight();
   renderSidebar();
@@ -1721,6 +2662,11 @@ function triggerShuffle() {
   state.banned = [...bannedSets[Math.floor(Math.random() * bannedSets.length)]];
   applyProgressionToState();
   stopTimer();
+  if (state.active && !state.submitted) {
+    applyWriteDocSemanticFlagsFromAnalysis();
+    scheduleEditorDotOverlaySync();
+    renderAnnotationRow();
+  }
   renderMeta();
   renderHighlight();
   renderSidebar();
@@ -1805,6 +2751,10 @@ function submitWriting(fromTimer = false) {
   if (state.submitted) {
     startWriting();
     return;
+  }
+
+  if (editorInput && !editorSurfaceComposing) {
+    flushEditorSurfaceIntoWriteDocOnce();
   }
 
   const currentText = getEditorText();
@@ -1970,18 +2920,42 @@ if (editorInput) {
   editorInput.addEventListener("blur", () => {
     setFocusMode(false);
     queueViewportSync();
+    hideEditorSemanticPicker();
   });
 
-  editorInput.addEventListener("input", () => {
+  editorInput.addEventListener("compositionstart", () => {
+    editorSurfaceComposing = true;
+  });
+
+  editorInput.addEventListener("compositionend", () => {
+    editorSurfaceComposing = false;
     if (!state.active || state.submitted) return;
+    flushEditorSurfaceIntoWriteDocOnce();
     pulseWordmark();
     renderHighlight();
     renderSidebar();
     updateWordProgress();
     updateEnterButtonVisibility();
+    scheduleSemanticPickerFromSelection();
   });
 
-  editorInput.addEventListener("scroll", syncScroll);
+  editorInput.addEventListener("input", () => {
+    if (!state.active || state.submitted) return;
+    if (editorSurfaceComposing) return;
+    flushEditorSurfaceIntoWriteDocOnce();
+    pulseWordmark();
+    renderHighlight();
+    renderSidebar();
+    updateWordProgress();
+    updateEnterButtonVisibility();
+    scheduleSemanticPickerFromSelection();
+  });
+
+  editorInput.addEventListener("scroll", () => {
+    syncScroll();
+    scheduleEditorDotOverlaySync();
+    scheduleSemanticPickerFromSelection();
+  });
 
   editorInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1999,17 +2973,25 @@ if (editorInput) {
 const editorShell = document.querySelector(".editor-shell");
 
 editorShell?.addEventListener("pointerdown", (e) => {
+  if (e.target.closest("#editorInput")) {
+    annotationRowPendingEditorSel = null;
+  }
+
   const blocked =
     e.target.closest("#optionsTrigger") ||
+    e.target.closest(".editor-progress") ||
     e.target.closest("#editorOptionsPanel") ||
     e.target.closest("#enterSubmitBtn") ||
     e.target.closest("#editorOverlay") ||
+    e.target.closest("#editorSemanticPicker") ||
     e.target.closest("#recentWritingTrigger") ||
     e.target.closest("#recentDrawer") ||
     e.target.closest("#recentDrawerBackdrop");
 
   if (blocked) return;
   if (!state.active || state.submitted) return;
+  /* Clicks on the editable surface must use native caret/selection; only chrome hits focus the end. */
+  if (e.target.closest("#editorInput")) return;
 
   requestAnimationFrame(() => {
     focusEditorToEnd();
@@ -2186,7 +3168,9 @@ applyProgressionToState();
 ensurePromptRerollButton();
 renderMeta();
 renderWritingState();
+projectWriteDocToEditorFromState(0, 0, false);
 renderHighlight();
+scheduleEditorDotOverlaySync();
 renderSidebar();
 renderHistory();
 renderProfile();
@@ -2195,8 +3179,20 @@ renderProfileSummaryStrip();
 updateEnterButtonVisibility();
 if (statusToast) statusToast.classList.add("hidden");
 
+try {
+  if (new URLSearchParams(location.search).get("writeDocMapping") === "1") {
+    if (!verifyWriteDocCanonicalMappingSelfTest()) {
+      console.warn("writeDoc canonical mapping self-test failed (see errors above)");
+    }
+  }
+} catch (_) {
+  /* ignore */
+}
+
 enterLandingState();
 initZenGarden();
+bindAnnotationRowFlagInteraction();
+bindEditorSemanticPicker();
 
 state.pendingTargetWords = state.targetWords;
 state.pendingTimerSeconds = state.timerSeconds;
