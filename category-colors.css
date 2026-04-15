@@ -1,0 +1,15 @@
+/**
+ * Wayword — category accent colors (single source of truth).
+ *
+ * Edit only the four values below to retune the whole app. Everything else
+ * (surfaces, borders, dots, meters, chips, etc.) is derived in style.css
+ * from these tokens via var(--color-*) and color-mix().
+ *
+ * Do not duplicate these hex values elsewhere.
+ */
+:root {
+  --color-filler: #2FA4A9;
+  --color-repetition: #7B61FF;
+  --color-openings: #3F7BFF;
+  --color-challenge: #D14FC4;
+}

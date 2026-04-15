@@ -8,7 +8,7 @@
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
 </head>
 <body>
-  <div class="app-shell">
+  <div class="app-shell app-shell--landing">
 
     <section id="landingView" class="landing-view">
       <div class="landing-gate">
@@ -28,8 +28,50 @@
       </div>
     </section>
 
-    <div id="appView" class="app hidden">
-      <div id="editorOptionsBackdrop" class="editor-options-backdrop hidden"></div>
+    <div id="appView" class="app" aria-hidden="true">
+      <div id="editorOptionsBackdrop" class="editor-options-backdrop dim-layer hidden" aria-hidden="true"></div>
+
+      <div id="editorOptionsPanel" class="editor-options-panel settings-modal hidden" aria-hidden="true">
+        <div class="editor-options-toprow">
+          <div class="editor-options-section editor-options-utility">
+            <div class="editor-options-label">Theme</div>
+            <button id="themeToggleInPanel" class="theme-toggle" type="button" aria-label="Toggle theme">
+              <span class="theme-half theme-sun">☼</span>
+              <span class="theme-half theme-moon">◐</span>
+            </button>
+          </div>
+
+          <div class="editor-options-section editor-options-utility">
+            <div class="editor-options-label">Setup</div>
+            <button id="shuffleBtnPanel" class="pill pill-button" type="button">Shuffle</button>
+          </div>
+        </div>
+
+        <div class="editor-options-section">
+          <div class="editor-options-label">Words</div>
+          <div class="segmented-pill" id="wordModesPanel">
+            <button class="mode-btn active" type="button" data-words="60">60</button>
+            <button class="mode-btn" type="button" data-words="75">75</button>
+            <button class="mode-btn" type="button" data-words="90">90</button>
+          </div>
+        </div>
+
+        <div class="editor-options-section">
+          <div class="editor-options-label">Time</div>
+          <div class="segmented-pill" id="timeModesPanel">
+            <button class="mode-btn active" type="button" data-time="0">Off</button>
+            <button class="mode-btn" type="button" data-time="60">1m</button>
+            <button class="mode-btn" type="button" data-time="180">3m</button>
+            <button class="mode-btn" type="button" data-time="300">5m</button>
+          </div>
+        </div>
+
+        <div class="editor-options-section">
+          <div class="editor-options-label">Words to avoid</div>
+          <input id="bannedInlineInputPanel" class="editor-options-input" type="text" />
+          <button id="saveBannedBtnPanel" class="pill pill-button" type="button">Apply</button>
+        </div>
+      </div>
 
       <div id="zenGarden" class="zen-overlay hidden">
         <div class="zen-shell">
@@ -179,8 +221,8 @@
 
       <div id="statusToast" class="status-toast hidden" aria-live="polite"></div>
 
-      <div id="recentDrawerBackdrop" class="recent-drawer-backdrop hidden" aria-hidden="true"></div>
-      <div id="recentDrawer" class="recent-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="recentDrawerTitle">
+      <div id="recentDrawerBackdrop" class="recent-drawer-backdrop" aria-hidden="true"></div>
+      <div id="recentDrawer" class="recent-drawer" role="dialog" aria-modal="true" aria-labelledby="recentDrawerTitle" aria-hidden="true">
         <div class="recent-drawer-header">
           <div id="recentDrawerTitle" class="recent-drawer-title">Recent writing</div>
           <button id="recentDrawerCloseBtn" class="recent-drawer-close" type="button" aria-label="Close recent writing">✕</button>
@@ -250,48 +292,23 @@
             </div>
 
             <div class="editor-shell">
-              <div id="editorOptionsPanel" class="editor-options-panel hidden">
-                <div class="editor-options-toprow">
-                  <div class="editor-options-section editor-options-utility">
-                    <div class="editor-options-label">Theme</div>
-                    <button id="themeToggleInPanel" class="theme-toggle" type="button" aria-label="Toggle theme">
-                      <span class="theme-half theme-sun">☼</span>
-                      <span class="theme-half theme-moon">◐</span>
-                    </button>
-                  </div>
+              <svg
+                class="editor-shell-edge"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+                focusable="false"
+                preserveAspectRatio="none"
+              >
+                <path
+                  class="editor-shell-edge-path"
+                  fill="none"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                  vector-effect="non-scaling-stroke"
+                  d=""
+                />
+              </svg>
 
-                  <div class="editor-options-section editor-options-utility">
-                    <div class="editor-options-label">Setup</div>
-                    <button id="shuffleBtnPanel" class="pill pill-button" type="button">Shuffle</button>
-                  </div>
-                </div>
-
-                <div class="editor-options-section">
-                  <div class="editor-options-label">Words</div>
-                  <div class="segmented-pill" id="wordModesPanel">
-                    <button class="mode-btn active" type="button" data-words="60">60</button>
-                    <button class="mode-btn" type="button" data-words="75">75</button>
-                    <button class="mode-btn" type="button" data-words="90">90</button>
-                  </div>
-                </div>
-
-                <div class="editor-options-section">
-                  <div class="editor-options-label">Time</div>
-                  <div class="segmented-pill" id="timeModesPanel">
-                    <button class="mode-btn active" type="button" data-time="0">Off</button>
-                    <button class="mode-btn" type="button" data-time="60">1m</button>
-                    <button class="mode-btn" type="button" data-time="180">3m</button>
-                    <button class="mode-btn" type="button" data-time="300">5m</button>
-                  </div>
-                </div>
-
-                <div class="editor-options-section">
-                  <div class="editor-options-label">Words to avoid</div>
-                  <input id="bannedInlineInputPanel" class="editor-options-input" type="text" />
-                  <button id="saveBannedBtnPanel" class="pill pill-button" type="button">Apply</button>
-                </div>
-              </div>
-              
               <div id="highlightLayer" class="highlight-layer hidden" aria-hidden="true"></div>
               
               <div
@@ -339,7 +356,6 @@
               </button>
 
               <div id="editorTimeFill" class="editor-time-fill" aria-hidden="true"></div>
-              <div id="editorTimer" class="editor-timer hidden"></div>
 
               <div class="editor-bottom-chrome">
                 <div class="editor-bottom-chrome-left">
@@ -376,28 +392,28 @@
                   role="group"
                   aria-label="Semantic highlights in this draft"
                 >
-                  <div id="legendPillFiller" class="legend-pill legend-red-pill legend-pill--inactive">
-                    <span class="legend-swatch legend-red-swatch" aria-hidden="true"></span>
+                  <div id="legendPillFiller" class="legend-pill legend-filler-pill legend-pill--inactive">
+                    <span class="legend-swatch legend-filler-swatch" aria-hidden="true"></span>
                     <span class="legend-text">Filler</span>
-                    <span id="legendRedCount" class="legend-count">0</span>
+                    <span id="legendFillerCount" class="legend-count">0</span>
                   </div>
 
-                  <div id="legendPillRepetition" class="legend-pill legend-yellow-pill legend-pill--inactive">
-                    <span class="legend-swatch legend-yellow-swatch" aria-hidden="true"></span>
+                  <div id="legendPillRepetition" class="legend-pill legend-repetition-pill legend-pill--inactive">
+                    <span class="legend-swatch legend-repetition-swatch" aria-hidden="true"></span>
                     <span class="legend-text">Repetition</span>
-                    <span id="legendYellowCount" class="legend-count">0</span>
+                    <span id="legendRepetitionCount" class="legend-count">0</span>
                   </div>
 
-                  <div id="legendPillOpening" class="legend-pill legend-purple-pill legend-pill--inactive">
-                    <span class="legend-swatch legend-purple-swatch" aria-hidden="true"></span>
+                  <div id="legendPillOpening" class="legend-pill legend-openings-pill legend-pill--inactive">
+                    <span class="legend-swatch legend-openings-swatch" aria-hidden="true"></span>
                     <span class="legend-text">Openings</span>
-                    <span id="legendPurpleCount" class="legend-count">0</span>
+                    <span id="legendOpeningsCount" class="legend-count">0</span>
                   </div>
 
-                  <div id="exerciseLegendPill" class="legend-pill legend-blue-pill hidden">
-                    <span class="legend-swatch legend-blue-swatch" aria-hidden="true"></span>
+                  <div id="exerciseLegendPill" class="legend-pill legend-challenge-pill hidden">
+                    <span class="legend-swatch legend-challenge-swatch" aria-hidden="true"></span>
                     <span class="legend-text">Challenge</span>
-                    <span id="legendBlueCount" class="legend-count">0</span>
+                    <span id="legendChallengeCount" class="legend-count">0</span>
                   </div>
                 </div>
               </div>
@@ -431,19 +447,6 @@
 
           <aside class="side-column">
             <div id="desktopRailDefault" class="desktop-rail-default">
-              <section id="profileStatusCard" class="compact-status">
-                <div id="calibrationBox" class="calibration-box">
-                  <div class="calibration-topline">
-                    <span id="calibrationLabel">Profile forming</span>
-                    <span id="calibrationCount">0 / 5</span>
-                  </div>
-                  <div class="calibration-bar">
-                    <div id="calibrationFill" class="calibration-fill"></div>
-                  </div>
-                  <div id="calibrationNote" class="calibration-note">Complete 5 rounds for your first reliable read.</div>
-                </div>
-              </section>
-
               <section class="desktop-rail-panel" aria-label="Recent writing">
                 <div class="desktop-rail-panel-head">
                   <div class="desktop-rail-panel-title">Recent writing</div>

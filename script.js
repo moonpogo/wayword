@@ -69,9 +69,29 @@ const punctuationMarks = {
   quotes: { regex: /["“”]/g, label: "“”" }
 };
 
-const WORD_PRESETS = [60, 75, 90];
-const TIME_PRESETS = [0, 60, 180, 300];
 const CALIBRATION_THRESHOLD = 5;
+/** Minimum material for a run to count toward calibration (avoid fake insight). */
+const CALIBRATION_MIN_WORDS = 40;
+const CALIBRATION_MIN_SENTENCE_UNITS = 3;
+const CALIBRATION_INSUFFICIENT_COPY = "Write a little more for calibration.";
+
+/** Bumped when opening Patterns so an in-flight close animation cannot hide the panel after reopen. */
+let profilePanelCloseMotionToken = 0;
+
+/**
+ * DEV-ONLY — search `WAYWORD_DEV_CALIBRATION_RESET` to remove this entire block.
+ * When true: `window.waywordDevResetCalibration()` clears run history + calibration state.
+ * Also enabled on `*.vercel.app` (previews share browser storage with past opens; use reset below).
+ * One-shot URL (runs before first paint of calibration UI): append `?resetCalibration=1` (strip self).
+ */
+const WAYWORD_DEV_CALIBRATION_RESET_ENABLED =
+  typeof location !== "undefined" &&
+  ((location.hostname || "") === "localhost" ||
+    (location.hostname || "") === "127.0.0.1" ||
+    location.protocol === "file:" ||
+    new URLSearchParams(location.search).get("waywordDev") === "1" ||
+    /\.vercel\.app$/i.test(location.hostname || ""));
+
 const PROMPT_REROLL_LIMIT = 2;
 
 const PROGRESSION_LEVELS = [
@@ -84,6 +104,37 @@ const INACTIVITY_EASE_RUN_KEY = "wayword-inactivity-eased-for-run";
 
 const $ = (id) => document.getElementById(id);
 
+/**
+ * Category accent colors — canonical values live in category-colors.css; JS must not hardcode hex.
+ * Use getCategoryAccentColor() when a runtime string is needed (e.g. canvas); otherwise rely on CSS classes.
+ */
+const CATEGORY_ACCENT_CSS_VARS = Object.freeze({
+  filler: "--color-filler",
+  repetition: "--color-repetition",
+  openings: "--color-openings",
+  challenge: "--color-challenge",
+});
+
+/** `var(--color-*)` strings — same tokens as category-colors.css; use with styles or resolve via getCategoryAccentColor. */
+const CATEGORY_COLOR_CSS = Object.freeze(
+  Object.fromEntries(Object.entries(CATEGORY_ACCENT_CSS_VARS).map(([k, prop]) => [k, `var(${prop})`]))
+);
+
+function getCategoryAccentCssVarName(key) {
+  return CATEGORY_ACCENT_CSS_VARS[key] || "";
+}
+
+function readRootCssVar(name) {
+  if (typeof document === "undefined" || !name) return "";
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/** Resolved accent for the active theme (reads :root custom properties from category-colors.css). */
+function getCategoryAccentColor(key) {
+  const n = getCategoryAccentCssVarName(key);
+  return n ? readRootCssVar(n) : "";
+}
+
 const state = {
   active: false,
   submitted: false,
@@ -91,6 +142,8 @@ const state = {
   repeatLimit: 2,
   timerSeconds: 0,
   timeRemaining: 0,
+  /** True until first meaningful edit arms `startTimer()`; focus alone does not start the countdown. */
+  timerWaitingForFirstInput: false,
   timerId: null,
   progressionLevel: 1,
   banned: [...bannedSets[0]],
@@ -114,6 +167,8 @@ const state = {
   pendingRecentDrawerExpand: false,
   writeDoc: { lines: [{ tokens: [], trailingSpace: false }] },
   lastRunFeedback: "",
+  /** After a saved run, set when step 1–5; observation lives here (not on reflection line). Cleared on new run. */
+  calibrationPostRun: null,
   completedUiActive: false
 };
 
@@ -233,19 +288,169 @@ function setFocusMode(enabled) {
   const shouldEnable = Boolean(enabled) && isMobileViewport();
   document.body.classList.toggle("focus-mode", shouldEnable);
   if (shouldEnable) setRecentDrawerOpen(false);
+  renderProfileSummaryStrip();
 }
 
 let viewportSyncRaf = null;
+
+/** Matches `style.css` `--surface-chamfer: clamp(7px, 1.35vw, 13px)` (1.35vw of viewport). */
+function editorShellChamferCssPx() {
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+  return Math.min(13, Math.max(7, vw * 0.0135));
+}
+
+const EDITOR_SHELL_CLIP_PATH_FROM_PATH_SUPPORTED =
+  typeof CSS !== "undefined" &&
+  (CSS.supports?.("clip-path", "path('M0 0 L10 0 L10 10 L0 10 Z')") ||
+    CSS.supports?.("-webkit-clip-path", "path('M0 0 L10 0 L10 10 L0 10 Z')"));
+
+function distSeg(ax, ay, bx, by) {
+  return Math.hypot(bx - ax, by - ay);
+}
+
+/** Closed path with quadratic fillets at each vertex (soft contour, not sharp kinks). */
+function closedRoundPolygonPathD(points, r) {
+  const n = points.length;
+  if (n < 3) return "";
+  const fr = Math.max(0, Math.min(r, 14));
+  const fmt = (v) => Number(v.toFixed(3));
+  let d = "";
+  for (let i = 0; i < n; i++) {
+    const p0 = points[(i + n - 1) % n];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    const d01 = distSeg(p0[0], p0[1], p1[0], p1[1]);
+    const d12 = distSeg(p1[0], p1[1], p2[0], p2[1]);
+    if (d01 < 1e-4 || d12 < 1e-4) continue;
+    const rr = Math.min(fr, d01 * 0.52, d12 * 0.52);
+    const t1 = 1 - rr / d01;
+    const ax = p0[0] + t1 * (p1[0] - p0[0]);
+    const ay = p0[1] + t1 * (p1[1] - p0[1]);
+    const t2 = rr / d12;
+    const bx = p1[0] + t2 * (p2[0] - p1[0]);
+    const by = p1[1] + t2 * (p2[1] - p1[1]);
+    if (i === 0) d += `M ${fmt(ax)} ${fmt(ay)}`;
+    else d += ` L ${fmt(ax)} ${fmt(ay)}`;
+    d += ` Q ${fmt(p1[0])} ${fmt(p1[1])} ${fmt(bx)} ${fmt(by)}`;
+  }
+  d += " Z";
+  return d;
+}
+
+/** Straight octagon (fallback when clip-path: path() is unsupported). */
+function closedLinearPolygonPathD(points) {
+  const fmt = (v) => Number(v.toFixed(3));
+  let d = `M ${fmt(points[0][0])} ${fmt(points[0][1])}`;
+  for (let i = 1; i < points.length; i++) {
+    d += ` L ${fmt(points[i][0])} ${fmt(points[i][1])}`;
+  }
+  d += " Z";
+  return d;
+}
+
+/** SVG stroke + same path as shell clip (one geometry). */
+function syncEditorShellChamferEdge() {
+  const shell = document.querySelector(".editor-shell");
+  const svg = shell?.querySelector(".editor-shell-edge");
+  const pathEl = shell?.querySelector(".editor-shell-edge-path");
+  if (!shell || !svg || !pathEl) return;
+
+  const w = shell.clientWidth;
+  const h = shell.clientHeight;
+  if (w < 4 || h < 4) return;
+
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+  const inset = 0.62;
+  const iw = w - 2 * inset;
+  const ih = h - 2 * inset;
+  let c = editorShellChamferCssPx();
+  const maxC = Math.max(0, Math.min(iw, ih) / 2 - 0.5);
+  if (c > maxC) c = maxC;
+
+  const x0 = inset;
+  const y0 = inset;
+  const pts = [
+    [x0 + c, y0],
+    [x0 + iw - c, y0],
+    [x0 + iw, y0 + c],
+    [x0 + iw, y0 + ih - c],
+    [x0 + iw - c, y0 + ih],
+    [x0 + c, y0 + ih],
+    [x0, y0 + ih - c],
+    [x0, y0 + c]
+  ];
+
+  const fillet = Math.min(6.5, Math.max(3.2, c * 0.58));
+  const pathD = closedRoundPolygonPathD(pts, fillet);
+  const pathLinear = closedLinearPolygonPathD(pts);
+  pathEl.setAttribute("d", EDITOR_SHELL_CLIP_PATH_FROM_PATH_SUPPORTED ? pathD : pathLinear);
+
+  if (EDITOR_SHELL_CLIP_PATH_FROM_PATH_SUPPORTED) {
+    const quoted = `path("${pathD}")`;
+    shell.style.clipPath = quoted;
+    shell.style.webkitClipPath = quoted;
+  } else {
+    shell.style.removeProperty("clip-path");
+    shell.style.removeProperty("-webkit-clip-path");
+  }
+}
+
+/** Same chamfer + quadratic fillets as the writing shell (`closedRoundPolygonPathD`), scaled to the overlay box. */
+function syncEditorCalibrationOverlayClip() {
+  const overlay = $("editorOverlay");
+  if (!overlay) return;
+  const isCalib =
+    overlay.classList.contains("editor-overlay--calibration") &&
+    !overlay.classList.contains("hidden");
+  if (!isCalib || !EDITOR_SHELL_CLIP_PATH_FROM_PATH_SUPPORTED) {
+    overlay.style.removeProperty("clip-path");
+    overlay.style.removeProperty("-webkit-clip-path");
+    return;
+  }
+  const w = overlay.clientWidth;
+  const h = overlay.clientHeight;
+  if (w < 12 || h < 12) return;
+  let c = editorShellChamferCssPx();
+  const maxC = Math.max(4, Math.min(w, h) * 0.11);
+  c = Math.min(c, maxC, w / 2 - 0.75, h / 2 - 0.75);
+  const pts = [
+    [c, 0],
+    [w - c, 0],
+    [w, c],
+    [w, h - c],
+    [w - c, h],
+    [c, h],
+    [0, h - c],
+    [0, c]
+  ];
+  const fillet = Math.min(6.5, Math.max(3.2, c * 0.52));
+  const pathD = closedRoundPolygonPathD(pts, fillet);
+  const quoted = `path("${pathD}")`;
+  overlay.style.webkitClipPath = quoted;
+  overlay.style.clipPath = quoted;
+}
+
+function scheduleCalibrationOverlayGeometrySync() {
+  requestAnimationFrame(() => {
+    syncEditorCalibrationOverlayClip();
+    requestAnimationFrame(() => syncEditorCalibrationOverlayClip());
+  });
+}
 
 function queueViewportSync() {
   if (viewportSyncRaf !== null) return;
   viewportSyncRaf = requestAnimationFrame(() => {
     viewportSyncRaf = null;
     syncViewportHeightVar();
+    syncEditorShellChamferEdge();
+    syncEditorCalibrationOverlayClip();
     if (!isMobileViewport()) setFocusMode(false);
     syncPatternsLayoutMode();
     renderHistory();
+    syncSubmittedAnnotatedEditorSurfaces();
     scheduleEditorDotOverlaySync();
+    renderProfileSummaryStrip();
   });
 }
 
@@ -256,6 +461,43 @@ let lastTypingTs = 0;
 let animFrame = null;
 let completionTimer = null;
 let settleTimer = null;
+
+/** After submit: brief shell pulse then auto `startWriting` (no overlay / “begin again”). */
+const POST_SUBMIT_EPHEMERAL_MS = 460;
+const POST_SUBMIT_EPHEMERAL_MS_REDUCED = 120;
+let postSubmitAutoRunTimer = null;
+
+function clearPostSubmitAutoRunTimer() {
+  if (postSubmitAutoRunTimer != null) {
+    clearTimeout(postSubmitAutoRunTimer);
+    postSubmitAutoRunTimer = null;
+  }
+}
+
+function runPostSubmitAutoNewRunNow() {
+  clearPostSubmitAutoRunTimer();
+  document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
+  if (state.optionsOpen) return;
+  if (!state.submitted || !state.completedUiActive) return;
+  startWriting({ silent: true, focusCaret: "start" });
+}
+
+function schedulePostSubmitEphemeralCompletion() {
+  clearPostSubmitAutoRunTimer();
+  const shell = document.querySelector(".editor-shell");
+  shell?.classList.add("editor-shell--submit-complete");
+
+  scheduleEditorDotOverlaySync();
+  requestAnimationFrame(() => {
+    scheduleEditorDotOverlaySync();
+  });
+
+  const ms = prefersReducedUiMotion() ? POST_SUBMIT_EPHEMERAL_MS_REDUCED : POST_SUBMIT_EPHEMERAL_MS;
+  postSubmitAutoRunTimer = window.setTimeout(() => {
+    postSubmitAutoRunTimer = null;
+    runPostSubmitAutoNewRunNow();
+  }, ms);
+}
 
 /* -----------------------------
    landing/app state
@@ -276,8 +518,8 @@ function serializeWriteDoc(doc) {
   return doc.lines.map(writeDocLineSegmentString).join("\n");
 }
 
-/** Supported semantic ids; stable merge / render order. */
-const SEMANTIC_FLAG_IDS = ["filler", "repetition", "opening"];
+/** Supported semantic ids; stable merge / render order (must match CSS .editor-token-dot--* / .annotation-dot--*). */
+const SEMANTIC_FLAG_IDS = ["filler", "repetition", "opening", "challenge"];
 
 /** Deduped subset of SEMANTIC_FLAG_IDS in canonical order (not serialized into text). */
 function normalizeSemanticFlagsArray(flags) {
@@ -289,23 +531,107 @@ function normalizeSemanticFlagsArray(flags) {
   return out;
 }
 
+/** Normalized active challenge words (session exercise list). */
+function getNormalizedExerciseWordSet() {
+  return new Set((state.exerciseWords || []).map((w) => normalizeWord(w)).filter(Boolean));
+}
+
+/**
+ * Challenge and filler are mutually exclusive for the same token; challenge stacks with repetition and opening.
+ * When `norm` matches an active challenge word: strip filler, ensure `challenge` is present.
+ */
+function mergeChallengeVsFillerSemanticFlags(tokenFlags, norm) {
+  let flags = normalizeSemanticFlagsArray(Array.isArray(tokenFlags) ? tokenFlags : []);
+  if (norm && getNormalizedExerciseWordSet().has(norm)) {
+    flags = flags.filter((id) => id !== "filler");
+    if (!flags.includes("challenge")) {
+      flags = normalizeSemanticFlagsArray([...flags, "challenge"]);
+    }
+  }
+  return flags;
+}
+
+/**
+ * Effective flags for dots, legend counts, and annotation UI (same rules as writeDoc analysis).
+ */
 function getOrderedSemanticFlagsForToken(token) {
-  return normalizeSemanticFlagsArray(Array.isArray(token?.flags) ? token.flags : []);
+  const norm = normalizeWord(token?.text);
+  return mergeChallengeVsFillerSemanticFlags(token?.flags, norm);
 }
 
 /** Per-category token membership: a token with k flags increments k categories (matches inline dots). */
 function countWriteDocSemanticFlagsOnTokens() {
-  const n = { filler: 0, repetition: 0, opening: 0 };
+  const n = { filler: 0, repetition: 0, opening: 0, challenge: 0 };
   for (const line of state.writeDoc?.lines || []) {
     for (const token of line.tokens || []) {
       for (const id of getOrderedSemanticFlagsForToken(token)) {
         if (id === "filler") n.filler += 1;
         else if (id === "repetition") n.repetition += 1;
         else if (id === "opening") n.opening += 1;
+        else if (id === "challenge") n.challenge += 1;
       }
     }
   }
   return n;
+}
+
+function writeDocHasAnySemanticFlags(writeDoc = state.writeDoc) {
+  for (const line of writeDoc?.lines || []) {
+    for (const token of line.tokens || []) {
+      if (getOrderedSemanticFlagsForToken(token).length) return true;
+    }
+  }
+  return false;
+}
+
+const WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID =
+  "wayword-submitted-annotated-typography";
+
+/**
+ * Submitted + semantic dots: inject a late document `<style>` with `#editorInput` / `#highlightLayer`
+ * rules so nothing in the cascade (focus, media queries) can override. Inline styles were still
+ * ineffective for some users; ID selectors + last stylesheet win.
+ */
+function syncSubmittedAnnotatedEditorSurfaces() {
+  const on =
+    state.active &&
+    state.submitted &&
+    state.completedUiActive &&
+    writeDocHasAnySemanticFlags();
+
+  const existing = document.getElementById(WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID);
+  if (!on) {
+    existing?.remove();
+    return;
+  }
+
+  const narrow =
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 680px)").matches;
+  const fontSize = narrow ? "17px" : "18px";
+  const padTop = narrow ? "16px" : "20px";
+  const padInline = narrow ? "18px" : "28px";
+  const padBottom = narrow ? "72px" : "80px";
+
+  let style = existing;
+  if (!style) {
+    style = document.createElement("style");
+    style.id = WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID;
+    document.head.appendChild(style);
+  }
+
+  style.textContent = `
+#editorInput.editor-input,
+#highlightLayer.highlight-layer {
+  font-family: Georgia, "Times New Roman", serif !important;
+  font-size: ${fontSize} !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+  line-height: 4.25 !important;
+  letter-spacing: normal !important;
+  padding: ${padTop} ${padInline} ${padBottom} !important;
+}
+`;
 }
 
 function writeDocCanonicalLength(doc) {
@@ -665,15 +991,72 @@ function focusEditorToStart() {
 }
 
 function enterLandingState() {
+  const shell = document.querySelector(".app-shell");
+  const app = $("appView");
+  shell?.classList.add("app-shell--landing");
+  shell?.classList.remove("app-shell--landing-out");
   $("landingView")?.classList.remove("hidden");
-  $("appView")?.classList.add("hidden");
+  app?.setAttribute("aria-hidden", "true");
 }
 
-function enterAppState() {
-  $("landingView")?.classList.add("hidden");
-  $("appView")?.classList.remove("hidden");
-  showProfile(false);
-  setOptionsOpen(false);
+let landingToAppExitTimer = null;
+
+function enterAppState(options = {}) {
+  const afterEnter = typeof options.afterEnter === "function" ? options.afterEnter : null;
+  const dockFocusModeForMobile = Boolean(options.dockFocusModeForMobile);
+  const shell = document.querySelector(".app-shell");
+  const landing = $("landingView");
+  const app = $("appView");
+  if (!shell || !landing || !app) return;
+
+  if (landing.classList.contains("hidden")) return;
+  if (shell.classList.contains("app-shell--landing-out")) return;
+
+  const finalizeLandingToApp = () => {
+    if (landingToAppExitTimer !== null) {
+      window.clearTimeout(landingToAppExitTimer);
+      landingToAppExitTimer = null;
+    }
+    shell.classList.remove("app-shell--landing", "app-shell--landing-out");
+    landing.classList.add("hidden");
+    app.removeAttribute("aria-hidden");
+    showProfile(false);
+    setOptionsOpen(false);
+    if (dockFocusModeForMobile && isMobileViewport()) {
+      setFocusMode(true);
+    }
+    afterEnter?.();
+  };
+
+  if (prefersReducedUiMotion()) {
+    finalizeLandingToApp();
+    return;
+  }
+
+  shell.classList.add("app-shell--landing-out");
+  void landing.offsetWidth;
+
+  const gate = landing.querySelector(".landing-gate");
+  let settled = false;
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    if (landingToAppExitTimer !== null) {
+      window.clearTimeout(landingToAppExitTimer);
+      landingToAppExitTimer = null;
+    }
+    gate?.removeEventListener("transitionend", onGateTransitionEnd);
+    finalizeLandingToApp();
+  };
+
+  const onGateTransitionEnd = (e) => {
+    if (e.target !== gate) return;
+    if (e.propertyName !== "opacity" && e.propertyName !== "transform") return;
+    settle();
+  };
+
+  gate?.addEventListener("transitionend", onGateTransitionEnd);
+  landingToAppExitTimer = window.setTimeout(settle, 320);
 }
 
 /* -----------------------------
@@ -764,7 +1147,21 @@ function completeWordmark() {
    helpers
 ----------------------------- */
 
+/** Ignore backdrop/outside dismiss briefly after open (same tap would otherwise “ghost click” the backdrop). */
+const OPTIONS_PANEL_DISMISS_GUARD_MS = 380;
+let optionsPanelDismissGuardUntil = 0;
+
+function afterOptionsPanelClosed() {
+  if (!isMobileViewport()) return;
+  if (!document.body.classList.contains("focus-mode")) return;
+  if (!state.active || state.submitted || !editorInput) return;
+  if (state.optionsOpen) return;
+  if (document.activeElement === editorInput) return;
+  focusEditorToEnd();
+}
+
 function setOptionsOpen(open) {
+  const wasOpen = state.optionsOpen;
   state.optionsOpen = open;
 
   const panel = $("editorOptionsPanel");
@@ -772,6 +1169,7 @@ function setOptionsOpen(open) {
   if (!panel) return;
 
   if (open) {
+    optionsPanelDismissGuardUntil = Date.now() + OPTIONS_PANEL_DISMISS_GUARD_MS;
     state.pendingTargetWords = state.targetWords;
     state.pendingTimerSeconds = state.timerSeconds;
 
@@ -780,11 +1178,21 @@ function setOptionsOpen(open) {
 
     const input = $("bannedInlineInputPanel");
     if (input) input.value = state.banned.join(", ");
+  } else {
+    optionsPanelDismissGuardUntil = 0;
   }
 
   panel.classList.toggle("hidden", !open);
+  panel.setAttribute("aria-hidden", open ? "false" : "true");
   if (backdrop) {
     backdrop.classList.toggle("hidden", !open);
+    backdrop.setAttribute("aria-hidden", open ? "false" : "true");
+  }
+
+  if (!open && wasOpen) {
+    requestAnimationFrame(() => {
+      afterOptionsPanelClosed();
+    });
   }
 }
 function showToast(message, ms = 1400) {
@@ -812,8 +1220,76 @@ function completedRuns() {
   return state.history.length;
 }
 
+function countCalibrationSentenceLikeUnits(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return 0;
+  return raw
+    .split(/[.!?]+|\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((s) => (s.match(/\b\w+\b/g) || []).length >= 3).length;
+}
+
+/** True when submission has enough text for calibration observation / step advance. */
+function calibrationSubmissionHasMinimumSignal(text, analysis) {
+  const words = Math.max(0, Number(analysis?.totalWords) || 0);
+  if (words >= CALIBRATION_MIN_WORDS) return true;
+  return countCalibrationSentenceLikeUnits(text) >= CALIBRATION_MIN_SENTENCE_UNITS;
+}
+
 function hasProfileSignal() {
   return completedRuns() >= CALIBRATION_THRESHOLD;
+}
+
+/** WAYWORD_DEV_CALIBRATION_RESET — local/testing only; not for production UX. */
+function waywordDevResetCalibrationForTesting() {
+  state.history = [];
+  state.savedRunIds = new Set();
+  state.calibrationPostRun = null;
+  state.lastRunFeedback = "";
+  state.pendingRecentDrawerExpand = false;
+  localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
+
+  state.progressionLevel = 1;
+  persistProgressionLevel();
+  persist();
+
+  const fb = $("feedbackBox");
+  if (fb) {
+    fb.dataset.calibrationRenderKey = "";
+    fb.className = "result-card empty";
+    fb.innerHTML = "";
+  }
+  $("editorOverlay")?.classList.add("hidden");
+
+  state.submitted = false;
+  state.completedUiActive = false;
+
+  recomputeProgressionLevel({});
+  applyProgressionToState();
+
+  if (state.active) {
+    startWriting();
+  } else {
+    renderMeta();
+    renderReflection("");
+    renderPostRunFeedbackContainer();
+    if (editorInput) {
+      renderWritingState();
+      renderHighlight();
+      scheduleEditorDotOverlaySync();
+    }
+    renderSidebar();
+    updateEnterButtonVisibility();
+  }
+
+  renderHistory();
+  renderCalibration();
+  renderProfileSummaryStrip();
+  renderProfile();
+  queueViewportSync();
+
+  showToast("Dev: calibration reset", 2400);
 }
 
 function persist() {
@@ -1067,27 +1543,6 @@ function ensurePromptRerollButton() {
    progress + timer UI
 ----------------------------- */
 
-function renderTimer() {
-  const timerEl = $("editorTimer");
-  if (!timerEl) return;
-
-  if (!state.active || !state.timerSeconds || state.submitted) {
-    timerEl.classList.add("hidden");
-    timerEl.textContent = "";
-    return;
-  }
-
-  timerEl.classList.remove("hidden");
-
-  if (state.timeRemaining >= 60) {
-    const mins = Math.floor(state.timeRemaining / 60);
-    const secs = state.timeRemaining % 60;
-    timerEl.textContent = secs ? `${mins}:${String(secs).padStart(2, "0")}` : `${mins}m`;
-  } else {
-    timerEl.textContent = `${state.timeRemaining}s`;
-  }
-}
-
 function updateWordProgress() {
   const fill = $("editorProgressFill");
   const progressRoot = fill?.closest(".editor-progress");
@@ -1098,6 +1553,7 @@ function updateWordProgress() {
 
   const clampedPercent = Math.min((words / target) * 100, 100);
   fill.style.width = `${clampedPercent}%`;
+  progressRoot?.classList.toggle("editor-progress--empty", words === 0);
 
   const atTarget = words >= target;
   fill.style.background = atTarget ? "var(--success)" : "var(--ink)";
@@ -1122,6 +1578,11 @@ function updateTimeFill() {
     return;
   }
 
+  if (state.timerWaitingForFirstInput) {
+    fill.style.height = "0%";
+    return;
+  }
+
   const elapsed = state.timerSeconds - state.timeRemaining;
   const progress = Math.min(Math.max(elapsed / state.timerSeconds, 0), 1);
   fill.style.height = `${progress * 100}%`;
@@ -1134,23 +1595,30 @@ function stopTimer() {
   }
 }
 
+function tryStartTimerOnFirstMeaningfulInput() {
+  if (!state.active || state.submitted || !state.timerSeconds) return;
+  if (!state.timerWaitingForFirstInput) return;
+  if (!String(getEditorText() || "").length) return;
+  state.timerWaitingForFirstInput = false;
+  startTimer();
+}
+
 function startTimer() {
   stopTimer();
 
   if (!state.timerSeconds) {
     state.timeRemaining = 0;
-    renderTimer();
+    state.timerWaitingForFirstInput = false;
     updateTimeFill();
     return;
   }
 
+  state.timerWaitingForFirstInput = false;
   state.timeRemaining = state.timerSeconds;
-  renderTimer();
   updateTimeFill();
 
   state.timerId = setInterval(() => {
     state.timeRemaining -= 1;
-    renderTimer();
     updateTimeFill();
 
     if (state.timeRemaining <= 0) {
@@ -1312,17 +1780,18 @@ function computeOpeningRepeatedStarterFirstWordIndices(text) {
 
 /**
  * Phase 3 Step 4 + 7: set each token's semantic flags from `analyze(serializeWriteDoc)` heuristics only.
- * Canonical text unchanged; a token may hold any subset of filler | repetition | opening (stable order).
+ * Challenge suppresses filler only; repetition and opening can stack with challenge on the same token.
+ * Optional `analysisPre` avoids a second analyze() when the caller already has results (e.g. submit).
  */
-function applyWriteDocSemanticFlagsFromAnalysis() {
-  if (!state.active || state.submitted) return;
+function applyWriteDocSemanticFlagsFromAnalysisCore(analysisPre) {
   const lines = state.writeDoc?.lines;
   if (!lines?.length) return;
 
   const text = serializeWriteDoc(state.writeDoc);
-  const analysis = analyze(text);
+  const analysis = analysisPre || analyze(text);
 
-  const bannedSet = new Set((state.banned || []).map((w) => normalizeWord(w)).filter(Boolean));
+  const exerciseSet = getNormalizedExerciseWordSet();
+  const plainBannedSet = new Set((state.banned || []).map((w) => normalizeWord(w)).filter(Boolean));
   const repeatedSet = new Set(analysis.repeated.map(([w]) => w));
   const openingIndices = computeOpeningRepeatedStarterFirstWordIndices(text);
 
@@ -1332,7 +1801,11 @@ function applyWriteDocSemanticFlagsFromAnalysis() {
     const newTokens = tokens.map((token) => {
       const norm = normalizeWord(token.text);
       const raw = [];
-      if (norm && bannedSet.has(norm)) raw.push("filler");
+      if (norm && exerciseSet.has(norm)) {
+        raw.push("challenge");
+      } else if (norm && plainBannedSet.has(norm)) {
+        raw.push("filler");
+      }
       if (norm && repeatedSet.has(norm)) raw.push("repetition");
       if (openingIndices.has(g)) raw.push("opening");
       g += 1;
@@ -1341,6 +1814,15 @@ function applyWriteDocSemanticFlagsFromAnalysis() {
     return { ...line, tokens: newTokens };
   });
   state.writeDoc = { ...state.writeDoc, lines: newLines };
+}
+
+/**
+ * Phase 3 Step 4 + 7: set each token's semantic flags from `analyze(serializeWriteDoc)` heuristics only.
+ * Skips while `state.submitted` so post-submit snapshots use {@link applyWriteDocSemanticFlagsFromAnalysisCore}.
+ */
+function applyWriteDocSemanticFlagsFromAnalysis() {
+  if (!state.active || state.submitted) return;
+  applyWriteDocSemanticFlagsFromAnalysisCore();
 }
 
 function buildStarterIndexSet(text) {
@@ -1393,26 +1875,32 @@ function scheduleEditorDotOverlaySync() {
 }
 
 /**
- * Deterministic anchor for dot placement from Range.getClientRects():
- * choose the rect with greatest width (reads as the main “body” of a wrapped token);
- * ties: smaller top, then smaller left. No DOM text semantics.
+ * Dot placement from Range.getClientRects():
+ * - Horizontal: center of the widest fragment (stable “body” of a wrapped token).
+ * - Vertical anchor: max(bottom) over all fragments so dots sit below the full token block.
+ *   Using only the widest fragment’s bottom was wrong for wrapped tokens (narrow focus layout
+ *   wraps more): dots could land above a lower fragment or collide with the next ink row.
  */
-function pickDotAnchorRectFromClientRects(rects) {
+function pickDotAnchorMetricsFromClientRects(rects) {
   const list = Array.from(rects).filter((r) => r.width > 0.5 && r.height > 0.5);
   if (!list.length) return null;
-  let best = list[0];
+  let widest = list[0];
   for (let i = 1; i < list.length; i++) {
     const r = list[i];
-    if (r.width > best.width + 0.5) {
-      best = r;
+    if (r.width > widest.width + 0.5) {
+      widest = r;
       continue;
     }
-    if (Math.abs(r.width - best.width) <= 0.5) {
-      if (r.top < best.top - 0.5) best = r;
-      else if (Math.abs(r.top - best.top) <= 0.5 && r.left < best.left) best = r;
+    if (Math.abs(r.width - widest.width) <= 0.5) {
+      if (r.top < widest.top - 0.5) widest = r;
+      else if (Math.abs(r.top - widest.top) <= 0.5 && r.left < widest.left) widest = r;
     }
   }
-  return best;
+  let anchorBottom = list[0].bottom;
+  for (const r of list) {
+    anchorBottom = Math.max(anchorBottom, r.bottom);
+  }
+  return { cx: widest.left + widest.width / 2, anchorBottom };
 }
 
 /** Must match `.editor-token-dot` width and `.editor-token-dot-group` gap in CSS. */
@@ -1434,7 +1922,7 @@ function syncEditorDotOverlay() {
     return;
   }
 
-  if (!state.active || state.submitted) {
+  if (!state.active) {
     overlay.replaceChildren();
     return;
   }
@@ -1469,7 +1957,15 @@ function syncEditorDotOverlay() {
   const oRect = overlay.getBoundingClientRect();
   const overlayW = oRect.width;
   const overlayH = oRect.height;
-  const bottomReservePx = EDITOR_SEMANTIC_DOT_PX + 7;
+  const submittedAnnotatedSpacing =
+    state.submitted &&
+    state.completedUiActive &&
+    writeDocHasAnySemanticFlags();
+  /* Submitted annotated: gap below glyph/line rect before dot row; keep in sync with CSS line-height slack. */
+  const gapBelowAnchorPx = submittedAnnotatedSpacing ? 20 : 5;
+  const bottomReservePx = submittedAnnotatedSpacing
+    ? EDITOR_SEMANTIC_DOT_PX + 36
+    : EDITOR_SEMANTIC_DOT_PX + 7;
 
   for (let li = 0; li < lines.length; li++) {
     const tokens = lines[li].tokens || [];
@@ -1486,12 +1982,11 @@ function syncEditorDotOverlay() {
         domRange.setStart(tn, range.start);
         domRange.setEnd(tn, range.end);
         const rects = domRange.getClientRects();
-        const r = pickDotAnchorRectFromClientRects(rects);
-        if (!r) continue;
+        const anchor = pickDotAnchorMetricsFromClientRects(rects);
+        if (!anchor) continue;
 
-        const gapBelowAnchorPx = 5;
-        const cxIdeal = r.left + r.width / 2 - oRect.left;
-        const top = r.bottom - oRect.top + gapBelowAnchorPx;
+        const cxIdeal = anchor.cx - oRect.left;
+        const top = anchor.anchorBottom - oRect.top + gapBelowAnchorPx;
         const halfW = editorSemanticDotGroupHalfWidthPx(sems.length);
         const edgePad = 2;
         let cx = cxIdeal;
@@ -1504,7 +1999,10 @@ function syncEditorDotOverlay() {
         } else {
           cx = Math.max(0, Math.min(overlayW, cxIdeal));
         }
-        const topClamped = Math.max(0, Math.min(overlayH - bottomReservePx, top));
+        /* Submitted annotated: do not upper-clamp toward 0 — that pulled dots up into the next line’s text. */
+        const topClamped = submittedAnnotatedSpacing
+          ? Math.max(0, top)
+          : Math.max(0, Math.min(overlayH - bottomReservePx, top));
 
         const group = document.createElement("span");
         group.className = "editor-token-dot-group";
@@ -1513,6 +2011,10 @@ function syncEditorDotOverlay() {
         group.style.top = `${topClamped}px`;
 
         for (const id of sems) {
+          if (!SEMANTIC_FLAG_IDS.includes(id)) {
+            console.warn("Unknown semantic category for editor dot:", id);
+            continue;
+          }
           const dot = document.createElement("span");
           dot.className = `editor-token-dot editor-token-dot--${id}`;
           group.appendChild(dot);
@@ -1529,7 +2031,7 @@ function syncEditorDotOverlay() {
 }
 
 /**
- * writeDoc-first (debug row): add next missing flag in filler → repetition → opening order, or clear when full.
+ * writeDoc-first (debug row): add next missing flag in filler → repetition → opening → challenge order, or clear when full.
  * Canonical text unchanged; preserves multi-flag state until full then resets.
  */
 function cycleAnnotationSemanticFlag(lineIndex, tokenIndex) {
@@ -1553,12 +2055,16 @@ function cycleAnnotationSemanticFlag(lineIndex, tokenIndex) {
 
 /** writeDoc-only semantic assignment; canonical text unchanged; no editor re-project. */
 function setSemanticFlagsOnToken(lineIndex, tokenIndex, rawFlags) {
-  const flags = !rawFlags || rawFlags.length === 0 ? [] : normalizeSemanticFlagsArray(rawFlags);
   const lines = state.writeDoc?.lines;
   if (!lines?.length) return;
   if (lineIndex < 0 || lineIndex >= lines.length) return;
   const tokens = lines[lineIndex].tokens || [];
   if (tokenIndex < 0 || tokenIndex >= tokens.length) return;
+
+  const token = tokens[tokenIndex];
+  const norm = normalizeWord(token.text);
+  let flags = !rawFlags || rawFlags.length === 0 ? [] : normalizeSemanticFlagsArray(rawFlags);
+  flags = mergeChallengeVsFillerSemanticFlags(flags, norm);
 
   const newLines = lines.map((line, li) => {
     if (li !== lineIndex) return line;
@@ -1816,6 +2322,10 @@ function renderAnnotationRow() {
         dotWrap.className = "annotation-slot-dots";
         dotWrap.setAttribute("aria-hidden", "true");
         for (const id of effective) {
+          if (!SEMANTIC_FLAG_IDS.includes(id)) {
+            console.warn("Unknown semantic category for annotation dot:", id);
+            continue;
+          }
           const dot = document.createElement("span");
           dot.className = `annotation-dot annotation-dot--${id}`;
           dotWrap.appendChild(dot);
@@ -1829,7 +2339,7 @@ function renderAnnotationRow() {
       label.textContent = token.text || "·";
       slot.appendChild(label);
 
-      slot.title = `Click: add filler → repetition → opening in order; clears after all three. Now: ${displayLabel} · line ${li + 1} · ${token.text || "·"}`;
+      slot.title = `Click: add filler → repetition → opening → challenge in order; clears after all set. Now: ${displayLabel} · line ${li + 1} · ${token.text || "·"}`;
 
       frag.appendChild(slot);
     }
@@ -1918,9 +2428,133 @@ function showEditorOverlay(message = "Submitted", persist = false) {
   }
 }
 
-function beginAgainFromCompletedState() {
-  if (!state.submitted) return;
-  startWriting();
+const BOTTOM_CHROME_CALIBRATION_HIDE_MS = 200;
+let bottomChromeCalibrationSettleTimer = null;
+
+function clearBottomChromeCalibrationSettleTimer() {
+  if (bottomChromeCalibrationSettleTimer != null) {
+    window.clearTimeout(bottomChromeCalibrationSettleTimer);
+    bottomChromeCalibrationSettleTimer = null;
+  }
+}
+
+/** Fade + slight drift for gear + progress when calibration overlay is up (not display:none). */
+function syncEditorBottomChromeForCalibrationOverlay() {
+  const overlay = $("editorOverlay");
+  const gear = $("optionsTrigger");
+  const progress = document.querySelector(".editor-bottom-chrome-center .editor-progress");
+  if (!overlay || !gear || !progress) return;
+
+  const hide =
+    !overlay.classList.contains("hidden") && overlay.classList.contains("editor-overlay--calibration");
+
+  if (hide) {
+    clearBottomChromeCalibrationSettleTimer();
+    gear.classList.remove("ui-hidden--settled");
+    progress.classList.remove("ui-hidden--settled");
+    gear.style.removeProperty("display");
+    progress.style.removeProperty("display");
+    gear.classList.add("ui-hidden");
+    progress.classList.add("ui-hidden");
+    bottomChromeCalibrationSettleTimer = window.setTimeout(() => {
+      bottomChromeCalibrationSettleTimer = null;
+      if (
+        !overlay.classList.contains("hidden") &&
+        overlay.classList.contains("editor-overlay--calibration")
+      ) {
+        gear.classList.add("ui-hidden--settled");
+        progress.classList.add("ui-hidden--settled");
+      }
+    }, BOTTOM_CHROME_CALIBRATION_HIDE_MS);
+    return;
+  }
+
+  clearBottomChromeCalibrationSettleTimer();
+  gear.classList.remove("ui-hidden--settled", "ui-hidden");
+  progress.classList.remove("ui-hidden--settled", "ui-hidden");
+  gear.style.removeProperty("display");
+  progress.style.removeProperty("display");
+}
+
+/** Post-submit overlay: calibration (runs 1–5) inside editor shell, or “Begin again”. */
+function syncEditorPostRunOverlay() {
+  try {
+    const overlay = $("editorOverlay");
+    const card = $("editorOverlayCard");
+    if (!overlay || !card) {
+      return;
+    }
+
+    if (!state.active || !state.submitted || !state.completedUiActive) {
+      overlay.classList.add("hidden");
+      overlay.classList.remove("editor-overlay--calibration");
+      card.className = "editor-overlay-card";
+      card.textContent = "";
+      card.innerHTML = "";
+      card.removeAttribute("data-calibration-overlay-key");
+      overlay.style.removeProperty("clip-path");
+      overlay.style.removeProperty("-webkit-clip-path");
+      scheduleCalibrationOverlayGeometrySync();
+      return;
+    }
+
+    if (state.calibrationPostRun) {
+      const { step, observation, insufficient } = state.calibrationPostRun;
+      const ins = insufficient ? "1" : "0";
+      const key = `${step}|${ins}|${observation}`;
+      if (card.dataset.calibrationOverlayKey === key) {
+        overlay.classList.remove("hidden");
+        scheduleCalibrationOverlayGeometrySync();
+        return;
+      }
+      card.dataset.calibrationOverlayKey = key;
+      overlay.classList.add("editor-overlay--calibration");
+      overlay.classList.remove("hidden");
+      card.className = "editor-overlay-card editor-overlay-card--calibration";
+      const pct = Math.min(100, Math.round((step / CALIBRATION_THRESHOLD) * 100));
+      const mod = insufficient ? " editor-overlay-calibration--insufficient" : "";
+      card.innerHTML = `
+      <div class="editor-overlay-calibration${mod}" role="dialog" aria-labelledby="editorCalibProgress">
+        <div class="editor-overlay-calibration-head">
+          <span class="editor-overlay-calibration-label">Calibration</span>
+          <span id="editorCalibProgress" class="editor-overlay-calibration-progress">${step} of ${CALIBRATION_THRESHOLD}</span>
+        </div>
+        <div class="editor-overlay-calibration-meter-wrap">
+          <div class="editor-overlay-calibration-meter" role="presentation">
+            <div class="editor-overlay-calibration-meter-fill" style="width:${pct}%"></div>
+          </div>
+        </div>
+        <p class="editor-overlay-calibration-observation" aria-live="polite">${escapeHtml(observation)}</p>
+      </div>`;
+      scheduleCalibrationOverlayGeometrySync();
+      return;
+    }
+
+    card.removeAttribute("data-calibration-overlay-key");
+    overlay.classList.remove("editor-overlay--calibration");
+    card.className = "editor-overlay-card";
+    card.innerHTML = "";
+    card.textContent = "";
+    overlay.classList.add("hidden");
+    overlay.style.removeProperty("clip-path");
+    overlay.style.removeProperty("-webkit-clip-path");
+    scheduleCalibrationOverlayGeometrySync();
+  } finally {
+    renderProfileSummaryStrip();
+    syncEditorBottomChromeForCalibrationOverlay();
+  }
+}
+
+function prefersReducedUiMotion() {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isRecentDrawerOpen() {
+  return Boolean(document.body?.classList.contains("recent-drawer-open"));
 }
 
 function initEditorCompletedFlow() {
@@ -1931,7 +2565,8 @@ function initEditorCompletedFlow() {
   overlay.dataset.completedFlowBound = "1";
 
   overlay.addEventListener("click", () => {
-    beginAgainFromCompletedState();
+    if (state.optionsOpen) return;
+    runPostSubmitAutoNewRunNow();
   });
 }
 
@@ -1973,7 +2608,7 @@ function renderExerciseBanner() {
   if (exercisePill) {
     if (state.exerciseWords.length) {
       exercisePill.classList.remove("hidden");
-      $("legendBlueCount").textContent = "0";
+      $("legendChallengeCount").textContent = "0";
     } else {
       exercisePill.classList.add("hidden");
     }
@@ -2010,7 +2645,6 @@ function renderMeta() {
   setActiveModeButton("wordModesPanel", "words", state.targetWords);
   setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
 
-  renderTimer();
   updateWordProgress();
   updateTimeFill();
   updateEnterButtonVisibility();
@@ -2031,33 +2665,9 @@ function renderMeta() {
   }
 }
 
+/** Calibration progress lives in the in-editor overlay only; this keeps header chrome in sync. */
 function renderCalibration() {
   const runs = completedRuns();
-  const progress = Math.min(runs, CALIBRATION_THRESHOLD);
-  const pct = (progress / CALIBRATION_THRESHOLD) * 100;
-
-  if ($("calibrationCount")) $("calibrationCount").textContent = `${progress} / ${CALIBRATION_THRESHOLD}`;
-  if ($("calibrationFill")) $("calibrationFill").style.width = `${pct}%`;
-
-  const statusCard = $("profileStatusCard");
-  if (!statusCard) return;
-
-  if (runs < CALIBRATION_THRESHOLD) {
-    statusCard.classList.remove("hidden");
-
-    if (runs === 0) {
-      $("calibrationLabel").textContent = "Profile forming";
-      $("calibrationNote").textContent = "Complete 5 rounds for your first reliable read.";
-    } else if (runs < 3) {
-      $("calibrationLabel").textContent = "Profile forming";
-      $("calibrationNote").textContent = "A few more rounds will make your profile clearer.";
-    } else {
-      $("calibrationLabel").textContent = "Almost ready";
-      $("calibrationNote").textContent = "You are close to unlocking your writing profile.";
-    }
-  } else {
-    statusCard.classList.add("hidden");
-  }
   const profileBtn = $("profileBtn");
   if (profileBtn) {
     profileBtn.classList.add("hidden");
@@ -2069,8 +2679,10 @@ function renderCalibration() {
   }
 }
 
-function renderWritingState() {
+function renderWritingState(options = {}) {
   if (!editorInput) return;
+
+  const deferPostRunOverlaySync = Boolean(options.deferPostRunOverlaySync);
 
   const isLocked = !state.active || state.submitted;
 
@@ -2084,11 +2696,34 @@ function renderWritingState() {
   editorInput.classList.toggle("is-empty", !getEditorText().trim());
 
   updateSubmitButtonState();
-  renderTimer();
   updateWordProgress();
   updateTimeFill();
   renderAnnotationRow();
-  renderReflection(state.submitted ? state.lastRunFeedback : "");
+  const showReflection =
+    state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
+  renderReflection(showReflection);
+  renderPostRunFeedbackContainer();
+  if (!deferPostRunOverlaySync) {
+    syncEditorPostRunOverlay();
+  }
+  renderCalibration();
+  renderProfileSummaryStrip();
+
+  const shell = document.querySelector(".editor-shell");
+  if (shell) {
+    shell.classList.toggle(
+      "editor-shell--submitted-annotated-spacing",
+      Boolean(
+        state.active &&
+          state.submitted &&
+          state.completedUiActive &&
+          writeDocHasAnySemanticFlags()
+      )
+    );
+  }
+  syncSubmittedAnnotatedEditorSurfaces();
+  scheduleEditorDotOverlaySync();
+  requestAnimationFrame(() => scheduleEditorDotOverlaySync());
 }
 
 function setSemanticLegendPillState(pillEl, count) {
@@ -2109,7 +2744,7 @@ function renderLegend(analysis) {
     setSemanticLegendPillState(fillerPill, 0);
     setSemanticLegendPillState(repetitionPill, 0);
     setSemanticLegendPillState(openingPill, 0);
-    if ($("legendBlueCount")) $("legendBlueCount").textContent = "0";
+    if ($("legendChallengeCount")) $("legendChallengeCount").textContent = "0";
     if (bluePill && !state.exerciseWords.length) bluePill.classList.add("hidden");
     return;
   }
@@ -2120,7 +2755,7 @@ function renderLegend(analysis) {
   setSemanticLegendPillState(openingPill, sem.opening);
 
   const blueCount = analysis.bannedHits.filter(i => i.isExercise).reduce((sum, item) => sum + item.count, 0);
-  if ($("legendBlueCount")) $("legendBlueCount").textContent = blueCount;
+  if ($("legendChallengeCount")) $("legendChallengeCount").textContent = blueCount;
 
   if (bluePill) {
     if (state.exerciseWords.length) bluePill.classList.remove("hidden");
@@ -2139,6 +2774,12 @@ function renderRunScoreStrip() {
   if (!section || !el) return;
 
   if (!state.active || !state.submitted) {
+    section.classList.add("hidden");
+    el.textContent = "";
+    return;
+  }
+
+  if (state.calibrationPostRun) {
     section.classList.add("hidden");
     el.textContent = "";
     return;
@@ -2197,14 +2838,18 @@ function analyzeText(text) {
     repetitions[word] = (repetitions[word] || 0) + 1;
   }
   let repetitionCount = 0;
+  let maxRepeat4 = 0;
   for (const count of Object.values(repetitions)) {
+    maxRepeat4 = Math.max(maxRepeat4, count);
     if (count > 1) repetitionCount += 1;
   }
 
   return {
     avgSentenceLength,
     fragmentCount,
-    repetitionCount
+    repetitionCount,
+    maxRepeat4,
+    totalWords
   };
 }
 
@@ -2238,46 +2883,96 @@ function buildBaseline(entries) {
   };
 }
 
-function selectReflection(current, baseline) {
-  if (!baseline || baseline.sampleSize < 2) {
-    return "Not enough recent writing yet to compare.";
+const CALIBRATION_OBS_REPETITION = [
+  "You repeat certain words.",
+  "One word appears often.",
+  "You return to the same word."
+];
+const CALIBRATION_OBS_OPENINGS = [
+  "You start lines the same way.",
+  "Your openings are similar.",
+  "You reuse the same start."
+];
+const CALIBRATION_OBS_FRAGMENTATION = ["Your lines are short.", "You break your thoughts up."];
+const CALIBRATION_OBS_LONG = [
+  "Your sentences are getting longer.",
+  "You keep extending sentences."
+];
+const CALIBRATION_OBS_FALLBACK = ["This is steady.", "Your structure is consistent.", "No strong change."];
+
+function pickCalibrationObservationPhrase(phrases, seed) {
+  if (!phrases.length) return "";
+  const i = Math.abs(Math.floor(seed)) % phrases.length;
+  return phrases[i];
+}
+
+/**
+ * Calibration observation: one plain line, dominant signal only (repetition → openings → fragmentation → long sentences → fallback).
+ */
+function selectCalibrationObservation(text, priorEntries) {
+  const raw = String(text || "").trim();
+  const t = analyzeText(raw);
+  const baseline = buildBaseline(priorEntries);
+  const seed =
+    (t.totalWords || 0) * 131 +
+    (t.fragmentCount || 0) * 57 +
+    (t.repetitionCount || 0) * 19 +
+    (t.avgSentenceLength || 0) * 41;
+
+  const minWordsForLexical = 10;
+  const full = analyze(raw);
+  const openingIncidents = full.repeatedStarters.reduce((s, [, c]) => s + Math.max(0, c - 1), 0);
+  const sentenceCount = raw
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean).length;
+
+  const repetitionApplies =
+    (t.totalWords || 0) >= minWordsForLexical &&
+    (t.repetitionCount >= 2 || (t.repetitionCount >= 1 && t.maxRepeat4 >= 4));
+
+  if (repetitionApplies) {
+    if (t.repetitionCount === 1 && t.maxRepeat4 >= 5) return "One word appears often.";
+    if (t.repetitionCount >= 3 || t.maxRepeat4 >= 6) return "You repeat certain words.";
+    if (t.repetitionCount === 1) return "You return to the same word.";
+    if (t.repetitionCount === 2) return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
+    return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
   }
 
-  if (current.fragmentCount > baseline.fragmentCount * 1.4) {
-    return "This is more fragmented than your recent writing.";
-  }
-  if (current.fragmentCount < baseline.fragmentCount * 0.6) {
-    return "This is more continuous than your recent writing.";
+  const openingsApplies =
+    (t.totalWords || 0) >= minWordsForLexical &&
+    sentenceCount >= 2 &&
+    openingIncidents >= 1;
+
+  if (openingsApplies) {
+    return pickCalibrationObservationPhrase(CALIBRATION_OBS_OPENINGS, seed);
   }
 
-  if (current.avgSentenceLength > baseline.avgSentenceLength * 1.4) {
-    return "You wrote longer sentences than usual.";
-  }
-  if (current.avgSentenceLength < baseline.avgSentenceLength * 0.6) {
-    return "You kept sentences shorter than usual.";
-  }
+  const baselineOk = baseline && baseline.sampleSize >= 2;
+  const fragmentationApplies =
+    t.fragmentCount >= 3 ||
+    (t.fragmentCount >= 2 && t.avgSentenceLength < 12) ||
+    (baselineOk &&
+      t.fragmentCount >= 2 &&
+      t.fragmentCount > baseline.fragmentCount * 1.22);
 
-  if (
-    current.repetitionCount > baseline.repetitionCount * 1.5 &&
-    current.repetitionCount >= 2
-  ) {
-    return "One word appears more than usual.";
+  if (fragmentationApplies) {
+    return pickCalibrationObservationPhrase(CALIBRATION_OBS_FRAGMENTATION, seed);
   }
 
-  const isWithinTwentyPercent = (value, base) => {
-    if (base === 0) return value === 0;
-    return Math.abs(value - base) <= Math.abs(base) * 0.2;
-  };
+  const longApplies =
+    (baselineOk &&
+      t.avgSentenceLength >= 12 &&
+      t.avgSentenceLength > baseline.avgSentenceLength * 1.28) ||
+    (t.avgSentenceLength >= 20 && t.fragmentCount <= 1);
 
-  if (
-    isWithinTwentyPercent(current.fragmentCount, baseline.fragmentCount) &&
-    isWithinTwentyPercent(current.avgSentenceLength, baseline.avgSentenceLength) &&
-    isWithinTwentyPercent(current.repetitionCount, baseline.repetitionCount)
-  ) {
-    return "No strong structural change from recent entries.";
+  if (longApplies) {
+    return baselineOk && t.avgSentenceLength > baseline.avgSentenceLength * 1.28
+      ? "Your sentences are getting longer."
+      : pickCalibrationObservationPhrase(CALIBRATION_OBS_LONG, seed);
   }
 
-  return "Similar rhythm to your recent writing.";
+  return pickCalibrationObservationPhrase(CALIBRATION_OBS_FALLBACK, seed);
 }
 
 function renderReflection(text) {
@@ -2299,14 +2994,40 @@ function renderReflection(text) {
   el.setAttribute("aria-hidden", "false");
 }
 
-function handleRunCompleted(text, priorEntries) {
+/** #feedbackBox: kept empty; post-run calibration uses the in-editor overlay. */
+function renderPostRunFeedbackContainer() {
+  const fb = $("feedbackBox");
+  if (!fb) return;
+  fb.dataset.calibrationRenderKey = "";
+  fb.className = "result-card empty";
+  fb.innerHTML = "";
+}
+
+function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibration = false) {
   try {
-    const current = analyzeText(text);
-    const baseline = buildBaseline(priorEntries);
-    const reflection = String(selectReflection(current, baseline) || "").trim();
-    state.lastRunFeedback = reflection;
+    if (insufficientCalibration) {
+      const step = Math.min(priorEntries.length + 1, CALIBRATION_THRESHOLD);
+      state.calibrationPostRun = {
+        step,
+        observation: CALIBRATION_INSUFFICIENT_COPY,
+        insufficient: true
+      };
+      state.lastRunFeedback = "";
+      return;
+    }
+    if (!runWasSaved) return;
+    const step = priorEntries.length + 1;
+    const observation = String(selectCalibrationObservation(text, priorEntries) || "").trim();
+    if (step <= CALIBRATION_THRESHOLD) {
+      state.calibrationPostRun = { step, observation, insufficient: false };
+      state.lastRunFeedback = "";
+    } else {
+      state.calibrationPostRun = null;
+      state.lastRunFeedback = observation;
+    }
   } catch (e) {
     state.lastRunFeedback = "";
+    state.calibrationPostRun = null;
   }
 }
 
@@ -2342,6 +3063,7 @@ function hideMetricExplainer() {
     pop.classList.add("hidden");
     pop.style.left = "";
     pop.style.top = "";
+    pop.removeAttribute("data-metric-category");
   }
   metricExplainerAnchorEl = null;
   metricExplainerOpenKey = null;
@@ -2398,8 +3120,7 @@ function positionMetricExplainer(anchorEl, popEl) {
 function showMetricExplainer(key, anchorEl) {
   const copy = METRIC_EXPLAINER_COPY[key];
   if (!copy || !anchorEl) return;
-  const drawer = $("recentDrawer");
-  const drawerVisible = drawer && !drawer.classList.contains("hidden");
+  const drawerVisible = isRecentDrawerOpen();
   const rail = $("recentRailList");
   const railVisible = rail && isDesktopPatternsViewport() && rail.closest(".hidden") === null;
   if (!drawerVisible && !railVisible) return;
@@ -2411,6 +3132,7 @@ function showMetricExplainer(key, anchorEl) {
   if (titleEl) titleEl.textContent = copy.title;
   if (bodyEl) bodyEl.textContent = copy.body;
   if (exampleEl) exampleEl.textContent = copy.example;
+  pop.dataset.metricCategory = key;
   pop.classList.remove("hidden");
   positionMetricExplainer(anchorEl, pop);
 }
@@ -2526,12 +3248,14 @@ function recentEntryScoreMeterHtml(label, value, max = 25, explainerKey = null) 
   const d = "M 4 16 A 16 16 0 0 1 36 16";
   const aria = `${label}, ${v} out of ${max}`;
   const maxClass = v === max ? " recent-entry-meter--max" : "";
+  const categoryClass =
+    explainerKey && METRIC_EXPLAINER_KEYS.has(explainerKey) ? ` recent-entry-meter--${explainerKey}` : "";
   const explainerAttr =
     explainerKey && METRIC_EXPLAINER_KEYS.has(explainerKey)
       ? ` data-metric-explainer="${explainerKey}" tabindex="0"`
       : "";
   return `
-    <div class="recent-entry-meter${maxClass}" role="img" aria-label="${escapeHtml(aria)}" title="${escapeHtml(`${label} ${v} / ${max}`)}"${explainerAttr}>
+    <div class="recent-entry-meter${maxClass}${categoryClass}" role="img" aria-label="${escapeHtml(aria)}" title="${escapeHtml(`${label} ${v} / ${max}`)}"${explainerAttr}>
       <svg class="recent-entry-meter-svg" viewBox="-4 -6 48 28" aria-hidden="true" focusable="false">
         <path class="recent-entry-meter-track" pathLength="100" d="${d}" fill="none" stroke-linecap="round" />
         <path
@@ -2609,7 +3333,7 @@ function formatRunDetailHtml(run) {
     ? repeatedShown
         .map(
           ([w, c]) =>
-            `<span class="chip chip--compact warn">${escapeHtml(w)} ×${escapeHtml(String(c))}</span>`
+            `<span class="chip chip--compact chip-repetition">${escapeHtml(w)} ×${escapeHtml(String(c))}</span>`
         )
         .join("") +
       (repeatedOverflow > 0
@@ -2620,7 +3344,7 @@ function formatRunDetailHtml(run) {
   const bannedHtml = banned.length
     ? banned
         .map((item) => {
-          const cls = item.isExercise ? "exercise-chip chip--compact" : "chip chip--compact bad";
+          const cls = item.isExercise ? "exercise-chip chip--compact" : "chip chip--compact chip-filler";
           const prefix = item.isExercise ? '<span class="exercise-dot"></span>' : "";
           return `<span class="${cls}">${prefix}${escapeHtml(item.word)} ×${escapeHtml(String(item.count))}</span>`;
         })
@@ -2633,7 +3357,7 @@ function formatRunDetailHtml(run) {
     ? startersShown
         .map(
           ([w, c]) =>
-            `<span class="chip chip--compact purple">${escapeHtml(w)} ×${escapeHtml(String(c))}</span>`
+            `<span class="chip chip--compact chip-openings">${escapeHtml(w)} ×${escapeHtml(String(c))}</span>`
         )
         .join("") +
       (startersOverflow > 0
@@ -2719,7 +3443,7 @@ function renderHistory() {
   }
 
   if (!state.history.length) {
-    const drawerOpen = $("recentDrawer") && !$("recentDrawer").classList.contains("hidden");
+    const drawerOpen = isRecentDrawerOpen();
     allLists.forEach((list) => {
       const isDrawer = list.id === "recentDrawerList";
       const showEmpty = isDrawer ? drawerOpen : isDesktopPatternsViewport();
@@ -2757,8 +3481,6 @@ function setRecentDrawerOpen(open, options = {}) {
   if (shouldOpen) {
     editorInput?.blur();
   }
-  backdrop?.classList.toggle("hidden", !shouldOpen);
-  drawer?.classList.toggle("hidden", !shouldOpen);
 
   backdrop?.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
   drawer?.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
@@ -2991,24 +3713,43 @@ function renderPunctuationChart(punctuationData) {
   `;
 }
 
+function shouldHideRunsWordsStrip() {
+  /* Main writing column: strip is desktop-only (matches @media min-width 981px layout). */
+  if (!isDesktopPatternsViewport()) return true;
+  if (document.body.classList.contains("focus-mode")) return true;
+  if (
+    state.calibrationPostRun &&
+    state.active &&
+    state.submitted &&
+    state.completedUiActive
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function renderProfileSummaryStrip() {
   const el = $("profileSummary");
   if (!el) return;
 
   const section = $("profileSummarySection");
-  
-const runs = completedRuns();
+  const runs = completedRuns();
 
-if (!runs) {
-  section?.classList.add("hidden");
-  el.innerHTML = "";
-  return;
-}
+  if (!runs) {
+    section?.classList.add("hidden");
+    el.textContent = "";
+    return;
+  }
 
-section?.classList.remove("hidden");
   const agg = aggregateProfile();
-
   el.textContent = `Runs ${agg.totalRuns} · Words ${agg.totalWords}`;
+
+  if (shouldHideRunsWordsStrip()) {
+    section?.classList.add("hidden");
+    return;
+  }
+
+  section?.classList.remove("hidden");
 }
 
 function renderProfile() {
@@ -3172,20 +3913,21 @@ function restartRunWithCurrentSettings() {
   state.submitted = false;
   state.completedUiActive = false;
   state.promptRerollsUsed = 0;
-  applyProgressionToState();
   state.prompt = generatePrompt();
   setEditorText("");
 
   const fb = $("feedbackBox");
   if (fb) {
+    fb.dataset.calibrationRenderKey = "";
     fb.className = "result-card empty";
     fb.innerHTML = "";
   }
   state.lastRunFeedback = "";
+  state.calibrationPostRun = null;
   renderReflection("");
 
   stopTimer();
-  startTimer();
+  state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
   setOptionsOpen(false);
 
   renderMeta();
@@ -3236,7 +3978,7 @@ function triggerShuffle() {
   renderSidebar();
 
   if (state.active && !state.submitted) {
-    startTimer();
+    state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
     renderWritingState();
   }
 
@@ -3278,7 +4020,10 @@ function clearExerciseIfCompleted(text) {
 }
 
 function startWriting(options = {}) {
-  const { preserveActiveChallenge = false } = options;
+  const { preserveActiveChallenge = false, silent = false, focusCaret = "end" } = options;
+  clearPostSubmitAutoRunTimer();
+  document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
+  stopTimer();
   if (!preserveActiveChallenge) {
     setExerciseWords([]);
   }
@@ -3289,17 +4034,21 @@ function startWriting(options = {}) {
   state.pendingRecentDrawerExpand = false;
 
   $("editorOverlay")?.classList.add("hidden");
+  $("editorOverlayCard")?.classList.remove("editor-overlay-card--calibration-dismiss");
 
   applyProgressionToState();
+  state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
   state.prompt = generatePrompt();
   setEditorText("");
 
   const fb = $("feedbackBox");
   if (fb) {
+    fb.dataset.calibrationRenderKey = "";
     fb.className = "result-card empty";
     fb.innerHTML = "";
   }
   state.lastRunFeedback = "";
+  state.calibrationPostRun = null;
   renderReflection("");
 
   setBannedEditorOpen(false);
@@ -3310,20 +4059,43 @@ function startWriting(options = {}) {
   renderWritingState();
   renderHighlight();
   renderSidebar();
-  startTimer();
+  syncEditorBottomChromeForCalibrationOverlay();
   updateEnterButtonVisibility();
-  showToast("Writing");
+  if (!silent) {
+    showToast("Writing");
+  }
 
   setTimeout(() => {
-    focusEditorToEnd();
+    if (focusCaret === "start") {
+      focusEditorToStart();
+    } else {
+      focusEditorToEnd();
+    }
   }, 50);
+}
+
+/**
+ * Timer reached zero with no words: no run payload to save — still a hard boundary for timed mode.
+ * Starts a fresh run so the user cannot keep typing in an expired session.
+ */
+function finalizeTimedRunExpiredWithNoText() {
+  if (!state.active || state.submitted) return;
+  stopTimer();
+  state.timeRemaining = 0;
+  updateTimeFill();
+  startWriting({ silent: true, focusCaret: "start" });
+  queueViewportSync();
 }
 
 function submitWriting(fromTimer = false) {
   if (!state.active) return;
 
   if (state.submitted) {
-    beginAgainFromCompletedState();
+    if (postSubmitAutoRunTimer != null) {
+      clearPostSubmitAutoRunTimer();
+      document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
+      runPostSubmitAutoNewRunNow();
+    }
     return;
   }
 
@@ -3334,9 +4106,17 @@ function submitWriting(fromTimer = false) {
   const currentText = getEditorText();
   const analysis = analyze(currentText);
 
-  if (analysis.totalWords === 0) return;
+  if (analysis.totalWords === 0) {
+    if (fromTimer) {
+      finalizeTimedRunExpiredWithNoText();
+    }
+    return;
+  }
 
-  const timeRemainingSnapshot = state.timeRemaining;
+  const timeRemainingSnapshot =
+    state.timerSeconds && state.timerWaitingForFirstInput
+      ? state.timerSeconds
+      : state.timeRemaining;
   const timerConfigured = Boolean(state.timerSeconds);
   const activeTimerSecondsForRun = timerConfigured ? state.timerSeconds : null;
 
@@ -3347,10 +4127,11 @@ function submitWriting(fromTimer = false) {
 
   state.submitted = true;
   state.completedUiActive = true;
+  applyWriteDocSemanticFlagsFromAnalysisCore(analysis);
+
   updateEnterButtonVisibility();
   stopTimer();
   completeWordmark();
-  showEditorOverlay("Begin again", true);
 
   const starterExamplesMap = {};
   analysis.starterExampleList.forEach(item => {
@@ -3407,47 +4188,114 @@ function submitWriting(fromTimer = false) {
   };
 
   const priorEntries = getRecentEntries();
+  const nextCalibrationStep = priorEntries.length + 1;
+  const inCalibrationWindow = nextCalibrationStep <= CALIBRATION_THRESHOLD;
+  const signalOkForCalibration =
+    !inCalibrationWindow || calibrationSubmissionHasMinimumSignal(currentText, analysis);
+
+  let runWasSaved = false;
+  let insufficientCalibration = false;
 
   if (!state.savedRunIds.has(run.runId)) {
-    state.history.push({ ...run });
-    state.savedRunIds.add(run.runId);
-    state.pendingRecentDrawerExpand = true;
-    localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
-    persist();
-    renderHistory();
-    renderCalibration();
-    renderProfileSummaryStrip();
+    if (inCalibrationWindow && !signalOkForCalibration) {
+      insufficientCalibration = true;
+    } else {
+      runWasSaved = true;
+      state.history.push({ ...run });
+      state.savedRunIds.add(run.runId);
+      state.pendingRecentDrawerExpand = true;
+      localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
+      persist();
+      renderHistory();
+      renderProfileSummaryStrip();
 
-    const prevLevel = state.progressionLevel;
-    const { changed } = recomputeProgressionLevel({ afterRun: true });
-    if (changed) {
-      maybeToastProgressionConditionChanges(prevLevel);
+      const prevLevel = state.progressionLevel;
+      const { changed } = recomputeProgressionLevel({ afterRun: true });
+      if (changed) {
+        maybeToastProgressionConditionChanges(prevLevel);
+      }
+      applyProgressionToState();
+      renderProfile();
     }
-    applyProgressionToState();
-    renderProfile();
   }
 
-  handleRunCompleted(currentText, priorEntries);
+  handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
 
-  renderWritingState();
+  renderWritingState({ deferPostRunOverlaySync: false });
   renderMeta();
   renderSidebar();
 
-  const fb = $("feedbackBox");
-  if (fb) {
-    fb.className = "result-card empty";
-    fb.innerHTML = "";
-  }
-
   queueViewportSync();
+
+  schedulePostSubmitEphemeralCompletion();
 }
 
 function showProfile(show = true) {
+  const profileView = $("profileView");
+  if (!profileView) return;
+
+  if (show) {
+    profilePanelCloseMotionToken++;
+  }
+
   if (show && !isDesktopPatternsViewport()) {
     editorInput?.blur();
     setFocusMode(false);
   }
-  $("profileView")?.classList.toggle("hidden", !show);
+
+  const motion = !prefersReducedUiMotion();
+  const wasVisible = !profileView.classList.contains("hidden");
+
+  if (!motion) {
+    profileView.classList.toggle("hidden", !show);
+    syncPatternsLayoutMode();
+    renderProfile();
+    return;
+  }
+
+  if (show && !wasVisible) {
+    profileView.classList.remove("profile-view--recede");
+    profileView.classList.add("profile-view--enter-from");
+    profileView.classList.remove("hidden");
+    syncPatternsLayoutMode();
+    renderProfile();
+    void profileView.offsetWidth;
+    requestAnimationFrame(() => {
+      profileView.classList.remove("profile-view--enter-from");
+    });
+    return;
+  }
+
+  if (!show && wasVisible) {
+    if (profileView.classList.contains("profile-view--recede")) {
+      return;
+    }
+    const closeToken = profilePanelCloseMotionToken;
+    let settled = false;
+    const settle = () => {
+      profileView.removeEventListener("transitionend", onTransitionEnd);
+      if (settled) return;
+      if (closeToken !== profilePanelCloseMotionToken) return;
+      settled = true;
+      profileView.classList.add("hidden");
+      profileView.classList.remove("profile-view--recede");
+      syncPatternsLayoutMode();
+      renderProfile();
+    };
+    const onTransitionEnd = (e) => {
+      if (e.target !== profileView) return;
+      if (e.propertyName !== "opacity" && e.propertyName !== "transform") return;
+      settle();
+    };
+    profileView.addEventListener("transitionend", onTransitionEnd);
+    void profileView.offsetWidth;
+    profileView.classList.add("profile-view--recede");
+    window.setTimeout(settle, 260);
+    return;
+  }
+
+  profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
+  profileView.classList.toggle("hidden", !show);
   syncPatternsLayoutMode();
   renderProfile();
 }
@@ -3496,10 +4344,41 @@ if (editorInput) {
     queueViewportSync();
   });
 
-  editorInput.addEventListener("blur", () => {
-    setFocusMode(false);
-    queueViewportSync();
-    hideEditorSemanticPicker();
+  editorInput.addEventListener("blur", (e) => {
+    if (state.submitted && state.completedUiActive) {
+      queueViewportSync();
+      hideEditorSemanticPicker();
+      return;
+    }
+    const rt = e.relatedTarget;
+    if (
+      rt &&
+      typeof rt.closest === "function" &&
+      (rt.closest("#optionsTrigger") ||
+        rt.closest("#editorOptionsPanel") ||
+        rt.closest("#editorOptionsBackdrop"))
+    ) {
+      queueViewportSync();
+      hideEditorSemanticPicker();
+      return;
+    }
+    window.setTimeout(() => {
+      const ae = document.activeElement;
+      if (
+        ae &&
+        typeof ae.closest === "function" &&
+        (ae.closest("#optionsTrigger") ||
+          ae.closest("#editorOptionsPanel") ||
+          ae.closest("#editorOptionsBackdrop"))
+      ) {
+        queueViewportSync();
+        hideEditorSemanticPicker();
+        return;
+      }
+      setFocusMode(false);
+      queueViewportSync();
+      hideEditorSemanticPicker();
+    }, 0);
   });
 
   editorInput.addEventListener("compositionstart", () => {
@@ -3510,6 +4389,7 @@ if (editorInput) {
     editorSurfaceComposing = false;
     if (!state.active || state.submitted) return;
     flushEditorSurfaceIntoWriteDocOnce();
+    tryStartTimerOnFirstMeaningfulInput();
     pulseWordmark();
     renderHighlight();
     renderSidebar();
@@ -3522,6 +4402,7 @@ if (editorInput) {
     if (!state.active || state.submitted) return;
     if (editorSurfaceComposing) return;
     flushEditorSurfaceIntoWriteDocOnce();
+    tryStartTimerOnFirstMeaningfulInput();
     pulseWordmark();
     renderHighlight();
     renderSidebar();
@@ -3536,12 +4417,36 @@ if (editorInput) {
     scheduleSemanticPickerFromSelection();
   });
 
+  editorInput.addEventListener("pointerdown", () => {
+    if (state.optionsOpen) return;
+    if (!state.submitted || !state.completedUiActive) return;
+    runPostSubmitAutoNewRunNow();
+  });
+
   editorInput.addEventListener("keydown", (e) => {
+    if (
+      !state.optionsOpen &&
+      state.submitted &&
+      state.completedUiActive
+    ) {
+      const enterBegin = e.key === "Enter" && !e.shiftKey;
+      const typingKey =
+        (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) ||
+        e.key === "Backspace" ||
+        e.key === "Delete" ||
+        e.key === " ";
+      if (enterBegin || typingKey) {
+        e.preventDefault();
+        runPostSubmitAutoNewRunNow();
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (state.submitted) {
-        if (state.completedUiActive) {
-          beginAgainFromCompletedState();
+        if (state.completedUiActive && !state.optionsOpen) {
+          runPostSubmitAutoNewRunNow();
         }
         return;
       }
@@ -3562,6 +4467,7 @@ editorShell?.addEventListener("pointerdown", (e) => {
     e.target.closest("#optionsTrigger") ||
     e.target.closest(".editor-progress") ||
     e.target.closest("#editorOptionsPanel") ||
+    e.target.closest("#editorOptionsBackdrop") ||
     e.target.closest("#enterSubmitBtn") ||
     e.target.closest("#editorOverlay") ||
     e.target.closest("#editorSemanticPicker") ||
@@ -3612,6 +4518,7 @@ document.addEventListener("keydown", (e) => {
     !e.ctrlKey &&
     !e.altKey
   ) {
+    if (state.optionsOpen) return;
     if (e.target && e.target.closest && e.target.closest("#editorInput")) {
       return;
     }
@@ -3624,23 +4531,21 @@ document.addEventListener("keydown", (e) => {
         target.tagName === "SELECT");
     if (!editable) {
       e.preventDefault();
-      beginAgainFromCompletedState();
+      runPostSubmitAutoNewRunNow();
       return;
     }
   }
 
   if (e.key !== "Escape") return;
-  if ($("recentDrawer") && !$("recentDrawer").classList.contains("hidden")) {
+  if (isRecentDrawerOpen()) {
     setRecentDrawerOpen(false);
   }
 });
 
-$("beginBtn")?.addEventListener("click", enterAppState);
-$("themeToggleInPanel")?.addEventListener("click", toggleTheme);
 $("beginBtn")?.addEventListener("click", () => {
-  enterAppState();
-  startWriting();
+  enterAppState({ afterEnter: () => startWriting(), dockFocusModeForMobile: true });
 });
+$("themeToggleInPanel")?.addEventListener("click", toggleTheme);
 $("styleTab")?.addEventListener("click", () => {
   const profileView = $("profileView");
   const isShowingProfile = profileView && !profileView.classList.contains("hidden");
@@ -3676,12 +4581,34 @@ $("bannedInlineInput")?.addEventListener("keydown", (e) => {
 });
 
 $("editorOptionsBackdrop")?.addEventListener("click", () => {
+  if (Date.now() < optionsPanelDismissGuardUntil) return;
   setOptionsOpen(false);
 });
 
+let suppressGearClickToggle = false;
+$("optionsTrigger")?.addEventListener(
+  "pointerdown",
+  (e) => {
+    suppressGearClickToggle = false;
+    if (!state.optionsOpen) {
+      setOptionsOpen(true);
+      suppressGearClickToggle = true;
+    }
+  },
+  true
+);
+
 $("optionsTrigger")?.addEventListener("click", (e) => {
   e.stopPropagation();
+  if (suppressGearClickToggle) {
+    suppressGearClickToggle = false;
+    return;
+  }
   setOptionsOpen(!state.optionsOpen);
+});
+
+$("editorOptionsPanel")?.addEventListener("pointerdown", (e) => {
+  e.stopPropagation();
 });
 
 document.addEventListener("click", (e) => {
@@ -3690,7 +4617,7 @@ document.addEventListener("click", (e) => {
   const editor = $("metaEditorRow");
   const pill = $("bannedPill");
 
-  if (panel && trigger && state.optionsOpen) {
+  if (panel && trigger && state.optionsOpen && Date.now() >= optionsPanelDismissGuardUntil) {
     const insidePanel = panel.contains(e.target);
     const clickedTrigger = trigger.contains(e.target);
     if (!insidePanel && !clickedTrigger) {
@@ -3720,7 +4647,10 @@ document.addEventListener("pointerdown", (e) => {
   if (interactiveControl) return;
 
   const insideEditor = e.target.closest(".editor-shell");
-  const insideOptions = e.target.closest("#editorOptionsPanel") || e.target.closest("#optionsTrigger");
+  const insideOptions =
+    e.target.closest("#editorOptionsPanel") ||
+    e.target.closest("#optionsTrigger") ||
+    e.target.closest("#editorOptionsBackdrop");
   const insideRecent =
     e.target.closest("#recentDrawer") || e.target.closest("#recentDrawerBackdrop");
   if (insideEditor || insideOptions || insideRecent) return;
@@ -3757,7 +4687,8 @@ $("saveBannedBtnPanel")?.addEventListener("click", () => {
     .map(normalizeWord)
     .filter(Boolean);
 
-  applyProgressionToState();
+  state.targetWords = state.pendingTargetWords;
+  state.timerSeconds = state.pendingTimerSeconds;
 
   if (state.active && !state.submitted) {
     restartRunWithCurrentSettings();
@@ -3773,11 +4704,44 @@ $("saveBannedBtnPanel")?.addEventListener("click", () => {
    boot
 ----------------------------- */
 
+if (WAYWORD_DEV_CALIBRATION_RESET_ENABLED) {
+  window.waywordDevResetCalibration = waywordDevResetCalibrationForTesting;
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get("resetCalibration") === "1") {
+      waywordDevResetCalibrationForTesting();
+      params.delete("resetCalibration");
+      const q = params.toString();
+      history.replaceState(null, "", location.pathname + (q ? `?${q}` : "") + location.hash);
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 window.addEventListener("resize", queueViewportSync);
 if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", queueViewportSync);
   window.visualViewport.addEventListener("scroll", queueViewportSync);
 }
+
+(function bindEditorShellEdgeResizeObserver() {
+  const shell = document.querySelector(".editor-shell");
+  if (!shell || typeof ResizeObserver === "undefined") return;
+  const ro = new ResizeObserver(() => queueViewportSync());
+  ro.observe(shell);
+})();
+
+(function bindEditorCalibrationOverlayResizeObserver() {
+  const overlay = $("editorOverlay");
+  if (!overlay || typeof ResizeObserver === "undefined") return;
+  const ro = new ResizeObserver(() => {
+    if (overlay.classList.contains("editor-overlay--calibration") && !overlay.classList.contains("hidden")) {
+      syncEditorCalibrationOverlayClip();
+    }
+  });
+  ro.observe(overlay);
+})();
 
 syncViewportHeightVar();
 applyTheme(state.theme);
@@ -3819,3 +4783,5 @@ bindMetricExplainerDelegation("recentRailList");
 
 state.pendingTargetWords = state.targetWords;
 state.pendingTimerSeconds = state.timerSeconds;
+
+queueViewportSync();
