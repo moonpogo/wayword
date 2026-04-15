@@ -854,11 +854,17 @@ html[data-theme="dark"] .theme-moon{
   margin:0;
   padding:0;
   min-height:44px;
+  position:relative;
+  isolation:isolate;
 }
 
 .prompt-meta-actions .field-expand-toggle,
 .prompt-meta-actions .prompt-reroll-btn{
   flex-shrink:0;
+}
+
+.prompt-meta-actions .prompt-reroll-badge{
+  pointer-events:none;
 }
 
 .prompt-text{
@@ -893,6 +899,7 @@ html[data-theme="dark"] .theme-moon{
   height:44px;
   margin:0;
   padding:0;
+  z-index:1;
 }
 
 .prompt-meta-actions .prompt-reroll-icon{
@@ -1618,6 +1625,11 @@ html[data-theme="dark"] .editor-time-fill{
 
 .field-expand-toggle svg{
   display:block;
+}
+
+.prompt-meta-actions .field-expand-toggle{
+  position:relative;
+  z-index:2;
 }
 
 @media (prefers-reduced-motion:reduce){
@@ -3544,24 +3556,87 @@ html[data-theme="dark"] .editor-options-banned-field{
   max-width:100%;
 }
 
-.editor-options-panel .theme-toggle{
-  width:56px;
-  height:34px;
+/* Panel theme control: compact two-state indicator, not a capsule switch */
+.editor-options-panel .theme-toggle--editorial{
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:2px;
+  width:auto;
+  height:auto;
+  min-height:34px;
+  padding:2px 0;
+  margin:0;
+  flex:0 0 auto;
   opacity:1;
+  overflow:visible;
+  border:none;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
 }
 
-.editor-options-panel .theme-half{
-  font-size:11px;
+.editor-options-panel .theme-toggle--editorial .theme-toggle-divider{
+  flex:0 0 auto;
+  width:1px;
+  align-self:stretch;
+  min-height:0.95rem;
+  max-height:1.05rem;
+  margin:0 4px;
+  background:color-mix(in srgb, var(--line) 72%, transparent);
+  opacity:0.9;
 }
 
-html[data-theme="light"] .editor-options-panel .theme-sun{
-  background:var(--ink);
-  color:var(--paper);
+.editor-options-panel .theme-toggle--editorial .theme-half{
+  position:relative;
+  z-index:0;
+  width:auto;
+  min-width:2.1rem;
+  height:auto;
+  padding:6px 10px;
+  font-size:12px;
+  line-height:1;
+  border-radius:6px;
+  border:1px solid transparent;
+  background:transparent;
+  color:color-mix(in srgb, var(--ink) 42%, var(--muted));
+  transition:
+    border-color 0.26s ease,
+    background 0.26s ease,
+    color 0.26s ease,
+    box-shadow 0.26s ease;
 }
 
-html[data-theme="dark"] .editor-options-panel .theme-moon{
-  background:var(--ink);
-  color:var(--paper);
+html[data-theme="light"] .editor-options-panel .theme-toggle--editorial .theme-sun{
+  border-color:color-mix(in srgb, var(--ink) 38%, transparent);
+  background:color-mix(in srgb, var(--ink) 7%, transparent);
+  color:var(--ink);
+}
+
+html[data-theme="light"] .editor-options-panel .theme-toggle--editorial .theme-moon{
+  border-color:transparent;
+  background:transparent;
+  color:color-mix(in srgb, var(--ink) 36%, var(--muted));
+  box-shadow:none;
+}
+
+html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-moon{
+  border-color:color-mix(in srgb, var(--ink) 42%, transparent);
+  background:color-mix(in srgb, var(--paper) 7%, transparent);
+  color:var(--ink);
+}
+
+html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-sun{
+  border-color:transparent;
+  background:transparent;
+  color:color-mix(in srgb, var(--ink) 40%, var(--muted));
+  box-shadow:none;
+}
+
+.editor-options-panel .theme-toggle--editorial:focus-visible{
+  outline:1px solid color-mix(in srgb, var(--ink) 26%, transparent);
+  outline-offset:3px;
+  border-radius:8px;
 }
 
 /* hide legacy banned words editor */
@@ -4379,13 +4454,20 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     letter-spacing:.1em;
   }
 
-  .editor-options-panel .theme-toggle{
-    height:34px;
-    width:52px;
+  .editor-options-panel .theme-toggle--editorial{
+    min-height:32px;
+    padding:1px 0;
   }
 
-  .editor-options-panel .theme-half{
-    font-size:10px;
+  .editor-options-panel .theme-toggle--editorial .theme-half{
+    min-width:1.95rem;
+    padding:5px 9px;
+    font-size:11px;
+  }
+
+  .editor-options-panel .theme-toggle--editorial .theme-toggle-divider{
+    margin:0 3px;
+    max-height:1rem;
   }
 
   .editor-options-shuffle-icon{
@@ -4455,9 +4537,14 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     margin:0 0 3px 2px;
   }
 
-  .editor-options-panel .theme-toggle{
-    height:32px;
-    width:48px;
+  .editor-options-panel .theme-toggle--editorial{
+    min-height:30px;
+  }
+
+  .editor-options-panel .theme-toggle--editorial .theme-half{
+    min-width:1.85rem;
+    padding:5px 8px;
+    font-size:10px;
   }
 
   .editor-options-seg{

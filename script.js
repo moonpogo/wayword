@@ -1724,6 +1724,51 @@ function rerollPrompt() {
 
 }
 
+/** Reprompt control only — never field toggle (explicit target + propagation guard). */
+function onPromptRerollControlClick(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.currentTarget?.id !== "promptRerollBtn") return;
+  rerollPrompt();
+}
+
+/** Field expanded toggle only — never prompt reroll (explicit target + propagation guard). */
+function onFieldExpandedControlClick(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.currentTarget?.id !== "fieldExpandedToggle") return;
+  if (!isMobileViewport()) return;
+  if (!document.body.classList.contains("focus-mode")) {
+    setFocusMode(true);
+  }
+  const hadEditorFocus = document.activeElement === editorInput;
+  setExpandedField(!state.isExpandedField);
+  if (hadEditorFocus && editorInput) {
+    requestAnimationFrame(() => {
+      editorInput.focus({ preventScroll: true });
+    });
+  }
+}
+
+function bindPromptClusterControlsOnce() {
+  const reroll = $("promptRerollBtn");
+  if (reroll) {
+    if (reroll.dataset.bound === "true" && !reroll.dataset.boundRerollPrompt) {
+      reroll.removeEventListener("click", rerollPrompt);
+      reroll.removeAttribute("data-bound");
+    }
+    if (!reroll.dataset.boundRerollPrompt) {
+      reroll.addEventListener("click", onPromptRerollControlClick);
+      reroll.dataset.boundRerollPrompt = "1";
+    }
+  }
+  const field = $("fieldExpandedToggle");
+  if (field && !field.dataset.boundFieldToggle) {
+    field.addEventListener("click", onFieldExpandedControlClick);
+    field.dataset.boundFieldToggle = "1";
+  }
+}
+
 function ensurePromptRerollButton() {
   const promptCard = $("promptCard");
   let btn = $("promptRerollBtn");
@@ -1753,10 +1798,7 @@ function ensurePromptRerollButton() {
     }
   }
 
-  if (!btn.dataset.bound) {
-    btn.addEventListener("click", rerollPrompt);
-    btn.dataset.bound = "true";
-  }
+  bindPromptClusterControlsOnce();
 }
 
 /* -----------------------------
@@ -4593,7 +4635,8 @@ if (editorInput) {
       (rt.closest("#optionsTrigger") ||
         rt.closest("#editorOptionsPanel") ||
         rt.closest("#editorOptionsBackdrop") ||
-        rt.closest("#fieldExpandedToggle"))
+        rt.closest("#fieldExpandedToggle") ||
+        rt.closest("#promptRerollBtn"))
     ) {
       queueViewportSync();
       hideEditorSemanticPicker();
@@ -4607,7 +4650,8 @@ if (editorInput) {
         (ae.closest("#optionsTrigger") ||
           ae.closest("#editorOptionsPanel") ||
           ae.closest("#editorOptionsBackdrop") ||
-          ae.closest("#fieldExpandedToggle"))
+          ae.closest("#fieldExpandedToggle") ||
+          ae.closest("#promptRerollBtn"))
       ) {
         queueViewportSync();
         hideEditorSemanticPicker();
@@ -4899,25 +4943,17 @@ document.addEventListener("pointerdown", (e) => {
     e.target.closest("#editorOptionsBackdrop");
   const insideRecent =
     e.target.closest("#recentDrawer") || e.target.closest("#recentDrawerBackdrop");
-  if (insideEditor || insideOptions || insideRecent || e.target.closest("#fieldExpandedToggle")) return;
+  if (
+    insideEditor ||
+    insideOptions ||
+    insideRecent ||
+    e.target.closest("#fieldExpandedToggle") ||
+    e.target.closest("#promptRerollBtn")
+  ) {
+    return;
+  }
 
   editorInput.blur();
-});
-
-$("fieldExpandedToggle")?.addEventListener("click", (e) => {
-  e.preventDefault();
-  if (!isMobileViewport()) return;
-  /* Field toggle must work whenever the write surface is visible; re-enter focus habitat if blur cleared it. */
-  if (!document.body.classList.contains("focus-mode")) {
-    setFocusMode(true);
-  }
-  const hadEditorFocus = document.activeElement === editorInput;
-  setExpandedField(!state.isExpandedField);
-  if (hadEditorFocus && editorInput) {
-    requestAnimationFrame(() => {
-      editorInput.focus({ preventScroll: true });
-    });
-  }
 });
 
 /* -----------------------------
@@ -4996,6 +5032,7 @@ state.progressionLevel = loadStoredProgressionLevel();
 recomputeProgressionLevel({ sessionInit: true });
 applyProgressionToState();
 ensurePromptRerollButton();
+bindPromptClusterControlsOnce();
 renderMeta();
 renderWritingState();
 projectWriteDocToEditorFromState(0, 0, false);
