@@ -1922,7 +1922,7 @@ body.focus-mode #profileSummarySection,
   display:flex;
   flex-direction:column;
   align-items:stretch;
-  gap:4px;
+  gap:10px;
 }
 
 .below-editor-reflection-stack #reflection-line{
@@ -2787,6 +2787,13 @@ html[data-theme="dark"] .recent-drawer{
   align-items:center;
   width:100%;
   margin-top:12px;
+}
+
+.recent-entry-mirror{
+  width:100%;
+  max-width:22rem;
+  margin-top:10px;
+  text-align:left;
 }
 
 .recent-entry-stats{
@@ -4934,4 +4941,168 @@ html[data-theme="dark"] .metric-explainer{
   font-weight:400;
   color:var(--muted);
   opacity:0.85;
+}
+
+/* —— Mirror Engine V1 (post-run): quiet postscript, not a score widget —— */
+.mirror-reflection-section{
+  margin-top:1.5rem;
+  padding-top:1rem;
+  padding-bottom:0.2rem;
+  border-top:1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.mirror-reflection-section.hidden{
+  display:none;
+}
+
+.mirror-reflection-root{
+  max-width:34rem;
+  padding-left:0.75rem;
+  margin-left:0.05rem;
+  border-left:2px solid color-mix(in srgb, var(--muted) 16%, transparent);
+}
+
+.mirror-reflection-eyebrow{
+  margin:0 0 0.65rem;
+  font-size:0.66rem;
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  font-weight:500;
+  color:var(--muted);
+  opacity:0.78;
+}
+
+.mirror-empty{
+  margin:0;
+  font-size:0.92rem;
+  line-height:1.58;
+  color:var(--muted);
+  font-style:normal;
+  opacity:0.9;
+}
+
+.mirror-stack{
+  display:flex;
+  flex-direction:column;
+  gap:0.55rem;
+}
+
+/* Supporting cards only: same rhythm as main+support, without a “missing main” gap */
+.mirror-stack--support-only{
+  gap:0.5rem;
+}
+
+.mirror-stack--support-only .mirror-card--support-first{
+  margin-top:0;
+}
+
+.mirror-card{
+  padding:0.6rem 0.72rem 0.65rem;
+  border:1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius:11px;
+  background:color-mix(in srgb, var(--paper) 55%, var(--panel) 45%);
+  transition:background 0.15s ease, border-color 0.15s ease;
+}
+
+.mirror-card--main{
+  padding:0.95rem 1rem 1rem;
+  border-color:color-mix(in srgb, var(--line) 62%, transparent);
+  background:color-mix(in srgb, var(--panel) 92%, var(--paper) 8%);
+  box-shadow:0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.mirror-card--support{
+  opacity:0.97;
+}
+
+.mirror-card--support.mirror-card--support-first{
+  margin-top:0.1rem;
+}
+
+.mirror-card--evidence-open.mirror-card--main,
+.mirror-card--evidence-open.mirror-card--support{
+  border-color:color-mix(in srgb, var(--line) 55%, transparent);
+  background:color-mix(in srgb, var(--panel) 88%, var(--paper) 12%);
+}
+
+.mirror-card__statement{
+  margin:0;
+  font-size:0.98rem;
+  line-height:1.56;
+  color:var(--ink);
+  font-weight:400;
+}
+
+.mirror-card--main .mirror-card__statement{
+  font-size:1.08rem;
+  line-height:1.52;
+  letter-spacing:-0.01em;
+}
+
+.mirror-card--support .mirror-card__statement{
+  font-size:0.95rem;
+  line-height:1.54;
+  color:color-mix(in srgb, var(--ink) 88%, var(--muted) 12%);
+}
+
+.mirror-card__evidence-toggle{
+  margin:0.5rem 0 0;
+  padding:0.12rem 0;
+  border:0;
+  background:transparent;
+  color:var(--muted);
+  font-size:0.78rem;
+  font-weight:500;
+  letter-spacing:0.04em;
+  text-decoration:none;
+  border-bottom:1px dotted color-mix(in srgb, var(--muted) 45%, transparent);
+  cursor:pointer;
+  text-align:left;
+  opacity:0.88;
+}
+
+.mirror-card__evidence-toggle:hover,
+.mirror-card__evidence-toggle:focus-visible{
+  color:var(--ink);
+  opacity:1;
+  border-bottom-color:color-mix(in srgb, var(--muted) 70%, transparent);
+  outline:none;
+}
+
+.mirror-card__evidence{
+  margin:0.4rem 0 0;
+  padding:0.45rem 0 0.05rem;
+  border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.mirror-card__evidence[hidden]{
+  display:none;
+}
+
+.mirror-card__evidence-line{
+  margin:0.3rem 0 0;
+  font-size:0.84rem;
+  line-height:1.5;
+  color:var(--muted);
+}
+
+.mirror-card__evidence-line:first-child{
+  margin-top:0;
+}
+
+.mirror-card__evidence-line--muted{
+  font-style:italic;
+  opacity:0.88;
+}
+
+/* Recent drawer / rail: keep mirror subordinate to run detail */
+.recent-entry-mirror .mirror-reflection-root{
+  padding-left:0.55rem;
+  margin-left:0;
+  border-left-width:1px;
+}
+
+.recent-entry-mirror .mirror-reflection-eyebrow{
+  font-size:0.62rem;
+  margin-bottom:0.45rem;
 }

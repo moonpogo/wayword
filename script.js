@@ -3572,7 +3572,7 @@ function escapeHtmlMirror(s) {
 
 function renderMirrorEvidenceLinesHtml(evidence) {
   if (!Array.isArray(evidence) || !evidence.length) {
-    return '<p class="mirror-card__evidence-line">No evidence attached.</p>';
+    return '<p class="mirror-card__evidence-line mirror-card__evidence-line--muted">Nothing quoted from the draft for this line.</p>';
   }
   return evidence
     .map((ev) => {
@@ -3600,7 +3600,7 @@ function mirrorReflectionCardHtml(card, opts) {
   return (
     `<article class="${cls}">` +
     `<p class="mirror-card__statement">${stmt}</p>` +
-    `<button type="button" class="mirror-card__evidence-toggle" aria-expanded="false" aria-controls="${uid}">Evidence</button>` +
+    `<button type="button" class="mirror-card__evidence-toggle" aria-expanded="false" aria-controls="${uid}" aria-label="Show where this line comes from in the draft">Context</button>` +
     `<div class="mirror-card__evidence" id="${uid}" hidden>${evHtml}</div>` +
     `</article>`
   );
@@ -3609,7 +3609,7 @@ function mirrorReflectionCardHtml(card, opts) {
 function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix }) {
   const pfx = String(idPrefix || "mirror");
   if (loadFailed) {
-    return '<p class="mirror-empty">Mirror readings are not available in this build.</p>';
+    return '<p class="mirror-empty">Reflection isn’t available in this build.</p>';
   }
   const r = result;
   if (!r || typeof r !== "object") {
@@ -3621,12 +3621,14 @@ function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix }) {
   const hasSupport = supporting.some((c) => c && String(c.statement || "").trim());
 
   if (!hasMain && !hasSupport) {
-    return '<p class="mirror-empty">Nothing surfaced clearly enough for mirror cards in this run.</p>';
+    return '<p class="mirror-empty">Nothing in this draft stood out enough to echo back.</p>';
   }
 
   const parts = [];
-  parts.push('<div class="mirror-reflection-eyebrow">Mirror</div>');
-  parts.push('<div class="mirror-stack">');
+  parts.push('<div class="mirror-reflection-eyebrow">Reflection</div>');
+  const stackClass =
+    "mirror-stack" + (!hasMain && hasSupport ? " mirror-stack--support-only" : "");
+  parts.push(`<div class="${stackClass}">`);
   if (hasMain) {
     parts.push(
       mirrorReflectionCardHtml(main, {
@@ -3652,7 +3654,7 @@ function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix }) {
 function formatRecentEntryMirrorHtml(run, idPrefix) {
   if (!run || typeof run !== "object") return "";
   if (run.mirrorLoadFailed) {
-    return `<div class="recent-entry-mirror-root recent-entry-mirror"><p class="mirror-empty">Mirror readings are not available in this build.</p></div>`;
+    return `<div class="recent-entry-mirror-root recent-entry-mirror"><p class="mirror-empty">Reflection isn’t available in this build.</p></div>`;
   }
   if (run.mirrorPipelineResult == null) return "";
   const body = buildMirrorPanelBodyHtml({
@@ -3674,8 +3676,15 @@ function wireMirrorEvidenceToggles(root) {
       if (!panel) return;
       const next = !open;
       btn.setAttribute("aria-expanded", String(next));
+      btn.textContent = next ? "Hide" : "Context";
+      btn.setAttribute(
+        "aria-label",
+        next ? "Hide grounding from the draft" : "Show where this line comes from in the draft"
+      );
       if (next) panel.removeAttribute("hidden");
       else panel.setAttribute("hidden", "");
+      const card = btn.closest(".mirror-card");
+      if (card) card.classList.toggle("mirror-card--evidence-open", next);
     });
   });
 }
