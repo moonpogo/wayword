@@ -943,10 +943,12 @@ html[data-theme="dark"] .theme-moon{
 
   cursor:pointer;
   opacity:0.62;
-  transition:opacity 0.15s ease, color 0.15s ease;
+  transition:opacity 0.15s ease, color 0.15s ease, transform 0.12s ease;
   position:relative;
   -webkit-appearance:none;
   appearance:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
 }
 
 .prompt-reroll-btn{
@@ -962,9 +964,23 @@ html[data-theme="dark"] .theme-moon{
   margin-left:-10px;
 }
 
-.prompt-reroll-btn:hover{
-  opacity:1;
-  color:var(--ink);
+/* Hover only for real pointers — touch Safari keeps :hover after tap and the badge reads as “selected.” */
+@media (hover:hover) and (pointer:fine){
+  .prompt-reroll-btn:hover{
+    opacity:1;
+    color:var(--ink);
+  }
+}
+
+/* Brief press read; softer than e.g. field-expand-toggle (scale 0.96 + opacity dip). */
+.prompt-reroll-btn:not(:disabled):active{
+  transform:scale(0.985);
+}
+
+@media (prefers-reduced-motion:reduce){
+  .prompt-reroll-btn:active{
+    transform:none;
+  }
 }
 
 .prompt-reroll-btn.locked,
