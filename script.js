@@ -160,15 +160,15 @@ const state = {
 ),
   bannedEditorOpen: false,
   optionsOpen: false,
-  pendingTargetWords: 60,
-  pendingTimerSeconds: 0,
   promptRerollsUsed: 0,
   pendingRecentDrawerExpand: false,
   writeDoc: { lines: [{ tokens: [], trailingSpace: false }] },
   lastRunFeedback: "",
   /** After a saved run, set when step 1–5; observation lives here (not on reflection line). Cleared on new run. */
   calibrationPostRun: null,
-  completedUiActive: false
+  completedUiActive: false,
+  /** Mobile writing field: when true, surrounding header/context is revealed (still in the same focus habitat). */
+  isExpandedField: false
 };
 
 let editorSurfaceComposing = false;
@@ -354,9 +354,42 @@ function exitFocusModeForLayoutIfNeeded() {
   syncKeyboardOpenClass();
   document.body.classList.remove("keyboard-open");
   document.body.classList.remove("focus-mode");
+  document.body.classList.remove("expanded-field");
+  state.isExpandedField = false;
   armPostFocusExitKeyboardLayoutSettle();
   resetWordmarkChromeMotionState();
   return true;
+}
+
+/** Single source for mobile expanded-field chrome (`body.expanded-field`). */
+function syncExpandedFieldClass() {
+  const btn = $("fieldExpandedToggle");
+  if (!isMobileViewport() || !document.body.classList.contains("focus-mode")) {
+    document.body.classList.remove("expanded-field");
+    if (!isMobileViewport()) state.isExpandedField = false;
+    if (btn) {
+      btn.setAttribute("aria-pressed", "false");
+      btn.setAttribute("aria-label", "Show surrounding context");
+    }
+    return;
+  }
+  document.body.classList.toggle("expanded-field", state.isExpandedField);
+  if (btn) {
+    btn.setAttribute("aria-pressed", state.isExpandedField ? "true" : "false");
+    btn.setAttribute(
+      "aria-label",
+      state.isExpandedField ? "Hide surrounding context" : "Show surrounding context"
+    );
+  }
+}
+
+function setExpandedField(expanded) {
+  if (!isMobileViewport()) return;
+  state.isExpandedField = Boolean(expanded);
+  syncExpandedFieldClass();
+  const showReflection =
+    state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
+  renderReflection(showReflection);
 }
 
 function setFocusMode(enabled) {
@@ -368,11 +401,17 @@ function setFocusMode(enabled) {
     document.body.classList.add("focus-mode");
     setRecentDrawerOpen(false);
     renderProfileSummaryStrip();
+    syncExpandedFieldClass();
+    const showReflectionLine =
+      state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
+    renderReflection(showReflectionLine);
     queueViewportSync();
     return;
   }
   if (!isMobileViewport()) {
     document.body.classList.remove("focus-mode");
+    document.body.classList.remove("expanded-field");
+    state.isExpandedField = false;
     renderProfileSummaryStrip();
     return;
   }
@@ -1278,6 +1317,89 @@ function completeWordmark() {
 const OPTIONS_PANEL_DISMISS_GUARD_MS = 380;
 let optionsPanelDismissGuardUntil = 0;
 
+let bannedPanelPersistTimer = null;
+const BANNED_PANEL_DEBOUNCE_MS = 220;
+
+function bannedWordsListFromPanelFieldValue(str) {
+  return String(str || "")
+    .split(",")
+    .map(normalizeWord)
+    .filter(Boolean);
+}
+
+function bannedListsShallowEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function flushBannedPanelPersistFromPanel() {
+  if (bannedPanelPersistTimer != null) {
+    clearTimeout(bannedPanelPersistTimer);
+    bannedPanelPersistTimer = null;
+  }
+  const input = $("bannedInlineInputPanel");
+  if (!input) return;
+  const next = bannedWordsListFromPanelFieldValue(input.value);
+  if (bannedListsShallowEqual(next, state.banned)) return;
+  state.banned = next;
+  if (state.active && !state.submitted) {
+    applyWriteDocSemanticFlagsFromAnalysis();
+    scheduleEditorDotOverlaySync();
+    renderAnnotationRow();
+  }
+  renderMeta();
+  renderHighlight();
+  renderSidebar();
+}
+
+function scheduleBannedPanelPersistFromPanel() {
+  if (bannedPanelPersistTimer != null) clearTimeout(bannedPanelPersistTimer);
+  bannedPanelPersistTimer = window.setTimeout(() => {
+    bannedPanelPersistTimer = null;
+    flushBannedPanelPersistFromPanel();
+  }, BANNED_PANEL_DEBOUNCE_MS);
+}
+
+function applyWordTargetFromPanel(nextWords) {
+  const n = Number(nextWords);
+  if (!Number.isFinite(n) || ![60, 75, 90].includes(n)) return;
+  state.targetWords = state.targetWords === n ? 0 : n;
+  if (state.active && !state.submitted) {
+    restartRunWithCurrentSettings();
+  } else {
+    setActiveModeButton("wordModesPanel", "words", state.targetWords);
+    setActiveModeButton("wordModes", "words", state.targetWords);
+    renderMeta();
+    renderHighlight();
+    renderSidebar();
+    updateWordProgress();
+    updateEnterButtonVisibility();
+  }
+}
+
+function applyTimerFromPanel(nextSeconds) {
+  const n = Number(nextSeconds);
+  if (!Number.isFinite(n) || ![60, 180, 300].includes(n)) return;
+  state.timerSeconds = state.timerSeconds === n ? 0 : n;
+  stopTimer();
+  state.timeRemaining = 0;
+  state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
+  if (state.active && !state.submitted) {
+    restartRunWithCurrentSettings();
+  } else {
+    setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
+    setActiveModeButton("timeModes", "time", state.timerSeconds);
+    updateTimeFill();
+    renderMeta();
+    renderHighlight();
+    renderSidebar();
+    renderWritingState();
+  }
+}
+
 function afterOptionsPanelClosed() {
   if (!isMobileViewport()) return;
   if (!document.body.classList.contains("focus-mode")) return;
@@ -1297,19 +1419,23 @@ function setOptionsOpen(open) {
 
   if (open) {
     optionsPanelDismissGuardUntil = Date.now() + OPTIONS_PANEL_DISMISS_GUARD_MS;
-    state.pendingTargetWords = state.targetWords;
-    state.pendingTimerSeconds = state.timerSeconds;
+    if (bannedPanelPersistTimer != null) {
+      clearTimeout(bannedPanelPersistTimer);
+      bannedPanelPersistTimer = null;
+    }
 
-    setActiveModeButton("wordModesPanel", "words", state.pendingTargetWords);
-    setActiveModeButton("timeModesPanel", "time", state.pendingTimerSeconds);
+    setActiveModeButton("wordModesPanel", "words", state.targetWords);
+    setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
 
     const input = $("bannedInlineInputPanel");
-    if (input) input.value = state.banned.join(", ");
+    if (input && document.activeElement !== input) {
+      input.value = state.banned.join(", ");
+    }
   } else {
     optionsPanelDismissGuardUntil = 0;
+    flushBannedPanelPersistFromPanel();
   }
 
-  panel.classList.toggle("hidden", !open);
   panel.setAttribute("aria-hidden", open ? "false" : "true");
   if (backdrop) {
     backdrop.classList.toggle("hidden", !open);
@@ -1434,8 +1560,6 @@ function applyProgressionToState() {
   const cfg = getProgressionConfig(state.progressionLevel);
   state.targetWords = cfg.targetWords;
   state.timerSeconds = cfg.timerSeconds;
-  state.pendingTargetWords = cfg.targetWords;
-  state.pendingTimerSeconds = cfg.timerSeconds;
 }
 
 function recomputeProgressionLevel(options = {}) {
@@ -1637,11 +1761,21 @@ function updateWordProgress() {
   if (!fill) return;
 
   const words = state.active ? tokenize(getEditorText()).length : 0;
-  const target = state.targetWords || 1;
 
+  if (!state.targetWords) {
+    fill.style.width = "0%";
+    fill.style.background = "var(--ink)";
+    progressRoot?.classList.toggle("editor-progress--empty", words === 0);
+    progressRoot?.classList.add("editor-progress--no-target");
+    progressRoot?.setAttribute("data-phase", "none");
+    return;
+  }
+
+  const target = state.targetWords;
   const clampedPercent = Math.min((words / target) * 100, 100);
   fill.style.width = `${clampedPercent}%`;
   progressRoot?.classList.toggle("editor-progress--empty", words === 0);
+  progressRoot?.classList.remove("editor-progress--no-target");
 
   const atTarget = words >= target;
   fill.style.background = atTarget ? "var(--success)" : "var(--ink)";
@@ -1812,7 +1946,7 @@ function analyze(text) {
     .filter(([, count]) => count > 1)
     .sort((a, b) => b[1] - a[1]);
 
-  const targetDelta = totalWords - state.targetWords;
+  const targetDelta = state.targetWords ? totalWords - state.targetWords : totalWords;
 
   const uniqueRatio = totalWords ? uniqueCount / totalWords : 0;
   const sentences = String(text || "").split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
@@ -2661,8 +2795,12 @@ function initEditorCompletedFlow() {
 function setActiveModeButton(containerId, attribute, value) {
   const container = $(containerId);
   if (!container) return;
-  Array.from(container.querySelectorAll(".mode-btn")).forEach(btn => {
-    btn.classList.toggle("active", Number(btn.dataset[attribute]) === value);
+  const sel = attribute === "words" ? "button[data-words]" : "button[data-time]";
+  Array.from(container.querySelectorAll(sel)).forEach(btn => {
+    const v = Number(btn.dataset[attribute]);
+    const on = Number.isFinite(v) && v === value;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
   });
 }
 
@@ -3065,10 +3203,38 @@ function selectCalibrationObservation(text, priorEntries) {
 
 function renderReflection(text) {
   const el = document.getElementById("reflection-line");
+  const editorLine = $("editorPostRunLine");
+  const trimmed = String(text || "").trim();
+  const useEditorSlot =
+    isMobileViewport() &&
+    document.body.classList.contains("focus-mode") &&
+    editorLine;
+
+  if (useEditorSlot) {
+    if (el) {
+      el.textContent = "";
+      el.classList.add("reflection-line--hidden");
+      el.setAttribute("aria-hidden", "true");
+    }
+    if (!trimmed) {
+      editorLine.textContent = "";
+      editorLine.classList.add("editor-post-run-line--empty");
+      editorLine.setAttribute("aria-hidden", "true");
+    } else {
+      editorLine.textContent = trimmed;
+      editorLine.classList.remove("editor-post-run-line--empty");
+      editorLine.setAttribute("aria-hidden", "false");
+    }
+    return;
+  }
+
+  if (editorLine) {
+    editorLine.textContent = "";
+    editorLine.classList.add("editor-post-run-line--empty");
+    editorLine.setAttribute("aria-hidden", "true");
+  }
 
   if (!el) return;
-
-  const trimmed = String(text || "").trim();
 
   if (!trimmed) {
     el.textContent = "";
@@ -4289,8 +4455,6 @@ function submitWriting(fromTimer = false) {
 
   handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
 
-  exitFocusModeForLayoutIfNeeded();
-
   renderWritingState({ deferPostRunOverlaySync: false });
   renderMeta();
   renderSidebar();
@@ -4411,7 +4575,6 @@ if (editorInput) {
 
   editorInput.addEventListener("blur", (e) => {
     if (state.submitted && state.completedUiActive) {
-      setFocusMode(false);
       hideEditorSemanticPicker();
       return;
     }
@@ -4421,7 +4584,8 @@ if (editorInput) {
       typeof rt.closest === "function" &&
       (rt.closest("#optionsTrigger") ||
         rt.closest("#editorOptionsPanel") ||
-        rt.closest("#editorOptionsBackdrop"))
+        rt.closest("#editorOptionsBackdrop") ||
+        rt.closest("#fieldExpandedToggle"))
     ) {
       queueViewportSync();
       hideEditorSemanticPicker();
@@ -4434,7 +4598,8 @@ if (editorInput) {
         typeof ae.closest === "function" &&
         (ae.closest("#optionsTrigger") ||
           ae.closest("#editorOptionsPanel") ||
-          ae.closest("#editorOptionsBackdrop"))
+          ae.closest("#editorOptionsBackdrop") ||
+          ae.closest("#fieldExpandedToggle"))
       ) {
         queueViewportSync();
         hideEditorSemanticPicker();
@@ -4603,6 +4768,11 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (e.key !== "Escape") return;
+  if (state.optionsOpen) {
+    setOptionsOpen(false);
+    e.preventDefault();
+    return;
+  }
   if (isRecentDrawerOpen()) {
     setRecentDrawerOpen(false);
   }
@@ -4719,49 +4889,42 @@ document.addEventListener("pointerdown", (e) => {
     e.target.closest("#editorOptionsBackdrop");
   const insideRecent =
     e.target.closest("#recentDrawer") || e.target.closest("#recentDrawerBackdrop");
-  if (insideEditor || insideOptions || insideRecent) return;
+  if (insideEditor || insideOptions || insideRecent || e.target.closest("#fieldExpandedToggle")) return;
 
   editorInput.blur();
+});
+
+$("fieldExpandedToggle")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (!isMobileViewport() || !document.body.classList.contains("focus-mode")) return;
+  const hadEditorFocus = document.activeElement === editorInput;
+  setExpandedField(!state.isExpandedField);
+  if (hadEditorFocus && editorInput) {
+    requestAnimationFrame(() => {
+      editorInput.focus({ preventScroll: true });
+    });
+  }
 });
 
 /* -----------------------------
    panel control wiring
 ----------------------------- */
 
-document.querySelectorAll("#wordModesPanel .mode-btn").forEach(btn => {
+document.querySelectorAll("#wordModesPanel button[data-words]").forEach(btn => {
   btn.addEventListener("click", () => {
-    state.pendingTargetWords = Number(btn.dataset.words);
-    setActiveModeButton("wordModesPanel", "words", state.pendingTargetWords);
+    applyWordTargetFromPanel(btn.dataset.words);
   });
 });
-document.querySelectorAll("#timeModesPanel .mode-btn").forEach(btn => {
+document.querySelectorAll("#timeModesPanel button[data-time]").forEach(btn => {
   btn.addEventListener("click", () => {
-    state.pendingTimerSeconds = Number(btn.dataset.time);
-    setActiveModeButton("timeModesPanel", "time", state.pendingTimerSeconds);
+    applyTimerFromPanel(btn.dataset.time);
   });
 });
 $("shuffleBtnPanel")?.addEventListener("click", triggerShuffle);
 
-$("saveBannedBtnPanel")?.addEventListener("click", () => {
-  const input = $("bannedInlineInputPanel");
-  if (!input) return;
-
-  state.banned = input.value
-    .split(",")
-    .map(normalizeWord)
-    .filter(Boolean);
-
-  state.targetWords = state.pendingTargetWords;
-  state.timerSeconds = state.pendingTimerSeconds;
-
-  if (state.active && !state.submitted) {
-    restartRunWithCurrentSettings();
-  } else {
-    renderMeta();
-    renderHighlight();
-    renderSidebar();
-    setOptionsOpen(false);
-  }
+$("bannedInlineInputPanel")?.addEventListener("input", scheduleBannedPanelPersistFromPanel);
+$("bannedInlineInputPanel")?.addEventListener("blur", () => {
+  flushBannedPanelPersistFromPanel();
 });
 /* -----------------------------
    boot
@@ -4849,8 +5012,5 @@ bindAnnotationRowFlagInteraction();
 bindEditorSemanticPicker();
 bindMetricExplainerDelegation("recentDrawerList");
 bindMetricExplainerDelegation("recentRailList");
-
-state.pendingTargetWords = state.targetWords;
-state.pendingTimerSeconds = state.timerSeconds;
 
 queueViewportSync();

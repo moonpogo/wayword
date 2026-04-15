@@ -29,47 +29,43 @@
     </section>
 
     <div id="appView" class="app" aria-hidden="true">
-      <div id="editorOptionsBackdrop" class="editor-options-backdrop dim-layer hidden" aria-hidden="true"></div>
-
-      <div id="editorOptionsPanel" class="editor-options-panel settings-modal hidden" aria-hidden="true">
-        <div class="editor-options-toprow">
-          <div class="editor-options-section editor-options-utility">
-            <div class="editor-options-label">Theme</div>
-            <button id="themeToggleInPanel" class="theme-toggle" type="button" aria-label="Toggle theme">
-              <span class="theme-half theme-sun">☼</span>
-              <span class="theme-half theme-moon">◐</span>
-            </button>
+      <div id="editorOptionsBackdrop" class="editor-options-backdrop dim-layer settings-overlay-backdrop hidden" aria-hidden="true">
+        <div id="editorOptionsPanel" class="editor-options-panel settings-modal settings-overlay-sheet" aria-hidden="true">
+          <div class="editor-options-toprow">
+            <div class="editor-options-section editor-options-utility">
+              <div class="editor-options-label">Theme</div>
+              <button id="themeToggleInPanel" class="theme-toggle" type="button" aria-label="Toggle theme">
+                <span class="theme-half theme-sun">☼</span>
+                <span class="theme-half theme-moon">◐</span>
+              </button>
+            </div>
+            <button id="shuffleBtnPanel" class="editor-options-shuffle" type="button" aria-label="Shuffle setup">Shuffle</button>
           </div>
 
-          <div class="editor-options-section editor-options-utility">
-            <div class="editor-options-label">Setup</div>
-            <button id="shuffleBtnPanel" class="pill pill-button" type="button">Shuffle</button>
-          </div>
-        </div>
+          <div class="editor-options-modes">
+            <div class="editor-options-section">
+              <div class="editor-options-label">Words</div>
+              <div class="editor-options-typeline" id="wordModesPanel" role="group" aria-label="Word count target">
+                <button type="button" class="editor-options-seg" data-words="60">60</button>
+                <button type="button" class="editor-options-seg" data-words="75">75</button>
+                <button type="button" class="editor-options-seg" data-words="90">90</button>
+              </div>
+            </div>
 
-        <div class="editor-options-section">
-          <div class="editor-options-label">Words</div>
-          <div class="segmented-pill" id="wordModesPanel">
-            <button class="mode-btn active" type="button" data-words="60">60</button>
-            <button class="mode-btn" type="button" data-words="75">75</button>
-            <button class="mode-btn" type="button" data-words="90">90</button>
+            <div class="editor-options-section">
+              <div class="editor-options-label">Time</div>
+              <div class="editor-options-typeline" id="timeModesPanel" role="group" aria-label="Timer">
+                <button type="button" class="editor-options-seg" data-time="60">1m</button>
+                <button type="button" class="editor-options-seg" data-time="180">3m</button>
+                <button type="button" class="editor-options-seg" data-time="300">5m</button>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div class="editor-options-section">
-          <div class="editor-options-label">Time</div>
-          <div class="segmented-pill" id="timeModesPanel">
-            <button class="mode-btn active" type="button" data-time="0">Off</button>
-            <button class="mode-btn" type="button" data-time="60">1m</button>
-            <button class="mode-btn" type="button" data-time="180">3m</button>
-            <button class="mode-btn" type="button" data-time="300">5m</button>
+          <div class="editor-options-section editor-options-banned">
+            <div class="editor-options-label">Words to avoid</div>
+            <textarea id="bannedInlineInputPanel" class="editor-options-banned-field" rows="2" spellcheck="false" autocomplete="off"></textarea>
           </div>
-        </div>
-
-        <div class="editor-options-section">
-          <div class="editor-options-label">Words to avoid</div>
-          <input id="bannedInlineInputPanel" class="editor-options-input" type="text" />
-          <button id="saveBannedBtnPanel" class="pill pill-button" type="button">Apply</button>
         </div>
       </div>
 
@@ -199,23 +195,25 @@
       <header class="header">
         <div class="header-theme"></div>
 
-        <div class="header-brand brand-block">
-          <h1 class="wordmark" id="wordmark" aria-label="Wayword">
-            <span class="wm wm-w1">W</span><span class="wm wm-a">a</span><span class="wm wm-y">y</span><span class="wm wm-w2">w</span><span class="wm wm-o">o</span><span class="wm wm-r">r</span><span class="wm wm-d">d</span>
-          </h1>
+        <div class="write-field-context">
+          <div class="header-brand brand-block">
+            <h1 class="wordmark" id="wordmark" aria-label="Wayword">
+              <span class="wm wm-w1">W</span><span class="wm wm-a">a</span><span class="wm wm-y">y</span><span class="wm wm-w2">w</span><span class="wm wm-o">o</span><span class="wm wm-r">r</span><span class="wm wm-d">d</span>
+            </h1>
 
-          <div class="subhed">Write. See what emerges.</div>
-        </div>
+            <div class="subhed">Write. See what emerges.</div>
+          </div>
 
-        <div
-          id="styleTab"
-          class="style-tab hidden"
-          role="button"
-          tabindex="0"
-          aria-controls="profileView"
-          aria-expanded="false"
-        >
-          Patterns
+          <div
+            id="styleTab"
+            class="style-tab hidden"
+            role="button"
+            tabindex="0"
+            aria-controls="profileView"
+            aria-expanded="false"
+          >
+            Patterns
+          </div>
         </div>
       </header>
 
@@ -229,6 +227,20 @@
       </div>
 
       <section id="writeView">
+        <button
+          id="fieldExpandedToggle"
+          class="field-expand-toggle"
+          type="button"
+          aria-label="Show surrounding context"
+          aria-pressed="false"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2.75" y="2.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+            <rect x="10.75" y="2.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+            <rect x="2.75" y="10.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+            <rect x="10.75" y="10.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+          </svg>
+        </button>
         <div class="layout">
           <section class="main-column">
 
@@ -354,6 +366,8 @@
               </button>
 
               <div id="editorTimeFill" class="editor-time-fill" aria-hidden="true"></div>
+
+              <div id="editorPostRunLine" class="editor-post-run-line editor-post-run-line--empty" aria-live="polite"></div>
 
               <div class="editor-bottom-chrome">
                 <div class="editor-bottom-chrome-left">
