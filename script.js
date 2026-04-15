@@ -4906,7 +4906,11 @@ document.addEventListener("pointerdown", (e) => {
 
 $("fieldExpandedToggle")?.addEventListener("click", (e) => {
   e.preventDefault();
-  if (!isMobileViewport() || !document.body.classList.contains("focus-mode")) return;
+  if (!isMobileViewport()) return;
+  /* Field toggle must work whenever the write surface is visible; re-enter focus habitat if blur cleared it. */
+  if (!document.body.classList.contains("focus-mode")) {
+    setFocusMode(true);
+  }
   const hadEditorFocus = document.activeElement === editorInput;
   setExpandedField(!state.isExpandedField);
   if (hadEditorFocus && editorInput) {

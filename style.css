@@ -846,6 +846,7 @@ html[data-theme="dark"] .theme-moon{
 
 .prompt-meta-actions{
   display:flex;
+  flex-wrap:nowrap;
   align-items:center;
   justify-content:flex-end;
   flex:0 0 auto;
@@ -853,6 +854,11 @@ html[data-theme="dark"] .theme-moon{
   margin:0;
   padding:0;
   min-height:44px;
+}
+
+.prompt-meta-actions .field-expand-toggle,
+.prompt-meta-actions .prompt-reroll-btn{
+  flex-shrink:0;
 }
 
 .prompt-text{
@@ -887,6 +893,10 @@ html[data-theme="dark"] .theme-moon{
   height:44px;
   margin:0;
   padding:0;
+}
+
+.prompt-meta-actions .prompt-reroll-icon{
+  font-size:20px;
 }
 
 .prompt-reroll-btn:hover{
@@ -1621,7 +1631,8 @@ html[data-theme="dark"] .editor-time-fill{
 }
 
 @media (max-width:720px){
-  body.focus-mode .field-expand-toggle{
+  /* Field grid: same slot in focused and expanded field; visible whenever write view is up. */
+  #appView:not([aria-hidden="true"]) #writeView:not(.hidden) .field-expand-toggle{
     display:inline-flex;
   }
 
@@ -3207,13 +3218,13 @@ html[data-theme="dark"] .dim-layer{
 .editor-options-panel,
 .settings-modal{
   position:relative;
-  width:min(84vw, 460px);
+  width:min(88vw, 496px);
   max-width:100%;
   max-height:min(85vh, 760px);
   margin-inline:auto;
   flex:0 1 auto;
 
-  padding:18px 18px 20px;
+  padding:18px 17px 20px;
   border:1px solid rgba(60, 50, 35, 0.10);
   border-radius:24px;
   background:rgba(245, 239, 226, 0.78);
@@ -3226,7 +3237,8 @@ html[data-theme="dark"] .dim-layer{
 
   display:flex;
   flex-direction:column;
-  gap:12px;
+  align-items:stretch;
+  gap:14px;
 
   overflow-y:auto;
   overflow-x:hidden;
@@ -3263,9 +3275,9 @@ html[data-theme="dark"] .settings-modal{
 @media (min-width:768px){
   .editor-options-panel,
   .settings-modal{
-    width:min(84vw, 460px);
-    padding:20px 20px 22px;
-    gap:13px;
+    width:min(88vw, 496px);
+    padding:20px 19px 22px;
+    gap:15px;
   }
 }
 
@@ -3283,27 +3295,60 @@ html[data-theme="dark"] .settings-modal{
   margin:0 0 2px 2px;
 }
 
-.editor-options-modes{
+.editor-options-label--block{
+  display:block;
+  width:100%;
+  margin:0 0 6px 0;
+  text-align:center;
+  letter-spacing:.14em;
+}
+
+.editor-options-body{
   display:flex;
   flex-direction:column;
-  gap:11px;
-  padding-top:0;
+  gap:14px;
+  width:100%;
+  min-width:0;
+}
+
+.editor-options-modes-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px 18px;
+  width:100%;
+  align-items:start;
+}
+
+.editor-options-modes-col{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:0;
+  min-width:0;
 }
 
 .editor-options-typeline{
-  display:flex;
-  flex-wrap:wrap;
-  align-items:baseline;
-  gap:2px 4px;
-  align-self:flex-start;
-  max-width:100%;
-  padding:2px 0 1px;
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:2px 3px;
+  align-items:end;
+  justify-items:stretch;
+  width:100%;
+  min-width:0;
+  padding:4px 0 6px;
   border-bottom:1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+@media (max-width:380px){
+  .editor-options-modes-grid{
+    grid-template-columns:1fr;
+    gap:14px;
+  }
 }
 
 .editor-options-seg{
   margin:0;
-  padding:5px 12px 6px;
+  padding:6px 4px 7px;
   border:none;
   border-radius:0;
   background:transparent;
@@ -3316,6 +3361,9 @@ html[data-theme="dark"] .settings-modal{
   cursor:pointer;
   box-shadow:none;
   position:relative;
+  min-width:0;
+  width:100%;
+  text-align:center;
   transition:color 0.15s ease, opacity 0.15s ease;
 }
 
@@ -3344,8 +3392,8 @@ html[data-theme="dark"] .settings-modal{
 .editor-options-seg.active::after{
   content:"";
   position:absolute;
-  left:10px;
-  right:10px;
+  left:5px;
+  right:5px;
   bottom:-2px;
   height:2px;
   border-radius:1px;
@@ -3360,17 +3408,22 @@ html[data-theme="dark"] .editor-options-seg.active::after{
   background:color-mix(in srgb, var(--ink) 55%, transparent);
 }
 
-.editor-options-banned{
-  gap:5px;
-  padding-top:4px;
-  margin-top:2px;
-  border-top:none;
+.editor-options-banned-row{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:6px;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:0;
+  border:none;
 }
 
 .editor-options-banned-field{
-  align-self:flex-start;
+  align-self:stretch;
   width:100%;
-  max-width:min(72%, 17.5rem);
+  max-width:100%;
   min-height:2.75rem;
   max-height:5.25rem;
   padding:8px 10px;
@@ -3403,10 +3456,11 @@ html[data-theme="dark"] .editor-options-banned-field{
 .editor-options-toprow{
   display:flex;
   justify-content:space-between;
-  align-items:flex-start;
+  align-items:center;
   flex-wrap:nowrap;
-  gap:8px 12px;
+  gap:10px 14px;
   width:100%;
+  min-height:44px;
 }
 
 .editor-options-util-cluster{
@@ -3458,7 +3512,7 @@ html[data-theme="dark"] .editor-options-banned-field{
   flex:0 0 auto;
   width:40px;
   height:40px;
-  margin:-4px -6px 0 0;
+  margin:0;
   padding:0;
   display:inline-flex;
   align-items:center;
@@ -4295,19 +4349,24 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   }
 
   .editor-options-panel{
-    width:min(84vw, 460px);
+    width:min(88vw, 496px);
     max-height:min(88vh, 760px);
     padding:16px 15px 18px;
-    gap:12px;
+    gap:13px;
   }
 
-  .editor-options-modes{
-    gap:11px;
+  .editor-options-body{
+    gap:13px;
+  }
+
+  .editor-options-modes-grid{
+    gap:10px 14px;
   }
 
   .editor-options-toprow{
-    align-items:flex-start;
+    align-items:center;
     gap:8px 10px;
+    min-height:42px;
   }
 
   .editor-options-section{
@@ -4352,7 +4411,6 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   .editor-options-banned-field{
     font-size:13px;
     max-height:4.75rem;
-    max-width:min(74%, 17rem);
   }
 
   .legend-row{
@@ -4383,13 +4441,13 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
   }
 
   .prompt-meta-actions .prompt-reroll-icon{
-    font-size:16px;
+    font-size:18px;
   }
 
   .editor-options-panel{
-    width:min(84vw, 460px);
+    width:min(88vw, 496px);
     padding:14px 13px 16px;
-    gap:11px;
+    gap:12px;
   }
 
   .editor-options-label{
@@ -4420,7 +4478,6 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 
   .editor-options-banned-field{
     font-size:12px;
-    max-width:min(76%, 16rem);
   }
 
   .legend-row{
