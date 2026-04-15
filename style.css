@@ -891,6 +891,7 @@ html[data-theme="dark"] .theme-moon{
 .prompt-text{
   font-size:25px;
   line-height:1.22;
+  margin:0 0 4px;
 }
 
 .prompt-reroll-btn{
@@ -1653,6 +1654,33 @@ html[data-theme="dark"] .editor-time-fill{
 .field-expand-toggle svg{
   display:block;
   transform:none;
+  --fold-square-shift:0.36px;
+}
+
+.field-expand-toggle svg rect{
+  transition:transform 0.17s ease;
+  transform-origin:50% 50%;
+  vector-effect:non-scaling-stroke;
+}
+
+.field-expand-toggle svg rect:nth-child(1){
+  transform:translate(calc(var(--fold-square-shift) * -1), calc(var(--fold-square-shift) * -1));
+}
+
+.field-expand-toggle svg rect:nth-child(2){
+  transform:translate(var(--fold-square-shift), calc(var(--fold-square-shift) * -1));
+}
+
+.field-expand-toggle svg rect:nth-child(3){
+  transform:translate(calc(var(--fold-square-shift) * -1), var(--fold-square-shift));
+}
+
+.field-expand-toggle svg rect:nth-child(4){
+  transform:translate(var(--fold-square-shift), var(--fold-square-shift));
+}
+
+.field-expand-toggle[aria-pressed="true"] svg{
+  --fold-square-shift:-0.22px;
 }
 
 .prompt-meta-actions .field-expand-toggle{
@@ -4089,7 +4117,7 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   .prompt-text{
-    margin-top:0;
+    margin:0 0 3px;
   }
 
   .editor-pill-band{
@@ -4136,6 +4164,7 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   body.keyboard-open .prompt-text{
     font-size:clamp(18px, 5.2vw, 22px);
     line-height:1.14;
+    margin:0 0 2px;
   }
 
   body.keyboard-open #recentWritingTrigger{
