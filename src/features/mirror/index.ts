@@ -10,6 +10,7 @@ export type {
   MirrorHesitationProfile,
   MirrorPipelineResult,
   MirrorReflection,
+  MirrorReflectionCandidate,
   MirrorRepetitionExtraction,
   MirrorSessionInput
 } from "./types/mirrorTypes.js";
@@ -23,6 +24,22 @@ export {
   MIRROR_QUALIFIER_WORDS,
   MIRROR_UNCERTAINTY_WORDS
 } from "./constants/hesitationWords.js";
+export {
+  MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO,
+  MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO,
+  MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT,
+  MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL,
+  MIRROR_GEN_CADENCE_EVEN_MAX_VARIANCE,
+  MIRROR_GEN_CADENCE_MIN_SENTENCES,
+  MIRROR_GEN_CADENCE_MIN_VARIANCE,
+  MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS,
+  MIRROR_GEN_HESITATION_MIN_TOTAL,
+  MIRROR_GEN_MIN_WORDS_FOR_ANY,
+  MIRROR_GEN_REPETITION_DULL_WORDS,
+  MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN,
+  MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT,
+  MIRROR_GEN_REPETITION_TOP_MIN_COUNT
+} from "./constants/generationThresholds.js";
 export { MIRROR_STOPWORDS } from "./constants/stopwords.js";
 export {
   MIRROR_ABSTRACTION_SHIFT_RATIO,
@@ -42,8 +59,11 @@ export { extractCadence } from "./analysis/extractCadence.js";
 export { extractHesitation } from "./analysis/extractHesitation.js";
 export { extractRepetition } from "./analysis/extractRepetition.js";
 
-export { generateReflections } from "./generation/generateReflections.js";
-export { MIRROR_REFLECTION_TEMPLATES } from "./generation/reflectionTemplates.js";
+export {
+  buildReflectionCandidates,
+  buildReflectionCandidates as generateReflectionCandidates
+} from "./generation/buildReflectionCandidates.js";
+export { MIRROR_REFLECTION_TEMPLATE_RULES_DOC } from "./generation/reflectionTemplates.js";
 
 export { dedupeReflections } from "./ranking/dedupeReflections.js";
 export { rankReflections } from "./ranking/rankReflections.js";

@@ -26,6 +26,12 @@ export interface MirrorReflection {
   evidence: MirrorEvidence[];
 }
 
+/** Candidate after generation; includes internal ordering signal for ranking. */
+export interface MirrorReflectionCandidate extends MirrorReflection {
+  /** Internal only — higher means stronger signal for downstream ranking/selection. */
+  rankScore: number;
+}
+
 /** Public extraction payload for generation (analysis only). */
 export type MirrorFeatures = {
   sessionId: string;
@@ -42,6 +48,9 @@ export type MirrorFeatures = {
     longSentenceCount: number;
     endCompression: boolean;
     endExpansion: boolean;
+    /** Present when sentence count supports quarter comparison; used for evidence-backed cadence lines. */
+    meanSentenceLengthFirstQuarterWords: number | null;
+    meanSentenceLengthLastQuarterWords: number | null;
   };
 
   /**
@@ -119,5 +128,5 @@ export interface MirrorHesitationExtraction {
 }
 
 export interface MirrorPipelineResult {
-  reflections: MirrorReflection[];
+  candidates: MirrorReflectionCandidate[];
 }

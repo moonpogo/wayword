@@ -22,7 +22,9 @@ export function analyzeText(input: MirrorSessionInput): MirrorFeatures {
       shortSentenceCount: cadence.shortSentenceCount,
       longSentenceCount: cadence.longSentenceCount,
       endCompression: cadence.endCompression,
-      endExpansion: cadence.endExpansion
+      endExpansion: cadence.endExpansion,
+      meanSentenceLengthFirstQuarterWords: cadence.meanSentenceLengthFirstQuarterWords,
+      meanSentenceLengthLastQuarterWords: cadence.meanSentenceLengthLastQuarterWords
     },
     abstractionProfile: {
       abstractCount: abstraction.abstractCount,
