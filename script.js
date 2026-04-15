@@ -1742,7 +1742,15 @@ function ensurePromptRerollButton() {
       <span class="prompt-reroll-icon">↻</span>
       <span id="promptRerollBadge" class="prompt-reroll-badge">2</span>
     `;
-    promptCard.appendChild(btn);
+    const actions = promptCard.querySelector(".prompt-meta-actions");
+    const fieldToggle = $("fieldExpandedToggle");
+    if (actions && fieldToggle) {
+      actions.insertBefore(btn, fieldToggle);
+    } else if (actions) {
+      actions.appendChild(btn);
+    } else {
+      promptCard.appendChild(btn);
+    }
   }
 
   if (!btn.dataset.bound) {
@@ -4816,8 +4824,10 @@ $("bannedInlineInput")?.addEventListener("keydown", (e) => {
   }
 });
 
-$("editorOptionsBackdrop")?.addEventListener("click", () => {
+$("editorOptionsBackdrop")?.addEventListener("click", e => {
   if (Date.now() < optionsPanelDismissGuardUntil) return;
+  const panel = $("editorOptionsPanel");
+  if (panel?.contains(e.target)) return;
   setOptionsOpen(false);
 });
 
@@ -4843,23 +4853,23 @@ $("optionsTrigger")?.addEventListener("click", (e) => {
   setOptionsOpen(!state.optionsOpen);
 });
 
-$("editorOptionsPanel")?.addEventListener("pointerdown", (e) => {
+$("editorOptionsPanel")?.addEventListener("pointerdown", e => {
   e.stopPropagation();
 });
 
-document.addEventListener("click", (e) => {
-  const panel = $("editorOptionsPanel");
-  const trigger = $("optionsTrigger");
+$("editorOptionsPanel")?.addEventListener("click", e => {
+  e.stopPropagation();
+});
+
+$("editorOptionsCloseBtn")?.addEventListener("click", e => {
+  e.stopPropagation();
+  if (Date.now() < optionsPanelDismissGuardUntil) return;
+  setOptionsOpen(false);
+});
+
+document.addEventListener("click", e => {
   const editor = $("metaEditorRow");
   const pill = $("bannedPill");
-
-  if (panel && trigger && state.optionsOpen && Date.now() >= optionsPanelDismissGuardUntil) {
-    const insidePanel = panel.contains(e.target);
-    const clickedTrigger = trigger.contains(e.target);
-    if (!insidePanel && !clickedTrigger) {
-      setOptionsOpen(false);
-    }
-  }
 
   if (!editor || !pill) return;
 
