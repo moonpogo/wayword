@@ -78,11 +78,6 @@ const CALIBRATION_INSUFFICIENT_COPY = "Write a little more for calibration.";
 /** Bumped when opening Patterns so an in-flight close animation cannot hide the panel after reopen. */
 let profilePanelCloseMotionToken = 0;
 
-/** Mobile (≤720px) only: `showProfile` saves focus mode before opening Patterns and restores it after close. */
-let mobilePatternsResumeFocusMode = false;
-/** Mobile only: recent drawer should not leave field toggle/focus state stale after close. */
-let mobileRecentDrawerResumeFocusMode = false;
-
 /**
  * DEV-ONLY — search `WAYWORD_DEV_CALIBRATION_RESET` to remove this entire block.
  * When true: `window.waywordDevResetCalibration()` clears run history + calibration state.
@@ -96,6 +91,82 @@ const WAYWORD_DEV_CALIBRATION_RESET_ENABLED =
     location.protocol === "file:" ||
     new URLSearchParams(location.search).get("waywordDev") === "1" ||
     /\.vercel\.app$/i.test(location.hostname || ""));
+
+const WAYWORD_DEBUG_PATTERNS_TRANSITIONS_ENABLED =
+  typeof location !== "undefined" &&
+  (() => {
+    try {
+      const params = new URLSearchParams(location.search);
+      if (params.get("debugPatterns") === "1") return true;
+      if (params.get("debugPatterns") === "0") return false;
+      return localStorage.getItem("waywordDebugPatterns") === "1";
+    } catch (_) {
+      return false;
+    }
+  })();
+
+function logPatternsTransitionSnapshot(label, extra = {}) {
+  if (!WAYWORD_DEBUG_PATTERNS_TRANSITIONS_ENABLED) return;
+  const root = document.documentElement;
+  const body = document.body;
+  const appView = $("appView");
+  const writeView = $("writeView");
+  const profileView = $("profileView");
+  const mainColumn = document.querySelector("#writeView .main-column");
+  const belowEditorStack = document.querySelector(".below-editor-stack");
+  const appShell = document.querySelector(".app-shell");
+  const vv = window.visualViewport || null;
+  const rootStyle = getComputedStyle(root);
+  const appRect = appView?.getBoundingClientRect() || null;
+  const mainRect = mainColumn?.getBoundingClientRect() || null;
+  const belowRect = belowEditorStack?.getBoundingClientRect() || null;
+  const profileRect = profileView?.getBoundingClientRect() || null;
+  const payload = {
+    label,
+    now: Math.round(performance.now()),
+    classes: {
+      html: root.className,
+      body: body.className,
+      appShell: appShell?.className || "",
+      appView: appView?.className || "",
+      writeView: writeView?.className || "",
+      profileView: profileView?.className || ""
+    },
+    flags: {
+      isMobileViewport: isMobileViewport(),
+      focusMode: body.classList.contains("focus-mode"),
+      keyboardOpen: body.classList.contains("keyboard-open"),
+      patternsOpen: body.classList.contains("patterns-open"),
+      profileHidden: Boolean(profileView?.classList.contains("hidden")),
+      writeHidden: Boolean(writeView?.classList.contains("hidden")),
+      expandedFieldClass: body.classList.contains("expanded-field"),
+      expandedFieldState: state.isExpandedField
+    },
+    cssVars: {
+      vvh: rootStyle.getPropertyValue("--vvh").trim(),
+      vvOffsetTop: rootStyle.getPropertyValue("--vv-offset-top").trim(),
+      windowInnerHeightVar: rootStyle.getPropertyValue("--window-inner-height").trim()
+    },
+    viewport: {
+      innerHeight: window.innerHeight,
+      vvHeight: vv ? Math.round(vv.height) : null,
+      vvOffsetTop: vv ? Math.round(vv.offsetTop) : null,
+      vvPageTop: vv ? Math.round(vv.pageTop) : null
+    },
+    geometry: {
+      appTop: appRect ? Math.round(appRect.top) : null,
+      appHeight: appRect ? Math.round(appRect.height) : null,
+      mainTop: mainRect ? Math.round(mainRect.top) : null,
+      mainHeight: mainRect ? Math.round(mainRect.height) : null,
+      belowTop: belowRect ? Math.round(belowRect.top) : null,
+      belowHeight: belowRect ? Math.round(belowRect.height) : null,
+      profileTop: profileRect ? Math.round(profileRect.top) : null,
+      profileHeight: profileRect ? Math.round(profileRect.height) : null
+    },
+    extra
+  };
+  console.log("[patterns-debug]", payload);
+}
 
 const PROMPT_REROLL_LIMIT = 2;
 
@@ -246,7 +317,11 @@ function getViewportHeight() {
 }
 
 function syncViewportHeightVar() {
-  const h = getViewportHeight();
+  // Canonical non-focus baseline should use layout viewport height.
+  // visualViewport can lag low after keyboard/panel transitions and leave
+  // the app in a compressed intermediary state.
+  const inFocusMode = document.body.classList.contains("focus-mode");
+  const h = inFocusMode ? getViewportHeight() : Math.round(window.innerHeight);
   document.documentElement.style.setProperty("--vvh", `${h}px`);
   if (window.visualViewport) {
     const vv = window.visualViewport;
@@ -256,6 +331,7 @@ function syncViewportHeightVar() {
     document.documentElement.style.removeProperty("--vv-offset-top");
     document.documentElement.style.removeProperty("--window-inner-height");
   }
+  logPatternsTransitionSnapshot("syncViewportHeightVar:after");
 }
 
 /** Mobile: software keyboard shrinks visualViewport — toggle for compact chrome. */
@@ -264,10 +340,10 @@ function syncKeyboardOpenClass() {
     document.body.classList.remove("keyboard-open");
     return;
   }
-  if (
-    !document.body.classList.contains("focus-mode") &&
-    performance.now() < suppressKeyboardOpenTruthUntil
-  ) {
+  // Non-focus layout should never use `keyboard-open` compaction geometry.
+  // This prevents transient visualViewport reads (e.g. after panel close)
+  // from leaving a compressed intermediary non-focus state.
+  if (!document.body.classList.contains("focus-mode")) {
     document.body.classList.remove("keyboard-open");
     return;
   }
@@ -282,6 +358,11 @@ function syncKeyboardOpenClass() {
   const ratio = visibleH / Math.max(layoutH, 1);
   const keyboardOpen = delta > 88 || ratio < 0.74;
   document.body.classList.toggle("keyboard-open", keyboardOpen);
+  logPatternsTransitionSnapshot("syncKeyboardOpenClass:after", {
+    delta: Math.round(delta),
+    ratio: Number(ratio.toFixed(3)),
+    keyboardOpen
+  });
 }
 
 function isMobileViewport() {
@@ -328,20 +409,12 @@ function syncPatternsLayoutMode() {
     styleTab.classList.toggle("is-active", profileVisible);
     styleTab.setAttribute("aria-expanded", profileVisible ? "true" : "false");
   }
-}
-
-function resumeFocusModeAfterMobilePatternsCloseIfNeeded() {
-  if (!isMobileViewport() || !mobilePatternsResumeFocusMode) return;
-  mobilePatternsResumeFocusMode = false;
-  setFocusMode(true);
-  queueViewportSync();
-}
-
-function resumeFocusModeAfterMobileRecentDrawerCloseIfNeeded() {
-  if (!isMobileViewport() || !mobileRecentDrawerResumeFocusMode) return;
-  mobileRecentDrawerResumeFocusMode = false;
-  setFocusMode(true);
-  syncExpandedFieldClass();
+  logPatternsTransitionSnapshot("syncPatternsLayoutMode:after", {
+    useDesktopRail,
+    profileVisible,
+    useDesktopPatterns,
+    useMobilePatterns
+  });
 }
 
 /**
@@ -420,6 +493,7 @@ function setExpandedField(expanded) {
 }
 
 function setFocusMode(enabled) {
+  logPatternsTransitionSnapshot("setFocusMode:before", { enabled });
   const shouldEnable = Boolean(enabled) && isMobileViewport();
   if (shouldEnable) {
     suppressKeyboardOpenTruthUntil = 0;
@@ -433,6 +507,7 @@ function setFocusMode(enabled) {
       state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
     renderReflection(showReflectionLine);
     queueViewportSync();
+    logPatternsTransitionSnapshot("setFocusMode:after-enable");
     return;
   }
   if (!isMobileViewport()) {
@@ -440,11 +515,37 @@ function setFocusMode(enabled) {
     document.body.classList.remove("expanded-field");
     state.isExpandedField = false;
     renderProfileSummaryStrip();
+    logPatternsTransitionSnapshot("setFocusMode:after-disable-desktop");
     return;
   }
   exitFocusModeForLayoutIfNeeded();
   renderProfileSummaryStrip();
   queueViewportSync();
+  logPatternsTransitionSnapshot("setFocusMode:after-disable-mobile");
+}
+
+function settleNonFocusBaselineAfterPatternsClose() {
+  if (!isMobileViewport()) return;
+  const profileView = $("profileView");
+  editorInput?.blur();
+  if (profileView) {
+    profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
+    profileView.classList.add("hidden");
+  }
+  // Match normal focus-exit behavior so transient visualViewport values do not
+  // leave non-focus layout in `keyboard-open` compressed geometry.
+  armPostFocusExitKeyboardLayoutSettle();
+  suppressKeyboardOpenTruthUntil = Math.max(
+    suppressKeyboardOpenTruthUntil,
+    performance.now() + 1400
+  );
+  syncViewportHeightVar();
+  document.body.classList.remove("focus-mode", "expanded-field", "keyboard-open", "patterns-open");
+  document.documentElement.classList.remove("focus-mode-layout-snap");
+  state.isExpandedField = false;
+  syncPatternsLayoutMode();
+  renderProfile();
+  syncExpandedFieldClass();
 }
 
 let viewportSyncRaf = null;
@@ -600,11 +701,15 @@ function scheduleCalibrationOverlayGeometrySync() {
 }
 
 function queueViewportSync() {
+  logPatternsTransitionSnapshot("queueViewportSync:requested", {
+    alreadyQueued: viewportSyncRaf !== null
+  });
   if (viewportSyncRaf !== null) {
     viewportSyncCoalescePending = true;
     return;
   }
   viewportSyncRaf = requestAnimationFrame(() => {
+    logPatternsTransitionSnapshot("queueViewportSync:raf-start");
     viewportSyncRaf = null;
     try {
       syncViewportHeightVar();
@@ -617,6 +722,7 @@ function queueViewportSync() {
       syncSubmittedAnnotatedEditorSurfaces();
       scheduleEditorDotOverlaySync();
       renderProfileSummaryStrip();
+      logPatternsTransitionSnapshot("queueViewportSync:raf-after-sync");
     } finally {
       if (viewportSyncCoalescePending) {
         viewportSyncCoalescePending = false;
@@ -627,6 +733,7 @@ function queueViewportSync() {
           requestAnimationFrame(() => {
             if (document.body.classList.contains("focus-mode")) return;
             document.documentElement.classList.remove("focus-mode-layout-snap");
+            logPatternsTransitionSnapshot("queueViewportSync:raf-snap-cleared");
           });
         });
       }
@@ -1786,6 +1893,46 @@ function onPromptClusterControlPointerDown(e) {
   e.stopPropagation();
 }
 
+function normalizeCanonicalLayoutStateBeforeFoldToggle() {
+  if (!isMobileViewport()) return;
+  const profileView = $("profileView");
+  // Fold/full toggle is a strict two-state control; expanded-field is not part of it.
+  state.isExpandedField = false;
+  document.body.classList.remove("expanded-field");
+  if (!document.body.classList.contains("focus-mode")) {
+    document.body.classList.remove("keyboard-open");
+    if (profileView?.classList.contains("hidden")) {
+      document.body.classList.remove("patterns-open");
+    }
+    document.documentElement.classList.remove("focus-mode-layout-snap");
+  }
+  syncExpandedFieldClass();
+}
+
+function runFieldExpandedToggleAction() {
+  if (!isMobileViewport()) return;
+  suppressFocusExitUntil = performance.now() + 520;
+  normalizeCanonicalLayoutStateBeforeFoldToggle();
+  const currentlyFocus = document.body.classList.contains("focus-mode");
+  if (currentlyFocus) {
+    setFocusMode(false);
+  } else {
+    setFocusMode(true);
+  }
+  // Keep fold/full as strict two-state control.
+  state.isExpandedField = false;
+  syncExpandedFieldClass();
+
+  if (editorInput) {
+    requestAnimationFrame(() => {
+      if (document.body.classList.contains("focus-mode")) {
+        editorInput.focus({ preventScroll: true });
+      }
+    });
+  }
+  queueViewportSync();
+}
+
 /** Field expanded toggle only — never prompt reroll (explicit target + propagation guard). */
 function onFieldExpandedControlClick(e) {
   if (e.currentTarget?.id !== "fieldExpandedToggle") return;
@@ -1794,18 +1941,7 @@ function onFieldExpandedControlClick(e) {
   e.preventDefault();
   e.stopPropagation();
   e.stopImmediatePropagation();
-  if (!isMobileViewport()) return;
-
-  // Two-state model only: full focus (collapsed) <-> full unfold (expanded).
-  const nextExpanded = !document.body.classList.contains("expanded-field");
-  setFocusMode(true);
-  setExpandedField(nextExpanded);
-
-  if (editorInput) {
-    requestAnimationFrame(() => {
-      editorInput.focus({ preventScroll: true });
-    });
-  }
+  runFieldExpandedToggleAction();
 }
 
 function bindPromptClusterControlsOnce() {
@@ -3875,8 +4011,10 @@ function setRecentDrawerOpen(open, options = {}) {
   if (shouldOpen) {
     recentDrawerDismissGuardUntil = Date.now() + RECENT_DRAWER_DISMISS_GUARD_MS;
     if (isMobileViewport()) {
-      mobileRecentDrawerResumeFocusMode = document.body.classList.contains("focus-mode");
       suppressFocusExitUntil = performance.now() + 380;
+      if (document.body.classList.contains("focus-mode")) {
+        setFocusMode(false);
+      }
     }
     if (document.activeElement === editorInput) {
       editorInput.blur();
@@ -3899,12 +4037,10 @@ function setRecentDrawerOpen(open, options = {}) {
     });
   } else {
     recentDrawerDismissGuardUntil = 0;
-    if (!isMobileViewport()) mobileRecentDrawerResumeFocusMode = false;
     state.pendingRecentDrawerExpand = false;
     hideMetricExplainer();
     if (!skipFocus) trigger?.focus();
     requestAnimationFrame(() => {
-      resumeFocusModeAfterMobileRecentDrawerCloseIfNeeded();
       queueViewportSync();
     });
   }
@@ -4626,23 +4762,54 @@ function submitWriting(fromTimer = false) {
 function showProfile(show = true) {
   const profileView = $("profileView");
   if (!profileView) return;
+  const wasVisible = !profileView.classList.contains("hidden");
+  const isMobilePatternsContext = isMobileViewport() && !isDesktopPatternsViewport();
+  const isPatternsOpen = document.body.classList.contains("patterns-open");
+  logPatternsTransitionSnapshot("showProfile:enter", {
+    show,
+    wasVisible,
+    isMobilePatternsContext,
+    isPatternsOpen
+  });
 
   if (show) {
     profilePanelCloseMotionToken++;
   }
 
-  if (!isMobileViewport()) {
-    mobilePatternsResumeFocusMode = false;
+  if (isMobilePatternsContext && (show || wasVisible || isPatternsOpen)) {
+    if (show) {
+      editorInput?.blur();
+      if (document.body.classList.contains("focus-mode")) {
+        setFocusMode(false);
+      }
+      profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
+      profileView.classList.remove("hidden");
+    } else {
+      // Canonical destination for mobile Patterns close: explicit non-focus baseline.
+      setFocusMode(false);
+      profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
+      profileView.classList.add("hidden");
+      document.body.classList.remove("patterns-open", "keyboard-open");
+      document.documentElement.classList.remove("focus-mode-layout-snap");
+      state.isExpandedField = false;
+      syncExpandedFieldClass();
+    }
+    syncPatternsLayoutMode();
+    renderProfile();
+    syncViewportHeightVar();
+    syncKeyboardOpenClass();
+    queueViewportSync();
+    logPatternsTransitionSnapshot("showProfile:mobile-resolver-return", { show });
+    requestAnimationFrame(() => {
+      logPatternsTransitionSnapshot("showProfile:mobile-resolver-next-raf", { show });
+    });
+    return;
   }
 
   const motion = !prefersReducedUiMotion();
-  const wasVisible = !profileView.classList.contains("hidden");
 
   if (show && !isDesktopPatternsViewport()) {
     editorInput?.blur();
-    if (isMobileViewport() && !wasVisible) {
-      mobilePatternsResumeFocusMode = document.body.classList.contains("focus-mode");
-    }
     if (isMobileViewport() && document.body.classList.contains("focus-mode")) {
       setFocusMode(false);
     }
@@ -4652,7 +4819,8 @@ function showProfile(show = true) {
     profileView.classList.toggle("hidden", !show);
     syncPatternsLayoutMode();
     renderProfile();
-    if (!show) resumeFocusModeAfterMobilePatternsCloseIfNeeded();
+    queueViewportSync();
+    logPatternsTransitionSnapshot("showProfile:no-motion-return", { show });
     return;
   }
 
@@ -4665,11 +4833,24 @@ function showProfile(show = true) {
     void profileView.offsetWidth;
     requestAnimationFrame(() => {
       profileView.classList.remove("profile-view--enter-from");
+      queueViewportSync();
+      logPatternsTransitionSnapshot("showProfile:open-next-raf");
     });
+    logPatternsTransitionSnapshot("showProfile:open-return");
     return;
   }
 
   if (!show && wasVisible) {
+    if (isMobileViewport()) {
+      setFocusMode(false);
+      profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
+      profileView.classList.add("hidden");
+      syncPatternsLayoutMode();
+      renderProfile();
+      queueViewportSync();
+      logPatternsTransitionSnapshot("showProfile:close-mobile-return");
+      return;
+    }
     if (profileView.classList.contains("profile-view--recede")) {
       return;
     }
@@ -4684,7 +4865,8 @@ function showProfile(show = true) {
       profileView.classList.remove("profile-view--recede");
       syncPatternsLayoutMode();
       renderProfile();
-      resumeFocusModeAfterMobilePatternsCloseIfNeeded();
+      queueViewportSync();
+      logPatternsTransitionSnapshot("showProfile:close-desktop-settle");
     };
     const onTransitionEnd = (e) => {
       if (e.target !== profileView) return;
@@ -4702,7 +4884,8 @@ function showProfile(show = true) {
   profileView.classList.toggle("hidden", !show);
   syncPatternsLayoutMode();
   renderProfile();
-  if (!show) resumeFocusModeAfterMobilePatternsCloseIfNeeded();
+  queueViewportSync();
+  logPatternsTransitionSnapshot("showProfile:fallthrough-return", { show });
 }
 
 /* -----------------------------
@@ -5021,7 +5204,15 @@ $("styleTab")?.addEventListener("pointerdown", () => {
 $("styleTab")?.addEventListener("click", () => {
   const profileView = $("profileView");
   const isShowingProfile = profileView && !profileView.classList.contains("hidden");
+  logPatternsTransitionSnapshot("styleTab:click-before-toggle", { isShowingProfile });
   showProfile(!isShowingProfile);
+  logPatternsTransitionSnapshot("styleTab:click-after-toggle", { nextShow: !isShowingProfile });
+  requestAnimationFrame(() => {
+    logPatternsTransitionSnapshot("styleTab:click-next-raf", { nextShow: !isShowingProfile });
+  });
+  window.setTimeout(() => {
+    logPatternsTransitionSnapshot("styleTab:click-timeout-200ms", { nextShow: !isShowingProfile });
+  }, 200);
 });
 $("styleTab")?.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
@@ -5029,7 +5220,15 @@ $("styleTab")?.addEventListener("keydown", (e) => {
   if (isMobileViewport()) suppressFocusExitUntil = performance.now() + 320;
   const profileView = $("profileView");
   const isShowingProfile = profileView && !profileView.classList.contains("hidden");
+  logPatternsTransitionSnapshot("styleTab:key-before-toggle", {
+    key: e.key,
+    isShowingProfile
+  });
   showProfile(!isShowingProfile);
+  logPatternsTransitionSnapshot("styleTab:key-after-toggle", { nextShow: !isShowingProfile });
+  requestAnimationFrame(() => {
+    logPatternsTransitionSnapshot("styleTab:key-next-raf", { nextShow: !isShowingProfile });
+  });
 });
 $("shuffleBtn")?.addEventListener("click", triggerShuffle);
 $("repeatLimitPill")?.addEventListener("click", cycleRepeatLimit);
@@ -5128,10 +5327,12 @@ document.addEventListener("pointerdown", (e) => {
     e.target.closest("#editorOptionsBackdrop");
   const insideRecent =
     e.target.closest("#recentDrawer") || e.target.closest("#recentDrawerBackdrop");
+  const insideBelowEditorStack = e.target.closest(".below-editor-stack");
   if (
     insideEditor ||
     insideOptions ||
     insideRecent ||
+    insideBelowEditorStack ||
     e.target.closest("#fieldExpandedToggle") ||
     e.target.closest("#promptRerollBtn")
   ) {
@@ -5178,6 +5379,27 @@ if (WAYWORD_DEV_CALIBRATION_RESET_ENABLED) {
   } catch (_) {
     /* ignore */
   }
+}
+
+if (WAYWORD_DEBUG_PATTERNS_TRANSITIONS_ENABLED) {
+  window.waywordDebugPatterns = {
+    snapshot: (label = "manual") => logPatternsTransitionSnapshot(label),
+    enable() {
+      try {
+        localStorage.setItem("waywordDebugPatterns", "1");
+      } catch (_) {
+        /* ignore */
+      }
+    },
+    disable() {
+      try {
+        localStorage.removeItem("waywordDebugPatterns");
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  };
+  logPatternsTransitionSnapshot("debugPatterns:boot");
 }
 
 window.addEventListener("resize", queueViewportSync);

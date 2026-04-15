@@ -877,9 +877,10 @@ html[data-theme="dark"] .theme-moon{
   flex:0 0 auto;
   margin:0 0 0 auto;
   padding:0;
-  min-height:44px;
+  min-height:36px;
   position:relative;
   isolation:isolate;
+  pointer-events:none;
 }
 
 .prompt-reroll-btn::after,
@@ -1628,18 +1629,20 @@ html[data-theme="dark"] .editor-time-fill{
   flex:0 0 auto;
   align-items:center;
   justify-content:center;
-  width:44px;
-  height:44px;
+  width:36px;
+  height:36px;
   margin:0;
   padding:0;
   border:none;
-  border-radius:10px;
+  border-radius:8px;
   background:transparent;
   color:color-mix(in srgb, var(--ink) 38%, var(--muted));
   opacity:0.48;
   cursor:pointer;
   line-height:0;
   transition:opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
+  pointer-events:auto;
+  touch-action:manipulation;
 }
 
 .field-expand-toggle:hover{
@@ -1717,9 +1720,9 @@ html[data-theme="dark"] .editor-time-fill{
 
   .prompt-meta-actions{
     margin-left:auto;
-    min-height:44px;
-    flex:0 0 44px;
-    width:44px;
+    min-height:36px;
+    flex:0 0 36px;
+    width:36px;
     justify-content:flex-end;
   }
 
@@ -1730,8 +1733,8 @@ html[data-theme="dark"] .editor-time-fill{
 
   /* Right utility visually terminates at the right endpoint of the top rule. */
   .prompt-meta-actions .field-expand-toggle{
-    width:44px;
-    height:44px;
+    width:36px;
+    height:36px;
     justify-content:flex-end;
     padding-left:0;
     padding-right:0;
