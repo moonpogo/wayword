@@ -13,9 +13,8 @@
  * - No advice, no diagnosis, no personality claims, no feigned certainty.
  *
  * **repetition**
- * - Named return: “You return several times to ‘lemma.’” (non–low-signal lemma, count floor lower).
- * - Low-signal lemma (dull list or very short): higher count floor; headline uses the generic
- *   recurrence line; evidence carries tokenizer counts and a text slice.
+ * - Named return only: “You return several times to ‘lemma.’” for the first top repeated lemma
+ *   that passes count gates and is not dull/ultra-short; otherwise no repetition card.
  *
  * **abstraction_concrete**
  * - Ambiguous movement (both shift flags): balance-only headline; metrics + note in evidence.
@@ -23,11 +22,10 @@
  * - Density-only: mostly-ideas / mostly-grounded / mixed middle line; ratio gates in thresholds file.
  *
  * **cadence**
- * - End compression / expansion: plain observation about tightening or lengthening toward the close;
- *   quarter means in evidence only.
- * - Short + long mix: alternation headline; thresholds and counts in evidence.
- * - Even rhythm: low spread; no “variance” in headline.
- * - Uneven rhythm: high spread; headline describes changing line length without naming variance.
+ * - End compression / expansion: stricter quarter mean ratio + minimum sentence count; quarter
+ *   means and ratio in evidence; lower rank weight than earlier V1.
+ * - Alternation: only when short/long counts and sentence-length variance all clear explicit floors;
+ *   counts and spread in evidence. No separate “even rhythm” or “changing length” headlines.
  *
  * **hesitation_qualification**
  * - Headline chosen from a small set by bucket balance (qualify-after-state vs turn/soften vs general).

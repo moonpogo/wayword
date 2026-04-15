@@ -16,17 +16,17 @@ export const MIRROR_SHORT_SENTENCE_MAX_WORDS = 7;
 export const MIRROR_LONG_SENTENCE_MIN_WORDS = 18;
 
 /** Minimum sentences required before quarter means and end flags are computed. */
-export const MIRROR_CADENCE_MIN_SENTENCES_FOR_END_SHAPE = 4;
+export const MIRROR_CADENCE_MIN_SENTENCES_FOR_END_SHAPE = 6;
 
 /**
  * Last-quarter mean must be below this fraction of the first-quarter mean to set endCompression.
  */
-export const MIRROR_END_COMPRESSION_RATIO = 0.85;
+export const MIRROR_END_COMPRESSION_RATIO = 0.72;
 
 /**
  * Last-quarter mean must be above this fraction of the first-quarter mean to set endExpansion.
  */
-export const MIRROR_END_EXPANSION_RATIO = 1.15;
+export const MIRROR_END_EXPANSION_RATIO = 1.28;
 
 /**
  * Second-half lexicon hit rate must exceed first-half by this factor to set a shift flag

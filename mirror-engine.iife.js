@@ -1,0 +1,824 @@
+"use strict";
+var WaywordMirror = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // src/features/mirror/entry-iife.ts
+  var entry_iife_exports = {};
+  __export(entry_iife_exports, {
+    runMirrorPipeline: () => runMirrorPipeline
+  });
+
+  // src/features/mirror/utils/normalizeText.ts
+  function normalizeText(text) {
+    return String(text || "").replace(/\r\n?/g, "\n").replace(/[\u2018\u2019\u201A\u2032\u2035]/g, "'").replace(/[\u201C\u201D\u201E\u2033]/g, '"').replace(/\s+/g, " ").trim();
+  }
+
+  // src/features/mirror/utils/mirrorSessionId.ts
+  function fnv1a32Hex(text) {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i += 1) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0).toString(16).padStart(8, "0");
+  }
+  function resolveMirrorSessionId(input) {
+    const explicit = input.sessionId?.trim();
+    if (explicit) return explicit;
+    const basis = `${normalizeText(input.text)}|${input.startedAt ?? ""}|${input.endedAt ?? ""}`;
+    return `mirror-${fnv1a32Hex(basis)}`;
+  }
+
+  // src/features/mirror/constants/abstractWords.ts
+  var MIRROR_ABSTRACT_WORDS = [
+    "idea",
+    "concept",
+    "notion",
+    "sense",
+    "structure",
+    "feeling",
+    "truth",
+    "meaning",
+    "justice",
+    "freedom",
+    "hope",
+    "fear",
+    "becoming",
+    "identity",
+    "love",
+    "time",
+    "life",
+    "death",
+    "power",
+    "beauty",
+    "good",
+    "evil",
+    "tomorrow",
+    "today",
+    "yesterday",
+    "waiting",
+    "wait",
+    "change",
+    "future",
+    "past",
+    "thought",
+    "wonder",
+    "self",
+    "remember",
+    "memory",
+    "dream"
+  ];
+
+  // src/features/mirror/constants/concreteWords.ts
+  var MIRROR_CONCRETE_WORDS = [
+    "table",
+    "chair",
+    "door",
+    "window",
+    "floor",
+    "wall",
+    "hand",
+    "foot",
+    "stone",
+    "water",
+    "metal",
+    "glass",
+    "paper",
+    "knife",
+    "cup",
+    "road",
+    "car",
+    "tree",
+    "sky",
+    "rain"
+  ];
+
+  // src/features/mirror/constants/thresholds.ts
+  var MIRROR_MIN_TOKEN_LENGTH = 3;
+  var MIRROR_REPETITION_TOP_N = 8;
+  var MIRROR_REPETITION_MIN_COUNT = 2;
+  var MIRROR_SHORT_SENTENCE_MAX_WORDS = 7;
+  var MIRROR_LONG_SENTENCE_MIN_WORDS = 18;
+  var MIRROR_CADENCE_MIN_SENTENCES_FOR_END_SHAPE = 6;
+  var MIRROR_END_COMPRESSION_RATIO = 0.72;
+  var MIRROR_END_EXPANSION_RATIO = 1.28;
+  var MIRROR_ABSTRACTION_SHIFT_RATIO = 1.1;
+
+  // src/features/mirror/utils/tokenizeText.ts
+  function tokenizeText(text) {
+    const normalized = normalizeText(text).toLowerCase();
+    if (!normalized) return [];
+    return normalized.match(/\p{L}+(?:'\p{L}+)?/gu) ?? [];
+  }
+
+  // src/features/mirror/analysis/extractAbstraction.ts
+  var ABSTRACT = new Set(MIRROR_ABSTRACT_WORDS.map((w) => w.toLowerCase()));
+  var CONCRETE = new Set(MIRROR_CONCRETE_WORDS.map((w) => w.toLowerCase()));
+  function extractAbstraction(input) {
+    const tokens = tokenizeText(input.text).map((t) => t.toLowerCase());
+    const contentTokenCount = tokens.length;
+    let abstractCount = 0;
+    let concreteCount = 0;
+    const firstHalfEnd = Math.ceil(contentTokenCount / 2);
+    let firstHalfAbstractMatchCount = 0;
+    let secondHalfAbstractMatchCount = 0;
+    let firstHalfConcreteMatchCount = 0;
+    let secondHalfConcreteMatchCount = 0;
+    for (let i = 0; i < tokens.length; i += 1) {
+      const w = tokens[i];
+      const inFirst = i < firstHalfEnd;
+      if (ABSTRACT.has(w)) {
+        abstractCount += 1;
+        if (inFirst) firstHalfAbstractMatchCount += 1;
+        else secondHalfAbstractMatchCount += 1;
+      }
+      if (CONCRETE.has(w)) {
+        concreteCount += 1;
+        if (inFirst) firstHalfConcreteMatchCount += 1;
+        else secondHalfConcreteMatchCount += 1;
+      }
+    }
+    const abstractConcreteRatio = abstractCount / Math.max(concreteCount, 1);
+    const firstTokens = firstHalfEnd;
+    const secondTokens = contentTokenCount - firstHalfEnd;
+    const d1a = firstHalfAbstractMatchCount / Math.max(1, firstTokens);
+    const d2a = secondHalfAbstractMatchCount / Math.max(1, secondTokens);
+    const d1c = firstHalfConcreteMatchCount / Math.max(1, firstTokens);
+    const d2c = secondHalfConcreteMatchCount / Math.max(1, secondTokens);
+    let shiftsTowardAbstract = false;
+    let shiftsTowardConcrete = false;
+    if (contentTokenCount >= 2 && firstTokens >= 1 && secondTokens >= 1) {
+      shiftsTowardAbstract = d2a > d1a * MIRROR_ABSTRACTION_SHIFT_RATIO;
+      shiftsTowardConcrete = d2c > d1c * MIRROR_ABSTRACTION_SHIFT_RATIO;
+    }
+    return {
+      abstractCount,
+      concreteCount,
+      abstractConcreteRatio,
+      shiftsTowardConcrete,
+      shiftsTowardAbstract,
+      contentTokenCount,
+      firstHalfAbstractMatchCount,
+      secondHalfAbstractMatchCount,
+      firstHalfConcreteMatchCount,
+      secondHalfConcreteMatchCount
+    };
+  }
+
+  // src/features/mirror/utils/splitSentences.ts
+  function splitSentences(text) {
+    const body = normalizeText(text);
+    if (!body) return [];
+    const parts = body.split(/(?<=[.!?])(?:\s+|$)/g);
+    const out = [];
+    for (const part of parts) {
+      const s = part.trim();
+      if (s) out.push(s);
+    }
+    return out;
+  }
+
+  // src/features/mirror/analysis/extractCadence.ts
+  function populationVariance(values) {
+    const n = values.length;
+    if (n === 0) return 0;
+    const mean2 = values.reduce((a, b) => a + b, 0) / n;
+    return values.reduce((acc, v) => acc + (v - mean2) ** 2, 0) / n;
+  }
+  function mean(values) {
+    const n = values.length;
+    if (n === 0) return 0;
+    return values.reduce((a, b) => a + b, 0) / n;
+  }
+  function extractCadence(input) {
+    const sentences = splitSentences(input.text);
+    const sentenceCount = sentences.length;
+    const lengths = sentences.map((s) => tokenizeText(s).length);
+    const averageSentenceLengthWords = sentenceCount === 0 ? 0 : lengths.reduce((a, b) => a + b, 0) / sentenceCount;
+    const sentenceLengthVariance = populationVariance(lengths);
+    let shortSentenceCount = 0;
+    let longSentenceCount = 0;
+    for (const len of lengths) {
+      if (len <= MIRROR_SHORT_SENTENCE_MAX_WORDS && len > 0) shortSentenceCount += 1;
+      if (len >= MIRROR_LONG_SENTENCE_MIN_WORDS) longSentenceCount += 1;
+    }
+    let meanSentenceLengthFirstQuarterWords = null;
+    let meanSentenceLengthLastQuarterWords = null;
+    let endCompression = false;
+    let endExpansion = false;
+    if (sentenceCount >= MIRROR_CADENCE_MIN_SENTENCES_FOR_END_SHAPE) {
+      const q = Math.max(1, Math.ceil(sentenceCount / 4));
+      const firstLens = lengths.slice(0, q);
+      const lastLens = lengths.slice(-q);
+      meanSentenceLengthFirstQuarterWords = mean(firstLens);
+      meanSentenceLengthLastQuarterWords = mean(lastLens);
+      if (meanSentenceLengthFirstQuarterWords > 0) {
+        const ratio = meanSentenceLengthLastQuarterWords / meanSentenceLengthFirstQuarterWords;
+        endCompression = ratio <= MIRROR_END_COMPRESSION_RATIO;
+        endExpansion = ratio >= MIRROR_END_EXPANSION_RATIO;
+      }
+    }
+    return {
+      sentenceCount,
+      averageSentenceLengthWords,
+      sentenceLengthVariance,
+      shortSentenceCount,
+      longSentenceCount,
+      endCompression,
+      endExpansion,
+      meanSentenceLengthFirstQuarterWords,
+      meanSentenceLengthLastQuarterWords
+    };
+  }
+
+  // src/features/mirror/constants/hesitationWords.ts
+  var MIRROR_QUALIFIER_WORDS = [
+    "almost",
+    "basically",
+    "maybe",
+    "fairly",
+    "generally",
+    "kind",
+    "largely",
+    "mostly",
+    "nearly",
+    "partially",
+    "perhaps",
+    "possibly",
+    "probably",
+    "quite",
+    "rather",
+    "relatively",
+    "roughly",
+    "seems",
+    "appears",
+    "somewhat",
+    "sort",
+    "usually",
+    "might",
+    "could",
+    "would"
+  ];
+  var MIRROR_PIVOT_WORDS = [
+    "although",
+    "besides",
+    "conversely",
+    "furthermore",
+    "hence",
+    "however",
+    "meanwhile",
+    "moreover",
+    "nevertheless",
+    "nonetheless",
+    "otherwise",
+    "still",
+    "therefore",
+    "though",
+    "thus",
+    "yet"
+  ];
+  var MIRROR_CONTRADICTION_MARKER_WORDS = [
+    "cannot",
+    "contrary",
+    "couldn't",
+    "despite",
+    "didn't",
+    "doesn't",
+    "instead",
+    "neither",
+    "never",
+    "nor",
+    "unlikely",
+    "unlike",
+    "wasn't",
+    "weren't"
+  ];
+  var MIRROR_UNCERTAINTY_WORDS = [
+    "arguably",
+    "guess",
+    "guessing",
+    "presumably",
+    "seemingly",
+    "supposedly",
+    "unclear",
+    "uncertain",
+    "unknown",
+    "unsure"
+  ];
+
+  // src/features/mirror/analysis/extractHesitation.ts
+  var QUALIFIERS = new Set(MIRROR_QUALIFIER_WORDS.map((w) => w.toLowerCase()));
+  var PIVOTS = new Set(MIRROR_PIVOT_WORDS.map((w) => w.toLowerCase()));
+  var CONTRADICTIONS = new Set(MIRROR_CONTRADICTION_MARKER_WORDS.map((w) => w.toLowerCase()));
+  var UNCERTAINTY = new Set(MIRROR_UNCERTAINTY_WORDS.map((w) => w.toLowerCase()));
+  function extractHesitation(input) {
+    const tokens = tokenizeText(input.text).map((t) => t.toLowerCase());
+    const contentTokenCount = tokens.length;
+    let qualifierLexiconMatchCount = 0;
+    let pivotLexiconMatchCount = 0;
+    let contradictionLexiconMatchCount = 0;
+    let uncertaintyLexiconMatchCount = 0;
+    for (const w of tokens) {
+      if (QUALIFIERS.has(w)) qualifierLexiconMatchCount += 1;
+      if (PIVOTS.has(w)) pivotLexiconMatchCount += 1;
+      if (CONTRADICTIONS.has(w)) contradictionLexiconMatchCount += 1;
+      if (UNCERTAINTY.has(w)) uncertaintyLexiconMatchCount += 1;
+    }
+    return {
+      contentTokenCount,
+      qualifierLexiconMatchCount,
+      pivotLexiconMatchCount,
+      contradictionLexiconMatchCount,
+      uncertaintyLexiconMatchCount
+    };
+  }
+
+  // src/features/mirror/constants/stopwords.ts
+  var MIRROR_STOPWORDS = /* @__PURE__ */ new Set([
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "but",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "as",
+    "by",
+    "with",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "it",
+    "its",
+    "this",
+    "that",
+    "these",
+    "those"
+  ]);
+
+  // src/features/mirror/analysis/extractRepetition.ts
+  function isEligibleRepetitionToken(word) {
+    if (word.length < MIRROR_MIN_TOKEN_LENGTH) return false;
+    if (MIRROR_STOPWORDS.has(word)) return false;
+    return true;
+  }
+  function extractRepetition(input) {
+    const tokens = tokenizeText(input.text);
+    const totalTokenCount = tokens.length;
+    const counts = /* @__PURE__ */ new Map();
+    let eligibleTokenCount = 0;
+    for (const raw of tokens) {
+      const w = raw.toLowerCase();
+      if (!isEligibleRepetitionToken(w)) continue;
+      eligibleTokenCount += 1;
+      counts.set(w, (counts.get(w) ?? 0) + 1);
+    }
+    const distinctEligibleTokenCount = counts.size;
+    const topRepeatedWords = [...counts.entries()].filter(([, c]) => c >= MIRROR_REPETITION_MIN_COUNT).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, MIRROR_REPETITION_TOP_N).map(([word, count]) => ({ word, count }));
+    return {
+      totalTokenCount,
+      eligibleTokenCount,
+      distinctEligibleTokenCount,
+      topRepeatedWords
+    };
+  }
+
+  // src/features/mirror/analysis/analyzeText.ts
+  function analyzeText(input) {
+    const repetition = extractRepetition(input);
+    const cadence = extractCadence(input);
+    const abstraction = extractAbstraction(input);
+    const hesitation = extractHesitation(input);
+    return {
+      sessionId: resolveMirrorSessionId(input),
+      wordCount: repetition.totalTokenCount,
+      sentenceCount: cadence.sentenceCount,
+      topRepeatedWords: [...repetition.topRepeatedWords],
+      cadenceProfile: {
+        avgSentenceLength: cadence.averageSentenceLengthWords,
+        varianceSentenceLength: cadence.sentenceLengthVariance,
+        shortSentenceCount: cadence.shortSentenceCount,
+        longSentenceCount: cadence.longSentenceCount,
+        endCompression: cadence.endCompression,
+        endExpansion: cadence.endExpansion,
+        meanSentenceLengthFirstQuarterWords: cadence.meanSentenceLengthFirstQuarterWords,
+        meanSentenceLengthLastQuarterWords: cadence.meanSentenceLengthLastQuarterWords
+      },
+      abstractionProfile: {
+        abstractCount: abstraction.abstractCount,
+        concreteCount: abstraction.concreteCount,
+        abstractConcreteRatio: abstraction.abstractConcreteRatio,
+        shiftsTowardConcrete: abstraction.shiftsTowardConcrete,
+        shiftsTowardAbstract: abstraction.shiftsTowardAbstract
+      },
+      hesitationProfile: {
+        qualifierCount: hesitation.qualifierLexiconMatchCount,
+        pivotCount: hesitation.pivotLexiconMatchCount,
+        contradictionMarkers: hesitation.contradictionLexiconMatchCount,
+        uncertaintyMarkers: hesitation.uncertaintyLexiconMatchCount
+      }
+    };
+  }
+
+  // src/features/mirror/constants/generationThresholds.ts
+  var MIRROR_GEN_MIN_WORDS_FOR_ANY = 28;
+  var MIRROR_GEN_REPETITION_TOP_MIN_COUNT = 3;
+  var MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN = 4;
+  var MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT = 5;
+  var MIRROR_GEN_REPETITION_DULL_WORDS = /* @__PURE__ */ new Set([
+    "thing",
+    "things",
+    "stuff",
+    "something",
+    "anything",
+    "nothing",
+    "way",
+    "ways",
+    "kind",
+    "sort",
+    "time",
+    "life",
+    "world",
+    "people",
+    "person",
+    "moment",
+    "day",
+    "night",
+    "hand",
+    "back",
+    "place",
+    "room",
+    "door"
+  ]);
+  var MIRROR_GEN_CADENCE_MIN_SENTENCES = 5;
+  var MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT = 3;
+  var MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG = 2;
+  var MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE = 16;
+  var MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL = 3;
+  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_WORDS = 24;
+  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_ABSTRACT = 3;
+  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_RATIO = 2;
+  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MAX_CONCRETE = 1;
+  var MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT = 3;
+  var MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO = 1.28;
+  var MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO = 1.28;
+  var MIRROR_GEN_HESITATION_MIN_TOTAL = 6;
+  var MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS = 1.5;
+
+  // src/features/mirror/generation/buildReflectionCandidates.ts
+  function snippetAround(text, needle, radius = 36) {
+    const t = text;
+    const lower = t.toLowerCase();
+    const n = needle.toLowerCase();
+    const idx = lower.indexOf(n);
+    if (idx < 0) {
+      return { text: needle };
+    }
+    const a = Math.max(0, idx - radius);
+    const b = Math.min(t.length, idx + needle.length + radius);
+    const slice = t.slice(a, b).trim();
+    return { text: slice, start: a, end: b };
+  }
+  function candidate(category, sessionId, statement, evidence, rankScore) {
+    return {
+      id: `${category}:${sessionId}`,
+      category,
+      statement,
+      evidence,
+      rankScore
+    };
+  }
+  function abstractionCandidate(sessionId, statement, evidence, rankScore) {
+    return candidate("abstraction_concrete", sessionId, statement, evidence, Math.max(rankScore, 38));
+  }
+  function repetitionWordIsLowSignal(word) {
+    const w = word.toLowerCase();
+    if (MIRROR_GEN_REPETITION_DULL_WORDS.has(w)) return true;
+    if (w.length <= MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN) return true;
+    return false;
+  }
+  function repetitionMeetsCountGate(word, count) {
+    if (repetitionWordIsLowSignal(word)) return count >= MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT;
+    return count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
+  }
+  function repetitionTopCountsEvidence(features, depth = 4) {
+    const parts = features.topRepeatedWords.slice(0, depth).map((e) => `"${e.word}" \xD7${e.count}`);
+    return { text: `Repeated lemmas (tokenizer): ${parts.join("; ")}.` };
+  }
+  function tryRepetition(features, sourceText) {
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
+    const list = features.topRepeatedWords;
+    const picked = list.find((e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word));
+    if (!picked) return null;
+    const namedEv = [snippetAround(sourceText, picked.word)];
+    const tie = list.find(
+      (e) => e.word !== picked.word && e.count === picked.count && repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
+    );
+    if (tie) namedEv.push(snippetAround(sourceText, tie.word));
+    namedEv.push(repetitionTopCountsEvidence(features));
+    const statement = `You return several times to \u201C${picked.word}.\u201D`;
+    const multiNamed = list.filter((e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)).length;
+    const rankScore = Math.min(100, picked.count * 14 + (multiNamed > 1 ? 5 : 0));
+    return candidate("repetition", features.sessionId, statement, namedEv, rankScore);
+  }
+  function tryCadence(features) {
+    const c = features.cadenceProfile;
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
+    if (features.sentenceCount < MIRROR_GEN_CADENCE_MIN_SENTENCES) return null;
+    const firstQ = c.meanSentenceLengthFirstQuarterWords;
+    const lastQ = c.meanSentenceLengthLastQuarterWords;
+    const quarterRatio = firstQ != null && lastQ != null && firstQ > 0 ? lastQ / firstQ : null;
+    if (c.endCompression && quarterRatio != null && firstQ != null && lastQ != null) {
+      const statement = "The ending tightens noticeably.";
+      const ev = [
+        {
+          text: `Opening-quarter mean sentence length ${firstQ.toFixed(1)} words; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
+        }
+      ];
+      const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
+      return candidate("cadence", features.sessionId, statement, ev, rankScore);
+    }
+    if (c.endExpansion && quarterRatio != null && firstQ != null && lastQ != null) {
+      const statement = "The lines lengthen as the piece moves toward its close.";
+      const ev = [
+        {
+          text: `Opening-quarter mean ${firstQ.toFixed(1)} words per sentence; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
+        }
+      ];
+      const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
+      return candidate("cadence", features.sessionId, statement, ev, rankScore);
+    }
+    const strongAlternation = features.sentenceCount >= MIRROR_GEN_CADENCE_MIN_SENTENCES && c.shortSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT && c.longSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG && c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
+    if (strongAlternation) {
+      const statement = "The cadence alternates between short and extended lines.";
+      const ev = [
+        {
+          text: `Short sentences (\u2264${MIRROR_SHORT_SENTENCE_MAX_WORDS} words): ${c.shortSentenceCount}; long (\u2265${MIRROR_LONG_SENTENCE_MIN_WORDS} words): ${c.longSentenceCount}; average sentence length ${c.avgSentenceLength.toFixed(1)} words; spread (population variance of sentence word counts) ${c.varianceSentenceLength.toFixed(2)}.`
+        }
+      ];
+      const rankScore = 44 + Math.min(16, c.shortSentenceCount + c.longSentenceCount);
+      return candidate("cadence", features.sessionId, statement, ev, rankScore);
+    }
+    return null;
+  }
+  function tryAbstraction(features) {
+    const a = features.abstractionProfile;
+    const lex = a.abstractCount + a.concreteCount;
+    const shortFormAbstractionEligible =
+      features.wordCount >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_WORDS &&
+      a.abstractCount >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_ABSTRACT &&
+      a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_RATIO &&
+      a.concreteCount <= MIRROR_GEN_ABSTRACTION_SHORTFORM_MAX_CONCRETE;
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && !shortFormAbstractionEligible) return null;
+    const metrics = `Abstract lexicon hits ${a.abstractCount}; concrete ${a.concreteCount}; ratio ${a.abstractConcreteRatio.toFixed(2)}.`;
+    if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
+      if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
+      const statement = "This piece holds ideas and concrete detail in balance.";
+      const ev = [{ text: `${metrics} Both half-session rates rise for abstract and concrete lexicon matches (ambiguous direction).` }];
+      const rankScore = 62 + Math.min(34, lex * 2.2);
+      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+    }
+    if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
+      const statement = "The writing leans more conceptual than scene-based toward the back half.";
+      const ev = [{ text: `${metrics} Abstract-lexicon matches pick up in the second half of tokens.` }];
+      const rankScore = 64 + Math.min(36, a.abstractCount * 3.2);
+      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+    }
+    if (a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
+      const statement = "Objects and detail carry more of the late passage than earlier on.";
+      const ev = [{ text: `${metrics} Concrete-lexicon matches pick up in the second half of tokens.` }];
+      const rankScore = 64 + Math.min(36, a.concreteCount * 3.2);
+      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+    }
+    if (lex >= MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) {
+      const ratioOkIdeas = a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO && a.abstractCount >= 2;
+      const ratioOkIdeasSoft = !ratioOkIdeas && a.abstractCount >= 3 && a.abstractConcreteRatio >= 1.06;
+      const ratioOkConcrete = a.concreteCount >= MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO * Math.max(a.abstractCount, 1) && a.concreteCount >= 2;
+      if (ratioOkIdeas && !ratioOkConcrete) {
+        const statement2 = "This piece stays mostly in the realm of ideas.";
+        const ev2 = [{ text: metrics }];
+        const rankScore2 = 52 + Math.min(34, lex * 2.5);
+        return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
+      }
+      if (ratioOkIdeasSoft && !ratioOkConcrete) {
+        const statement2 = "This piece stays mostly in the realm of ideas.";
+        const ev2 = [{ text: `${metrics} Idea-leaning lexicon signal is present but below the stricter ratio gate.` }];
+        const rankScore2 = 50 + Math.min(32, lex * 2.5);
+        return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
+      }
+      if (ratioOkConcrete && !ratioOkIdeas) {
+        const statement2 = "The piece is grounded more in objects and detail than in abstraction.";
+        const ev2 = [{ text: metrics }];
+        const rankScore2 = 52 + Math.min(34, lex * 2.5);
+        return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
+      }
+      const statement = "Idea-words and image-words both show up often enough to matter.";
+      const ev = [{ text: metrics }];
+      const rankScore = 47 + Math.min(30, lex * 2.35);
+      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+    }
+    return null;
+  }
+  function tryHesitation(features) {
+    const h = features.hesitationProfile;
+    const total = h.qualifierCount + h.pivotCount + h.contradictionMarkers + h.uncertaintyMarkers;
+    const per100 = total / Math.max(features.wordCount, 1) * 100;
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
+    const soft = h.qualifierCount + h.uncertaintyMarkers;
+    const turn = h.pivotCount + h.contradictionMarkers;
+    if (turn === 0) {
+      if (soft < 4) return null;
+    } else {
+      if (soft < 2 && (total < 10 || turn < 4)) return null;
+      if (soft < 3 && turn > soft && total < 8) return null;
+    }
+    if (total < MIRROR_GEN_HESITATION_MIN_TOTAL && per100 < MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS) {
+      return null;
+    }
+    const tallies = `Qualifiers ${h.qualifierCount}; pivots ${h.pivotCount}; contradiction markers ${h.contradictionMarkers}; uncertainty markers ${h.uncertaintyMarkers}; total ${total}; about ${per100.toFixed(1)} per 100 tokenizer words.`;
+    let statement;
+    if (soft >= turn && h.qualifierCount >= 2) {
+      statement = "You often qualify a thought just after stating it.";
+    } else if (turn >= soft && turn >= 2 && soft >= 2) {
+      statement = "There's a pattern of assertion followed by softening.";
+    } else {
+      statement = "Statements here are often followed by revision or softening.";
+    }
+    const ev = [{ text: tallies }];
+    let rankScore = Math.min(100, 30 + total * 4 + per100);
+    if (soft < 3 && turn >= 2) rankScore -= 10;
+    return candidate("hesitation_qualification", features.sessionId, statement, ev, rankScore);
+  }
+  function buildReflectionCandidates(features, sourceText) {
+    const text = normalizeText(sourceText);
+    const out = [];
+    const rep = tryRepetition(features, text);
+    if (rep) out.push(rep);
+    const abs = tryAbstraction(features);
+    if (abs) out.push(abs);
+    const cad = tryCadence(features);
+    if (cad) out.push(cad);
+    const hes = tryHesitation(features);
+    if (hes) out.push(hes);
+    return out;
+  }
+
+  // src/features/mirror/constants/selectionThresholds.ts
+  var MIRROR_SELECTION_MIN_RANK_SCORE_FOR_MAIN = 40;
+  var MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT = 34;
+  var MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA = 5;
+  var MIRROR_SELECTION_MAX_SUPPORTING = 4;
+
+  // src/features/mirror/ranking/statementSpecificity.ts
+  var GENERIC_FALLBACK_STATEMENTS = new Set(
+    [
+      "idea-words and image-words both show up often enough to matter.",
+      "statements here are often followed by revision or softening."
+    ].map((s) => s.toLowerCase())
+  );
+  function norm(s) {
+    return s.trim().toLowerCase().replace(/\s+/g, " ");
+  }
+  function mirrorStatementSpecificity(statement) {
+    const n = norm(statement);
+    if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 25;
+    if (n.startsWith("you return several times to")) return 100;
+    if (n === "the ending tightens noticeably." || n === "the lines lengthen as the piece moves toward its close.") {
+      return 95;
+    }
+    if (n === "the cadence alternates between short and extended lines.") return 90;
+    if (n === "the writing leans more conceptual than scene-based toward the back half." || n === "objects and detail carry more of the late passage than earlier on.") {
+      return 90;
+    }
+    if (n === "this piece stays mostly in the realm of ideas." || n === "the piece is grounded more in objects and detail than in abstraction.") {
+      return 85;
+    }
+    if (n === "this piece holds ideas and concrete detail in balance.") return 80;
+    if (n === "you often qualify a thought just after stating it.") return 58;
+    if (n === "there's a pattern of assertion followed by softening.") return 58;
+    return 45;
+  }
+
+  // src/features/mirror/ranking/rankReflections.ts
+  function categoryTiePreference(category) {
+    if (category === "abstraction_concrete" || category === "hesitation_qualification") return 3;
+    if (category === "repetition") return 2;
+    if (category === "cadence") return 0;
+    return 1;
+  }
+  function compareRanked(a, b) {
+    const d = b.rankScore - a.rankScore;
+    if (Math.abs(d) <= MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA) {
+      const sp = mirrorStatementSpecificity(b.statement) - mirrorStatementSpecificity(a.statement);
+      if (sp !== 0) return sp;
+      const pref = categoryTiePreference(b.category) - categoryTiePreference(a.category);
+      if (pref !== 0) return pref;
+    } else if (d !== 0) {
+      return d;
+    }
+    return 0;
+  }
+  function rankReflections(candidates) {
+    return [...candidates].map((c, inputIndex) => ({ c, inputIndex })).sort((a, b) => {
+      const cmp = compareRanked(a.c, b.c);
+      if (cmp !== 0) return cmp;
+      return a.inputIndex - b.inputIndex;
+    }).map(({ c }) => c);
+  }
+
+  // src/features/mirror/ranking/dedupeReflections.ts
+  function dedupeReflections(candidates) {
+    const byCategory = /* @__PURE__ */ new Map();
+    for (const c of candidates) {
+      const prev = byCategory.get(c.category);
+      if (!prev || compareRanked(c, prev) < 0) byCategory.set(c.category, c);
+    }
+    const byStatement = /* @__PURE__ */ new Map();
+    for (const c of byCategory.values()) {
+      const key = c.statement.trim().toLowerCase().replace(/\s+/g, " ");
+      const prev = byStatement.get(key);
+      if (!prev || compareRanked(c, prev) < 0) byStatement.set(key, c);
+    }
+    return rankReflections([...byStatement.values()]);
+  }
+
+  // src/features/mirror/ranking/selectFinalReflections.ts
+  function asSelected(c, role) {
+    return {
+      id: c.id,
+      category: c.category,
+      statement: c.statement,
+      evidence: [...c.evidence],
+      role,
+      rankScore: c.rankScore
+    };
+  }
+  function selectFinalReflections(rankedDeduped) {
+    if (rankedDeduped.length === 0) {
+      return { main: null, supporting: [] };
+    }
+    const supportEligible = rankedDeduped.filter(
+      (c) => c.rankScore >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT
+    );
+    if (supportEligible.length === 0) {
+      return { main: null, supporting: [] };
+    }
+    const best = rankedDeduped[0];
+    const supporting = [];
+    const used = /* @__PURE__ */ new Set();
+    if (best.rankScore >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_MAIN) {
+      const main = asSelected(best, "main");
+      used.add(best.category);
+      for (const c of rankedDeduped.slice(1)) {
+        if (supporting.length >= MIRROR_SELECTION_MAX_SUPPORTING) break;
+        if (used.has(c.category)) continue;
+        if (c.rankScore < MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT) continue;
+        supporting.push(asSelected(c, "support"));
+        used.add(c.category);
+      }
+      return { main, supporting };
+    }
+    for (const c of supportEligible) {
+      if (supporting.length >= MIRROR_SELECTION_MAX_SUPPORTING) break;
+      if (used.has(c.category)) continue;
+      supporting.push(asSelected(c, "support"));
+      used.add(c.category);
+    }
+    return { main: null, supporting };
+  }
+
+  // src/features/mirror/pipeline/runMirrorPipeline.ts
+  function runMirrorPipeline(input) {
+    const features = analyzeText(input);
+    const raw = buildReflectionCandidates(features, normalizeText(input.text));
+    const ranked = rankReflections(raw);
+    const deduped = dedupeReflections(ranked);
+    return selectFinalReflections(deduped);
+  }
+  return __toCommonJS(entry_iife_exports);
+})();

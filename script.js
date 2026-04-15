@@ -243,6 +243,10 @@ const state = {
   pendingRecentDrawerExpand: false,
   writeDoc: { lines: [{ tokens: [], trailingSpace: false }] },
   lastRunFeedback: "",
+  /** Last `runMirrorPipeline` result after submit; cleared on new run. */
+  lastMirrorPipelineResult: null,
+  /** True when the mirror bundle failed to load or threw during the last submit. */
+  lastMirrorLoadFailed: false,
   /** After a saved run, set when step 1–5; observation lives here (not on reflection line). Cleared on new run. */
   calibrationPostRun: null,
   completedUiActive: false,
@@ -752,12 +756,6 @@ let animFrame = null;
 let completionTimer = null;
 let settleTimer = null;
 
-/** After submit: brief shell pulse then auto `startWriting` (no overlay / “begin again”). */
-const POST_SUBMIT_EPHEMERAL_MS = 460;
-const POST_SUBMIT_EPHEMERAL_MS_REDUCED = 120;
-/** Extra wait on mobile focus mode so reflection / run score / calibration overlay can be read before the next prompt. */
-const POST_SUBMIT_MOBILE_FOCUS_READ_MS = 2000;
-const POST_SUBMIT_MOBILE_FOCUS_READ_MS_REDUCED = 800;
 let postSubmitAutoRunTimer = null;
 
 function clearPostSubmitAutoRunTimer() {
@@ -775,18 +773,8 @@ function runPostSubmitAutoNewRunNow() {
   startWriting({ focusCaret: "start" });
 }
 
-function getPostSubmitAutoAdvanceDelayMs() {
-  const baseMs = prefersReducedUiMotion() ? POST_SUBMIT_EPHEMERAL_MS_REDUCED : POST_SUBMIT_EPHEMERAL_MS;
-  if (isMobileViewport() && document.body.classList.contains("focus-mode")) {
-    const readMs = prefersReducedUiMotion()
-      ? POST_SUBMIT_MOBILE_FOCUS_READ_MS_REDUCED
-      : POST_SUBMIT_MOBILE_FOCUS_READ_MS;
-    return baseMs + readMs;
-  }
-  return baseMs;
-}
-
-function schedulePostSubmitEphemeralCompletion() {
+/** After submit: shell completion pulse only (post-run UI stays until the user begins again). */
+function pulseEditorShellAfterSubmit() {
   clearPostSubmitAutoRunTimer();
   const shell = document.querySelector(".editor-shell");
   shell?.classList.add("editor-shell--submit-complete");
@@ -795,12 +783,6 @@ function schedulePostSubmitEphemeralCompletion() {
   requestAnimationFrame(() => {
     scheduleEditorDotOverlaySync();
   });
-
-  const ms = getPostSubmitAutoAdvanceDelayMs();
-  postSubmitAutoRunTimer = window.setTimeout(() => {
-    postSubmitAutoRunTimer = null;
-    runPostSubmitAutoNewRunNow();
-  }, ms);
 }
 
 /* -----------------------------
@@ -1646,6 +1628,8 @@ function waywordDevResetCalibrationForTesting() {
   state.savedRunIds = new Set();
   state.calibrationPostRun = null;
   state.lastRunFeedback = "";
+  state.lastMirrorPipelineResult = null;
+  state.lastMirrorLoadFailed = false;
   state.pendingRecentDrawerExpand = false;
   localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
 
@@ -3202,6 +3186,7 @@ function renderWritingState(options = {}) {
     state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
   renderReflection(showReflection);
   renderPostRunFeedbackContainer();
+  renderMirrorReflectionPanel();
   if (!deferPostRunOverlaySync) {
     syncEditorPostRunOverlay();
   }
@@ -3394,8 +3379,8 @@ const CALIBRATION_OBS_OPENINGS = [
 ];
 const CALIBRATION_OBS_FRAGMENTATION = ["Your lines are short.", "You break your thoughts up."];
 const CALIBRATION_OBS_LONG = [
-  "Your sentences are getting longer.",
-  "You keep extending sentences."
+  "Average sentence length sits above your recent baseline.",
+  "Sentences run longer than in your last few saved runs."
 ];
 const CALIBRATION_OBS_FALLBACK = ["This is steady.", "Your structure is consistent.", "No strong change."];
 
@@ -3467,7 +3452,7 @@ function selectCalibrationObservation(text, priorEntries) {
 
   if (longApplies) {
     return baselineOk && t.avgSentenceLength > baseline.avgSentenceLength * 1.28
-      ? "Your sentences are getting longer."
+      ? "Average sentence length sits above your recent baseline."
       : pickCalibrationObservationPhrase(CALIBRATION_OBS_LONG, seed);
   }
 
@@ -3528,6 +3513,198 @@ function renderPostRunFeedbackContainer() {
   fb.dataset.calibrationRenderKey = "";
   fb.className = "result-card empty";
   fb.innerHTML = "";
+}
+
+function mirrorPipelineAvailable() {
+  return Boolean(
+    typeof globalThis !== "undefined" &&
+      globalThis.WaywordMirror &&
+      typeof globalThis.WaywordMirror.runMirrorPipeline === "function"
+  );
+}
+
+function computeAndStoreMirrorPipelineResult(text, run) {
+  state.lastMirrorPipelineResult = null;
+  state.lastMirrorLoadFailed = false;
+  if (!mirrorPipelineAvailable()) {
+    state.lastMirrorLoadFailed = true;
+    return;
+  }
+  try {
+    state.lastMirrorPipelineResult = globalThis.WaywordMirror.runMirrorPipeline({
+      text: String(text || ""),
+      sessionId: run && run.runId ? String(run.runId) : undefined,
+      startedAt: run && typeof run.timestamp === "number" ? run.timestamp : undefined,
+      endedAt: Date.now(),
+    });
+  } catch (_) {
+    state.lastMirrorPipelineResult = null;
+    state.lastMirrorLoadFailed = true;
+  }
+}
+
+function cloneMirrorPipelineResultForStorage(src) {
+  if (src == null || typeof src !== "object") return null;
+  try {
+    return JSON.parse(JSON.stringify(src));
+  } catch (_) {
+    return null;
+  }
+}
+
+function attachMirrorSnapshotToRunFromState(run) {
+  if (state.lastMirrorLoadFailed) {
+    run.mirrorLoadFailed = true;
+    run.mirrorPipelineResult = null;
+    return;
+  }
+  run.mirrorLoadFailed = false;
+  run.mirrorPipelineResult = cloneMirrorPipelineResultForStorage(state.lastMirrorPipelineResult);
+}
+
+function escapeHtmlMirror(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderMirrorEvidenceLinesHtml(evidence) {
+  if (!Array.isArray(evidence) || !evidence.length) {
+    return '<p class="mirror-card__evidence-line">No evidence attached.</p>';
+  }
+  return evidence
+    .map((ev) => {
+      const t = escapeHtmlMirror(ev && ev.text != null ? ev.text : "");
+      return `<p class="mirror-card__evidence-line">${t}</p>`;
+    })
+    .join("");
+}
+
+function mirrorReflectionCardHtml(card, opts) {
+  const role = opts && opts.role === "main" ? "main" : "support";
+  const firstSupport = Boolean(opts && opts.firstSupportInSupportOnlyStack);
+  const uid =
+    opts && opts.evidencePanelId
+      ? String(opts.evidencePanelId)
+      : `mirror-ev-${Math.random().toString(36).slice(2, 11)}`;
+  const stmt = escapeHtmlMirror(card.statement);
+  const evHtml = renderMirrorEvidenceLinesHtml(card.evidence);
+  let cls = "mirror-card";
+  if (role === "main") cls += " mirror-card--main";
+  else {
+    cls += " mirror-card--support";
+    if (firstSupport) cls += " mirror-card--support-first";
+  }
+  return (
+    `<article class="${cls}">` +
+    `<p class="mirror-card__statement">${stmt}</p>` +
+    `<button type="button" class="mirror-card__evidence-toggle" aria-expanded="false" aria-controls="${uid}">Evidence</button>` +
+    `<div class="mirror-card__evidence" id="${uid}" hidden>${evHtml}</div>` +
+    `</article>`
+  );
+}
+
+function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix }) {
+  const pfx = String(idPrefix || "mirror");
+  if (loadFailed) {
+    return '<p class="mirror-empty">Mirror readings are not available in this build.</p>';
+  }
+  const r = result;
+  if (!r || typeof r !== "object") {
+    return "";
+  }
+  const main = r.main;
+  const supporting = Array.isArray(r.supporting) ? r.supporting : [];
+  const hasMain = Boolean(main && String(main.statement || "").trim());
+  const hasSupport = supporting.some((c) => c && String(c.statement || "").trim());
+
+  if (!hasMain && !hasSupport) {
+    return '<p class="mirror-empty">Nothing surfaced clearly enough for mirror cards in this run.</p>';
+  }
+
+  const parts = [];
+  parts.push('<div class="mirror-reflection-eyebrow">Mirror</div>');
+  parts.push('<div class="mirror-stack">');
+  if (hasMain) {
+    parts.push(
+      mirrorReflectionCardHtml(main, {
+        role: "main",
+        evidencePanelId: `${pfx}-main`
+      })
+    );
+  }
+  supporting.forEach((c, i) => {
+    if (!c || !String(c.statement || "").trim()) return;
+    parts.push(
+      mirrorReflectionCardHtml(c, {
+        role: "support",
+        firstSupportInSupportOnlyStack: !hasMain && i === 0,
+        evidencePanelId: `${pfx}-s-${i}`
+      })
+    );
+  });
+  parts.push("</div>");
+  return parts.join("");
+}
+
+function formatRecentEntryMirrorHtml(run, idPrefix) {
+  if (!run || typeof run !== "object") return "";
+  if (run.mirrorLoadFailed) {
+    return `<div class="recent-entry-mirror-root recent-entry-mirror"><p class="mirror-empty">Mirror readings are not available in this build.</p></div>`;
+  }
+  if (run.mirrorPipelineResult == null) return "";
+  const body = buildMirrorPanelBodyHtml({
+    loadFailed: false,
+    result: run.mirrorPipelineResult,
+    idPrefix
+  });
+  if (!body) return "";
+  return `<div class="recent-entry-mirror-root recent-entry-mirror">${body}</div>`;
+}
+
+function wireMirrorEvidenceToggles(root) {
+  if (!root) return;
+  root.querySelectorAll(".mirror-card__evidence-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const open = btn.getAttribute("aria-expanded") === "true";
+      const panelId = btn.getAttribute("aria-controls");
+      const panel = panelId ? document.getElementById(panelId) : null;
+      if (!panel) return;
+      const next = !open;
+      btn.setAttribute("aria-expanded", String(next));
+      if (next) panel.removeAttribute("hidden");
+      else panel.setAttribute("hidden", "");
+    });
+  });
+}
+
+function renderMirrorReflectionPanel() {
+  const section = $("mirrorReflectionSection");
+  const root = $("mirrorReflectionRoot");
+  if (!section || !root) return;
+
+  if (!state.submitted || !state.completedUiActive) {
+    section.classList.add("hidden");
+    root.innerHTML = "";
+    return;
+  }
+
+  const body = buildMirrorPanelBodyHtml({
+    loadFailed: state.lastMirrorLoadFailed,
+    result: state.lastMirrorPipelineResult,
+    idPrefix: "mirror-postrun"
+  });
+  if (!body) {
+    section.classList.add("hidden");
+    root.innerHTML = "";
+    return;
+  }
+
+  section.classList.remove("hidden");
+  root.innerHTML = body;
+  wireMirrorEvidenceToggles(root);
 }
 
 function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibration = false) {
@@ -3941,7 +4118,7 @@ function renderHistory() {
   const trigger = $("recentWritingTrigger");
   const allLists = [drawerList, railList].filter(Boolean);
 
-  function buildRecentEntries(items) {
+  function buildRecentEntries(items, listKey) {
     return items
       .map((item, idx) => {
         const excerpt = promptExcerpt(item.prompt);
@@ -3949,6 +4126,8 @@ function renderHistory() {
         const meta = when ? `<div class="recent-entry-meta">${escapeHtml(when)}</div>` : "";
         const detail = formatRunDetailHtml(item);
         const scoreBlock = formatRecentEntryScoreBlock(item);
+        const idPrefix = `mirror-${listKey}-${idx}-${item.runId || "run"}`;
+        const mirrorBlock = formatRecentEntryMirrorHtml(item, idPrefix);
         return `
           <button class="recent-entry" type="button" data-recent-index="${idx}">
             <div class="recent-entry-compact">
@@ -3959,6 +4138,7 @@ function renderHistory() {
               <div class="recent-entry-prompt">${escapeHtml((item.text || "").trim() || "Writing text wasn’t saved for this run.")}</div>
               <div class="recent-entry-results">
                 ${scoreBlock}
+                ${mirrorBlock}
                 <div class="recent-entry-detail">${detail}</div>
               </div>
               <div class="recent-entry-future-meta" aria-hidden="true"></div>
@@ -3984,9 +4164,12 @@ function renderHistory() {
   }
 
   const items = state.history.slice().reverse().slice(0, 5);
-  const html = buildRecentEntries(items);
   allLists.forEach((list) => {
-    list.innerHTML = html;
+    const listKey = list.id === "recentRailList" ? "rail" : "draw";
+    list.innerHTML = buildRecentEntries(items, listKey);
+    list.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
+      wireMirrorEvidenceToggles(el);
+    });
   });
 
   if (trigger) {
@@ -4462,6 +4645,8 @@ function restartRunWithCurrentSettings(options = {}) {
     fb.innerHTML = "";
   }
   state.lastRunFeedback = "";
+  state.lastMirrorPipelineResult = null;
+  state.lastMirrorLoadFailed = false;
   state.calibrationPostRun = null;
   renderReflection("");
 
@@ -4591,6 +4776,8 @@ function startWriting(options = {}) {
     fb.innerHTML = "";
   }
   state.lastRunFeedback = "";
+  state.lastMirrorPipelineResult = null;
+  state.lastMirrorLoadFailed = false;
   state.calibrationPostRun = null;
   renderReflection("");
 
@@ -4737,21 +4924,27 @@ function submitWriting(fromTimer = false) {
       insufficientCalibration = true;
     } else {
       runWasSaved = true;
-      state.history.push({ ...run });
-      state.savedRunIds.add(run.runId);
-      state.pendingRecentDrawerExpand = true;
-      localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
-      persist();
-      renderHistory();
-      renderProfileSummaryStrip();
-
-      recomputeProgressionLevel({ afterRun: true });
-      applyProgressionToState();
-      renderProfile();
     }
   }
 
   handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
+
+  computeAndStoreMirrorPipelineResult(currentText, run);
+
+  if (runWasSaved) {
+    attachMirrorSnapshotToRunFromState(run);
+    state.history.push({ ...run });
+    state.savedRunIds.add(run.runId);
+    state.pendingRecentDrawerExpand = true;
+    localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
+    persist();
+    renderHistory();
+    renderProfileSummaryStrip();
+
+    recomputeProgressionLevel({ afterRun: true });
+    applyProgressionToState();
+    renderProfile();
+  }
 
   renderWritingState({ deferPostRunOverlaySync: false });
   renderMeta();
@@ -4759,7 +4952,7 @@ function submitWriting(fromTimer = false) {
 
   queueViewportSync();
 
-  schedulePostSubmitEphemeralCompletion();
+  pulseEditorShellAfterSubmit();
 }
 
 function showProfile(show = true) {
@@ -5037,12 +5230,6 @@ if (editorInput) {
     scheduleSemanticPickerFromSelection();
   });
 
-  editorInput.addEventListener("pointerdown", () => {
-    if (state.optionsOpen) return;
-    if (!state.submitted || !state.completedUiActive) return;
-    runPostSubmitAutoNewRunNow();
-  });
-
   editorInput.addEventListener("keydown", (e) => {
     if (
       !state.optionsOpen &&
@@ -5055,9 +5242,13 @@ if (editorInput) {
         e.key === "Backspace" ||
         e.key === "Delete" ||
         e.key === " ";
-      if (enterBegin || typingKey) {
+      if (enterBegin) {
         e.preventDefault();
         runPostSubmitAutoNewRunNow();
+        return;
+      }
+      if (typingKey) {
+        e.preventDefault();
         return;
       }
     }

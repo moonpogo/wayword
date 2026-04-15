@@ -1,12 +1,23 @@
-import type { MirrorReflectionCandidate } from "../types/mirrorTypes.js";
+import type { MirrorCategoryV1, MirrorReflectionCandidate } from "../types/mirrorTypes.js";
+import { compareRanked, rankReflections } from "./rankReflections.js";
 
-/** Collapse identical statements, keeping the stronger `rankScore`. */
+/**
+ * At most one candidate per category (defensive), then identical headlines collapsed.
+ * Output is re-sorted with the same rules as `rankReflections`.
+ */
 export function dedupeReflections(candidates: MirrorReflectionCandidate[]): MirrorReflectionCandidate[] {
-  const byStatement = new Map<string, MirrorReflectionCandidate>();
+  const byCategory = new Map<MirrorCategoryV1, MirrorReflectionCandidate>();
   for (const c of candidates) {
-    const key = c.statement.trim().toLowerCase();
-    const prev = byStatement.get(key);
-    if (!prev || c.rankScore > prev.rankScore) byStatement.set(key, c);
+    const prev = byCategory.get(c.category);
+    if (!prev || compareRanked(c, prev) < 0) byCategory.set(c.category, c);
   }
-  return [...byStatement.values()];
+
+  const byStatement = new Map<string, MirrorReflectionCandidate>();
+  for (const c of byCategory.values()) {
+    const key = c.statement.trim().toLowerCase().replace(/\s+/g, " ");
+    const prev = byStatement.get(key);
+    if (!prev || compareRanked(c, prev) < 0) byStatement.set(key, c);
+  }
+
+  return rankReflections([...byStatement.values()]);
 }

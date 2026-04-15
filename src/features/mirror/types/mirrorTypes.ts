@@ -127,6 +127,26 @@ export interface MirrorHesitationExtraction {
   uncertaintyLexiconMatchCount: number;
 }
 
+export type MirrorReflectionRole = "main" | "support";
+
+/** One card in the final mirror stack (main or supporting). */
+export interface MirrorSelectedReflection {
+  id: string;
+  category: MirrorCategoryV1;
+  statement: string;
+  evidence: MirrorEvidence[];
+  role: MirrorReflectionRole;
+  /** Unchanged from the candidate; for tuning / transparency (UI may hide). */
+  rankScore: number;
+}
+
+/** Final pipeline output after rank, dedupe, and selection. */
 export interface MirrorPipelineResult {
-  candidates: MirrorReflectionCandidate[];
+  /**
+   * Strongest card when it clears the main `rankScore` floor; otherwise null.
+   * Supporting cards may still appear without a main when only the support floor is met.
+   */
+  main: MirrorSelectedReflection | null;
+  /** Up to four cards, distinct categories, each meeting the support floor (`role` is always `support` here). */
+  supporting: MirrorSelectedReflection[];
 }
