@@ -75,6 +75,9 @@ const CALIBRATION_MIN_WORDS = 40;
 const CALIBRATION_MIN_SENTENCE_UNITS = 3;
 const CALIBRATION_INSUFFICIENT_COPY = "Write a little more for calibration.";
 
+/** Zen garden entry (wordmark toggle). Set to true when the garden is ready to ship. */
+const ZEN_GARDEN_OPENABLE = false;
+
 /** Bumped when opening Patterns so an in-flight close animation cannot hide the panel after reopen. */
 let profilePanelCloseMotionToken = 0;
 
@@ -4898,18 +4901,16 @@ function initZenGarden() {
   const wordmarkEl = $("wordmark");
   if (!overlay || !closeBtn || !wordmarkEl) return;
 
-  function openGarden() {
-    overlay.classList.remove("hidden");
-  }
-
   function closeGarden() {
     overlay.classList.add("hidden");
   }
 
-  wordmarkEl.addEventListener("click", () => {
-    if (overlay.classList.contains("hidden")) openGarden();
-    else closeGarden();
-  });
+  if (ZEN_GARDEN_OPENABLE) {
+    wordmarkEl.addEventListener("click", () => {
+      if (overlay.classList.contains("hidden")) overlay.classList.remove("hidden");
+      else closeGarden();
+    });
+  }
 
   closeBtn.addEventListener("click", closeGarden);
   overlay.addEventListener("click", (e) => {
