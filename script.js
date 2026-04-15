@@ -310,23 +310,36 @@ function syncPatternsLayoutMode() {
   }
 }
 
+/** Mobile: leave focus mode in one layout pass (caller should end with `queueViewportSync()` to clear snap). */
+function exitFocusModeForLayoutIfNeeded() {
+  if (!isMobileViewport()) return false;
+  if (!document.body.classList.contains("focus-mode")) return false;
+  document.documentElement.classList.add("focus-mode-layout-snap");
+  syncViewportHeightVar();
+  syncKeyboardOpenClass();
+  document.body.classList.remove("keyboard-open");
+  document.body.classList.remove("focus-mode");
+  return true;
+}
+
 function setFocusMode(enabled) {
   const shouldEnable = Boolean(enabled) && isMobileViewport();
-  const wasFocus = document.body.classList.contains("focus-mode");
-  if (!shouldEnable && wasFocus) {
-    document.documentElement.classList.add("focus-mode-layout-snap");
-    syncViewportHeightVar();
-    syncKeyboardOpenClass();
-    document.body.classList.remove("keyboard-open");
+  if (shouldEnable) {
+    document.documentElement.classList.remove("focus-mode-layout-snap");
+    document.body.classList.add("focus-mode");
+    setRecentDrawerOpen(false);
+    renderProfileSummaryStrip();
+    queueViewportSync();
+    return;
   }
-  document.body.classList.toggle("focus-mode", shouldEnable);
-  if (shouldEnable) setRecentDrawerOpen(false);
+  if (!isMobileViewport()) {
+    document.body.classList.remove("focus-mode");
+    renderProfileSummaryStrip();
+    return;
+  }
+  exitFocusModeForLayoutIfNeeded();
   renderProfileSummaryStrip();
-  if (!shouldEnable && wasFocus) {
-    requestAnimationFrame(() => {
-      document.documentElement.classList.remove("focus-mode-layout-snap");
-    });
-  }
+  queueViewportSync();
 }
 
 let viewportSyncRaf = null;
@@ -490,6 +503,7 @@ function queueViewportSync() {
     syncSubmittedAnnotatedEditorSurfaces();
     scheduleEditorDotOverlaySync();
     renderProfileSummaryStrip();
+    document.documentElement.classList.remove("focus-mode-layout-snap");
   });
 }
 
@@ -4216,6 +4230,8 @@ function submitWriting(fromTimer = false) {
 
   handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
 
+  exitFocusModeForLayoutIfNeeded();
+
   renderWritingState({ deferPostRunOverlaySync: false });
   renderMeta();
   renderSidebar();
@@ -4332,12 +4348,11 @@ function initZenGarden() {
 if (editorInput) {
   editorInput.addEventListener("focus", () => {
     setFocusMode(true);
-    queueViewportSync();
   });
 
   editorInput.addEventListener("blur", (e) => {
     if (state.submitted && state.completedUiActive) {
-      queueViewportSync();
+      setFocusMode(false);
       hideEditorSemanticPicker();
       return;
     }
@@ -4369,7 +4384,6 @@ if (editorInput) {
       syncViewportHeightVar();
       syncKeyboardOpenClass();
       setFocusMode(false);
-      queueViewportSync();
       hideEditorSemanticPicker();
     }, 0);
   });
