@@ -259,6 +259,13 @@ function syncKeyboardOpenClass() {
     document.body.classList.remove("keyboard-open");
     return;
   }
+  if (
+    !document.body.classList.contains("focus-mode") &&
+    performance.now() < suppressKeyboardOpenTruthUntil
+  ) {
+    document.body.classList.remove("keyboard-open");
+    return;
+  }
   const vv = window.visualViewport;
   if (!vv) {
     document.body.classList.remove("keyboard-open");
@@ -334,6 +341,10 @@ function resetWordmarkChromeMotionState() {
   wordmark.style.setProperty("--complete-scale", "1");
 }
 
+function armPostFocusExitKeyboardLayoutSettle() {
+  suppressKeyboardOpenTruthUntil = performance.now() + 450;
+}
+
 /** Mobile: leave focus mode in one layout pass (caller should end with `queueViewportSync()` to clear snap). */
 function exitFocusModeForLayoutIfNeeded() {
   if (!isMobileViewport()) return false;
@@ -343,6 +354,7 @@ function exitFocusModeForLayoutIfNeeded() {
   syncKeyboardOpenClass();
   document.body.classList.remove("keyboard-open");
   document.body.classList.remove("focus-mode");
+  armPostFocusExitKeyboardLayoutSettle();
   resetWordmarkChromeMotionState();
   return true;
 }
@@ -350,6 +362,7 @@ function exitFocusModeForLayoutIfNeeded() {
 function setFocusMode(enabled) {
   const shouldEnable = Boolean(enabled) && isMobileViewport();
   if (shouldEnable) {
+    suppressKeyboardOpenTruthUntil = 0;
     document.documentElement.classList.remove("focus-mode-layout-snap");
     resetWordmarkChromeMotionState();
     document.body.classList.add("focus-mode");
@@ -370,6 +383,8 @@ function setFocusMode(enabled) {
 
 let viewportSyncRaf = null;
 let viewportSyncCoalescePending = false;
+/** After leaving focus mode, ignore transient visualViewport reads so `keyboard-open` does not flicker back on while the shell reflows. */
+let suppressKeyboardOpenTruthUntil = 0;
 
 /** Matches `style.css` `--surface-chamfer: clamp(7px, 1.35vw, 13px)` (1.35vw of viewport). */
 function editorShellChamferCssPx() {
@@ -535,10 +550,17 @@ function queueViewportSync() {
       scheduleEditorDotOverlaySync();
       renderProfileSummaryStrip();
     } finally {
-      document.documentElement.classList.remove("focus-mode-layout-snap");
       if (viewportSyncCoalescePending) {
         viewportSyncCoalescePending = false;
         queueViewportSync();
+      } else {
+        /* Defer removing snap until after follow-up layout + ResizeObserver bursts, so padding/gap transitions stay off while the shell settles. */
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (document.body.classList.contains("focus-mode")) return;
+            document.documentElement.classList.remove("focus-mode-layout-snap");
+          });
+        });
       }
     }
   });
@@ -4769,7 +4791,14 @@ if (window.visualViewport) {
 (function bindEditorShellEdgeResizeObserver() {
   const shell = document.querySelector(".editor-shell");
   if (!shell || typeof ResizeObserver === "undefined") return;
-  const ro = new ResizeObserver(() => queueViewportSync());
+  let debounceTimer = null;
+  const ro = new ResizeObserver(() => {
+    if (debounceTimer !== null) clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(() => {
+      debounceTimer = null;
+      queueViewportSync();
+    }, 36);
+  });
   ro.observe(shell);
 })();
 
