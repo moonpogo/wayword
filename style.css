@@ -2522,6 +2522,8 @@ body.recent-drawer-open .recent-drawer-backdrop{
   visibility:hidden;
   pointer-events:none;
   transform:translateY(var(--motion-shift-subtle));
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
   transition:opacity var(--motion-duration-panel) var(--motion-ease-out),
     transform var(--motion-duration-panel) var(--motion-ease-out),
     visibility 0s linear var(--motion-duration-panel);
@@ -2572,6 +2574,31 @@ html[data-theme="dark"] .recent-drawer{
   background:transparent;
   color:var(--muted);
   cursor:pointer;
+  -webkit-appearance:none;
+  appearance:none;
+  -webkit-tap-highlight-color:transparent;
+  outline:none;
+  box-shadow:none;
+}
+
+.recent-drawer-close:focus{
+  outline:none;
+  box-shadow:none;
+}
+
+.recent-drawer-close:focus-visible{
+  outline:1px solid color-mix(in srgb, var(--ink) 32%, transparent);
+  outline-offset:2px;
+}
+
+.recent-drawer-close:focus:not(:focus-visible){
+  outline:none;
+  box-shadow:none;
+}
+
+.recent-drawer-close:active{
+  background:transparent;
+  box-shadow:none;
 }
 
 .recent-drawer-list{
@@ -2599,7 +2626,29 @@ html[data-theme="dark"] .recent-drawer{
   font-weight:400;
   padding:9px 2px 11px;
   cursor:pointer;
+  -webkit-appearance:none;
+  appearance:none;
+  -webkit-tap-highlight-color:transparent;
+  outline:none;
+  box-shadow:none;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
   transition:background-color 120ms ease, opacity 120ms ease;
+}
+
+.recent-entry:focus{
+  outline:none;
+  box-shadow:none;
+}
+
+.recent-entry:focus-visible{
+  outline:1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  outline-offset:2px;
+}
+
+.recent-entry:focus:not(:focus-visible){
+  outline:none;
+  box-shadow:none;
 }
 
 .recent-entry + .recent-entry{
@@ -2641,6 +2690,7 @@ html[data-theme="dark"] .recent-drawer{
 .recent-entry:active{
   background:transparent;
   opacity:0.9;
+  box-shadow:none;
 }
 
 .recent-entry-prompt{
