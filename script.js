@@ -310,6 +310,30 @@ function syncPatternsLayoutMode() {
   }
 }
 
+/**
+ * Clears wordmark completion timers, idle lift loop, and transform CSS vars so header chrome
+ * does not keep animating after focus exit (or re-enter) — avoids repeat-cycle stagger from
+ * stale `completeWordmark` timeouts / RAF lift decay overlapping normal header layout.
+ */
+function resetWordmarkChromeMotionState() {
+  if (!wordmark) return;
+  clearTimeout(completionTimer);
+  clearTimeout(settleTimer);
+  completionTimer = null;
+  settleTimer = null;
+  if (animFrame !== null) {
+    cancelAnimationFrame(animFrame);
+    animFrame = null;
+  }
+  liftCurrent = 0;
+  liftTarget = 0;
+  liftVelocity = 0;
+  wordmark.style.setProperty("--lift", "0");
+  wordmark.style.setProperty("--complete-tilt", "0deg");
+  wordmark.style.setProperty("--complete-drop", "0em");
+  wordmark.style.setProperty("--complete-scale", "1");
+}
+
 /** Mobile: leave focus mode in one layout pass (caller should end with `queueViewportSync()` to clear snap). */
 function exitFocusModeForLayoutIfNeeded() {
   if (!isMobileViewport()) return false;
@@ -319,6 +343,7 @@ function exitFocusModeForLayoutIfNeeded() {
   syncKeyboardOpenClass();
   document.body.classList.remove("keyboard-open");
   document.body.classList.remove("focus-mode");
+  resetWordmarkChromeMotionState();
   return true;
 }
 
@@ -326,6 +351,7 @@ function setFocusMode(enabled) {
   const shouldEnable = Boolean(enabled) && isMobileViewport();
   if (shouldEnable) {
     document.documentElement.classList.remove("focus-mode-layout-snap");
+    resetWordmarkChromeMotionState();
     document.body.classList.add("focus-mode");
     setRecentDrawerOpen(false);
     renderProfileSummaryStrip();
@@ -343,6 +369,7 @@ function setFocusMode(enabled) {
 }
 
 let viewportSyncRaf = null;
+let viewportSyncCoalescePending = false;
 
 /** Matches `style.css` `--surface-chamfer: clamp(7px, 1.35vw, 13px)` (1.35vw of viewport). */
 function editorShellChamferCssPx() {
@@ -490,20 +517,30 @@ function scheduleCalibrationOverlayGeometrySync() {
 }
 
 function queueViewportSync() {
-  if (viewportSyncRaf !== null) return;
+  if (viewportSyncRaf !== null) {
+    viewportSyncCoalescePending = true;
+    return;
+  }
   viewportSyncRaf = requestAnimationFrame(() => {
     viewportSyncRaf = null;
-    syncViewportHeightVar();
-    syncKeyboardOpenClass();
-    syncEditorShellChamferEdge();
-    syncEditorCalibrationOverlayClip();
-    if (!isMobileViewport()) setFocusMode(false);
-    syncPatternsLayoutMode();
-    renderHistory();
-    syncSubmittedAnnotatedEditorSurfaces();
-    scheduleEditorDotOverlaySync();
-    renderProfileSummaryStrip();
-    document.documentElement.classList.remove("focus-mode-layout-snap");
+    try {
+      syncViewportHeightVar();
+      syncKeyboardOpenClass();
+      syncEditorShellChamferEdge();
+      syncEditorCalibrationOverlayClip();
+      if (!isMobileViewport()) setFocusMode(false);
+      syncPatternsLayoutMode();
+      renderHistory();
+      syncSubmittedAnnotatedEditorSurfaces();
+      scheduleEditorDotOverlaySync();
+      renderProfileSummaryStrip();
+    } finally {
+      document.documentElement.classList.remove("focus-mode-layout-snap");
+      if (viewportSyncCoalescePending) {
+        viewportSyncCoalescePending = false;
+        queueViewportSync();
+      }
+    }
   });
 }
 
