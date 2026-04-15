@@ -312,9 +312,21 @@ function syncPatternsLayoutMode() {
 
 function setFocusMode(enabled) {
   const shouldEnable = Boolean(enabled) && isMobileViewport();
+  const wasFocus = document.body.classList.contains("focus-mode");
+  if (!shouldEnable && wasFocus) {
+    document.documentElement.classList.add("focus-mode-layout-snap");
+    syncViewportHeightVar();
+    syncKeyboardOpenClass();
+    document.body.classList.remove("keyboard-open");
+  }
   document.body.classList.toggle("focus-mode", shouldEnable);
   if (shouldEnable) setRecentDrawerOpen(false);
   renderProfileSummaryStrip();
+  if (!shouldEnable && wasFocus) {
+    requestAnimationFrame(() => {
+      document.documentElement.classList.remove("focus-mode-layout-snap");
+    });
+  }
 }
 
 let viewportSyncRaf = null;
@@ -4354,6 +4366,8 @@ if (editorInput) {
         hideEditorSemanticPicker();
         return;
       }
+      syncViewportHeightVar();
+      syncKeyboardOpenClass();
       setFocusMode(false);
       queueViewportSync();
       hideEditorSemanticPicker();

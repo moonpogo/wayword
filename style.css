@@ -3563,6 +3563,14 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     }
   }
 
+  /* One-frame snap when leaving focus mode so header + shell settle without staggered padding/gap animation. */
+  html.focus-mode-layout-snap body .app,
+  html.focus-mode-layout-snap #writeView > .layout,
+  html.focus-mode-layout-snap .main-column,
+  html.focus-mode-layout-snap .header{
+    transition:none !important;
+  }
+
   body.focus-mode{
     overflow:hidden;
   }
