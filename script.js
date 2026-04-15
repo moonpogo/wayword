@@ -310,6 +310,7 @@ function syncPatternsLayoutMode() {
   const useDesktopRail = isDesktopPatternsViewport();
   const profileVisible = !profileView.classList.contains("hidden");
   const useDesktopPatterns = profileVisible && useDesktopRail;
+  const useMobilePatterns = profileVisible && !useDesktopRail;
 
   if (useDesktopRail && sideColumn && profileView.parentElement !== sideColumn) {
     sideColumn.appendChild(profileView);
@@ -318,6 +319,7 @@ function syncPatternsLayoutMode() {
   }
 
   writeView.classList.toggle("hidden", profileVisible && !useDesktopRail);
+  document.body.classList.toggle("patterns-open", useMobilePatterns);
   appView?.classList.toggle("desktop-patterns-open", useDesktopPatterns);
   sideColumn?.classList.toggle("rail-mode-patterns", useDesktopPatterns);
   if (defaultRail) defaultRail.classList.toggle("hidden", useDesktopPatterns);
@@ -1448,6 +1450,7 @@ function setOptionsOpen(open) {
   const panel = $("editorOptionsPanel");
   const backdrop = $("editorOptionsBackdrop");
   if (!panel) return;
+  document.body.classList.toggle("settings-open", open);
 
   if (open) {
     optionsPanelDismissGuardUntil = Date.now() + OPTIONS_PANEL_DISMISS_GUARD_MS;
@@ -4639,6 +4642,9 @@ function showProfile(show = true) {
     editorInput?.blur();
     if (isMobileViewport() && !wasVisible) {
       mobilePatternsResumeFocusMode = document.body.classList.contains("focus-mode");
+    }
+    if (isMobileViewport() && document.body.classList.contains("focus-mode")) {
+      setFocusMode(false);
     }
   }
 

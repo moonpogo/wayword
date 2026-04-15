@@ -2443,6 +2443,7 @@ html[data-theme="dark"] .result-support{
   margin-top:10px;
   border:0;
   border-top:1px solid var(--line);
+  border-radius:0;
   background:transparent;
   color:var(--muted);
   padding:10px 2px 8px;
@@ -2451,6 +2452,26 @@ html[data-theme="dark"] .result-support{
   text-transform:uppercase;
   text-align:center;
   cursor:pointer;
+  -webkit-appearance:none;
+  appearance:none;
+  -webkit-tap-highlight-color:transparent;
+  outline:none;
+  box-shadow:none;
+}
+
+.recent-writing-trigger:focus{
+  outline:none;
+  box-shadow:none;
+}
+
+.recent-writing-trigger:focus-visible{
+  outline:1px solid color-mix(in srgb, var(--ink) 32%, transparent);
+  outline-offset:2px;
+}
+
+.recent-writing-trigger:focus:not(:focus-visible){
+  outline:none;
+  box-shadow:none;
 }
 
 .recent-writing-trigger:disabled{
@@ -3319,10 +3340,8 @@ html[data-theme="dark"] .dim-layer{
   align-items:stretch;
   gap:14px;
 
-  overflow-y:scroll;
-  overflow-x:hidden;
+  overflow:hidden;
   scrollbar-gutter:stable both-edges;
-  -webkit-overflow-scrolling:touch;
 
   opacity:0;
   transform:translateY(10px) scale(0.988);
@@ -3386,9 +3405,31 @@ html[data-theme="dark"] .settings-modal{
 .editor-options-body{
   display:flex;
   flex-direction:column;
+  flex:1 1 auto;
+  min-height:0;
   gap:14px;
   width:100%;
   min-width:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+  padding-right:2px;
+}
+
+body.settings-open{
+  overflow:hidden;
+  overscroll-behavior:none;
+  touch-action:none;
+}
+
+body.settings-open .editor-options-panel{
+  touch-action:auto;
+}
+
+body.settings-open .editor-options-body{
+  touch-action:pan-y;
 }
 
 .editor-options-modes-grid{
@@ -3928,6 +3969,34 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     padding-right:max(14px, env(safe-area-inset-right, 0px));
   }
 
+  body.patterns-open{
+    overflow:hidden;
+    overscroll-behavior:none;
+  }
+
+  body.patterns-open #appView.app{
+    height:var(--vvh, 100vh);
+    min-height:var(--vvh, 100vh);
+    overflow:hidden;
+  }
+
+  #profileView{
+    flex:1 1 auto;
+    min-height:0;
+  }
+
+  body.patterns-open #profileView:not(.hidden){
+    flex:1 1 auto;
+    min-height:0;
+    max-height:100%;
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+    touch-action:pan-y;
+    padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
+  }
+
   #writeView{
     position:relative;
     flex:1 1 auto;
@@ -4256,7 +4325,7 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     transform:none;
     width:auto;
     max-height:calc(var(--vvh, 100vh) - 16px);
-    overflow:auto;
+    overflow:hidden;
   }
 }
 
