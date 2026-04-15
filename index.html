@@ -35,9 +35,9 @@
             <div class="editor-options-util-cluster">
               <div class="editor-options-label">Theme</div>
               <div class="editor-options-util-tools">
-                <button id="themeToggleInPanel" class="theme-toggle" type="button" aria-label="Toggle theme">
-                  <span class="theme-half theme-sun">☼</span>
-                  <span class="theme-half theme-moon">◐</span>
+                <button id="themeToggleInPanel" class="theme-toggle theme-toggle--editorial" type="button" aria-label="Toggle theme">
+                  <span class="theme-half theme-sun" aria-hidden="true">☼</span>
+                  <span class="theme-half theme-moon" aria-hidden="true">◐</span>
                 </button>
                 <button id="shuffleBtnPanel" class="editor-options-shuffle-icon" type="button" aria-label="Shuffle setup">
                   <span class="editor-options-shuffle-glyph" aria-hidden="true">⇄</span>
@@ -47,29 +47,30 @@
             <button id="editorOptionsCloseBtn" class="editor-options-close" type="button" aria-label="Close settings">✕</button>
           </div>
 
-          <div class="editor-options-modes">
-            <div class="editor-options-section">
-              <div class="editor-options-label">Words</div>
-              <div class="editor-options-typeline" id="wordModesPanel" role="group" aria-label="Word count target">
-                <button type="button" class="editor-options-seg" data-words="60">60</button>
-                <button type="button" class="editor-options-seg" data-words="75">75</button>
-                <button type="button" class="editor-options-seg" data-words="90">90</button>
+          <div class="editor-options-body">
+            <div class="editor-options-modes-grid">
+              <div class="editor-options-modes-col">
+                <div class="editor-options-label editor-options-label--block">Words</div>
+                <div class="editor-options-typeline" id="wordModesPanel" role="group" aria-label="Word count target">
+                  <button type="button" class="editor-options-seg" data-words="60">60</button>
+                  <button type="button" class="editor-options-seg" data-words="75">75</button>
+                  <button type="button" class="editor-options-seg" data-words="90">90</button>
+                </div>
+              </div>
+              <div class="editor-options-modes-col">
+                <div class="editor-options-label editor-options-label--block">Time</div>
+                <div class="editor-options-typeline" id="timeModesPanel" role="group" aria-label="Timer">
+                  <button type="button" class="editor-options-seg" data-time="60">1m</button>
+                  <button type="button" class="editor-options-seg" data-time="180">3m</button>
+                  <button type="button" class="editor-options-seg" data-time="300">5m</button>
+                </div>
               </div>
             </div>
 
-            <div class="editor-options-section">
-              <div class="editor-options-label">Time</div>
-              <div class="editor-options-typeline" id="timeModesPanel" role="group" aria-label="Timer">
-                <button type="button" class="editor-options-seg" data-time="60">1m</button>
-                <button type="button" class="editor-options-seg" data-time="180">3m</button>
-                <button type="button" class="editor-options-seg" data-time="300">5m</button>
-              </div>
+            <div class="editor-options-banned-row">
+              <div class="editor-options-label editor-options-label--block">Words to avoid</div>
+              <textarea id="bannedInlineInputPanel" class="editor-options-banned-field" rows="2" spellcheck="false" autocomplete="off"></textarea>
             </div>
-          </div>
-
-          <div class="editor-options-section editor-options-banned">
-            <div class="editor-options-label">Words to avoid</div>
-            <textarea id="bannedInlineInputPanel" class="editor-options-banned-field" rows="2" spellcheck="false" autocomplete="off"></textarea>
           </div>
         </div>
       </div>
@@ -238,12 +239,13 @@
             <div id="promptCard" class="prompt-card">
               <div class="prompt-main">
                 <div class="prompt-meta-row">
-                  <div class="prompt-topline" id="promptFamilyLabel">Prompt</div>
-                  <div class="prompt-meta-actions">
-                    <button id="promptRerollBtn" class="prompt-reroll-btn" type="button" aria-label="Get a different prompt">
-                      <span class="prompt-reroll-icon">↻</span>
-                      <span id="promptRerollBadge" class="prompt-reroll-badge">2</span>
+                  <div class="prompt-meta-left">
+                    <div class="prompt-topline" id="promptFamilyLabel">Prompt</div>
+                    <button id="promptRerollBtn" class="prompt-reroll-btn" type="button" aria-label="Get a different prompt (2 rerolls left)" data-rerolls="2">
+                      <span class="prompt-reroll-icon" aria-hidden="true">✎</span>
                     </button>
+                  </div>
+                  <div class="prompt-meta-actions">
                     <button
                       id="fieldExpandedToggle"
                       class="field-expand-toggle"

@@ -78,6 +78,11 @@ const CALIBRATION_INSUFFICIENT_COPY = "Write a little more for calibration.";
 /** Bumped when opening Patterns so an in-flight close animation cannot hide the panel after reopen. */
 let profilePanelCloseMotionToken = 0;
 
+/** Mobile (≤720px) only: `showProfile` saves focus mode before opening Patterns and restores it after close. */
+let mobilePatternsResumeFocusMode = false;
+/** Mobile only: recent drawer should not leave field toggle/focus state stale after close. */
+let mobileRecentDrawerResumeFocusMode = false;
+
 /**
  * DEV-ONLY — search `WAYWORD_DEV_CALIBRATION_RESET` to remove this entire block.
  * When true: `window.waywordDevResetCalibration()` clears run history + calibration state.
@@ -287,6 +292,12 @@ function isDesktopPatternsViewport() {
   return window.matchMedia("(min-width: 981px)").matches;
 }
 
+function isMobilePatternsVisible() {
+  if (!isMobileViewport() || isDesktopPatternsViewport()) return false;
+  const profileView = $("profileView");
+  return Boolean(profileView && !profileView.classList.contains("hidden"));
+}
+
 function syncPatternsLayoutMode() {
   const appView = $("appView");
   const writeView = $("writeView");
@@ -315,6 +326,20 @@ function syncPatternsLayoutMode() {
     styleTab.classList.toggle("is-active", profileVisible);
     styleTab.setAttribute("aria-expanded", profileVisible ? "true" : "false");
   }
+}
+
+function resumeFocusModeAfterMobilePatternsCloseIfNeeded() {
+  if (!isMobileViewport() || !mobilePatternsResumeFocusMode) return;
+  mobilePatternsResumeFocusMode = false;
+  setFocusMode(true);
+  queueViewportSync();
+}
+
+function resumeFocusModeAfterMobileRecentDrawerCloseIfNeeded() {
+  if (!isMobileViewport() || !mobileRecentDrawerResumeFocusMode) return;
+  mobileRecentDrawerResumeFocusMode = false;
+  setFocusMode(true);
+  syncExpandedFieldClass();
 }
 
 /**
@@ -424,6 +449,8 @@ let viewportSyncRaf = null;
 let viewportSyncCoalescePending = false;
 /** After leaving focus mode, ignore transient visualViewport reads so `keyboard-open` does not flicker back on while the shell reflows. */
 let suppressKeyboardOpenTruthUntil = 0;
+/** Ignore blur-driven focus exits during mobile Patterns toggles. */
+let suppressFocusExitUntil = 0;
 
 /** Matches `style.css` `--surface-chamfer: clamp(7px, 1.35vw, 13px)` (1.35vw of viewport). */
 function editorShellChamferCssPx() {
@@ -1155,6 +1182,17 @@ function focusEditorToStart() {
   selection.addRange(range);
 }
 
+/** Shared delayed focus timing for run start flows. */
+function scheduleDeferredEditorFocus(focusCaret = "end") {
+  setTimeout(() => {
+    if (focusCaret === "start") {
+      focusEditorToStart();
+    } else {
+      focusEditorToEnd();
+    }
+  }, 50);
+}
+
 function enterLandingState() {
   const shell = document.querySelector(".app-shell");
   const app = $("appView");
@@ -1316,6 +1354,8 @@ function completeWordmark() {
 /** Ignore backdrop/outside dismiss briefly after open (same tap would otherwise “ghost click” the backdrop). */
 const OPTIONS_PANEL_DISMISS_GUARD_MS = 380;
 let optionsPanelDismissGuardUntil = 0;
+const RECENT_DRAWER_DISMISS_GUARD_MS = 260;
+let recentDrawerDismissGuardUntil = 0;
 
 let bannedPanelPersistTimer = null;
 const BANNED_PANEL_DEBOUNCE_MS = 220;
@@ -1367,17 +1407,13 @@ function applyWordTargetFromPanel(nextWords) {
   const n = Number(nextWords);
   if (!Number.isFinite(n) || ![60, 75, 90].includes(n)) return;
   state.targetWords = state.targetWords === n ? 0 : n;
-  if (state.active && !state.submitted) {
-    restartRunWithCurrentSettings();
-  } else {
-    setActiveModeButton("wordModesPanel", "words", state.targetWords);
-    setActiveModeButton("wordModes", "words", state.targetWords);
-    renderMeta();
-    renderHighlight();
-    renderSidebar();
-    updateWordProgress();
-    updateEnterButtonVisibility();
-  }
+  setActiveModeButton("wordModesPanel", "words", state.targetWords);
+  setActiveModeButton("wordModes", "words", state.targetWords);
+  renderMeta();
+  renderHighlight();
+  renderSidebar();
+  updateWordProgress();
+  updateEnterButtonVisibility();
 }
 
 function applyTimerFromPanel(nextSeconds) {
@@ -1387,17 +1423,13 @@ function applyTimerFromPanel(nextSeconds) {
   stopTimer();
   state.timeRemaining = 0;
   state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
-  if (state.active && !state.submitted) {
-    restartRunWithCurrentSettings();
-  } else {
-    setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
-    setActiveModeButton("timeModes", "time", state.timerSeconds);
-    updateTimeFill();
-    renderMeta();
-    renderHighlight();
-    renderSidebar();
-    renderWritingState();
-  }
+  setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
+  setActiveModeButton("timeModes", "time", state.timerSeconds);
+  updateTimeFill();
+  renderMeta();
+  renderHighlight();
+  renderSidebar();
+  renderWritingState();
 }
 
 function afterOptionsPanelClosed() {
@@ -1431,9 +1463,20 @@ function setOptionsOpen(open) {
     if (input && document.activeElement !== input) {
       input.value = state.banned.join(", ");
     }
+    requestAnimationFrame(() => {
+      const livePanel = $("editorOptionsPanel");
+      if (!livePanel || !state.optionsOpen) return;
+      const lockWidth = Math.round(livePanel.getBoundingClientRect().width);
+      if (lockWidth > 0) {
+        livePanel.style.width = `${lockWidth}px`;
+        livePanel.style.maxWidth = `${lockWidth}px`;
+      }
+    });
   } else {
     optionsPanelDismissGuardUntil = 0;
     flushBannedPanelPersistFromPanel();
+    panel.style.removeProperty("width");
+    panel.style.removeProperty("max-width");
   }
 
   panel.setAttribute("aria-hidden", open ? "false" : "true");
@@ -1726,24 +1769,36 @@ function rerollPrompt() {
 
 /** Reprompt control only — never field toggle (explicit target + propagation guard). */
 function onPromptRerollControlClick(e) {
+  if (e.currentTarget?.id !== "promptRerollBtn") return;
+  const t = e.target;
+  if (t instanceof Element && t.closest("#fieldExpandedToggle")) return;
   e.preventDefault();
   e.stopPropagation();
-  if (e.currentTarget?.id !== "promptRerollBtn") return;
+  e.stopImmediatePropagation();
   rerollPrompt();
+}
+
+function onPromptClusterControlPointerDown(e) {
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 /** Field expanded toggle only — never prompt reroll (explicit target + propagation guard). */
 function onFieldExpandedControlClick(e) {
+  if (e.currentTarget?.id !== "fieldExpandedToggle") return;
+  const t = e.target;
+  if (t instanceof Element && t.closest("#promptRerollBtn")) return;
   e.preventDefault();
   e.stopPropagation();
-  if (e.currentTarget?.id !== "fieldExpandedToggle") return;
+  e.stopImmediatePropagation();
   if (!isMobileViewport()) return;
-  if (!document.body.classList.contains("focus-mode")) {
-    setFocusMode(true);
-  }
-  const hadEditorFocus = document.activeElement === editorInput;
-  setExpandedField(!state.isExpandedField);
-  if (hadEditorFocus && editorInput) {
+
+  // Two-state model only: full focus (collapsed) <-> full unfold (expanded).
+  const nextExpanded = !document.body.classList.contains("expanded-field");
+  setFocusMode(true);
+  setExpandedField(nextExpanded);
+
+  if (editorInput) {
     requestAnimationFrame(() => {
       editorInput.focus({ preventScroll: true });
     });
@@ -1753,20 +1808,43 @@ function onFieldExpandedControlClick(e) {
 function bindPromptClusterControlsOnce() {
   const reroll = $("promptRerollBtn");
   if (reroll) {
-    if (reroll.dataset.bound === "true" && !reroll.dataset.boundRerollPrompt) {
-      reroll.removeEventListener("click", rerollPrompt);
-      reroll.removeAttribute("data-bound");
-    }
-    if (!reroll.dataset.boundRerollPrompt) {
-      reroll.addEventListener("click", onPromptRerollControlClick);
-      reroll.dataset.boundRerollPrompt = "1";
-    }
+    reroll.removeEventListener("pointerdown", onPromptClusterControlPointerDown);
+    reroll.addEventListener("pointerdown", onPromptClusterControlPointerDown);
+    reroll.removeEventListener("click", rerollPrompt);
+    reroll.removeEventListener("click", onPromptRerollControlClick);
+    reroll.addEventListener("click", onPromptRerollControlClick);
   }
   const field = $("fieldExpandedToggle");
-  if (field && !field.dataset.boundFieldToggle) {
+  if (field) {
+    field.removeEventListener("pointerdown", onPromptClusterControlPointerDown);
+    field.addEventListener("pointerdown", onPromptClusterControlPointerDown);
+    field.removeEventListener("click", onFieldExpandedControlClick);
     field.addEventListener("click", onFieldExpandedControlClick);
-    field.dataset.boundFieldToggle = "1";
   }
+}
+
+/** Keep reroll DOM minimal: icon in button, count via `data-rerolls` pseudo-element. */
+function normalizePromptRerollButtonIfNeeded() {
+  const btn = $("promptRerollBtn");
+  if (!btn) return;
+  const targetLeftGroup =
+    btn.closest(".prompt-meta-left") ||
+    document.querySelector("#promptCard .prompt-meta-left");
+  if (targetLeftGroup) {
+    const slot = $("promptRerollSlot");
+    if (slot && btn.parentElement === slot) {
+      targetLeftGroup.appendChild(btn);
+      slot.remove();
+    }
+    if (btn.parentElement !== targetLeftGroup) {
+      targetLeftGroup.appendChild(btn);
+    }
+  }
+
+  if (!btn.querySelector(".prompt-reroll-icon")) {
+    btn.innerHTML = `<span class="prompt-reroll-icon" aria-hidden="true">✎</span>`;
+  }
+  if (!btn.dataset.rerolls) btn.dataset.rerolls = String(PROMPT_REROLL_LIMIT);
 }
 
 function ensurePromptRerollButton() {
@@ -1783,21 +1861,17 @@ function ensurePromptRerollButton() {
     btn.id = "promptRerollBtn";
     btn.className = "prompt-reroll-btn";
     btn.setAttribute("aria-label", "Get a different prompt");
-    btn.innerHTML = `
-      <span class="prompt-reroll-icon">↻</span>
-      <span id="promptRerollBadge" class="prompt-reroll-badge">2</span>
-    `;
-    const actions = promptCard.querySelector(".prompt-meta-actions");
-    const fieldToggle = $("fieldExpandedToggle");
-    if (actions && fieldToggle) {
-      actions.insertBefore(btn, fieldToggle);
-    } else if (actions) {
-      actions.appendChild(btn);
+    btn.dataset.rerolls = String(PROMPT_REROLL_LIMIT);
+    btn.innerHTML = `<span class="prompt-reroll-icon" aria-hidden="true">✎</span>`;
+    const leftGroup = promptCard.querySelector(".prompt-meta-left");
+    if (leftGroup) {
+      leftGroup.appendChild(btn);
     } else {
       promptCard.appendChild(btn);
     }
   }
 
+  normalizePromptRerollButtonIfNeeded();
   bindPromptClusterControlsOnce();
 }
 
@@ -2925,19 +2999,26 @@ function renderMeta() {
   updateTimeFill();
   updateEnterButtonVisibility();
 
-  const rerollBtn = $("promptRerollBtn");
-  const rerollBadge = $("promptRerollBadge");
+  let rerollBtn = $("promptRerollBtn");
+  if (rerollBtn) {
+    normalizePromptRerollButtonIfNeeded();
+    rerollBtn = $("promptRerollBtn");
+  }
 
-  if (rerollBtn && rerollBadge) {
+  if (rerollBtn) {
     const remaining = Math.max(0, PROMPT_REROLL_LIMIT - state.promptRerollsUsed);
     const locked = !canRerollPrompt();
 
     rerollBtn.disabled = locked;
     rerollBtn.classList.toggle("locked", locked);
     rerollBtn.classList.toggle("hidden", remaining === 0);
-
-    rerollBadge.textContent = String(remaining);
-    rerollBadge.classList.toggle("hidden", remaining === 0);
+    rerollBtn.dataset.rerolls = String(remaining);
+    rerollBtn.setAttribute(
+      "aria-label",
+      remaining === 0
+        ? "No prompt rerolls left"
+        : `Get a different prompt (${remaining} reroll${remaining === 1 ? "" : "s"} left)`
+    );
   }
 }
 
@@ -3782,15 +3863,22 @@ function setRecentDrawerOpen(open, options = {}) {
   const skipFocus = Boolean(options.skipFocus);
   const afterOpen = typeof options.afterOpen === "function" ? options.afterOpen : null;
 
-  if (shouldOpen) {
-    editorInput?.blur();
-  }
-
   backdrop?.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
   drawer?.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
   trigger?.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
 
   document.body.classList.toggle("recent-drawer-open", shouldOpen);
+
+  if (shouldOpen) {
+    recentDrawerDismissGuardUntil = Date.now() + RECENT_DRAWER_DISMISS_GUARD_MS;
+    if (isMobileViewport()) {
+      mobileRecentDrawerResumeFocusMode = document.body.classList.contains("focus-mode");
+      suppressFocusExitUntil = performance.now() + 380;
+    }
+    if (document.activeElement === editorInput) {
+      editorInput.blur();
+    }
+  }
 
   queueViewportSync();
 
@@ -3807,10 +3895,15 @@ function setRecentDrawerOpen(open, options = {}) {
       queueViewportSync();
     });
   } else {
+    recentDrawerDismissGuardUntil = 0;
+    if (!isMobileViewport()) mobileRecentDrawerResumeFocusMode = false;
     state.pendingRecentDrawerExpand = false;
     hideMetricExplainer();
     if (!skipFocus) trigger?.focus();
-    requestAnimationFrame(() => queueViewportSync());
+    requestAnimationFrame(() => {
+      resumeFocusModeAfterMobileRecentDrawerCloseIfNeeded();
+      queueViewportSync();
+    });
   }
 }
 
@@ -4210,7 +4303,8 @@ function cycleRepeatLimit() {
   renderSidebar();
 }
 
-function restartRunWithCurrentSettings() {
+function restartRunWithCurrentSettings(options = {}) {
+  const keepOptionsPanelOpen = Boolean(options.keepOptionsPanelOpen);
   if (!state.active) return;
 
   state.submitted = false;
@@ -4231,7 +4325,9 @@ function restartRunWithCurrentSettings() {
 
   stopTimer();
   state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
-  setOptionsOpen(false);
+  if (!keepOptionsPanelOpen) {
+    setOptionsOpen(false);
+  }
 
   renderMeta();
   renderWritingState();
@@ -4239,9 +4335,11 @@ function restartRunWithCurrentSettings() {
   renderSidebar();
   updateEnterButtonVisibility();
 
-  requestAnimationFrame(() => {
-    focusEditorToStart();
-  });
+  if (!keepOptionsPanelOpen) {
+    requestAnimationFrame(() => {
+      focusEditorToStart();
+    });
+  }
 }
 
 function saveBannedInline() {
@@ -4264,23 +4362,31 @@ function saveBannedInline() {
   renderSidebar();
 }
 
+const SHUFFLE_TARGET_WORDS = [60, 75, 90];
+const SHUFFLE_TIMER_SECONDS = [60, 180, 300];
+
 function triggerShuffle() {
+  state.targetWords =
+    SHUFFLE_TARGET_WORDS[Math.floor(Math.random() * SHUFFLE_TARGET_WORDS.length)];
+  state.timerSeconds =
+    SHUFFLE_TIMER_SECONDS[Math.floor(Math.random() * SHUFFLE_TIMER_SECONDS.length)];
   state.banned = [...bannedSets[Math.floor(Math.random() * bannedSets.length)]];
-  applyProgressionToState();
+
   stopTimer();
-  if (state.active && !state.submitted) {
-    applyWriteDocSemanticFlagsFromAnalysis();
-    scheduleEditorDotOverlaySync();
-    renderAnnotationRow();
+  state.timeRemaining = 0;
+  state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
+  setActiveModeButton("wordModesPanel", "words", state.targetWords);
+  setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
+  setActiveModeButton("wordModes", "words", state.targetWords);
+  setActiveModeButton("timeModes", "time", state.timerSeconds);
+  const panelInput = $("bannedInlineInputPanel");
+  if (panelInput && document.activeElement !== panelInput) {
+    panelInput.value = state.banned.join(", ");
   }
   renderMeta();
   renderHighlight();
   renderSidebar();
-
-  if (state.active && !state.submitted) {
-    state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
-    renderWritingState();
-  }
+  renderWritingState();
 }
 
 function startExerciseRun(wordsOrWord) {
@@ -4311,7 +4417,11 @@ function clearExerciseIfCompleted(text) {
 }
 
 function startWriting(options = {}) {
-  const { preserveActiveChallenge = false, focusCaret = "end" } = options;
+  const {
+    preserveActiveChallenge = false,
+    focusCaret = "end",
+    deferEditorFocus = false,
+  } = options;
   clearPostSubmitAutoRunTimer();
   document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
   stopTimer();
@@ -4353,13 +4463,9 @@ function startWriting(options = {}) {
   syncEditorBottomChromeForCalibrationOverlay();
   updateEnterButtonVisibility();
 
-  setTimeout(() => {
-    if (focusCaret === "start") {
-      focusEditorToStart();
-    } else {
-      focusEditorToEnd();
-    }
-  }, 50);
+  if (!deferEditorFocus) {
+    scheduleDeferredEditorFocus(focusCaret);
+  }
 }
 
 /**
@@ -4522,18 +4628,25 @@ function showProfile(show = true) {
     profilePanelCloseMotionToken++;
   }
 
-  if (show && !isDesktopPatternsViewport()) {
-    editorInput?.blur();
-    setFocusMode(false);
+  if (!isMobileViewport()) {
+    mobilePatternsResumeFocusMode = false;
   }
 
   const motion = !prefersReducedUiMotion();
   const wasVisible = !profileView.classList.contains("hidden");
 
+  if (show && !isDesktopPatternsViewport()) {
+    editorInput?.blur();
+    if (isMobileViewport() && !wasVisible) {
+      mobilePatternsResumeFocusMode = document.body.classList.contains("focus-mode");
+    }
+  }
+
   if (!motion) {
     profileView.classList.toggle("hidden", !show);
     syncPatternsLayoutMode();
     renderProfile();
+    if (!show) resumeFocusModeAfterMobilePatternsCloseIfNeeded();
     return;
   }
 
@@ -4565,6 +4678,7 @@ function showProfile(show = true) {
       profileView.classList.remove("profile-view--recede");
       syncPatternsLayoutMode();
       renderProfile();
+      resumeFocusModeAfterMobilePatternsCloseIfNeeded();
     };
     const onTransitionEnd = (e) => {
       if (e.target !== profileView) return;
@@ -4582,6 +4696,7 @@ function showProfile(show = true) {
   profileView.classList.toggle("hidden", !show);
   syncPatternsLayoutMode();
   renderProfile();
+  if (!show) resumeFocusModeAfterMobilePatternsCloseIfNeeded();
 }
 
 /* -----------------------------
@@ -4628,6 +4743,10 @@ if (editorInput) {
       hideEditorSemanticPicker();
       return;
     }
+    if (state.optionsOpen) {
+      hideEditorSemanticPicker();
+      return;
+    }
     const rt = e.relatedTarget;
     if (
       rt &&
@@ -4635,6 +4754,13 @@ if (editorInput) {
       (rt.closest("#optionsTrigger") ||
         rt.closest("#editorOptionsPanel") ||
         rt.closest("#editorOptionsBackdrop") ||
+        rt.closest("#recentWritingTrigger") ||
+        rt.closest("#recentDrawer") ||
+        rt.closest("#recentDrawerBackdrop") ||
+        rt.closest("#recentDrawerCloseBtn") ||
+        rt.closest("#recentDrawerList") ||
+        rt.closest("#styleTab") ||
+        rt.closest("#profileView") ||
         rt.closest("#fieldExpandedToggle") ||
         rt.closest("#promptRerollBtn"))
     ) {
@@ -4643,6 +4769,10 @@ if (editorInput) {
       return;
     }
     window.setTimeout(() => {
+      if (state.optionsOpen) {
+        hideEditorSemanticPicker();
+        return;
+      }
       const ae = document.activeElement;
       if (
         ae &&
@@ -4650,9 +4780,26 @@ if (editorInput) {
         (ae.closest("#optionsTrigger") ||
           ae.closest("#editorOptionsPanel") ||
           ae.closest("#editorOptionsBackdrop") ||
+          ae.closest("#recentWritingTrigger") ||
+          ae.closest("#recentDrawer") ||
+          ae.closest("#recentDrawerBackdrop") ||
+          ae.closest("#recentDrawerCloseBtn") ||
+          ae.closest("#recentDrawerList") ||
+          ae.closest("#styleTab") ||
+          ae.closest("#profileView") ||
           ae.closest("#fieldExpandedToggle") ||
           ae.closest("#promptRerollBtn"))
       ) {
+        queueViewportSync();
+        hideEditorSemanticPicker();
+        return;
+      }
+      if (document.body.classList.contains("recent-drawer-open")) {
+        queueViewportSync();
+        hideEditorSemanticPicker();
+        return;
+      }
+      if (performance.now() < suppressFocusExitUntil || isMobilePatternsVisible()) {
         queueViewportSync();
         hideEditorSemanticPicker();
         return;
@@ -4768,7 +4915,26 @@ editorShell?.addEventListener("pointerdown", (e) => {
   });
 });
 
-$("recentWritingTrigger")?.addEventListener("click", () => {
+let suppressRecentTriggerClickOpen = false;
+$("recentWritingTrigger")?.addEventListener(
+  "pointerdown",
+  (e) => {
+    suppressRecentTriggerClickOpen = false;
+    if (isRecentDrawerOpen()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setRecentDrawerOpen(true);
+    suppressRecentTriggerClickOpen = true;
+  },
+  true
+);
+
+$("recentWritingTrigger")?.addEventListener("click", (e) => {
+  if (suppressRecentTriggerClickOpen) {
+    suppressRecentTriggerClickOpen = false;
+    return;
+  }
+  e.stopPropagation();
   setRecentDrawerOpen(true);
 });
 
@@ -4777,6 +4943,7 @@ $("recentDrawerCloseBtn")?.addEventListener("click", () => {
 });
 
 $("recentDrawerBackdrop")?.addEventListener("click", () => {
+  if (Date.now() < recentDrawerDismissGuardUntil) return;
   setRecentDrawerOpen(false);
 });
 
@@ -4831,9 +4998,20 @@ document.addEventListener("keydown", (e) => {
 });
 
 $("beginBtn")?.addEventListener("click", () => {
-  enterAppState({ afterEnter: () => startWriting(), dockFocusModeForMobile: true });
+  if (isMobileViewport()) {
+    setFocusMode(true);
+  }
+  startWriting({ deferEditorFocus: true });
+  enterAppState({
+    afterEnter: () => scheduleDeferredEditorFocus("end"),
+    dockFocusModeForMobile: false,
+  });
 });
 $("themeToggleInPanel")?.addEventListener("click", toggleTheme);
+$("styleTab")?.addEventListener("pointerdown", () => {
+  if (!isMobileViewport()) return;
+  suppressFocusExitUntil = performance.now() + 320;
+});
 $("styleTab")?.addEventListener("click", () => {
   const profileView = $("profileView");
   const isShowingProfile = profileView && !profileView.classList.contains("hidden");
@@ -4842,6 +5020,7 @@ $("styleTab")?.addEventListener("click", () => {
 $("styleTab")?.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
   e.preventDefault();
+  if (isMobileViewport()) suppressFocusExitUntil = performance.now() + 320;
   const profileView = $("profileView");
   const isShowingProfile = profileView && !profileView.classList.contains("hidden");
   showProfile(!isShowingProfile);
