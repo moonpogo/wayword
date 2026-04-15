@@ -151,7 +151,6 @@ const state = {
   promptFamily: "",
   lastPromptKey: "",
   theme: localStorage.getItem("wayword-theme") || "light",
-  toastTimeout: null,
   history: JSON.parse(localStorage.getItem("wayword-history") || "[]"),
   savedRunIds: new Set(JSON.parse(localStorage.getItem("wayword-runids") || "[]")),
   exerciseWords: [],
@@ -233,7 +232,6 @@ const editorDotOverlay = $("editorDotOverlay");
 const editorSemanticPicker = $("editorSemanticPicker");
 const highlightLayer = $("highlightLayer");
 const wordmark = $("wordmark");
-const statusToast = $("statusToast");
 
 function getViewportHeight() {
   if (window.visualViewport && window.visualViewport.height) {
@@ -243,7 +241,35 @@ function getViewportHeight() {
 }
 
 function syncViewportHeightVar() {
-  document.documentElement.style.setProperty("--vvh", `${getViewportHeight()}px`);
+  const h = getViewportHeight();
+  document.documentElement.style.setProperty("--vvh", `${h}px`);
+  if (window.visualViewport) {
+    const vv = window.visualViewport;
+    document.documentElement.style.setProperty("--vv-offset-top", `${vv.offsetTop}px`);
+    document.documentElement.style.setProperty("--window-inner-height", `${window.innerHeight}px`);
+  } else {
+    document.documentElement.style.removeProperty("--vv-offset-top");
+    document.documentElement.style.removeProperty("--window-inner-height");
+  }
+}
+
+/** Mobile: software keyboard shrinks visualViewport — toggle for compact chrome. */
+function syncKeyboardOpenClass() {
+  if (!isMobileViewport()) {
+    document.body.classList.remove("keyboard-open");
+    return;
+  }
+  const vv = window.visualViewport;
+  if (!vv) {
+    document.body.classList.remove("keyboard-open");
+    return;
+  }
+  const layoutH = window.innerHeight;
+  const visibleH = vv.height;
+  const delta = layoutH - visibleH;
+  const ratio = visibleH / Math.max(layoutH, 1);
+  const keyboardOpen = delta > 88 || ratio < 0.74;
+  document.body.classList.toggle("keyboard-open", keyboardOpen);
 }
 
 function isMobileViewport() {
@@ -443,6 +469,7 @@ function queueViewportSync() {
   viewportSyncRaf = requestAnimationFrame(() => {
     viewportSyncRaf = null;
     syncViewportHeightVar();
+    syncKeyboardOpenClass();
     syncEditorShellChamferEdge();
     syncEditorCalibrationOverlayClip();
     if (!isMobileViewport()) setFocusMode(false);
@@ -465,6 +492,9 @@ let settleTimer = null;
 /** After submit: brief shell pulse then auto `startWriting` (no overlay / “begin again”). */
 const POST_SUBMIT_EPHEMERAL_MS = 460;
 const POST_SUBMIT_EPHEMERAL_MS_REDUCED = 120;
+/** Extra wait on mobile focus mode so reflection / run score / calibration overlay can be read before the next prompt. */
+const POST_SUBMIT_MOBILE_FOCUS_READ_MS = 2000;
+const POST_SUBMIT_MOBILE_FOCUS_READ_MS_REDUCED = 800;
 let postSubmitAutoRunTimer = null;
 
 function clearPostSubmitAutoRunTimer() {
@@ -479,7 +509,18 @@ function runPostSubmitAutoNewRunNow() {
   document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
   if (state.optionsOpen) return;
   if (!state.submitted || !state.completedUiActive) return;
-  startWriting({ silent: true, focusCaret: "start" });
+  startWriting({ focusCaret: "start" });
+}
+
+function getPostSubmitAutoAdvanceDelayMs() {
+  const baseMs = prefersReducedUiMotion() ? POST_SUBMIT_EPHEMERAL_MS_REDUCED : POST_SUBMIT_EPHEMERAL_MS;
+  if (isMobileViewport() && document.body.classList.contains("focus-mode")) {
+    const readMs = prefersReducedUiMotion()
+      ? POST_SUBMIT_MOBILE_FOCUS_READ_MS_REDUCED
+      : POST_SUBMIT_MOBILE_FOCUS_READ_MS;
+    return baseMs + readMs;
+  }
+  return baseMs;
 }
 
 function schedulePostSubmitEphemeralCompletion() {
@@ -492,7 +533,7 @@ function schedulePostSubmitEphemeralCompletion() {
     scheduleEditorDotOverlaySync();
   });
 
-  const ms = prefersReducedUiMotion() ? POST_SUBMIT_EPHEMERAL_MS_REDUCED : POST_SUBMIT_EPHEMERAL_MS;
+  const ms = getPostSubmitAutoAdvanceDelayMs();
   postSubmitAutoRunTimer = window.setTimeout(() => {
     postSubmitAutoRunTimer = null;
     runPostSubmitAutoNewRunNow();
@@ -1012,6 +1053,10 @@ function enterAppState(options = {}) {
   if (landing.classList.contains("hidden")) return;
   if (shell.classList.contains("app-shell--landing-out")) return;
 
+  if (dockFocusModeForMobile && isMobileViewport()) {
+    setFocusMode(true);
+  }
+
   const finalizeLandingToApp = () => {
     if (landingToAppExitTimer !== null) {
       window.clearTimeout(landingToAppExitTimer);
@@ -1022,9 +1067,6 @@ function enterAppState(options = {}) {
     app.removeAttribute("aria-hidden");
     showProfile(false);
     setOptionsOpen(false);
-    if (dockFocusModeForMobile && isMobileViewport()) {
-      setFocusMode(true);
-    }
     afterEnter?.();
   };
 
@@ -1195,15 +1237,6 @@ function setOptionsOpen(open) {
     });
   }
 }
-function showToast(message, ms = 1400) {
-  if (!statusToast) return;
-  clearTimeout(state.toastTimeout);
-  statusToast.textContent = message;
-  statusToast.classList.remove("hidden");
-  state.toastTimeout = setTimeout(() => {
-    statusToast.classList.add("hidden");
-  }, ms);
-}
 
 function applyTheme(theme) {
   state.theme = theme;
@@ -1213,7 +1246,6 @@ function applyTheme(theme) {
 
 function toggleTheme() {
   applyTheme(state.theme === "light" ? "dark" : "light");
-  showToast(state.theme === "dark" ? "Dark mode" : "Light mode", 900);
 }
 
 function completedRuns() {
@@ -1288,8 +1320,6 @@ function waywordDevResetCalibrationForTesting() {
   renderProfileSummaryStrip();
   renderProfile();
   queueViewportSync();
-
-  showToast("Dev: calibration reset", 2400);
 }
 
 function persist() {
@@ -1321,14 +1351,6 @@ function applyProgressionToState() {
   state.timerSeconds = cfg.timerSeconds;
   state.pendingTargetWords = cfg.targetWords;
   state.pendingTimerSeconds = cfg.timerSeconds;
-}
-
-function formatTimerToastLabel(timerSeconds) {
-  const t = Number(timerSeconds) || 0;
-  if (!t) return "off";
-  const m = Math.floor(t / 60);
-  const s = t % 60;
-  return s ? `${m}:${String(s).padStart(2, "0")}` : `${m}m`;
 }
 
 function recomputeProgressionLevel(options = {}) {
@@ -1369,23 +1391,6 @@ function recomputeProgressionLevel(options = {}) {
   persistProgressionLevel();
 
   return { changed: prev !== state.progressionLevel, prevLevel: prev };
-}
-
-function maybeToastProgressionConditionChanges(prevLevel) {
-  const prevCfg = getProgressionConfig(prevLevel);
-  const nextCfg = getProgressionConfig(state.progressionLevel);
-  if (nextCfg.targetWords !== prevCfg.targetWords) {
-    showToast(`New target: ${nextCfg.targetWords} words`, 1800);
-  }
-  const prevT = prevCfg.timerSeconds || 0;
-  const nextT = nextCfg.timerSeconds || 0;
-  if (prevT !== nextT) {
-    if (nextT) {
-      showToast(`Timer enabled: ${formatTimerToastLabel(nextT)}`, 1800);
-    } else {
-      showToast("Timer off", 1400);
-    }
-  }
 }
 
 function escapeHtml(str) {
@@ -1508,8 +1513,6 @@ function rerollPrompt() {
 
   renderMeta();
 
-  const remaining = PROMPT_REROLL_LIMIT - state.promptRerollsUsed;
-  showToast(remaining > 0 ? `New prompt · ${remaining} left` : "Prompt locked", 900);
 }
 
 function ensurePromptRerollButton() {
@@ -3904,7 +3907,6 @@ function cycleRepeatLimit() {
   renderMeta();
   renderHighlight();
   renderSidebar();
-  showToast(`Repeat limit ${next}`);
 }
 
 function restartRunWithCurrentSettings() {
@@ -3939,8 +3941,6 @@ function restartRunWithCurrentSettings() {
   requestAnimationFrame(() => {
     focusEditorToStart();
   });
-
-  showToast("New prompt loaded");
 }
 
 function saveBannedInline() {
@@ -3961,7 +3961,6 @@ function saveBannedInline() {
   renderMeta();
   renderHighlight();
   renderSidebar();
-  showToast("Words to avoid updated");
 }
 
 function triggerShuffle() {
@@ -3981,11 +3980,6 @@ function triggerShuffle() {
     state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
     renderWritingState();
   }
-
-  showToast(
-    `Shuffled · ${state.targetWords} words · ${state.timerSeconds ? formatTimerToastLabel(state.timerSeconds) : "off"}`,
-    1600
-  );
 }
 
 function startExerciseRun(wordsOrWord) {
@@ -3999,10 +3993,6 @@ function startExerciseRun(wordsOrWord) {
   renderMeta();
   renderHighlight();
   renderSidebar();
-  const challengeLabel = normalizedWords.length === 1
-    ? `"${normalizedWords[0]}"`
-    : `${normalizedWords.length} selected words`;
-  showToast(`Challenge: avoid ${challengeLabel}`);
 }
 
 function clearExerciseIfCompleted(text) {
@@ -4020,7 +4010,7 @@ function clearExerciseIfCompleted(text) {
 }
 
 function startWriting(options = {}) {
-  const { preserveActiveChallenge = false, silent = false, focusCaret = "end" } = options;
+  const { preserveActiveChallenge = false, focusCaret = "end" } = options;
   clearPostSubmitAutoRunTimer();
   document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
   stopTimer();
@@ -4061,9 +4051,6 @@ function startWriting(options = {}) {
   renderSidebar();
   syncEditorBottomChromeForCalibrationOverlay();
   updateEnterButtonVisibility();
-  if (!silent) {
-    showToast("Writing");
-  }
 
   setTimeout(() => {
     if (focusCaret === "start") {
@@ -4083,7 +4070,7 @@ function finalizeTimedRunExpiredWithNoText() {
   stopTimer();
   state.timeRemaining = 0;
   updateTimeFill();
-  startWriting({ silent: true, focusCaret: "start" });
+  startWriting({ focusCaret: "start" });
   queueViewportSync();
 }
 
@@ -4209,11 +4196,7 @@ function submitWriting(fromTimer = false) {
       renderHistory();
       renderProfileSummaryStrip();
 
-      const prevLevel = state.progressionLevel;
-      const { changed } = recomputeProgressionLevel({ afterRun: true });
-      if (changed) {
-        maybeToastProgressionConditionChanges(prevLevel);
-      }
+      recomputeProgressionLevel({ afterRun: true });
       applyProgressionToState();
       renderProfile();
     }
@@ -4328,10 +4311,6 @@ function initZenGarden() {
     if (e.target === overlay) closeGarden();
   });
 
-  $("zenClearBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
-  $("zenRandomBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
-  $("zenSaveBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
-  $("zenUndoBtn")?.addEventListener("click", () => showToast("Zen garden actions remain on your current build."));
 }
 
 /* -----------------------------
@@ -4666,14 +4645,12 @@ document.querySelectorAll("#wordModesPanel .mode-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     state.pendingTargetWords = Number(btn.dataset.words);
     setActiveModeButton("wordModesPanel", "words", state.pendingTargetWords);
-    showToast(`Word target ${state.pendingTargetWords}`, 700);
   });
 });
 document.querySelectorAll("#timeModesPanel .mode-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     state.pendingTimerSeconds = Number(btn.dataset.time);
     setActiveModeButton("timeModesPanel", "time", state.pendingTimerSeconds);
-    showToast(`Timer ${state.pendingTimerSeconds ? state.pendingTimerSeconds / 60 + "m" : "off"}`, 700);
   });
 });
 $("shuffleBtnPanel")?.addEventListener("click", triggerShuffle);
@@ -4697,7 +4674,6 @@ $("saveBannedBtnPanel")?.addEventListener("click", () => {
     renderHighlight();
     renderSidebar();
     setOptionsOpen(false);
-    showToast("Settings updated");
   }
 });
 /* -----------------------------
@@ -4761,7 +4737,6 @@ syncPatternsLayoutMode();
 renderCalibration();
 renderProfileSummaryStrip();
 updateEnterButtonVisibility();
-if (statusToast) statusToast.classList.add("hidden");
 
 try {
   if (new URLSearchParams(location.search).get("writeDocMapping") === "1") {

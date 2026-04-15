@@ -1,7 +1,10 @@
 @import "category-colors.css";
 
 :root{
-  --vvh:100vh;
+  --vvh:100dvh;
+  --app-safe-top:calc(env(safe-area-inset-top, 0px) + 12px);
+  --app-safe-top-dense:calc(env(safe-area-inset-top, 0px) + 6px);
+  --app-safe-bottom:max(12px, env(safe-area-inset-bottom, 0px));
   --paper:#f6f4ee;
   --ink:#121212;
   --muted:#6a6a6a;
@@ -77,7 +80,9 @@ button,input,textarea{
 .hidden{display:none !important}
 
 .app-shell{
-  min-height:var(--vvh, 100vh);
+  min-height:100dvh;
+  min-height:100vh;
+  min-height:var(--vvh, 100dvh);
 }
 
 .app{
@@ -3028,30 +3033,6 @@ html[data-theme="dark"] .perspective-tile{
   color:var(--muted);
 }
 
-/* toast */
-
-.status-toast{
-  position:fixed;
-  top:16px;
-  left:50%;
-  transform:translateX(-50%);
-  background:var(--ink);
-  color:var(--paper);
-  padding:10px 14px;
-  border-radius:999px;
-  font-size:13px;
-  z-index:999;
-  box-shadow:0 6px 20px rgba(0,0,0,.10);
-  opacity:1;
-  transition:opacity .25s ease, transform .25s ease;
-}
-
-.status-toast.hidden{
-  opacity:0;
-  transform:translateX(-50%) translateY(-8px);
-  pointer-events:none;
-}
-
 /*
  * Settings: dim + panel are siblings under #appView (not nested).
  * Stacking above main chrome and recent drawer; below metric explainer / zen.
@@ -3448,8 +3429,116 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
 }
 
 @media (max-width:720px){
+  #appView.app{
+    display:flex;
+    flex-direction:column;
+    min-height:100dvh;
+    min-height:100vh;
+    min-height:var(--vvh, 100dvh);
+    padding-top:var(--app-safe-top);
+    padding-bottom:var(--app-safe-bottom);
+    padding-left:max(14px, env(safe-area-inset-left, 0px));
+    padding-right:max(14px, env(safe-area-inset-right, 0px));
+  }
+
+  #writeView{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+  }
+
   .layout{
     grid-template-columns:1fr;
+    gap:10px;
+    flex:1 1 auto;
+    min-height:0;
+  }
+
+  .main-column{
+    display:flex;
+    flex-direction:column;
+    flex:1 1 auto;
+    min-height:0;
+    gap:8px;
+  }
+
+  .header{
+    margin-bottom:10px;
+    padding-bottom:10px;
+    gap:10px;
+  }
+
+  .prompt-card{
+    margin-bottom:6px;
+    padding:6px 0 8px;
+  }
+
+  .prompt-meta-row{
+    margin-bottom:2px;
+  }
+
+  .prompt-text{
+    margin-top:0;
+  }
+
+  .editor-pill-band{
+    margin-top:4px;
+  }
+
+  .below-editor-stack{
+    margin-top:2px;
+    gap:2px;
+  }
+
+  body.keyboard-open .app{
+    padding-top:var(--app-safe-top-dense);
+    padding-bottom:max(4px, env(safe-area-inset-bottom, 0px));
+  }
+
+  body.keyboard-open .header{
+    margin-bottom:6px;
+    padding-bottom:6px;
+    gap:6px;
+  }
+
+  body.keyboard-open .subhed{
+    display:none;
+  }
+
+  body.keyboard-open #writeView > .layout{
+    gap:6px;
+  }
+
+  body.keyboard-open .main-column{
+    gap:5px;
+  }
+
+  body.keyboard-open .prompt-card{
+    margin-bottom:4px;
+    padding:4px 0 6px;
+  }
+
+  body.keyboard-open .prompt-meta-row{
+    margin-bottom:0;
+  }
+
+  body.keyboard-open .prompt-text{
+    font-size:clamp(18px, 5.2vw, 22px);
+    line-height:1.14;
+  }
+
+  body.keyboard-open #recentWritingTrigger{
+    display:none;
+  }
+
+  body.keyboard-open .editor-pill-band{
+    margin-top:2px;
+  }
+
+  body.keyboard-open .legend-pill{
+    padding:5px 7px;
+    font-size:10px;
   }
 
   body .app{
@@ -3489,8 +3578,41 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     height:100%;
     min-height:0;
     overflow:hidden;
-    padding-top:10px;
-    padding-bottom:10px;
+    padding-top:max(10px, var(--app-safe-top-dense));
+    padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
+  }
+
+  body.focus-mode.keyboard-open .app{
+    padding-top:max(6px, env(safe-area-inset-top, 0px));
+    padding-bottom:max(4px, env(safe-area-inset-bottom, 0px));
+  }
+
+  body.focus-mode.keyboard-open #writeView > .layout{
+    gap:5px;
+  }
+
+  body.focus-mode.keyboard-open .main-column{
+    gap:6px;
+  }
+
+  body.focus-mode.keyboard-open .prompt-card{
+    margin-bottom:3px;
+    padding:4px 0 5px;
+  }
+
+  body.focus-mode.keyboard-open .prompt-text{
+    font-size:clamp(17px, 5vw, 20px);
+  }
+
+  body.focus-mode.keyboard-open .below-editor-stack{
+    gap:3px;
+    padding-bottom:max(4px, env(safe-area-inset-bottom, 0px));
+  }
+
+  body.focus-mode.keyboard-open .editor-shell:not(.editor-shell--submitted-annotated-spacing) .highlight-layer,
+  body.focus-mode.keyboard-open .editor-shell:not(.editor-shell--submitted-annotated-spacing) .editor-input{
+    padding-top:14px;
+    padding-bottom:32px;
   }
 
   body.focus-mode #writeView{
@@ -3534,6 +3656,11 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     flex:1 1 auto;
     min-height:0;
     height:auto;
+    max-height:none;
+  }
+
+  body.focus-mode.keyboard-open .editor-shell{
+    max-height:min(72dvh, calc(var(--vvh, 100dvh) - 104px));
   }
 
   body.focus-mode .editor-shell .highlight-layer,
@@ -3766,9 +3893,17 @@ html[data-theme="dark"] .editor-options-panel .theme-moon{
     justify-content:flex-end;
   }
 
-  .editor-shell{
-    min-height:auto;
-    height:clamp(260px, 46svh, 420px);
+  body:not(.focus-mode) .editor-shell{
+    flex:1 1 auto;
+    min-height:clamp(200px, 42dvh, 380px);
+    min-height:clamp(200px, 42vh, 380px);
+    height:auto;
+    max-height:min(420px, calc(var(--vvh, 100dvh) - 200px));
+  }
+
+  body:not(.focus-mode).keyboard-open .editor-shell{
+    min-height:clamp(160px, calc(var(--vvh, 50vh) * 0.44), 340px);
+    max-height:calc(var(--vvh, 100dvh) - 140px);
   }
 
   .highlight-layer,
