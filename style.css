@@ -706,6 +706,37 @@ button,input,textarea{
   z-index:4;
 }
 
+/* Fast-moving utility controls: avoid shadow/filter feedback that can ghost on mobile. */
+.style-tab,
+.style-tab:hover,
+.style-tab:active,
+.style-tab:focus,
+.style-tab:focus-visible,
+.style-tab.is-active,
+.field-expand-toggle,
+.field-expand-toggle:hover,
+.field-expand-toggle:active,
+.field-expand-toggle:focus,
+.field-expand-toggle:focus-visible,
+.prompt-reroll-btn,
+.prompt-reroll-btn:hover,
+.prompt-reroll-btn:active,
+.prompt-reroll-btn:focus,
+.prompt-reroll-btn:focus-visible,
+.recent-writing-trigger,
+.recent-writing-trigger:hover,
+.recent-writing-trigger:active,
+.recent-writing-trigger:focus,
+.recent-writing-trigger:focus-visible,
+.recent-drawer-close,
+.recent-drawer-close:hover,
+.recent-drawer-close:active,
+.recent-drawer-close:focus,
+.recent-drawer-close:focus-visible{
+  box-shadow:none !important;
+  filter:none !important;
+}
+
 .style-tab.hidden{
   display:none !important;
 }
