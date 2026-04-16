@@ -494,9 +494,7 @@ function setExpandedField(expanded) {
   if (!isMobileViewport()) return;
   state.isExpandedField = Boolean(expanded);
   syncExpandedFieldClass();
-  const showReflection =
-    state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
-  renderReflection(showReflection);
+  renderReflection(getPostRunReflectionLineText());
 }
 
 function setFocusMode(enabled) {
@@ -510,9 +508,7 @@ function setFocusMode(enabled) {
     setRecentDrawerOpen(false);
     renderProfileSummaryStrip();
     syncExpandedFieldClass();
-    const showReflectionLine =
-      state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
-    renderReflection(showReflectionLine);
+    renderReflection(getPostRunReflectionLineText());
     queueViewportSync();
     logPatternsTransitionSnapshot("setFocusMode:after-enable");
     return;
@@ -3182,11 +3178,10 @@ function renderWritingState(options = {}) {
   updateWordProgress();
   updateTimeFill();
   renderAnnotationRow();
-  const showReflection =
-    state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
-  renderReflection(showReflection);
+  const mirrorPostRunParts = computeMirrorPostRunPanelParts();
+  renderReflection(getPostRunReflectionLineText(mirrorPostRunParts));
   renderPostRunFeedbackContainer();
-  renderMirrorReflectionPanel();
+  renderMirrorReflectionPanel(mirrorPostRunParts);
   if (!deferPostRunOverlaySync) {
     syncEditorPostRunOverlay();
   }
@@ -3382,7 +3377,6 @@ const CALIBRATION_OBS_LONG = [
   "Average sentence length sits above your recent baseline.",
   "Sentences run longer than in your last few saved runs."
 ];
-const CALIBRATION_OBS_FALLBACK = ["This is steady.", "Your structure is consistent.", "No strong change."];
 
 function pickCalibrationObservationPhrase(phrases, seed) {
   if (!phrases.length) return "";
@@ -3456,7 +3450,7 @@ function selectCalibrationObservation(text, priorEntries) {
       : pickCalibrationObservationPhrase(CALIBRATION_OBS_LONG, seed);
   }
 
-  return pickCalibrationObservationPhrase(CALIBRATION_OBS_FALLBACK, seed);
+  return "";
 }
 
 function renderReflection(text) {
@@ -3529,6 +3523,75 @@ function mirrorSessionDigestAvailable() {
       globalThis.WaywordMirror &&
       typeof globalThis.WaywordMirror.buildMirrorSessionDigest === "function"
   );
+}
+
+function mirrorRecentTrendsPipelineAvailable() {
+  return Boolean(
+    typeof globalThis !== "undefined" &&
+      globalThis.WaywordMirror &&
+      typeof globalThis.WaywordMirror.runMirrorRecentTrendsPipeline === "function"
+  );
+}
+
+/** Digests from saved runs (newest last in `state.history`); pipeline sorts internally. */
+function collectMirrorSessionDigestsFromHistory() {
+  if (!Array.isArray(state.history)) return [];
+  const out = [];
+  for (const entry of state.history) {
+    const d = entry && entry.mirrorSessionDigest;
+    if (d && typeof d === "object" && d.v === 1) {
+      out.push(d);
+    }
+  }
+  return out;
+}
+
+/**
+ * Recent-pattern block for post-run (V1.1). Returns "" when pipeline unavailable, errors, or no trends.
+ */
+function buildMirrorRecentTrendsBlockHtml(idPrefix) {
+  if (!mirrorRecentTrendsPipelineAvailable()) return "";
+  let result;
+  try {
+    result = globalThis.WaywordMirror.runMirrorRecentTrendsPipeline(collectMirrorSessionDigestsFromHistory());
+  } catch (_) {
+    return "";
+  }
+  const W = globalThis.WaywordMirror;
+  if (W && typeof W.buildReflectiveProfile === "function") {
+    const trends = result && Array.isArray(result.trends) ? result.trends : [];
+    console.log(W.buildReflectiveProfile(trends));
+  }
+  if (!result || !Array.isArray(result.trends) || result.trends.length === 0) {
+    return "";
+  }
+
+  const rows = result.trends.filter((t) => t && String(t.statement || "").trim());
+  if (!rows.length) {
+    return "";
+  }
+
+  const pfx = String(idPrefix || "mirror-recent");
+  const parts = [];
+  parts.push('<div class="mirror-recent-block">');
+  parts.push(
+    '<div class="mirror-reflection-eyebrow mirror-recent-pattern-eyebrow">Across recent drafts</div>'
+  );
+  parts.push('<div class="mirror-stack mirror-stack--recent mirror-stack--support-only">');
+  rows.forEach((t, i) => {
+    parts.push(
+      mirrorReflectionCardHtml(
+        { statement: t.statement, evidence: t.evidence },
+        {
+          role: "support",
+          firstSupportInSupportOnlyStack: i === 0,
+          evidencePanelId: `${pfx}-t-${i}`
+        }
+      )
+    );
+  });
+  parts.push("</div></div>");
+  return parts.join("");
 }
 
 function computeAndStoreMirrorPipelineResult(text, run) {
@@ -3697,7 +3760,36 @@ function wireMirrorEvidenceToggles(root) {
   });
 }
 
-function renderMirrorReflectionPanel() {
+/** Same HTML parts `renderMirrorReflectionPanel` uses (V1 body + recent trends). */
+function computeMirrorPostRunPanelParts() {
+  if (!state.submitted || !state.completedUiActive) {
+    return { v1Body: "", recentBody: "" };
+  }
+  const v1Body = buildMirrorPanelBodyHtml({
+    loadFailed: state.lastMirrorLoadFailed,
+    result: state.lastMirrorPipelineResult,
+    idPrefix: "mirror-postrun"
+  });
+  const recentBody = buildMirrorRecentTrendsBlockHtml("mirror-postrun-recent");
+  return { v1Body, recentBody };
+}
+
+/**
+ * One-line calibration read for #reflection-line / mobile post-run slot.
+ * Suppressed when the Mirror block would be visible (including empty-state copy).
+ */
+function getPostRunReflectionLineText(precomputedParts) {
+  if (!state.submitted || state.calibrationPostRun) {
+    return "";
+  }
+  const parts = precomputedParts || computeMirrorPostRunPanelParts();
+  if (state.completedUiActive && Boolean(parts.v1Body || parts.recentBody)) {
+    return "";
+  }
+  return String(state.lastRunFeedback || "").trim();
+}
+
+function renderMirrorReflectionPanel(precomputedParts) {
   const section = $("mirrorReflectionSection");
   const root = $("mirrorReflectionRoot");
   if (!section || !root) return;
@@ -3708,19 +3800,15 @@ function renderMirrorReflectionPanel() {
     return;
   }
 
-  const body = buildMirrorPanelBodyHtml({
-    loadFailed: state.lastMirrorLoadFailed,
-    result: state.lastMirrorPipelineResult,
-    idPrefix: "mirror-postrun"
-  });
-  if (!body) {
+  const { v1Body, recentBody } = precomputedParts || computeMirrorPostRunPanelParts();
+  if (!v1Body && !recentBody) {
     section.classList.add("hidden");
     root.innerHTML = "";
     return;
   }
 
   section.classList.remove("hidden");
-  root.innerHTML = body;
+  root.innerHTML = (v1Body || "") + recentBody;
   wireMirrorEvidenceToggles(root);
 }
 
