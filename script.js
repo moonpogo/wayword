@@ -3600,8 +3600,7 @@ function renderPatternsMirrorHeroHtml() {
 
   return (
     '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
-    '<p class="patterns-mirror-empty">No long-run writing patterns have surfaced in your saved qualifying drafts yet. ' +
-    "When something holds across several recent runs, it will appear here.</p>" +
+    '<p class="patterns-mirror-empty">Nothing has held long enough to define your writing yet.</p>' +
     "</div>"
   );
 }
@@ -3797,10 +3796,29 @@ function formatRecentEntryMirrorHtml(run, idPrefix) {
   return `<div class="recent-entry-mirror-root recent-entry-mirror">${body}</div>`;
 }
 
+/** Collapse all Mirror evidence panels under `root` (Recent drawer, rail, post-run, Patterns). */
+function collapseMirrorEvidenceInRoot(root) {
+  if (!root) return;
+  root.querySelectorAll(".mirror-card__evidence-toggle").forEach((btn) => {
+    btn.setAttribute("aria-expanded", "false");
+    btn.textContent = "Context";
+    btn.setAttribute(
+      "aria-label",
+      "Show where this line comes from in the draft"
+    );
+    const panelId = btn.getAttribute("aria-controls");
+    const panel = panelId ? document.getElementById(panelId) : null;
+    if (panel) panel.setAttribute("hidden", "");
+    const card = btn.closest(".mirror-card");
+    if (card) card.classList.remove("mirror-card--evidence-open");
+  });
+}
+
 function wireMirrorEvidenceToggles(root) {
   if (!root) return;
   root.querySelectorAll(".mirror-card__evidence-toggle").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
       const open = btn.getAttribute("aria-expanded") === "true";
       const panelId = btn.getAttribute("aria-controls");
       const panel = panelId ? document.getElementById(panelId) : null;
@@ -3818,6 +3836,7 @@ function wireMirrorEvidenceToggles(root) {
       if (card) card.classList.toggle("mirror-card--evidence-open", next);
     });
   });
+  collapseMirrorEvidenceInRoot(root);
 }
 
 /** Same HTML parts `renderMirrorReflectionPanel` uses (V1 body + recent trends). */
@@ -4382,7 +4401,9 @@ function setRecentDrawerOpen(open, options = {}) {
       afterOpen?.();
       if (shouldAutoExpand) {
         state.pendingRecentDrawerExpand = false;
-        expandFirstRecentDrawerEntry({ focusClose: true });
+        const list = $("recentDrawerList");
+        if (list) list.scrollTop = 0;
+        if (!skipFocus) $("recentDrawerCloseBtn")?.focus();
       }
       queueViewportSync();
     });
@@ -4411,28 +4432,7 @@ function toggleRecentEntry(button) {
 
   button.classList.toggle("is-open", !isOpen);
   expanded.hidden = isOpen;
-}
-
-function expandFirstRecentDrawerEntry({ focusClose = false } = {}) {
-  const list = $("recentDrawerList");
-  if (!list) return;
-
-  list.scrollTop = 0;
-
-  const first = list.querySelector(".recent-entry");
-  if (!first) return;
-
-  document.querySelectorAll(".recent-entry.is-open").forEach(el => {
-    el.classList.remove("is-open");
-    const other = el.querySelector(".recent-entry-expanded");
-    if (other) other.hidden = true;
-  });
-
-  first.classList.add("is-open");
-  const expanded = first.querySelector(".recent-entry-expanded");
-  if (expanded) expanded.hidden = false;
-
-  if (focusClose) $("recentDrawerCloseBtn")?.focus();
+  button.querySelectorAll(".recent-entry-mirror-root").forEach(collapseMirrorEvidenceInRoot);
 }
 
 function aggregateProfile() {
@@ -4493,11 +4493,10 @@ function renderProfileLocked() {
     </div>
   `;
 
-  ["topWordsProfile","startersProfile","punctuationProfile","perspectiveProfile","patternCallouts"]
-    .forEach(id => {
-      const el = $(id);
-      if (el) el.innerHTML = lockedHtml;
-    });
+  ["patternsRepeatedChallengeRoot", "patternCallouts"].forEach((id) => {
+    const el = $(id);
+    if (el) el.innerHTML = lockedHtml;
+  });
 
   if ($("profileHeroSummary")) {
     const hero = $("profileHeroSummary");
@@ -4508,7 +4507,19 @@ function renderProfileLocked() {
       hero.textContent = "";
     }
   }
-  if ($("profileActionArea")) $("profileActionArea").innerHTML = "";
+}
+
+/** Suggested challenge target from repeated-word tallies only (existing ≥4 + not completed rule). */
+function buildRepeatedWordChallengeSuggestion(topWords) {
+  const list = Array.isArray(topWords) ? topWords : [];
+  if (
+    list[0] &&
+    list[0][1] >= 4 &&
+    !state.completedChallenges.has(list[0][0])
+  ) {
+    return list[0][0];
+  }
+  return "";
 }
 
 function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters) {
@@ -4569,37 +4580,6 @@ function buildChallengeCopy(words) {
   return `Start one run without using these words: ${wordsText}.`;
 }
 
-function renderPunctuationChart(punctuationData) {
-  const el = $("punctuationProfile");
-  if (!el) return;
-
-  const entries = Object.entries(punctuationMarks).map(([key, meta], idx) => ({
-    key,
-    label: meta.label,
-    value: punctuationData[key] || 0,
-    patternClass: `punct-pattern-${idx % 10}`
-  }));
-
-  const maxValue = Math.max(1, ...entries.map(e => e.value));
-
-  el.innerHTML = `
-    <div class="punctuation-chart">
-      ${entries.map(entry => {
-        const heightPct = Math.min(100, Math.max(4, (entry.value / maxValue) * 100));
-        return `
-          <div class="punct-col">
-            <div class="punct-bar-wrap">
-              <div class="punct-bar ${entry.patternClass}" style="height:${heightPct}%"></div>
-            </div>
-            <div class="punct-label">${escapeHtml(entry.label)}</div>
-            <div class="punct-value">${entry.value}</div>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-}
-
 function shouldHideRunsWordsStrip() {
   /* Main writing column: strip is desktop-only (matches @media min-width 981px layout). */
   if (!isDesktopPatternsViewport()) return true;
@@ -4648,7 +4628,6 @@ function renderProfile() {
   const agg = aggregateProfile();
   const runs = Math.max(agg.totalRuns, 1);
   const avgUniqueRatio = agg.totalUniqueRatio / runs;
-  const avgSentenceLength = agg.avgSentenceLength / runs;
   const avgFiller = agg.fillerHits / runs;
 
   if ($("profileHeroSummary")) {
@@ -4666,7 +4645,7 @@ function renderProfile() {
     .slice(0, 4);
 
   const calloutsWithStarters = buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters);
-  const suggestedChallengeWord = calloutsWithStarters.suggestedExerciseWord || "";
+  const suggestedChallengeWord = buildRepeatedWordChallengeSuggestion(topWords);
   const topRepeatedWords = topWords.map(([word]) => word);
   const topRepeatedWordsSet = new Set(topRepeatedWords);
   const selectedChallengeWords = state.patternSelectedWords.filter((word) => topRepeatedWordsSet.has(word));
@@ -4679,8 +4658,9 @@ function renderProfile() {
     : [];
   const draftChallengeWords = selectedChallengeWords.length ? selectedChallengeWords : suggestedChallengeWords;
 
-  if ($("topWordsProfile")) {
-    $("topWordsProfile").innerHTML = topWords.length
+  const patternsUtilityRoot = $("patternsRepeatedChallengeRoot");
+  if (patternsUtilityRoot) {
+    const wordsHtml = topWords.length
       ? `<div class="word-cloud">
           ${topWords.map(([w, c]) => `
             <button
@@ -4692,10 +4672,30 @@ function renderProfile() {
             >${escapeHtml(w)}</button>
           `).join("")}
          </div>`
-      : '<div class="history-item">No repeated words yet.</div>';
+      : `<p class="patterns-repeated-empty">No repeated words in your saved runs yet.</p>`;
 
-    const challengeWordButtons = $("topWordsProfile").querySelectorAll("[data-challenge-word]");
-    challengeWordButtons.forEach((btn) => {
+    const challengeHtml = draftChallengeWords.length
+      ? `<div class="patterns-challenge-block">
+          <div class="patterns-challenge-label">Challenge from your repeats</div>
+          <div class="challenge-copy">${buildChallengeCopy(draftChallengeWords)}</div>
+          <button id="startExerciseBtn" class="exercise-btn" type="button">
+            <span class="exercise-dot"></span>
+            Begin challenge
+          </button>
+        </div>`
+      : topWords.length
+        ? `<p class="patterns-challenge-hint">Tap a word above to try leaving it out for one run.</p>`
+        : "";
+
+    patternsUtilityRoot.innerHTML = `
+      <div class="patterns-utility-card">
+        <div class="section-title card-section-title patterns-utility-card__title">Repeated words</div>
+        ${wordsHtml}
+        ${challengeHtml}
+      </div>
+    `;
+
+    patternsUtilityRoot.querySelectorAll("[data-challenge-word]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const word = normalizeWord(btn.getAttribute("data-challenge-word") || "");
         if (!word) return;
@@ -4706,45 +4706,8 @@ function renderProfile() {
         renderProfile();
       });
     });
-  }
-
-  if ($("startersProfile")) {
-    $("startersProfile").innerHTML = topStarters.length
-      ? topStarters.map(([w, c]) => {
-          const example = agg.starterExamples[w] || `Sentence opening seen ${c} times so far`;
-          return `
-            <div class="opening-row">
-              <div class="opening-word">${escapeHtml(w)}</div>
-              <div class="opening-example">${escapeHtml(example)}</div>
-              <div class="opening-count">${c} times</div>
-            </div>
-          `;
-        }).join("")
-      : '<div class="history-item">No repeated starters yet.</div>';
-  }
-
-  renderPunctuationChart(agg.punctuation);
-
-  const perspectiveTotal = agg.perspective.first + agg.perspective.second + agg.perspective.third;
-  if ($("perspectiveProfile")) {
-    $("perspectiveProfile").innerHTML = perspectiveTotal
-      ? `
-        <div class="perspective-grid">
-          <div class="perspective-tile">
-            <div class="perspective-label">First person</div>
-            <div class="perspective-value">${agg.perspective.first}</div>
-          </div>
-          <div class="perspective-tile">
-            <div class="perspective-label">Second person</div>
-            <div class="perspective-value">${agg.perspective.second}</div>
-          </div>
-          <div class="perspective-tile">
-            <div class="perspective-label">Third person</div>
-            <div class="perspective-value">${agg.perspective.third}</div>
-          </div>
-        </div>
-      `
-      : '<div class="history-item">No stance data yet.</div>';
+    const startBtn = $("startExerciseBtn");
+    if (startBtn) startBtn.addEventListener("click", () => startExerciseRun(draftChallengeWords));
   }
 
   if ($("patternCallouts")) {
@@ -4759,26 +4722,6 @@ function renderProfile() {
       ${calloutsWithStarters.direction ? `<div class="history-item">${calloutsWithStarters.direction}</div>` : ""}
     `;
     }
-  }
-
-  if ($("profileActionArea")) {
-    $("profileActionArea").innerHTML = draftChallengeWords.length
-      ? `
-        <div class="exercise-card">
-          <div class="challenge-title">Suggested challenge</div>
-          <div class="challenge-copy">
-            ${buildChallengeCopy(draftChallengeWords)}
-          </div>
-          <button id="startExerciseBtn" class="exercise-btn" type="button">
-            <span class="exercise-dot"></span>
-            Begin challenge
-          </button>
-        </div>
-      `
-      : "";
-
-    const btn = $("startExerciseBtn");
-    if (btn) btn.addEventListener("click", () => startExerciseRun(draftChallengeWords));
   }
 }
 
