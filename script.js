@@ -494,9 +494,7 @@ function setExpandedField(expanded) {
   if (!isMobileViewport()) return;
   state.isExpandedField = Boolean(expanded);
   syncExpandedFieldClass();
-  const showReflection =
-    state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
-  renderReflection(showReflection);
+  renderReflection(getPostRunReflectionLineText());
 }
 
 function setFocusMode(enabled) {
@@ -510,9 +508,7 @@ function setFocusMode(enabled) {
     setRecentDrawerOpen(false);
     renderProfileSummaryStrip();
     syncExpandedFieldClass();
-    const showReflectionLine =
-      state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
-    renderReflection(showReflectionLine);
+    renderReflection(getPostRunReflectionLineText());
     queueViewportSync();
     logPatternsTransitionSnapshot("setFocusMode:after-enable");
     return;
@@ -3182,11 +3178,10 @@ function renderWritingState(options = {}) {
   updateWordProgress();
   updateTimeFill();
   renderAnnotationRow();
-  const showReflection =
-    state.submitted && !state.calibrationPostRun ? state.lastRunFeedback : "";
-  renderReflection(showReflection);
+  const mirrorPostRunParts = computeMirrorPostRunPanelParts();
+  renderReflection(getPostRunReflectionLineText(mirrorPostRunParts));
   renderPostRunFeedbackContainer();
-  renderMirrorReflectionPanel();
+  renderMirrorReflectionPanel(mirrorPostRunParts);
   if (!deferPostRunOverlaySync) {
     syncEditorPostRunOverlay();
   }
@@ -3382,7 +3377,6 @@ const CALIBRATION_OBS_LONG = [
   "Average sentence length sits above your recent baseline.",
   "Sentences run longer than in your last few saved runs."
 ];
-const CALIBRATION_OBS_FALLBACK = ["This is steady.", "Your structure is consistent.", "No strong change."];
 
 function pickCalibrationObservationPhrase(phrases, seed) {
   if (!phrases.length) return "";
@@ -3456,7 +3450,7 @@ function selectCalibrationObservation(text, priorEntries) {
       : pickCalibrationObservationPhrase(CALIBRATION_OBS_LONG, seed);
   }
 
-  return pickCalibrationObservationPhrase(CALIBRATION_OBS_FALLBACK, seed);
+  return "";
 }
 
 function renderReflection(text) {
@@ -3521,6 +3515,142 @@ function mirrorPipelineAvailable() {
       globalThis.WaywordMirror &&
       typeof globalThis.WaywordMirror.runMirrorPipeline === "function"
   );
+}
+
+function mirrorSessionDigestAvailable() {
+  return Boolean(
+    typeof globalThis !== "undefined" &&
+      globalThis.WaywordMirror &&
+      typeof globalThis.WaywordMirror.buildMirrorSessionDigest === "function"
+  );
+}
+
+function mirrorRecentTrendsPipelineAvailable() {
+  return Boolean(
+    typeof globalThis !== "undefined" &&
+      globalThis.WaywordMirror &&
+      typeof globalThis.WaywordMirror.runMirrorRecentTrendsPipeline === "function"
+  );
+}
+
+/** Digests from saved runs (newest last in `state.history`); pipeline sorts internally. */
+function collectMirrorSessionDigestsFromHistory() {
+  if (!Array.isArray(state.history)) return [];
+  const out = [];
+  for (const entry of state.history) {
+    const d = entry && entry.mirrorSessionDigest;
+    if (d && typeof d === "object" && d.v === 1) {
+      out.push(d);
+    }
+  }
+  return out;
+}
+
+function mirrorPatternsProfileAvailable() {
+  return Boolean(
+    typeof globalThis !== "undefined" &&
+      globalThis.WaywordMirror &&
+      typeof globalThis.WaywordMirror.getPatternsProfileFromDigests === "function"
+  );
+}
+
+/**
+ * Patterns hero: reflective profile + promoted Mirror cards, or a quiet empty state.
+ * Returns `null` to fall back to legacy `buildPatternCallouts` copy in `#patternCallouts`.
+ */
+function renderPatternsMirrorHeroHtml() {
+  if (!mirrorPatternsProfileAvailable()) {
+    return null;
+  }
+  let result;
+  try {
+    result = globalThis.WaywordMirror.getPatternsProfileFromDigests(collectMirrorSessionDigestsFromHistory());
+  } catch (_) {
+    return null;
+  }
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  const promoted = Array.isArray(result.promotedPatterns) ? result.promotedPatterns : [];
+  const profile = result.profile != null ? String(result.profile).trim() : "";
+
+  if (promoted.length > 0) {
+    const parts = ['<div class="patterns-mirror-hero">'];
+    if (profile) {
+      parts.push(`<p class="patterns-mirror-profile">${escapeHtml(profile)}</p>`);
+    }
+    parts.push('<div class="mirror-stack mirror-stack--patterns-promoted mirror-stack--support-only">');
+    promoted.slice(0, 3).forEach((card, i) => {
+      if (!card || !String(card.statement || "").trim()) return;
+      parts.push(
+        mirrorReflectionCardHtml(
+          { statement: card.statement, evidence: card.evidence },
+          {
+            role: "support",
+            firstSupportInSupportOnlyStack: i === 0,
+            evidencePanelId: `patterns-promoted-${i}`
+          }
+        )
+      );
+    });
+    parts.push("</div></div>");
+    return parts.join("");
+  }
+
+  return (
+    '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
+    '<p class="patterns-mirror-empty">Nothing has held long enough to define your writing yet.</p>' +
+    "</div>"
+  );
+}
+
+/**
+ * Recent-pattern block for post-run (V1.1). Returns "" when pipeline unavailable, errors, or no trends.
+ */
+function buildMirrorRecentTrendsBlockHtml(idPrefix) {
+  if (!mirrorRecentTrendsPipelineAvailable()) return "";
+  let result;
+  try {
+    result = globalThis.WaywordMirror.runMirrorRecentTrendsPipeline(collectMirrorSessionDigestsFromHistory());
+  } catch (_) {
+    return "";
+  }
+  const W = globalThis.WaywordMirror;
+  if (W && typeof W.buildReflectiveProfile === "function") {
+    const trends = result && Array.isArray(result.trends) ? result.trends : [];
+    console.log(W.buildReflectiveProfile(trends));
+  }
+  if (!result || !Array.isArray(result.trends) || result.trends.length === 0) {
+    return "";
+  }
+
+  const rows = result.trends.filter((t) => t && String(t.statement || "").trim());
+  if (!rows.length) {
+    return "";
+  }
+
+  const pfx = String(idPrefix || "mirror-recent");
+  const parts = [];
+  parts.push('<div class="mirror-recent-block">');
+  parts.push(
+    '<div class="mirror-reflection-eyebrow mirror-recent-pattern-eyebrow">Across recent drafts</div>'
+  );
+  parts.push('<div class="mirror-stack mirror-stack--recent mirror-stack--support-only">');
+  rows.forEach((t, i) => {
+    parts.push(
+      mirrorReflectionCardHtml(
+        { statement: t.statement, evidence: t.evidence },
+        {
+          role: "support",
+          firstSupportInSupportOnlyStack: i === 0,
+          evidencePanelId: `${pfx}-t-${i}`
+        }
+      )
+    );
+  });
+  parts.push("</div></div>");
+  return parts.join("");
 }
 
 function computeAndStoreMirrorPipelineResult(text, run) {
@@ -3666,10 +3796,29 @@ function formatRecentEntryMirrorHtml(run, idPrefix) {
   return `<div class="recent-entry-mirror-root recent-entry-mirror">${body}</div>`;
 }
 
+/** Collapse all Mirror evidence panels under `root` (Recent drawer, rail, post-run, Patterns). */
+function collapseMirrorEvidenceInRoot(root) {
+  if (!root) return;
+  root.querySelectorAll(".mirror-card__evidence-toggle").forEach((btn) => {
+    btn.setAttribute("aria-expanded", "false");
+    btn.textContent = "Context";
+    btn.setAttribute(
+      "aria-label",
+      "Show where this line comes from in the draft"
+    );
+    const panelId = btn.getAttribute("aria-controls");
+    const panel = panelId ? document.getElementById(panelId) : null;
+    if (panel) panel.setAttribute("hidden", "");
+    const card = btn.closest(".mirror-card");
+    if (card) card.classList.remove("mirror-card--evidence-open");
+  });
+}
+
 function wireMirrorEvidenceToggles(root) {
   if (!root) return;
   root.querySelectorAll(".mirror-card__evidence-toggle").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
       const open = btn.getAttribute("aria-expanded") === "true";
       const panelId = btn.getAttribute("aria-controls");
       const panel = panelId ? document.getElementById(panelId) : null;
@@ -3689,7 +3838,36 @@ function wireMirrorEvidenceToggles(root) {
   });
 }
 
-function renderMirrorReflectionPanel() {
+/** Same HTML parts `renderMirrorReflectionPanel` uses (V1 body + recent trends). */
+function computeMirrorPostRunPanelParts() {
+  if (!state.submitted || !state.completedUiActive) {
+    return { v1Body: "", recentBody: "" };
+  }
+  const v1Body = buildMirrorPanelBodyHtml({
+    loadFailed: state.lastMirrorLoadFailed,
+    result: state.lastMirrorPipelineResult,
+    idPrefix: "mirror-postrun"
+  });
+  const recentBody = buildMirrorRecentTrendsBlockHtml("mirror-postrun-recent");
+  return { v1Body, recentBody };
+}
+
+/**
+ * One-line calibration read for #reflection-line / mobile post-run slot.
+ * Suppressed when the Mirror block would be visible (including empty-state copy).
+ */
+function getPostRunReflectionLineText(precomputedParts) {
+  if (!state.submitted || state.calibrationPostRun) {
+    return "";
+  }
+  const parts = precomputedParts || computeMirrorPostRunPanelParts();
+  if (state.completedUiActive && Boolean(parts.v1Body || parts.recentBody)) {
+    return "";
+  }
+  return String(state.lastRunFeedback || "").trim();
+}
+
+function renderMirrorReflectionPanel(precomputedParts) {
   const section = $("mirrorReflectionSection");
   const root = $("mirrorReflectionRoot");
   if (!section || !root) return;
@@ -3700,20 +3878,17 @@ function renderMirrorReflectionPanel() {
     return;
   }
 
-  const body = buildMirrorPanelBodyHtml({
-    loadFailed: state.lastMirrorLoadFailed,
-    result: state.lastMirrorPipelineResult,
-    idPrefix: "mirror-postrun"
-  });
-  if (!body) {
+  const { v1Body, recentBody } = precomputedParts || computeMirrorPostRunPanelParts();
+  if (!v1Body && !recentBody) {
     section.classList.add("hidden");
     root.innerHTML = "";
     return;
   }
 
   section.classList.remove("hidden");
-  root.innerHTML = body;
+  root.innerHTML = (v1Body || "") + recentBody;
   wireMirrorEvidenceToggles(root);
+  collapseMirrorEvidenceInRoot(root);
 }
 
 function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibration = false) {
@@ -4126,6 +4301,7 @@ function renderHistory() {
   const railList = $("recentRailList");
   const trigger = $("recentWritingTrigger");
   const allLists = [drawerList, railList].filter(Boolean);
+  allLists.forEach((list) => wireRecentEntryRowKeynav(list));
 
   function buildRecentEntries(items, listKey) {
     return items
@@ -4137,8 +4313,17 @@ function renderHistory() {
         const scoreBlock = formatRecentEntryScoreBlock(item);
         const idPrefix = `mirror-${listKey}-${idx}-${item.runId || "run"}`;
         const mirrorBlock = formatRecentEntryMirrorHtml(item, idPrefix);
+        const mirrorWrap = mirrorBlock
+          ? `<div class="recent-entry-reflection" aria-label="Reflection">${mirrorBlock}</div>`
+          : "";
         return `
-          <button class="recent-entry" type="button" data-recent-index="${idx}">
+          <div
+            class="recent-entry"
+            role="button"
+            tabindex="0"
+            aria-expanded="false"
+            data-recent-index="${idx}"
+          >
             <div class="recent-entry-compact">
               <div class="recent-entry-excerpt">${escapeHtml(excerpt || "Run")}</div>
               ${meta}
@@ -4147,12 +4332,12 @@ function renderHistory() {
               <div class="recent-entry-prompt">${escapeHtml((item.text || "").trim() || "Writing text wasn’t saved for this run.")}</div>
               <div class="recent-entry-results">
                 ${scoreBlock}
-                ${mirrorBlock}
+                ${mirrorWrap}
                 <div class="recent-entry-detail">${detail}</div>
               </div>
               <div class="recent-entry-future-meta" aria-hidden="true"></div>
             </div>
-          </button>
+          </div>
         `;
       })
       .join("");
@@ -4178,6 +4363,7 @@ function renderHistory() {
     list.innerHTML = buildRecentEntries(items, listKey);
     list.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
       wireMirrorEvidenceToggles(el);
+      collapseMirrorEvidenceInRoot(el);
     });
   });
 
@@ -4226,7 +4412,9 @@ function setRecentDrawerOpen(open, options = {}) {
       afterOpen?.();
       if (shouldAutoExpand) {
         state.pendingRecentDrawerExpand = false;
-        expandFirstRecentDrawerEntry({ focusClose: true });
+        const list = $("recentDrawerList");
+        if (list) list.scrollTop = 0;
+        if (!skipFocus) $("recentDrawerCloseBtn")?.focus();
       }
       queueViewportSync();
     });
@@ -4241,42 +4429,35 @@ function setRecentDrawerOpen(open, options = {}) {
   }
 }
 
-function toggleRecentEntry(button) {
-  const expanded = button.querySelector(".recent-entry-expanded");
-  if (!expanded) return;
-
-  const isOpen = button.classList.contains("is-open");
-  document.querySelectorAll(".recent-entry.is-open").forEach(el => {
-    if (el === button) return;
-    el.classList.remove("is-open");
-    const other = el.querySelector(".recent-entry-expanded");
-    if (other) other.hidden = true;
+function wireRecentEntryRowKeynav(list) {
+  if (!list || list.dataset.recentEntryKeynav === "1") return;
+  list.dataset.recentEntryKeynav = "1";
+  list.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const ae = document.activeElement;
+    if (!ae || !ae.classList.contains("recent-entry") || !list.contains(ae)) return;
+    e.preventDefault();
+    toggleRecentEntry(ae);
   });
-
-  button.classList.toggle("is-open", !isOpen);
-  expanded.hidden = isOpen;
 }
 
-function expandFirstRecentDrawerEntry({ focusClose = false } = {}) {
-  const list = $("recentDrawerList");
-  if (!list) return;
+function toggleRecentEntry(entry) {
+  const expanded = entry.querySelector(".recent-entry-expanded");
+  if (!expanded) return;
 
-  list.scrollTop = 0;
-
-  const first = list.querySelector(".recent-entry");
-  if (!first) return;
-
-  document.querySelectorAll(".recent-entry.is-open").forEach(el => {
+  const isOpen = entry.classList.contains("is-open");
+  document.querySelectorAll(".recent-entry.is-open").forEach((el) => {
+    if (el === entry) return;
     el.classList.remove("is-open");
+    el.setAttribute("aria-expanded", "false");
     const other = el.querySelector(".recent-entry-expanded");
     if (other) other.hidden = true;
   });
 
-  first.classList.add("is-open");
-  const expanded = first.querySelector(".recent-entry-expanded");
-  if (expanded) expanded.hidden = false;
-
-  if (focusClose) $("recentDrawerCloseBtn")?.focus();
+  entry.classList.toggle("is-open", !isOpen);
+  expanded.hidden = isOpen;
+  entry.setAttribute("aria-expanded", String(!isOpen));
+  entry.querySelectorAll(".recent-entry-mirror-root").forEach(collapseMirrorEvidenceInRoot);
 }
 
 function aggregateProfile() {
@@ -4337,11 +4518,10 @@ function renderProfileLocked() {
     </div>
   `;
 
-  ["topWordsProfile","startersProfile","punctuationProfile","perspectiveProfile","patternCallouts"]
-    .forEach(id => {
-      const el = $(id);
-      if (el) el.innerHTML = lockedHtml;
-    });
+  ["patternsRepeatedChallengeRoot", "patternCallouts"].forEach((id) => {
+    const el = $(id);
+    if (el) el.innerHTML = lockedHtml;
+  });
 
   if ($("profileHeroSummary")) {
     const hero = $("profileHeroSummary");
@@ -4352,7 +4532,19 @@ function renderProfileLocked() {
       hero.textContent = "";
     }
   }
-  if ($("profileActionArea")) $("profileActionArea").innerHTML = "";
+}
+
+/** Suggested challenge target from repeated-word tallies only (existing ≥4 + not completed rule). */
+function buildRepeatedWordChallengeSuggestion(topWords) {
+  const list = Array.isArray(topWords) ? topWords : [];
+  if (
+    list[0] &&
+    list[0][1] >= 4 &&
+    !state.completedChallenges.has(list[0][0])
+  ) {
+    return list[0][0];
+  }
+  return "";
 }
 
 function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters) {
@@ -4413,37 +4605,6 @@ function buildChallengeCopy(words) {
   return `Start one run without using these words: ${wordsText}.`;
 }
 
-function renderPunctuationChart(punctuationData) {
-  const el = $("punctuationProfile");
-  if (!el) return;
-
-  const entries = Object.entries(punctuationMarks).map(([key, meta], idx) => ({
-    key,
-    label: meta.label,
-    value: punctuationData[key] || 0,
-    patternClass: `punct-pattern-${idx % 10}`
-  }));
-
-  const maxValue = Math.max(1, ...entries.map(e => e.value));
-
-  el.innerHTML = `
-    <div class="punctuation-chart">
-      ${entries.map(entry => {
-        const heightPct = Math.min(100, Math.max(4, (entry.value / maxValue) * 100));
-        return `
-          <div class="punct-col">
-            <div class="punct-bar-wrap">
-              <div class="punct-bar ${entry.patternClass}" style="height:${heightPct}%"></div>
-            </div>
-            <div class="punct-label">${escapeHtml(entry.label)}</div>
-            <div class="punct-value">${entry.value}</div>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-}
-
 function shouldHideRunsWordsStrip() {
   /* Main writing column: strip is desktop-only (matches @media min-width 981px layout). */
   if (!isDesktopPatternsViewport()) return true;
@@ -4492,7 +4653,6 @@ function renderProfile() {
   const agg = aggregateProfile();
   const runs = Math.max(agg.totalRuns, 1);
   const avgUniqueRatio = agg.totalUniqueRatio / runs;
-  const avgSentenceLength = agg.avgSentenceLength / runs;
   const avgFiller = agg.fillerHits / runs;
 
   if ($("profileHeroSummary")) {
@@ -4510,7 +4670,7 @@ function renderProfile() {
     .slice(0, 4);
 
   const calloutsWithStarters = buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters);
-  const suggestedChallengeWord = calloutsWithStarters.suggestedExerciseWord || "";
+  const suggestedChallengeWord = buildRepeatedWordChallengeSuggestion(topWords);
   const topRepeatedWords = topWords.map(([word]) => word);
   const topRepeatedWordsSet = new Set(topRepeatedWords);
   const selectedChallengeWords = state.patternSelectedWords.filter((word) => topRepeatedWordsSet.has(word));
@@ -4523,23 +4683,45 @@ function renderProfile() {
     : [];
   const draftChallengeWords = selectedChallengeWords.length ? selectedChallengeWords : suggestedChallengeWords;
 
-  if ($("topWordsProfile")) {
-    $("topWordsProfile").innerHTML = topWords.length
-      ? `<div class="word-cloud">
-          ${topWords.map(([w, c]) => `
+  const patternsUtilityRoot = $("patternsRepeatedChallengeRoot");
+  if (patternsUtilityRoot) {
+    const wordsHtml = topWords.length
+      ? `<div class="patterns-word-map">
+          ${topWords.map(([w, c]) => {
+            const sel = selectedChallengeSet.has(w);
+            const fs = (12.25 + Math.min(c * 0.42, 3.25)).toFixed(2);
+            return `
             <button
               type="button"
-              class="word-bubble word-bubble-btn ${selectedChallengeSet.has(w) ? "is-selected" : ""}"
+              class="patterns-word-chip ${sel ? "is-selected" : ""}"
               data-challenge-word="${escapeHtml(w)}"
-              aria-pressed="${selectedChallengeSet.has(w) ? "true" : "false"}"
-              style="font-size:${12 + Math.min(c * 2, 18)}px"
-            >${escapeHtml(w)}</button>
-          `).join("")}
+              aria-pressed="${sel ? "true" : "false"}"
+              style="font-size:${fs}px"
+            >${escapeHtml(w)}</button>`;
+          }).join("")}
          </div>`
-      : '<div class="history-item">No repeated words yet.</div>';
+      : `<p class="patterns-repeated-empty">No repeated words in your saved runs yet.</p>`;
 
-    const challengeWordButtons = $("topWordsProfile").querySelectorAll("[data-challenge-word]");
-    challengeWordButtons.forEach((btn) => {
+    const challengeHtml = draftChallengeWords.length
+      ? `<div class="patterns-challenge-block">
+          <div class="patterns-challenge-label">Challenge from your repeats</div>
+          <div class="challenge-copy">${buildChallengeCopy(draftChallengeWords)}</div>
+          <button id="startExerciseBtn" class="exercise-btn" type="button">
+            <span class="exercise-dot"></span>
+            Begin challenge
+          </button>
+        </div>`
+      : topWords.length
+        ? `<p class="patterns-challenge-hint">Tap a word above to try leaving it out for one run.</p>`
+        : "";
+
+    patternsUtilityRoot.innerHTML = `
+      <div class="section-title card-section-title patterns-repeated-challenge__title">Repeated words</div>
+      ${wordsHtml}
+      ${challengeHtml}
+    `;
+
+    patternsUtilityRoot.querySelectorAll("[data-challenge-word]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const word = normalizeWord(btn.getAttribute("data-challenge-word") || "");
         if (!word) return;
@@ -4550,73 +4732,23 @@ function renderProfile() {
         renderProfile();
       });
     });
-  }
-
-  if ($("startersProfile")) {
-    $("startersProfile").innerHTML = topStarters.length
-      ? topStarters.map(([w, c]) => {
-          const example = agg.starterExamples[w] || `Sentence opening seen ${c} times so far`;
-          return `
-            <div class="opening-row">
-              <div class="opening-word">${escapeHtml(w)}</div>
-              <div class="opening-example">${escapeHtml(example)}</div>
-              <div class="opening-count">${c} times</div>
-            </div>
-          `;
-        }).join("")
-      : '<div class="history-item">No repeated starters yet.</div>';
-  }
-
-  renderPunctuationChart(agg.punctuation);
-
-  const perspectiveTotal = agg.perspective.first + agg.perspective.second + agg.perspective.third;
-  if ($("perspectiveProfile")) {
-    $("perspectiveProfile").innerHTML = perspectiveTotal
-      ? `
-        <div class="perspective-grid">
-          <div class="perspective-tile">
-            <div class="perspective-label">First person</div>
-            <div class="perspective-value">${agg.perspective.first}</div>
-          </div>
-          <div class="perspective-tile">
-            <div class="perspective-label">Second person</div>
-            <div class="perspective-value">${agg.perspective.second}</div>
-          </div>
-          <div class="perspective-tile">
-            <div class="perspective-label">Third person</div>
-            <div class="perspective-value">${agg.perspective.third}</div>
-          </div>
-        </div>
-      `
-      : '<div class="history-item">No stance data yet.</div>';
+    const startBtn = $("startExerciseBtn");
+    if (startBtn) startBtn.addEventListener("click", () => startExerciseRun(draftChallengeWords));
   }
 
   if ($("patternCallouts")) {
-    $("patternCallouts").innerHTML = `
+    const patternsMirrorHero = renderPatternsMirrorHeroHtml();
+    if (patternsMirrorHero != null) {
+      $("patternCallouts").innerHTML = patternsMirrorHero;
+      wireMirrorEvidenceToggles($("patternCallouts"));
+      collapseMirrorEvidenceInRoot($("patternCallouts"));
+    } else {
+      $("patternCallouts").innerHTML = `
       <div class="history-item"><strong>${calloutsWithStarters.headline}</strong></div>
       <div class="history-item">${calloutsWithStarters.support}</div>
       ${calloutsWithStarters.direction ? `<div class="history-item">${calloutsWithStarters.direction}</div>` : ""}
     `;
-  }
-
-  if ($("profileActionArea")) {
-    $("profileActionArea").innerHTML = draftChallengeWords.length
-      ? `
-        <div class="exercise-card">
-          <div class="challenge-title">Suggested challenge</div>
-          <div class="challenge-copy">
-            ${buildChallengeCopy(draftChallengeWords)}
-          </div>
-          <button id="startExerciseBtn" class="exercise-btn" type="button">
-            <span class="exercise-dot"></span>
-            Begin challenge
-          </button>
-        </div>
-      `
-      : "";
-
-    const btn = $("startExerciseBtn");
-    if (btn) btn.addEventListener("click", () => startExerciseRun(draftChallengeWords));
+    }
   }
 }
 
@@ -4942,6 +5074,18 @@ function submitWriting(fromTimer = false) {
 
   if (runWasSaved) {
     attachMirrorSnapshotToRunFromState(run);
+    if (mirrorSessionDigestAvailable()) {
+      try {
+        run.mirrorSessionDigest = globalThis.WaywordMirror.buildMirrorSessionDigest({
+          text: String(currentText || ""),
+          sessionId: String(run.runId),
+          startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
+          endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
+        });
+      } catch (_) {
+        run.mirrorSessionDigest = undefined;
+      }
+    }
     state.history.push({ ...run });
     state.savedRunIds.add(run.runId);
     state.pendingRecentDrawerExpand = true;
@@ -5340,11 +5484,13 @@ $("recentDrawerBackdrop")?.addEventListener("click", () => {
 $("recentDrawerList")?.addEventListener("click", (e) => {
   const entry = e.target.closest(".recent-entry");
   if (!entry) return;
+  if (e.target.closest("button, a")) return;
   toggleRecentEntry(entry);
 });
 $("recentRailList")?.addEventListener("click", (e) => {
   const entry = e.target.closest(".recent-entry");
   if (!entry) return;
+  if (e.target.closest("button, a")) return;
   toggleRecentEntry(entry);
 });
 

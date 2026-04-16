@@ -89,3 +89,27 @@ export { splitSentences } from "./utils/splitSentences.js";
 export { tokenizeText } from "./utils/tokenizeText.js";
 
 export { runMirrorPipeline } from "./pipeline/runMirrorPipeline.js";
+
+export type {
+  MirrorRecentTrend,
+  MirrorRecentTrendCandidate,
+  MirrorRecentTrendCategory,
+  MirrorRecentTrendEvidence,
+  MirrorRecentTrendsResult,
+  MirrorSessionDigest,
+  MirrorSessionDigestVersion,
+  PatternsProfileFromDigestsResult
+} from "./recent/types.js";
+export {
+  MIRROR_RECENT_MAX_SUPPORTING,
+  MIRROR_RECENT_MAX_TRENDS_TOTAL
+} from "./recent/types.js";
+export { buildMirrorSessionDigest } from "./recent/buildMirrorSessionDigest.js";
+export { buildReflectiveProfile } from "./recent/buildReflectiveProfile.js";
+export {
+  getPatternsProfileFromDigests,
+  MIRROR_PROMOTION_THRESHOLD_HITS,
+  MIRROR_PROMOTION_WINDOW_QUALIFYING,
+  sliceLastQualifyingMirrorDigests
+} from "./recent/getPatternsProfileFromDigests.js";
+export { runMirrorRecentTrendsPipeline } from "./recent/runMirrorRecentTrendsPipeline.js";
