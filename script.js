@@ -73,7 +73,8 @@ const CALIBRATION_THRESHOLD = 5;
 /** Minimum material for a run to count toward calibration (avoid fake insight). */
 const CALIBRATION_MIN_WORDS = 40;
 const CALIBRATION_MIN_SENTENCE_UNITS = 3;
-const CALIBRATION_INSUFFICIENT_COPY = "Write a little more for calibration.";
+const CALIBRATION_INSUFFICIENT_COPY =
+  "Add a little more writing so the system can reflect your patterns more clearly.";
 
 /** Zen garden entry (wordmark toggle). Set to true when the garden is ready to ship. */
 const ZEN_GARDEN_OPENABLE = false;
@@ -2984,7 +2985,7 @@ function syncEditorPostRunOverlay() {
       card.innerHTML = `
       <div class="editor-overlay-calibration${mod}" role="dialog" aria-labelledby="editorCalibProgress">
         <div class="editor-overlay-calibration-head">
-          <span class="editor-overlay-calibration-label">Calibration</span>
+          <span class="editor-overlay-calibration-label">Finding your baseline</span>
           <span id="editorCalibProgress" class="editor-overlay-calibration-progress">${step} of ${CALIBRATION_THRESHOLD}</span>
         </div>
         <div class="editor-overlay-calibration-meter-wrap">
@@ -3090,6 +3091,17 @@ function renderExerciseBanner() {
 function updateSubmitButtonState() {
   updateEnterButtonVisibility();
 }
+
+function syncWordTargetLabels() {
+  const t = Number(state.targetWords) || 0;
+  const text =
+    t === 75 ? "Write to 75 words" : t === 90 ? "Write to 90 words" : "Write to 60 words";
+  const panel = $("wordTargetLabelPanel");
+  const setup = $("wordTargetLabelSetup");
+  if (panel) panel.textContent = text;
+  if (setup) setup.textContent = text;
+}
+
 function renderMeta() {
   const promptCard = $("promptCard");
   const promptText = $("promptText");
@@ -3116,6 +3128,8 @@ function renderMeta() {
   setActiveModeButton("timeModes", "time", state.timerSeconds);
   setActiveModeButton("wordModesPanel", "words", state.targetWords);
   setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
+
+  syncWordTargetLabels();
 
   updateWordProgress();
   updateTimeFill();
@@ -3169,7 +3183,7 @@ function renderWritingState(options = {}) {
   editorInput.setAttribute(
     "data-placeholder",
     state.active && !state.submitted && !getEditorText().trim()
-      ? "Start typing here..."
+      ? "Write freely. Submit when you're done. Marked words show patterns in this run."
       : ""
   );
   editorInput.classList.toggle("is-empty", !getEditorText().trim());
@@ -3211,9 +3225,11 @@ function setSemanticLegendPillState(pillEl, count) {
   const countEl = pillEl.querySelector(".legend-count");
   if (countEl) countEl.textContent = String(c);
   pillEl.classList.toggle("legend-pill--inactive", c === 0);
+  pillEl.classList.toggle("hidden", c === 0);
 }
 
 function renderLegend(analysis) {
+  const bar = $("editorSemanticStatusBar");
   const bluePill = $("exerciseLegendPill");
   const fillerPill = $("legendPillFiller");
   const repetitionPill = $("legendPillRepetition");
@@ -3223,8 +3239,11 @@ function renderLegend(analysis) {
     setSemanticLegendPillState(fillerPill, 0);
     setSemanticLegendPillState(repetitionPill, 0);
     setSemanticLegendPillState(openingPill, 0);
-    if ($("legendChallengeCount")) $("legendChallengeCount").textContent = "0";
-    if (bluePill && !state.exerciseWords.length) bluePill.classList.add("hidden");
+    setSemanticLegendPillState(bluePill, 0);
+    if (bar) {
+      const pills = [fillerPill, repetitionPill, openingPill, bluePill].filter(Boolean);
+      bar.classList.toggle("hidden", !pills.some((p) => !p.classList.contains("hidden")));
+    }
     return;
   }
 
@@ -3234,44 +3253,17 @@ function renderLegend(analysis) {
   setSemanticLegendPillState(openingPill, sem.opening);
 
   const blueCount = analysis.bannedHits.filter(i => i.isExercise).reduce((sum, item) => sum + item.count, 0);
-  if ($("legendChallengeCount")) $("legendChallengeCount").textContent = blueCount;
+  const challengeCount = state.exerciseWords.length ? blueCount : 0;
+  setSemanticLegendPillState(bluePill, challengeCount);
 
-  if (bluePill) {
-    if (state.exerciseWords.length) bluePill.classList.remove("hidden");
-    else bluePill.classList.add("hidden");
+  if (bar) {
+    const pills = [fillerPill, repetitionPill, openingPill, bluePill].filter(Boolean);
+    bar.classList.toggle("hidden", !pills.some((p) => !p.classList.contains("hidden")));
   }
 }
 
 function renderSidebar() {
   renderLegend(state.active ? analyze(getEditorText()) : null);
-  renderRunScoreStrip();
-}
-
-function renderRunScoreStrip() {
-  const section = $("runScoreSection");
-  const el = $("runScoreSummary");
-  if (!section || !el) return;
-
-  if (!state.active || !state.submitted) {
-    section.classList.add("hidden");
-    el.textContent = "";
-    return;
-  }
-
-  if (state.calibrationPostRun) {
-    section.classList.add("hidden");
-    el.textContent = "";
-    return;
-  }
-
-  const analysis = analyze(getEditorText());
-  const { runScore } = computeRunScoreV1(
-    analysis,
-    state.repeatLimit,
-    getActiveTargetWordsForScoring()
-  );
-  el.textContent = `Run score: ${runScore}`;
-  section.classList.remove("hidden");
 }
 
 function getRecentEntries() {
@@ -3634,7 +3626,7 @@ function buildMirrorRecentTrendsBlockHtml(idPrefix) {
   const parts = [];
   parts.push('<div class="mirror-recent-block">');
   parts.push(
-    '<div class="mirror-reflection-eyebrow mirror-recent-pattern-eyebrow">Across recent drafts</div>'
+    '<div class="mirror-reflection-eyebrow mirror-recent-pattern-eyebrow">Across recent runs</div>'
   );
   parts.push('<div class="mirror-stack mirror-stack--recent mirror-stack--support-only">');
   rows.forEach((t, i) => {
@@ -3702,7 +3694,7 @@ function escapeHtmlMirror(s) {
 
 function renderMirrorEvidenceLinesHtml(evidence) {
   if (!Array.isArray(evidence) || !evidence.length) {
-    return '<p class="mirror-card__evidence-line mirror-card__evidence-line--muted">Nothing quoted from the draft for this line.</p>';
+    return '<p class="mirror-card__evidence-line mirror-card__evidence-line--muted">Nothing quoted from this run for this line.</p>';
   }
   return evidence
     .map((ev) => {
@@ -3730,7 +3722,7 @@ function mirrorReflectionCardHtml(card, opts) {
   return (
     `<article class="${cls}">` +
     `<p class="mirror-card__statement">${stmt}</p>` +
-    `<button type="button" class="mirror-card__evidence-toggle" aria-expanded="false" aria-controls="${uid}" aria-label="Show where this line comes from in the draft">Context</button>` +
+    `<button type="button" class="mirror-card__evidence-toggle" aria-expanded="false" aria-controls="${uid}" aria-label="Show where this line comes from in the run">Context</button>` +
     `<div class="mirror-card__evidence" id="${uid}" hidden>${evHtml}</div>` +
     `</article>`
   );
@@ -3751,7 +3743,7 @@ function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix }) {
   const hasSupport = supporting.some((c) => c && String(c.statement || "").trim());
 
   if (!hasMain && !hasSupport) {
-    return '<p class="mirror-empty">Nothing in this draft stood out enough to echo back.</p>';
+    return '<p class="mirror-empty">Nothing stood out in this run.</p>';
   }
 
   const parts = [];
@@ -3804,7 +3796,7 @@ function collapseMirrorEvidenceInRoot(root) {
     btn.textContent = "Context";
     btn.setAttribute(
       "aria-label",
-      "Show where this line comes from in the draft"
+      "Show where this line comes from in the run"
     );
     const panelId = btn.getAttribute("aria-controls");
     const panel = panelId ? document.getElementById(panelId) : null;
@@ -3828,7 +3820,7 @@ function wireMirrorEvidenceToggles(root) {
       btn.textContent = next ? "Hide" : "Context";
       btn.setAttribute(
         "aria-label",
-        next ? "Hide grounding from the draft" : "Show where this line comes from in the draft"
+        next ? "Hide grounding from the run" : "Show where this line comes from in the run"
       );
       if (next) panel.removeAttribute("hidden");
       else panel.setAttribute("hidden", "");

@@ -1059,11 +1059,6 @@ html[data-theme="dark"] .theme-moon{
   transition:opacity 0.24s ease-out, transform 0.24s ease-out;
 }
 
-.editor-shell.editor-shell--submit-complete #runScoreSection{
-  visibility:hidden;
-  pointer-events:none;
-}
-
 .editor-shell.editor-shell--submit-complete .editor-input[contenteditable="false"]{
   cursor:text;
 }
@@ -1912,12 +1907,6 @@ body.focus-mode #profileSummarySection,
   margin-top:6px;
 }
 
-#runScoreSection{
-  margin:0;
-  padding:0;
-  display:block;
-}
-
 .below-editor-reflection-stack{
   display:flex;
   flex-direction:column;
@@ -1927,16 +1916,6 @@ body.focus-mode #profileSummarySection,
 
 .below-editor-reflection-stack #reflection-line{
   margin-top:2px;
-}
-
-.below-editor-stack #runScoreSummary.run-stats-inline{
-  text-align:left;
-  max-width:42rem;
-  margin:0;
-  padding:4px 2px 0 0;
-  font-size:12px;
-  letter-spacing:0.02em;
-  color:var(--muted);
 }
 
 @media (max-width:980px){

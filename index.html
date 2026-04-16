@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Wayword — Write. See what emerges.</title>
+  <title>Wayword — Notice how you write, as you write</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <link rel="stylesheet" href="/style.css" />
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
@@ -17,12 +17,12 @@
         </h1>
 
         <div class="landing-copy">
-          <p>Most tools try to fix writing.<br>Wayword shows how you actually write.</p>
-          <p>Write in short constrained runs.<br>Then see what repeats, softens, and surfaces.</p>
+          <p>Wayword reflects your writing as it happens, so you can notice patterns taking shape on the page.</p>
+          <p>You get a prompt and a short run.<br>Write freely, submit when you're done, then review what surfaced.</p>
         </div>
 
         <button id="beginBtn" class="landing-enter-btn primary" type="button" aria-label="Enter Wayword">
-          <span>Write</span>
+          <span>Begin</span>
           <span class="landing-enter-arrow" aria-hidden="true">→</span>
         </button>
       </div>
@@ -50,7 +50,7 @@
           <div class="editor-options-body">
             <div class="editor-options-modes-grid">
               <div class="editor-options-modes-col">
-                <div class="editor-options-label editor-options-label--block">Words</div>
+                <div id="wordTargetLabelPanel" class="editor-options-label editor-options-label--block">Write to 60 words</div>
                 <div class="editor-options-typeline" id="wordModesPanel" role="group" aria-label="Word count target">
                   <button type="button" class="editor-options-seg" data-words="60">60</button>
                   <button type="button" class="editor-options-seg" data-words="75">75</button>
@@ -207,7 +207,7 @@
               <span class="wm wm-w1">W</span><span class="wm wm-a">a</span><span class="wm wm-y">y</span><span class="wm wm-w2">w</span><span class="wm wm-o">o</span><span class="wm wm-r">r</span><span class="wm wm-d">d</span>
             </h1>
 
-            <div class="subhed">Write. See what emerges.</div>
+            <div class="subhed">Notice how you write, as you write</div>
           </div>
 
           <div
@@ -269,7 +269,7 @@
             <div class="setup-stack hidden">
               <div class="control-row">
                 <div class="control-group">
-                  <div class="control-label">Words</div>
+                  <div id="wordTargetLabelSetup" class="control-label">Write to 60 words</div>
                   <div class="segmented-pill" id="wordModes">
                     <button class="mode-btn active" type="button" data-words="60">60</button>
                     <button class="mode-btn" type="button" data-words="75">75</button>
@@ -409,23 +409,23 @@
                 <div id="annotationRow" class="annotation-row hidden"></div>
                 <div
                   id="editorSemanticStatusBar"
-                  class="legend-row semantic-status-bar"
+                  class="legend-row semantic-status-bar hidden"
                   role="group"
-                  aria-label="Semantic highlights in this draft"
+                  aria-label="Pattern counts for this run"
                 >
-                  <div id="legendPillFiller" class="legend-pill legend-filler-pill legend-pill--inactive">
+                  <div id="legendPillFiller" class="legend-pill legend-filler-pill legend-pill--inactive hidden">
                     <span class="legend-swatch legend-filler-swatch" aria-hidden="true"></span>
                     <span class="legend-text">Filler</span>
                     <span id="legendFillerCount" class="legend-count">0</span>
                   </div>
 
-                  <div id="legendPillRepetition" class="legend-pill legend-repetition-pill legend-pill--inactive">
+                  <div id="legendPillRepetition" class="legend-pill legend-repetition-pill legend-pill--inactive hidden">
                     <span class="legend-swatch legend-repetition-swatch" aria-hidden="true"></span>
                     <span class="legend-text">Repetition</span>
                     <span id="legendRepetitionCount" class="legend-count">0</span>
                   </div>
 
-                  <div id="legendPillOpening" class="legend-pill legend-openings-pill legend-pill--inactive">
+                  <div id="legendPillOpening" class="legend-pill legend-openings-pill legend-pill--inactive hidden">
                     <span class="legend-swatch legend-openings-swatch" aria-hidden="true"></span>
                     <span class="legend-text">Openings</span>
                     <span id="legendOpeningsCount" class="legend-count">0</span>
@@ -441,10 +441,6 @@
 
               <div class="below-editor-reflection-stack">
                 <div id="reflection-line" class="reflection-line--hidden" aria-hidden="true"></div>
-
-                <section id="runScoreSection" class="soft-strip-section hidden">
-                  <div id="runScoreSummary" class="run-stats-inline" aria-live="polite"></div>
-                </section>
 
                 <section
                   id="mirrorReflectionSection"
