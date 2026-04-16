@@ -3836,7 +3836,6 @@ function wireMirrorEvidenceToggles(root) {
       if (card) card.classList.toggle("mirror-card--evidence-open", next);
     });
   });
-  collapseMirrorEvidenceInRoot(root);
 }
 
 /** Same HTML parts `renderMirrorReflectionPanel` uses (V1 body + recent trends). */
@@ -3889,6 +3888,7 @@ function renderMirrorReflectionPanel(precomputedParts) {
   section.classList.remove("hidden");
   root.innerHTML = (v1Body || "") + recentBody;
   wireMirrorEvidenceToggles(root);
+  collapseMirrorEvidenceInRoot(root);
 }
 
 function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibration = false) {
@@ -4301,6 +4301,7 @@ function renderHistory() {
   const railList = $("recentRailList");
   const trigger = $("recentWritingTrigger");
   const allLists = [drawerList, railList].filter(Boolean);
+  allLists.forEach((list) => wireRecentEntryRowKeynav(list));
 
   function buildRecentEntries(items, listKey) {
     return items
@@ -4312,8 +4313,17 @@ function renderHistory() {
         const scoreBlock = formatRecentEntryScoreBlock(item);
         const idPrefix = `mirror-${listKey}-${idx}-${item.runId || "run"}`;
         const mirrorBlock = formatRecentEntryMirrorHtml(item, idPrefix);
+        const mirrorWrap = mirrorBlock
+          ? `<div class="recent-entry-reflection" aria-label="Reflection">${mirrorBlock}</div>`
+          : "";
         return `
-          <button class="recent-entry" type="button" data-recent-index="${idx}">
+          <div
+            class="recent-entry"
+            role="button"
+            tabindex="0"
+            aria-expanded="false"
+            data-recent-index="${idx}"
+          >
             <div class="recent-entry-compact">
               <div class="recent-entry-excerpt">${escapeHtml(excerpt || "Run")}</div>
               ${meta}
@@ -4322,12 +4332,12 @@ function renderHistory() {
               <div class="recent-entry-prompt">${escapeHtml((item.text || "").trim() || "Writing text wasn’t saved for this run.")}</div>
               <div class="recent-entry-results">
                 ${scoreBlock}
-                ${mirrorBlock}
+                ${mirrorWrap}
                 <div class="recent-entry-detail">${detail}</div>
               </div>
               <div class="recent-entry-future-meta" aria-hidden="true"></div>
             </div>
-          </button>
+          </div>
         `;
       })
       .join("");
@@ -4353,6 +4363,7 @@ function renderHistory() {
     list.innerHTML = buildRecentEntries(items, listKey);
     list.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
       wireMirrorEvidenceToggles(el);
+      collapseMirrorEvidenceInRoot(el);
     });
   });
 
@@ -4418,21 +4429,35 @@ function setRecentDrawerOpen(open, options = {}) {
   }
 }
 
-function toggleRecentEntry(button) {
-  const expanded = button.querySelector(".recent-entry-expanded");
+function wireRecentEntryRowKeynav(list) {
+  if (!list || list.dataset.recentEntryKeynav === "1") return;
+  list.dataset.recentEntryKeynav = "1";
+  list.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const ae = document.activeElement;
+    if (!ae || !ae.classList.contains("recent-entry") || !list.contains(ae)) return;
+    e.preventDefault();
+    toggleRecentEntry(ae);
+  });
+}
+
+function toggleRecentEntry(entry) {
+  const expanded = entry.querySelector(".recent-entry-expanded");
   if (!expanded) return;
 
-  const isOpen = button.classList.contains("is-open");
-  document.querySelectorAll(".recent-entry.is-open").forEach(el => {
-    if (el === button) return;
+  const isOpen = entry.classList.contains("is-open");
+  document.querySelectorAll(".recent-entry.is-open").forEach((el) => {
+    if (el === entry) return;
     el.classList.remove("is-open");
+    el.setAttribute("aria-expanded", "false");
     const other = el.querySelector(".recent-entry-expanded");
     if (other) other.hidden = true;
   });
 
-  button.classList.toggle("is-open", !isOpen);
+  entry.classList.toggle("is-open", !isOpen);
   expanded.hidden = isOpen;
-  button.querySelectorAll(".recent-entry-mirror-root").forEach(collapseMirrorEvidenceInRoot);
+  entry.setAttribute("aria-expanded", String(!isOpen));
+  entry.querySelectorAll(".recent-entry-mirror-root").forEach(collapseMirrorEvidenceInRoot);
 }
 
 function aggregateProfile() {
@@ -4661,16 +4686,19 @@ function renderProfile() {
   const patternsUtilityRoot = $("patternsRepeatedChallengeRoot");
   if (patternsUtilityRoot) {
     const wordsHtml = topWords.length
-      ? `<div class="word-cloud">
-          ${topWords.map(([w, c]) => `
+      ? `<div class="patterns-word-map">
+          ${topWords.map(([w, c]) => {
+            const sel = selectedChallengeSet.has(w);
+            const fs = (12.25 + Math.min(c * 0.42, 3.25)).toFixed(2);
+            return `
             <button
               type="button"
-              class="word-bubble word-bubble-btn ${selectedChallengeSet.has(w) ? "is-selected" : ""}"
+              class="patterns-word-chip ${sel ? "is-selected" : ""}"
               data-challenge-word="${escapeHtml(w)}"
-              aria-pressed="${selectedChallengeSet.has(w) ? "true" : "false"}"
-              style="font-size:${12 + Math.min(c * 2, 18)}px"
-            >${escapeHtml(w)}</button>
-          `).join("")}
+              aria-pressed="${sel ? "true" : "false"}"
+              style="font-size:${fs}px"
+            >${escapeHtml(w)}</button>`;
+          }).join("")}
          </div>`
       : `<p class="patterns-repeated-empty">No repeated words in your saved runs yet.</p>`;
 
@@ -4688,11 +4716,9 @@ function renderProfile() {
         : "";
 
     patternsUtilityRoot.innerHTML = `
-      <div class="patterns-utility-card">
-        <div class="section-title card-section-title patterns-utility-card__title">Repeated words</div>
-        ${wordsHtml}
-        ${challengeHtml}
-      </div>
+      <div class="section-title card-section-title patterns-repeated-challenge__title">Repeated words</div>
+      ${wordsHtml}
+      ${challengeHtml}
     `;
 
     patternsUtilityRoot.querySelectorAll("[data-challenge-word]").forEach((btn) => {
@@ -4715,6 +4741,7 @@ function renderProfile() {
     if (patternsMirrorHero != null) {
       $("patternCallouts").innerHTML = patternsMirrorHero;
       wireMirrorEvidenceToggles($("patternCallouts"));
+      collapseMirrorEvidenceInRoot($("patternCallouts"));
     } else {
       $("patternCallouts").innerHTML = `
       <div class="history-item"><strong>${calloutsWithStarters.headline}</strong></div>
@@ -5457,11 +5484,13 @@ $("recentDrawerBackdrop")?.addEventListener("click", () => {
 $("recentDrawerList")?.addEventListener("click", (e) => {
   const entry = e.target.closest(".recent-entry");
   if (!entry) return;
+  if (e.target.closest("button, a")) return;
   toggleRecentEntry(entry);
 });
 $("recentRailList")?.addEventListener("click", (e) => {
   const entry = e.target.closest(".recent-entry");
   if (!entry) return;
+  if (e.target.closest("button, a")) return;
   toggleRecentEntry(entry);
 });
 
