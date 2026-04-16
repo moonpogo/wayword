@@ -21,7 +21,9 @@ var WaywordMirror = (() => {
   // src/features/mirror/entry-iife.ts
   var entry_iife_exports = {};
   __export(entry_iife_exports, {
-    runMirrorPipeline: () => runMirrorPipeline
+    buildMirrorSessionDigest: () => buildMirrorSessionDigest,
+    runMirrorPipeline: () => runMirrorPipeline,
+    runMirrorRecentTrendsPipeline: () => runMirrorRecentTrendsPipeline
   });
 
   // src/features/mirror/utils/normalizeText.ts
@@ -514,7 +516,13 @@ var WaywordMirror = (() => {
     };
   }
   function abstractionCandidate(sessionId, statement, evidence, rankScore) {
-    return candidate("abstraction_concrete", sessionId, statement, evidence, Math.max(rankScore, 38));
+    return candidate(
+      "abstraction_concrete",
+      sessionId,
+      statement,
+      evidence,
+      Math.max(rankScore, 38)
+    );
   }
   function repetitionWordIsLowSignal(word) {
     const w = word.toLowerCase();
@@ -533,7 +541,9 @@ var WaywordMirror = (() => {
   function tryRepetition(features, sourceText) {
     if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
     const list = features.topRepeatedWords;
-    const picked = list.find((e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word));
+    const picked = list.find(
+      (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
+    );
     if (!picked) return null;
     const namedEv = [snippetAround(sourceText, picked.word)];
     const tie = list.find(
@@ -542,7 +552,9 @@ var WaywordMirror = (() => {
     if (tie) namedEv.push(snippetAround(sourceText, tie.word));
     namedEv.push(repetitionTopCountsEvidence(features));
     const statement = `You return several times to \u201C${picked.word}.\u201D`;
-    const multiNamed = list.filter((e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)).length;
+    const multiNamed = list.filter(
+      (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
+    ).length;
     const rankScore = Math.min(100, picked.count * 14 + (multiNamed > 1 ? 5 : 0));
     return candidate("repetition", features.sessionId, statement, namedEv, rankScore);
   }
@@ -589,12 +601,10 @@ var WaywordMirror = (() => {
   function tryAbstraction(features) {
     const a = features.abstractionProfile;
     const lex = a.abstractCount + a.concreteCount;
-    const shortFormAbstractionEligible =
-      features.wordCount >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_WORDS &&
-      a.abstractCount >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_ABSTRACT &&
-      a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_RATIO &&
-      a.concreteCount <= MIRROR_GEN_ABSTRACTION_SHORTFORM_MAX_CONCRETE;
-    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && !shortFormAbstractionEligible) return null;
+    const shortFormAbstractionEligible = features.wordCount >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_WORDS && a.abstractCount >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_ABSTRACT && a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_RATIO && a.concreteCount <= MIRROR_GEN_ABSTRACTION_SHORTFORM_MAX_CONCRETE;
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && !shortFormAbstractionEligible) {
+      return null;
+    }
     const metrics = `Abstract lexicon hits ${a.abstractCount}; concrete ${a.concreteCount}; ratio ${a.abstractConcreteRatio.toFixed(2)}.`;
     if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
       if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
@@ -819,6 +829,49 @@ var WaywordMirror = (() => {
     const ranked = rankReflections(raw);
     const deduped = dedupeReflections(ranked);
     return selectFinalReflections(deduped);
+  }
+
+  // src/features/mirror/recent/buildMirrorSessionDigest.ts
+  var DIGEST_TOP_REPEATED_WORDS_MAX = 5;
+  function digestTimestampMs(input) {
+    if (typeof input.endedAt === "number" && Number.isFinite(input.endedAt)) {
+      return input.endedAt;
+    }
+    if (typeof input.startedAt === "number" && Number.isFinite(input.startedAt)) {
+      return input.startedAt;
+    }
+    return Date.now();
+  }
+  function buildMirrorSessionDigest(input) {
+    const features = analyzeText(input);
+    const qualifiesForRecent = features.wordCount >= MIRROR_GEN_MIN_WORDS_FOR_ANY;
+    return {
+      v: 1,
+      sessionId: features.sessionId,
+      timestamp: digestTimestampMs(input),
+      qualifiesForRecent,
+      wordCount: features.wordCount,
+      topRepeatedWords: features.topRepeatedWords.slice(0, DIGEST_TOP_REPEATED_WORDS_MAX).map((e) => ({
+        word: e.word,
+        count: e.count
+      })),
+      abstraction: {
+        abstractCount: features.abstractionProfile.abstractCount,
+        concreteCount: features.abstractionProfile.concreteCount,
+        abstractConcreteRatio: features.abstractionProfile.abstractConcreteRatio
+      },
+      hesitation: {
+        qualifierCount: features.hesitationProfile.qualifierCount,
+        pivotCount: features.hesitationProfile.pivotCount,
+        contradictionMarkers: features.hesitationProfile.contradictionMarkers,
+        uncertaintyMarkers: features.hesitationProfile.uncertaintyMarkers
+      }
+    };
+  }
+
+  // src/features/mirror/recent/runMirrorRecentTrendsPipeline.ts
+  function runMirrorRecentTrendsPipeline(_digests) {
+    return { trends: [] };
   }
   return __toCommonJS(entry_iife_exports);
 })();

@@ -3523,6 +3523,14 @@ function mirrorPipelineAvailable() {
   );
 }
 
+function mirrorSessionDigestAvailable() {
+  return Boolean(
+    typeof globalThis !== "undefined" &&
+      globalThis.WaywordMirror &&
+      typeof globalThis.WaywordMirror.buildMirrorSessionDigest === "function"
+  );
+}
+
 function computeAndStoreMirrorPipelineResult(text, run) {
   state.lastMirrorPipelineResult = null;
   state.lastMirrorLoadFailed = false;
@@ -4942,6 +4950,18 @@ function submitWriting(fromTimer = false) {
 
   if (runWasSaved) {
     attachMirrorSnapshotToRunFromState(run);
+    if (mirrorSessionDigestAvailable()) {
+      try {
+        run.mirrorSessionDigest = globalThis.WaywordMirror.buildMirrorSessionDigest({
+          text: String(currentText || ""),
+          sessionId: String(run.runId),
+          startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
+          endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
+        });
+      } catch (_) {
+        run.mirrorSessionDigest = undefined;
+      }
+    }
     state.history.push({ ...run });
     state.savedRunIds.add(run.runId);
     state.pendingRecentDrawerExpand = true;
