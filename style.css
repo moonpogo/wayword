@@ -3160,6 +3160,29 @@ body.recent-drawer-open{
   color:var(--muted);
 }
 
+/* Patterns (V1.1): reflective profile + promoted Mirror cards in #patternCallouts */
+.profile-hero-copy .patterns-mirror-hero{
+  display:block;
+  margin:0;
+}
+.profile-hero-copy .patterns-mirror-profile{
+  margin:0 0 14px;
+  font-size:1.05rem;
+  line-height:1.62;
+  font-weight:400;
+  color:var(--ink);
+}
+.profile-hero-copy .patterns-mirror-hero--empty .patterns-mirror-empty{
+  margin:0;
+  font-size:0.95rem;
+  line-height:1.58;
+  font-weight:400;
+  color:var(--muted);
+}
+.profile-hero-copy .mirror-stack--patterns-promoted{
+  gap:0.55rem;
+}
+
 .profile-hero-action{
   margin-bottom:14px;
 }
@@ -4994,6 +5017,18 @@ html[data-theme="dark"] .metric-explainer{
 
 .mirror-stack--support-only .mirror-card--support-first{
   margin-top:0;
+}
+
+/* V1.1 recent patterns: second stack under this session’s reflection cards */
+.mirror-recent-block{
+  margin-top:1.1rem;
+  padding-top:0.9rem;
+  border-top:1px solid color-mix(in srgb, var(--line) 58%, transparent);
+}
+
+.mirror-recent-pattern-eyebrow{
+  letter-spacing:0.14em;
+  opacity:0.7;
 }
 
 .mirror-card{

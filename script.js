@@ -3546,6 +3546,66 @@ function collectMirrorSessionDigestsFromHistory() {
   return out;
 }
 
+function mirrorPatternsProfileAvailable() {
+  return Boolean(
+    typeof globalThis !== "undefined" &&
+      globalThis.WaywordMirror &&
+      typeof globalThis.WaywordMirror.getPatternsProfileFromDigests === "function"
+  );
+}
+
+/**
+ * Patterns hero: reflective profile + promoted Mirror cards, or a quiet empty state.
+ * Returns `null` to fall back to legacy `buildPatternCallouts` copy in `#patternCallouts`.
+ */
+function renderPatternsMirrorHeroHtml() {
+  if (!mirrorPatternsProfileAvailable()) {
+    return null;
+  }
+  let result;
+  try {
+    result = globalThis.WaywordMirror.getPatternsProfileFromDigests(collectMirrorSessionDigestsFromHistory());
+  } catch (_) {
+    return null;
+  }
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  const promoted = Array.isArray(result.promotedPatterns) ? result.promotedPatterns : [];
+  const profile = result.profile != null ? String(result.profile).trim() : "";
+
+  if (promoted.length > 0) {
+    const parts = ['<div class="patterns-mirror-hero">'];
+    if (profile) {
+      parts.push(`<p class="patterns-mirror-profile">${escapeHtml(profile)}</p>`);
+    }
+    parts.push('<div class="mirror-stack mirror-stack--patterns-promoted mirror-stack--support-only">');
+    promoted.slice(0, 3).forEach((card, i) => {
+      if (!card || !String(card.statement || "").trim()) return;
+      parts.push(
+        mirrorReflectionCardHtml(
+          { statement: card.statement, evidence: card.evidence },
+          {
+            role: "support",
+            firstSupportInSupportOnlyStack: i === 0,
+            evidencePanelId: `patterns-promoted-${i}`
+          }
+        )
+      );
+    });
+    parts.push("</div></div>");
+    return parts.join("");
+  }
+
+  return (
+    '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
+    '<p class="patterns-mirror-empty">No long-run writing patterns have surfaced in your saved qualifying drafts yet. ' +
+    "When something holds across several recent runs, it will appear here.</p>" +
+    "</div>"
+  );
+}
+
 /**
  * Recent-pattern block for post-run (V1.1). Returns "" when pipeline unavailable, errors, or no trends.
  */
@@ -4688,11 +4748,17 @@ function renderProfile() {
   }
 
   if ($("patternCallouts")) {
-    $("patternCallouts").innerHTML = `
+    const patternsMirrorHero = renderPatternsMirrorHeroHtml();
+    if (patternsMirrorHero != null) {
+      $("patternCallouts").innerHTML = patternsMirrorHero;
+      wireMirrorEvidenceToggles($("patternCallouts"));
+    } else {
+      $("patternCallouts").innerHTML = `
       <div class="history-item"><strong>${calloutsWithStarters.headline}</strong></div>
       <div class="history-item">${calloutsWithStarters.support}</div>
       ${calloutsWithStarters.direction ? `<div class="history-item">${calloutsWithStarters.direction}</div>` : ""}
     `;
+    }
   }
 
   if ($("profileActionArea")) {
