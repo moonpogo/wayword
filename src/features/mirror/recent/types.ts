@@ -68,3 +68,9 @@ export interface MirrorRecentTrendCandidate extends MirrorRecentTrend {
 export interface MirrorRecentTrendsResult {
   readonly trends: ReadonlyArray<MirrorRecentTrend>;
 }
+
+/** Durable patterns promoted from digest history + reflective profile string. */
+export interface PatternsProfileFromDigestsResult {
+  readonly promotedPatterns: ReadonlyArray<MirrorRecentTrend>;
+  readonly profile: string | null;
+}
