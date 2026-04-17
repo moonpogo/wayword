@@ -30,6 +30,14 @@
  * **hesitation_qualification**
  * - Headline chosen from a small set by bucket balance (qualify-after-state vs turn/soften vs general).
  * - Full bucket tallies and rate live in evidence only.
+ *
+ * **headline style rules**
+ * - Avoid filler subjects like "this piece" or "the writing" unless necessary.
+ * - Avoid vague abstractions like "realm of ideas."
+ * - Prefer direct contrast where possible.
+ * - Prefer simple phrasing over academic phrasing.
+ * - Headlines should feel like observations, not labels.
+ * - Keep sentences short and structurally clean.
  */
 
 /** Pointer for tooling / search; rules live in this file’s module comment block. */

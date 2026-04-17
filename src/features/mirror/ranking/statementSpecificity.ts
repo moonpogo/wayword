@@ -5,8 +5,9 @@
 
 const GENERIC_FALLBACK_STATEMENTS = new Set(
   [
-    "idea-words and image-words both show up often enough to matter.",
-    "statements are often followed by revision or softening."
+    "both idea-words and image-words appear frequently.",
+    "ideas and concrete detail stay in balance.",
+    "statements are often revised or softened."
   ].map((s) => s.toLowerCase())
 );
 
@@ -19,33 +20,35 @@ function norm(s: string): string {
  */
 export function mirrorStatementSpecificity(statement: string): number {
   const n = norm(statement);
-  if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 25;
+  if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
 
+  // Named recurrence should beat most non-directional observations.
   if (n.includes("returns several times in this draft")) return 100;
 
-  if (n === "the ending tightens noticeably." || n === "the lines lengthen as the piece moves toward its close.") {
-    return 95;
-  }
-  if (n === "the cadence alternates between short and extended lines.") return 90;
-
+  // Directional abstraction movement should lead when present.
   if (
-    n === "language grows more conceptual than scene-based toward the back half." ||
-    n === "objects and detail carry more of the late passage than earlier on."
+    n === "the back half leans more conceptual than scene-based." ||
+    n === "concrete detail carries more of the later passages."
   ) {
+    return 110;
+  }
+
+  // Strong directional cadence changes remain high, but below directional abstraction.
+  if (n === "the ending tightens noticeably." || n === "lines lengthen near the end.") {
     return 90;
   }
+  if (n === "the cadence alternates between short and long lines.") return 84;
 
+  // Non-shift directional abstraction beats generic mixed states.
   if (
-    n === "this piece stays mostly in the realm of ideas." ||
-    n === "the piece is grounded more in objects and detail than in abstraction."
+    n === "ideas dominate over concrete detail." ||
+    n === "concrete detail outweighs abstraction."
   ) {
-    return 85;
+    return 82;
   }
 
-  if (n === "this piece holds ideas and concrete detail in balance.") return 80;
+  if (n === "statements are often qualified just after they’re made.") return 58;
+  if (n === "assertions are often followed by softening.") return 56;
 
-  if (n === "statements are often qualified just after they appear.") return 58;
-  if (n === "assertions are often followed by softening.") return 58;
-
-  return 45;
+  return 40;
 }

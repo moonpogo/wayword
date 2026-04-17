@@ -147,7 +147,7 @@ function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null 
   }
 
   if (c.endExpansion && quarterRatio != null && firstQ != null && lastQ != null) {
-    const statement = "The lines lengthen as the piece moves toward its close.";
+    const statement = "Lines lengthen near the end.";
     const ev: MirrorEvidence[] = [
       {
         text: `Opening-quarter mean ${firstQ.toFixed(1)} words per sentence; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
@@ -164,7 +164,7 @@ function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null 
     c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
 
   if (strongAlternation) {
-    const statement = "The cadence alternates between short and extended lines.";
+    const statement = "The cadence alternates between short and long lines.";
     const ev: MirrorEvidence[] = [
       {
         text: `Short sentences (≤${MIRROR_SHORT_SENTENCE_MAX_WORDS} words): ${c.shortSentenceCount}; long (≥${MIRROR_LONG_SENTENCE_MIN_WORDS} words): ${c.longSentenceCount}; average sentence length ${c.avgSentenceLength.toFixed(1)} words; spread (population variance of sentence word counts) ${c.varianceSentenceLength.toFixed(2)}.`
@@ -195,23 +195,23 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
 
   if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
     if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
-    const statement = "This piece holds ideas and concrete detail in balance.";
+    const statement = "Ideas and concrete detail stay in balance.";
     const ev: MirrorEvidence[] = [{ text: `${metrics} Both half-session rates rise for abstract and concrete lexicon matches (ambiguous direction).` }];
-    const rankScore = 62 + Math.min(34, lex * 2.2);
+    const rankScore = 40 + Math.min(22, lex * 1.6);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
   }
 
   if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
-    const statement = "Language grows more conceptual than scene-based toward the back half.";
+    const statement = "The back half leans more conceptual than scene-based.";
     const ev: MirrorEvidence[] = [{ text: `${metrics} Abstract-lexicon matches pick up in the second half of tokens.` }];
-    const rankScore = 64 + Math.min(36, a.abstractCount * 3.2);
+    const rankScore = 80 + Math.min(20, a.abstractCount * 2.4);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
   }
 
   if (a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
-    const statement = "Objects and detail carry more of the late passage than earlier on.";
+    const statement = "Concrete detail carries more of the later passages.";
     const ev: MirrorEvidence[] = [{ text: `${metrics} Concrete-lexicon matches pick up in the second half of tokens.` }];
-    const rankScore = 64 + Math.min(36, a.concreteCount * 3.2);
+    const rankScore = 80 + Math.min(20, a.concreteCount * 2.4);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
   }
 
@@ -227,27 +227,27 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
       a.concreteCount >= 2;
 
     if (ratioOkIdeas && !ratioOkConcrete) {
-      const statement = "This piece stays mostly in the realm of ideas.";
+      const statement = "Ideas dominate over concrete detail.";
       const ev: MirrorEvidence[] = [{ text: metrics }];
-      const rankScore = 52 + Math.min(34, lex * 2.5);
+      const rankScore = 68 + Math.min(16, lex * 1.8);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
     if (ratioOkIdeasSoft && !ratioOkConcrete) {
-      const statement = "This piece stays mostly in the realm of ideas.";
+      const statement = "Ideas dominate over concrete detail.";
       const ev: MirrorEvidence[] = [{ text: `${metrics} Idea-leaning lexicon signal is present but below the stricter ratio gate.` }];
-      const rankScore = 50 + Math.min(32, lex * 2.5);
+      const rankScore = 64 + Math.min(14, lex * 1.8);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
     if (ratioOkConcrete && !ratioOkIdeas) {
-      const statement = "The piece is grounded more in objects and detail than in abstraction.";
+      const statement = "Concrete detail outweighs abstraction.";
       const ev: MirrorEvidence[] = [{ text: metrics }];
-      const rankScore = 52 + Math.min(34, lex * 2.5);
+      const rankScore = 68 + Math.min(16, lex * 1.8);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
 
-    const statement = "Idea-words and image-words both show up often enough to matter.";
+    const statement = "Both idea-words and image-words appear frequently.";
     const ev: MirrorEvidence[] = [{ text: metrics }];
-    const rankScore = 47 + Math.min(30, lex * 2.35);
+    const rankScore = 34 + Math.min(14, lex * 1.5);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
   }
 
@@ -281,15 +281,15 @@ function tryHesitation(features: MirrorFeatures): MirrorReflectionCandidate | nu
 
   let statement: string;
   if (soft >= turn && h.qualifierCount >= 2) {
-    statement = "Statements are often qualified just after they appear.";
+    statement = "Statements are often qualified just after they\u2019re made.";
   } else if (turn >= soft && turn >= 2 && soft >= 2) {
     statement = "Assertions are often followed by softening.";
   } else {
-    statement = "Statements are often followed by revision or softening.";
+    statement = "Statements are often revised or softened.";
   }
 
   const ev: MirrorEvidence[] = [{ text: tallies }];
-  let rankScore = Math.min(100, 30 + total * 4 + per100);
+  let rankScore = Math.min(54, 24 + total * 2.2 + per100 * 0.7);
   if (soft < 3 && turn >= 2) rankScore -= 10;
   return candidate("hesitation_qualification", features.sessionId, statement, ev, rankScore);
 }

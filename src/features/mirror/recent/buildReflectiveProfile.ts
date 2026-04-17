@@ -26,7 +26,7 @@ function clauseFor(pattern: MirrorRecentTrend): string | null {
     case "recent_abstraction_lean":
       return "Language leans toward ideas over scenes";
     case "recent_hesitation_qualification":
-      return "Statements are often qualified just after they appear";
+      return "Statements are often qualified just after they’re made";
     default:
       return null;
   }
@@ -43,7 +43,7 @@ function standaloneSentence(pattern: MirrorRecentTrend): string | null {
     case "recent_abstraction_lean":
       return "Language leans toward ideas over scenes.";
     case "recent_hesitation_qualification":
-      return "Statements are often qualified just after they appear.";
+      return "Statements are often qualified just after they’re made.";
     default:
       return null;
   }
