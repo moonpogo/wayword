@@ -2712,6 +2712,10 @@ html[data-theme="dark"] .recent-drawer{
 }
 
 .recent-entry-expanded{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:12px;
   margin-top:10px;
   padding-top:10px;
   border-top:1px solid color-mix(in srgb, var(--line) 64%, transparent);
@@ -2726,7 +2730,7 @@ html[data-theme="dark"] .recent-drawer{
   max-width:100%;
   min-width:0;
   box-sizing:border-box;
-  margin-top:10px;
+  margin-top:0;
   text-align:left;
 }
 
@@ -2743,19 +2747,37 @@ html[data-theme="dark"] .recent-drawer{
   box-shadow:none;
 }
 
+.recent-entry-prompt-wrap{
+  margin:0;
+}
+
+.recent-entry-prompt-kicker{
+  margin:0 0 4px;
+  font-size:9.5px;
+  font-weight:500;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  opacity:0.62;
+  line-height:1.15;
+}
+
 .recent-entry-prompt{
-  font-size:15px;
-  line-height:1.6;
+  margin:0;
+  font-size:12.5px;
+  line-height:1.48;
   font-weight:400;
+  color:color-mix(in srgb, var(--muted) 34%, var(--ink));
   white-space:pre-wrap;
 }
 
 .recent-entry-results{
   display:flex;
   flex-direction:column;
-  align-items:center;
+  align-items:stretch;
+  gap:20px;
   width:100%;
-  margin-top:12px;
+  margin-top:0;
 }
 
 .recent-entry-mirror{
@@ -2769,14 +2791,137 @@ html[data-theme="dark"] .recent-drawer{
 
 .recent-entry-stats{
   margin-top:0;
-  margin-bottom:16px;
+  margin-bottom:0;
   display:flex;
   flex-direction:column;
   align-items:center;
   gap:4px;
   width:100%;
   max-width:22rem;
+  margin-left:auto;
+  margin-right:auto;
   text-align:center;
+}
+
+/* Demoted run score: quiet metadata under Mirror (Recent Writing drawer / rail) */
+.recent-entry-stats.recent-entry-stats--demoted{
+  max-width:18.5rem;
+  padding-top:0;
+  border-top:0;
+  gap:2px;
+  opacity:1;
+}
+
+/* Score strip is always first inside `.recent-entry-results` (reflection + prompt live above). */
+.recent-entry-results > .recent-entry-stats.recent-entry-stats--demoted{
+  margin-top:0;
+  padding-top:12px;
+  border-top:1px solid color-mix(in srgb, var(--line) 48%, transparent);
+}
+
+.recent-entry-stats--demoted .recent-entry-stats-label{
+  font-size:8px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+  opacity:0.52;
+  line-height:1.25;
+}
+
+.recent-entry-stats--demoted .recent-entry-stats-score{
+  font-size:clamp(15px, 3.6vw, 19px);
+  font-weight:600;
+  letter-spacing:-0.015em;
+  line-height:1.05;
+  color:color-mix(in srgb, var(--muted) 58%, var(--ink));
+}
+
+.recent-entry-stats--demoted .recent-entry-stats-words{
+  font-size:10px;
+  font-weight:400;
+  line-height:1.25;
+  color:color-mix(in srgb, var(--muted) 72%, var(--ink));
+  opacity:0.92;
+}
+
+.recent-entry-stats--demoted .recent-entry-stats-row{
+  gap:5px 10px;
+  margin-top:1px;
+}
+
+.recent-entry-stats--demoted .recent-entry-score-meters{
+  max-width:16.75rem;
+  gap:5px 6px;
+  margin-top:1px;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter{
+  gap:0;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter-svg{
+  max-width:30px;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter-track{
+  stroke-width:2.1;
+  stroke-opacity:0.58;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter-fill{
+  stroke-width:2.1;
+  stroke:color-mix(in srgb, var(--muted) 35%, var(--ink));
+  stroke-opacity:0.32;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter--max .recent-entry-meter-fill{
+  stroke:color-mix(in srgb, var(--success) 52%, var(--muted));
+  stroke-opacity:0.44;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter-value{
+  font-size:9px;
+  font-weight:500;
+  font-variant-numeric:tabular-nums;
+  color:color-mix(in srgb, var(--muted) 48%, var(--ink));
+  line-height:1.1;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter-label{
+  font-size:7.5px;
+  letter-spacing:0.03em;
+  color:color-mix(in srgb, var(--muted) 88%, var(--ink));
+  opacity:0.78;
+  line-height:1.12;
+}
+
+/* Softer category arcs: less saturation than default meters */
+.recent-entry-stats--demoted .recent-entry-meter--filler .recent-entry-meter-fill{
+  stroke:color-mix(in srgb, var(--color-filler) 38%, var(--muted));
+  stroke-opacity:0.48;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter--repetition .recent-entry-meter-fill{
+  stroke:color-mix(in srgb, var(--color-repetition) 38%, var(--muted));
+  stroke-opacity:0.48;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter--openings .recent-entry-meter-fill{
+  stroke:color-mix(in srgb, var(--color-openings) 38%, var(--muted));
+  stroke-opacity:0.48;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter--filler.recent-entry-meter--max .recent-entry-meter-fill,
+.recent-entry-stats--demoted .recent-entry-meter--repetition.recent-entry-meter--max .recent-entry-meter-fill,
+.recent-entry-stats--demoted .recent-entry-meter--openings.recent-entry-meter--max .recent-entry-meter-fill{
+  stroke-opacity:0.54;
+}
+
+.recent-entry-stats--demoted .recent-entry-meter--filler .recent-entry-meter-label,
+.recent-entry-stats--demoted .recent-entry-meter--repetition .recent-entry-meter-label,
+.recent-entry-stats--demoted .recent-entry-meter--openings .recent-entry-meter-label{
+  color:color-mix(in srgb, var(--muted) 90%, var(--ink));
+  opacity:0.76;
 }
 
 .recent-entry-stats-label{
@@ -2945,7 +3090,7 @@ html[data-theme="dark"] .recent-drawer{
 }
 
 .recent-entry-detail{
-  margin-top:15px;
+  margin-top:0;
   width:100%;
   display:flex;
   justify-content:center;
@@ -3217,6 +3362,13 @@ html[data-theme="dark"] .profile-hero{
 
 .patterns-repeated-challenge__title{
   margin-bottom:10px;
+}
+
+.patterns-repeated-tool-note{
+  margin:0 0 10px;
+  font-size:12px;
+  line-height:1.45;
+  color:var(--muted);
 }
 
 .patterns-challenge-block{
@@ -5141,7 +5293,7 @@ html[data-theme="dark"] .metric-explainer{
   opacity:0.88;
 }
 
-/* Recent drawer / rail: keep mirror subordinate to run detail */
+/* Recent drawer / rail: reflection is the primary read inside expanded results */
 .recent-entry-mirror .mirror-reflection-root{
   width:100%;
   max-width:100%;
@@ -5153,8 +5305,11 @@ html[data-theme="dark"] .metric-explainer{
 }
 
 .recent-entry-mirror .mirror-reflection-eyebrow{
-  font-size:0.62rem;
-  margin-bottom:0.45rem;
+  font-size:0.7rem;
+  font-weight:600;
+  letter-spacing:0.07em;
+  color:color-mix(in srgb, var(--ink) 52%, var(--muted));
+  margin-bottom:0.5rem;
 }
 
 .recent-entry-mirror .mirror-stack,

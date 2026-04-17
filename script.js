@@ -74,7 +74,7 @@ const CALIBRATION_THRESHOLD = 5;
 const CALIBRATION_MIN_WORDS = 40;
 const CALIBRATION_MIN_SENTENCE_UNITS = 3;
 const CALIBRATION_INSUFFICIENT_COPY =
-  "Add a little more writing so the system can reflect your patterns more clearly.";
+  "Add a little more writing so the next save has enough to echo back clearly.";
 
 /** Zen garden entry (wordmark toggle). Set to true when the garden is ready to ship. */
 const ZEN_GARDEN_OPENABLE = false;
@@ -96,80 +96,8 @@ const WAYWORD_DEV_CALIBRATION_RESET_ENABLED =
     new URLSearchParams(location.search).get("waywordDev") === "1" ||
     /\.vercel\.app$/i.test(location.hostname || ""));
 
-const WAYWORD_DEBUG_PATTERNS_TRANSITIONS_ENABLED =
-  typeof location !== "undefined" &&
-  (() => {
-    try {
-      const params = new URLSearchParams(location.search);
-      if (params.get("debugPatterns") === "1") return true;
-      if (params.get("debugPatterns") === "0") return false;
-      return localStorage.getItem("waywordDebugPatterns") === "1";
-    } catch (_) {
-      return false;
-    }
-  })();
-
-function logPatternsTransitionSnapshot(label, extra = {}) {
-  if (!WAYWORD_DEBUG_PATTERNS_TRANSITIONS_ENABLED) return;
-  const root = document.documentElement;
-  const body = document.body;
-  const appView = $("appView");
-  const writeView = $("writeView");
-  const profileView = $("profileView");
-  const mainColumn = document.querySelector("#writeView .main-column");
-  const belowEditorStack = document.querySelector(".below-editor-stack");
-  const appShell = document.querySelector(".app-shell");
-  const vv = window.visualViewport || null;
-  const rootStyle = getComputedStyle(root);
-  const appRect = appView?.getBoundingClientRect() || null;
-  const mainRect = mainColumn?.getBoundingClientRect() || null;
-  const belowRect = belowEditorStack?.getBoundingClientRect() || null;
-  const profileRect = profileView?.getBoundingClientRect() || null;
-  const payload = {
-    label,
-    now: Math.round(performance.now()),
-    classes: {
-      html: root.className,
-      body: body.className,
-      appShell: appShell?.className || "",
-      appView: appView?.className || "",
-      writeView: writeView?.className || "",
-      profileView: profileView?.className || ""
-    },
-    flags: {
-      isMobileViewport: isMobileViewport(),
-      focusMode: body.classList.contains("focus-mode"),
-      keyboardOpen: body.classList.contains("keyboard-open"),
-      patternsOpen: body.classList.contains("patterns-open"),
-      profileHidden: Boolean(profileView?.classList.contains("hidden")),
-      writeHidden: Boolean(writeView?.classList.contains("hidden")),
-      expandedFieldClass: body.classList.contains("expanded-field"),
-      expandedFieldState: state.isExpandedField
-    },
-    cssVars: {
-      vvh: rootStyle.getPropertyValue("--vvh").trim(),
-      vvOffsetTop: rootStyle.getPropertyValue("--vv-offset-top").trim(),
-      windowInnerHeightVar: rootStyle.getPropertyValue("--window-inner-height").trim()
-    },
-    viewport: {
-      innerHeight: window.innerHeight,
-      vvHeight: vv ? Math.round(vv.height) : null,
-      vvOffsetTop: vv ? Math.round(vv.offsetTop) : null,
-      vvPageTop: vv ? Math.round(vv.pageTop) : null
-    },
-    geometry: {
-      appTop: appRect ? Math.round(appRect.top) : null,
-      appHeight: appRect ? Math.round(appRect.height) : null,
-      mainTop: mainRect ? Math.round(mainRect.top) : null,
-      mainHeight: mainRect ? Math.round(mainRect.height) : null,
-      belowTop: belowRect ? Math.round(belowRect.top) : null,
-      belowHeight: belowRect ? Math.round(belowRect.height) : null,
-      profileTop: profileRect ? Math.round(profileRect.top) : null,
-      profileHeight: profileRect ? Math.round(profileRect.height) : null
-    },
-    extra
-  };
-  console.log("[patterns-debug]", payload);
+function logPatternsTransitionSnapshot(_label, _extra = {}) {
+  /* Intentionally empty: patterns layout snapshots were removed from default builds. */
 }
 
 const PROMPT_REROLL_LIMIT = 2;
@@ -3144,7 +3072,7 @@ function renderWritingState(options = {}) {
   editorInput.setAttribute(
     "data-placeholder",
     state.active && !state.submitted && !getEditorText().trim()
-      ? "Write freely. Submit when you're done. Marked words show patterns in this run."
+      ? "Write freely. Submit when you're done. Highlights flag filler, repetition, and openings in this run."
       : ""
   );
   editorInput.classList.toggle("is-empty", !getEditorText().trim());
@@ -3231,7 +3159,7 @@ function getRecentEntries() {
   return state.history.map((entry) => ({ text: String(entry?.text || "") }));
 }
 
-function analyzeText(text) {
+function analyzeDraftStats(text) {
   const raw = String(text || "");
   const sentenceParts = raw
     .split(/[.!?]+/)
@@ -3301,7 +3229,7 @@ function buildBaseline(entries) {
   let totalRepetitionCount = 0;
 
   for (const entry of source) {
-    const metrics = analyzeText(String(entry?.text || ""));
+    const metrics = analyzeDraftStats(String(entry?.text || ""));
     totalAvgSentenceLength += metrics.avgSentenceLength;
     totalFragmentCount += metrics.fragmentCount;
     totalRepetitionCount += metrics.repetitionCount;
@@ -3342,7 +3270,7 @@ function pickCalibrationObservationPhrase(phrases, seed) {
  */
 function selectCalibrationObservation(text, priorEntries) {
   const raw = String(text || "").trim();
-  const t = analyzeText(raw);
+  const t = analyzeDraftStats(raw);
   const baseline = buildBaseline(priorEntries);
   const seed =
     (t.totalWords || 0) * 131 +
@@ -3507,9 +3435,18 @@ function mirrorPatternsProfileAvailable() {
   );
 }
 
+/** Quiet Patterns hero when digest-backed reflection has nothing to echo yet. */
+function patternsMirrorHeroEmptyHtml() {
+  return (
+    '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
+    '<p class="patterns-mirror-empty">Nothing across your saved runs stood out enough to echo back yet.</p>' +
+    "</div>"
+  );
+}
+
 /**
- * Patterns hero: reflective profile + promoted Mirror cards, or a quiet empty state.
- * Returns `null` to fall back to legacy `buildPatternCallouts` copy in `#patternCallouts`.
+ * Patterns hero: digest-backed profile line + promoted reflection cards, or a quiet empty state.
+ * Returns `null` only when the mirror bundle does not expose `getPatternsProfileFromDigests` (legacy builds).
  */
 function renderPatternsMirrorHeroHtml() {
   if (!mirrorPatternsProfileAvailable()) {
@@ -3519,10 +3456,10 @@ function renderPatternsMirrorHeroHtml() {
   try {
     result = globalThis.WaywordMirror.getPatternsProfileFromDigests(collectMirrorSessionDigestsFromHistory());
   } catch (_) {
-    return null;
+    return patternsMirrorHeroEmptyHtml();
   }
   if (!result || typeof result !== "object") {
-    return null;
+    return patternsMirrorHeroEmptyHtml();
   }
 
   const promoted = Array.isArray(result.promotedPatterns) ? result.promotedPatterns : [];
@@ -3551,11 +3488,7 @@ function renderPatternsMirrorHeroHtml() {
     return parts.join("");
   }
 
-  return (
-    '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
-    '<p class="patterns-mirror-empty">Nothing has held long enough to define your writing yet.</p>' +
-    "</div>"
-  );
+  return patternsMirrorHeroEmptyHtml();
 }
 
 /**
@@ -3568,11 +3501,6 @@ function buildMirrorRecentTrendsBlockHtml(idPrefix) {
     result = globalThis.WaywordMirror.runMirrorRecentTrendsPipeline(collectMirrorSessionDigestsFromHistory());
   } catch (_) {
     return "";
-  }
-  const W = globalThis.WaywordMirror;
-  if (W && typeof W.buildReflectiveProfile === "function") {
-    const trends = result && Array.isArray(result.trends) ? result.trends : [];
-    console.log(W.buildReflectiveProfile(trends));
   }
   if (!result || !Array.isArray(result.trends) || result.trends.length === 0) {
     return "";
@@ -3704,7 +3632,7 @@ function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix }) {
   const hasSupport = supporting.some((c) => c && String(c.statement || "").trim());
 
   if (!hasMain && !hasSupport) {
-    return '<p class="mirror-empty">Nothing stood out in this run.</p>';
+    return '<p class="mirror-empty">Nothing in this run stood out enough to echo back.</p>';
   }
 
   const parts = [];
@@ -4119,8 +4047,8 @@ function formatRecentEntryScoreBlock(item) {
   const words = item.wordCount ?? item.words ?? 0;
   const wordsLabel = Number(words) === 1 ? "word" : "words";
   const sb = item.scoreBreakdown;
-  let html = `<div class="recent-entry-stats">
-    <div class="recent-entry-stats-label">Run score</div>
+  let html = `<div class="recent-entry-stats recent-entry-stats--demoted">
+    <div class="recent-entry-stats-label">Numbers for this run</div>
     <div class="recent-entry-stats-row">
       <span class="recent-entry-stats-score">${escapeHtml(String(total))}</span>
       <span class="recent-entry-stats-words">${escapeHtml(String(words))} ${wordsLabel}</span>
@@ -4267,8 +4195,10 @@ function renderHistory() {
         const idPrefix = `mirror-${listKey}-${idx}-${item.runId || "run"}`;
         const mirrorBlock = formatRecentEntryMirrorHtml(item, idPrefix);
         const mirrorWrap = mirrorBlock
-          ? `<div class="recent-entry-reflection" aria-label="Reflection">${mirrorBlock}</div>`
+          ? `<div class="recent-entry-reflection" aria-label="Reflection for this run">${mirrorBlock}</div>`
           : "";
+        const draftRaw = String(item.text || "").trim();
+        const draftDisplay = draftRaw || "Draft text wasn’t kept on this device.";
         return `
           <div
             class="recent-entry"
@@ -4282,10 +4212,13 @@ function renderHistory() {
               ${meta}
             </div>
             <div class="recent-entry-expanded" hidden>
-              <div class="recent-entry-prompt">${escapeHtml((item.text || "").trim() || "Writing text wasn’t saved for this run.")}</div>
+              ${mirrorWrap}
+              <div class="recent-entry-prompt-wrap">
+                <div class="recent-entry-prompt-kicker">Saved draft</div>
+                <div class="recent-entry-prompt">${escapeHtml(draftDisplay)}</div>
+              </div>
               <div class="recent-entry-results">
                 ${scoreBlock}
-                ${mirrorWrap}
                 <div class="recent-entry-detail">${detail}</div>
               </div>
               <div class="recent-entry-future-meta" aria-hidden="true"></div>
@@ -4301,7 +4234,9 @@ function renderHistory() {
     allLists.forEach((list) => {
       const isDrawer = list.id === "recentDrawerList";
       const showEmpty = isDrawer ? drawerOpen : isDesktopPatternsViewport();
-      list.innerHTML = showEmpty ? `<div class="recent-drawer-empty">No runs yet.</div>` : "";
+      list.innerHTML = showEmpty
+        ? `<div class="recent-drawer-empty">Nothing saved to review yet.</div>`
+        : "";
     });
     if (trigger) {
       trigger.disabled = false;
@@ -4465,9 +4400,9 @@ function renderProfileLocked() {
 
   const lockedHtml = `
     <div class="profile-locked">
-      <div class="profile-locked-title">Profile forming.</div>
-      <div class="profile-locked-copy">You need ${remaining} more ${remaining === 1 ? "round" : "rounds"} before your first reliable read.</div>
-      <div class="profile-locked-copy">${runs} of ${CALIBRATION_THRESHOLD} completed.</div>
+      <div class="profile-locked-title">Almost there</div>
+      <div class="profile-locked-copy">Save ${remaining} more ${remaining === 1 ? "run" : "runs"} to open reflection across your saved drafts here.</div>
+      <div class="profile-locked-copy">${runs} of ${CALIBRATION_THRESHOLD} saved.</div>
     </div>
   `;
 
@@ -4542,9 +4477,9 @@ function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStart
   }
 
   return {
-    headline: "Your pattern is still forming.",
-    support: "There is enough structure to continue, but not enough yet for a sharper read.",
-    direction: "Do a few more runs under pressure and the profile will start to speak more clearly.",
+    headline: "Not much to echo back yet.",
+    support: "There is enough to continue, but not enough saved material yet for a sharper read.",
+    direction: "A few more saved drafts give reflection across runs more to hold onto.",
     suggestedExerciseWord: ""
   };
 }
@@ -4622,7 +4557,6 @@ function renderProfile() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
 
-  const calloutsWithStarters = buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters);
   const suggestedChallengeWord = buildRepeatedWordChallengeSuggestion(topWords);
   const topRepeatedWords = topWords.map(([word]) => word);
   const topRepeatedWordsSet = new Set(topRepeatedWords);
@@ -4670,6 +4604,7 @@ function renderProfile() {
 
     patternsUtilityRoot.innerHTML = `
       <div class="section-title card-section-title patterns-repeated-challenge__title">Repeated words</div>
+      <p class="patterns-repeated-tool-note">Saved-run word counts — for choosing a practice challenge below.</p>
       ${wordsHtml}
       ${challengeHtml}
     `;
@@ -4690,12 +4625,20 @@ function renderProfile() {
   }
 
   if ($("patternCallouts")) {
-    const patternsMirrorHero = renderPatternsMirrorHeroHtml();
-    if (patternsMirrorHero != null) {
-      $("patternCallouts").innerHTML = patternsMirrorHero;
+    if (mirrorPatternsProfileAvailable()) {
+      const patternsMirrorHero = renderPatternsMirrorHeroHtml();
+      $("patternCallouts").innerHTML =
+        patternsMirrorHero != null ? patternsMirrorHero : patternsMirrorHeroEmptyHtml();
       wireMirrorEvidenceToggles($("patternCallouts"));
       collapseMirrorEvidenceInRoot($("patternCallouts"));
     } else {
+      const calloutsWithStarters = buildPatternCallouts(
+        agg,
+        avgUniqueRatio,
+        avgFiller,
+        topWords,
+        topStarters
+      );
       $("patternCallouts").innerHTML = `
       <div class="history-item"><strong>${calloutsWithStarters.headline}</strong></div>
       <div class="history-item">${calloutsWithStarters.support}</div>
@@ -5679,27 +5622,6 @@ if (WAYWORD_DEV_CALIBRATION_RESET_ENABLED) {
   } catch (_) {
     /* ignore */
   }
-}
-
-if (WAYWORD_DEBUG_PATTERNS_TRANSITIONS_ENABLED) {
-  window.waywordDebugPatterns = {
-    snapshot: (label = "manual") => logPatternsTransitionSnapshot(label),
-    enable() {
-      try {
-        localStorage.setItem("waywordDebugPatterns", "1");
-      } catch (_) {
-        /* ignore */
-      }
-    },
-    disable() {
-      try {
-        localStorage.removeItem("waywordDebugPatterns");
-      } catch (_) {
-        /* ignore */
-      }
-    }
-  };
-  logPatternsTransitionSnapshot("debugPatterns:boot");
 }
 
 window.addEventListener("resize", queueViewportSync);
