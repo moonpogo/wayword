@@ -20,6 +20,21 @@ import {
   MIRROR_GEN_REPETITION_TOP_MIN_COUNT
 } from "../constants/generationThresholds.js";
 import {
+  MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL,
+  MIRROR_HEADLINE_ABSTRACTION_BALANCE,
+  MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT,
+  MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER,
+  MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS,
+  MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE,
+  MIRROR_HEADLINE_CADENCE_ALTERNATION,
+  MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
+  MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
+  MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
+  MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
+  MIRROR_HEADLINE_HESITATION_REVISED,
+  mirrorHeadlineRepetitionNamed
+} from "../constants/mirrorSessionHeadlines.js";
+import {
   MIRROR_LONG_SENTENCE_MIN_WORDS,
   MIRROR_SHORT_SENTENCE_MAX_WORDS
 } from "../constants/thresholds.js";
@@ -117,7 +132,7 @@ function tryRepetition(
   if (tie) namedEv.push(snippetAround(sourceText, tie.word));
   namedEv.push(repetitionTopCountsEvidence(features));
 
-  const statement = `“${picked.word}” returns several times in this draft.`;
+  const statement = mirrorHeadlineRepetitionNamed(picked.word);
   const multiNamed = list.filter(
     (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
   ).length;
@@ -136,7 +151,7 @@ function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null 
     firstQ != null && lastQ != null && firstQ > 0 ? lastQ / firstQ : null;
 
   if (c.endCompression && quarterRatio != null && firstQ != null && lastQ != null) {
-    const statement = "The ending tightens noticeably.";
+    const statement = MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS;
     const ev: MirrorEvidence[] = [
       {
         text: `Opening-quarter mean sentence length ${firstQ.toFixed(1)} words; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
@@ -147,7 +162,7 @@ function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null 
   }
 
   if (c.endExpansion && quarterRatio != null && firstQ != null && lastQ != null) {
-    const statement = "Lines lengthen near the end.";
+    const statement = MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN;
     const ev: MirrorEvidence[] = [
       {
         text: `Opening-quarter mean ${firstQ.toFixed(1)} words per sentence; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
@@ -164,7 +179,7 @@ function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null 
     c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
 
   if (strongAlternation) {
-    const statement = "The cadence alternates between short and long lines.";
+    const statement = MIRROR_HEADLINE_CADENCE_ALTERNATION;
     const ev: MirrorEvidence[] = [
       {
         text: `Short sentences (≤${MIRROR_SHORT_SENTENCE_MAX_WORDS} words): ${c.shortSentenceCount}; long (≥${MIRROR_LONG_SENTENCE_MIN_WORDS} words): ${c.longSentenceCount}; average sentence length ${c.avgSentenceLength.toFixed(1)} words; spread (population variance of sentence word counts) ${c.varianceSentenceLength.toFixed(2)}.`
@@ -195,21 +210,21 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
 
   if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
     if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
-    const statement = "Ideas and concrete detail stay in balance.";
+    const statement = MIRROR_HEADLINE_ABSTRACTION_BALANCE;
     const ev: MirrorEvidence[] = [{ text: `${metrics} Both half-session rates rise for abstract and concrete lexicon matches (ambiguous direction).` }];
     const rankScore = 40 + Math.min(22, lex * 1.6);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
   }
 
   if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
-    const statement = "The back half leans more conceptual than scene-based.";
+    const statement = MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL;
     const ev: MirrorEvidence[] = [{ text: `${metrics} Abstract-lexicon matches pick up in the second half of tokens.` }];
     const rankScore = 80 + Math.min(20, a.abstractCount * 2.4);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
   }
 
   if (a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
-    const statement = "Concrete detail carries more of the later passages.";
+    const statement = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER;
     const ev: MirrorEvidence[] = [{ text: `${metrics} Concrete-lexicon matches pick up in the second half of tokens.` }];
     const rankScore = 80 + Math.min(20, a.concreteCount * 2.4);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
@@ -227,25 +242,25 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
       a.concreteCount >= 2;
 
     if (ratioOkIdeas && !ratioOkConcrete) {
-      const statement = "Ideas dominate over concrete detail.";
+      const statement = MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE;
       const ev: MirrorEvidence[] = [{ text: metrics }];
       const rankScore = 68 + Math.min(16, lex * 1.8);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
     if (ratioOkIdeasSoft && !ratioOkConcrete) {
-      const statement = "Ideas dominate over concrete detail.";
+      const statement = MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE;
       const ev: MirrorEvidence[] = [{ text: `${metrics} Idea-leaning lexicon signal is present but below the stricter ratio gate.` }];
       const rankScore = 64 + Math.min(14, lex * 1.8);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
     if (ratioOkConcrete && !ratioOkIdeas) {
-      const statement = "Concrete detail outweighs abstraction.";
+      const statement = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS;
       const ev: MirrorEvidence[] = [{ text: metrics }];
       const rankScore = 68 + Math.min(16, lex * 1.8);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
 
-    const statement = "Both idea-words and image-words appear frequently.";
+    const statement = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT;
     const ev: MirrorEvidence[] = [{ text: metrics }];
     const rankScore = 34 + Math.min(14, lex * 1.5);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
@@ -281,11 +296,11 @@ function tryHesitation(features: MirrorFeatures): MirrorReflectionCandidate | nu
 
   let statement: string;
   if (soft >= turn && h.qualifierCount >= 2) {
-    statement = "Statements are often qualified just after they\u2019re made.";
+    statement = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER;
   } else if (turn >= soft && turn >= 2 && soft >= 2) {
-    statement = "Assertions are often followed by softening.";
+    statement = MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING;
   } else {
-    statement = "Statements are often revised or softened.";
+    statement = MIRROR_HEADLINE_HESITATION_REVISED;
   }
 
   const ev: MirrorEvidence[] = [{ text: tallies }];

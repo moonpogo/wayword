@@ -1,9 +1,25 @@
+import {
+  MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL,
+  MIRROR_HEADLINE_ABSTRACTION_BALANCE,
+  MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT,
+  MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER,
+  MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS,
+  MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE,
+  MIRROR_HEADLINE_CADENCE_ALTERNATION,
+  MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
+  MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
+  MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
+  MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
+  MIRROR_HEADLINE_HESITATION_REVISED,
+  MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER,
+  normMirrorReflectionHeadline
+} from "../constants/mirrorSessionHeadlines.js";
 import { MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA } from "../constants/selectionThresholds.js";
 import type { MirrorCategoryV1, MirrorReflectionCandidate } from "../types/mirrorTypes.js";
 import { mirrorStatementSpecificity } from "./statementSpecificity.js";
 
 function norm(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
+  return normMirrorReflectionHeadline(s);
 }
 
 /**
@@ -15,41 +31,41 @@ function rankingWeight(candidate: MirrorReflectionCandidate): number {
 
   // Lower-priority abstraction states should not outrank directional observations.
   if (
-    s === "ideas and concrete detail stay in balance." ||
-    s === "both idea-words and image-words appear frequently."
+    s === norm(MIRROR_HEADLINE_ABSTRACTION_BALANCE) ||
+    s === norm(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)
   ) {
     return -28;
   }
 
   // Highest-priority directional abstraction movement and directional abstraction dominance.
   if (
-    s === "the back half leans more conceptual than scene-based." ||
-    s === "concrete detail carries more of the later passages." ||
-    s === "ideas dominate over concrete detail." ||
-    s === "concrete detail outweighs abstraction."
+    s === norm(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) ||
+    s === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER) ||
+    s === norm(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) ||
+    s === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)
   ) {
     return 34;
   }
 
   // Named recurrence should remain near the top.
-  if (s.includes("returns several times in this draft")) {
+  if (s.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) {
     return 30;
   }
 
   // Medium-priority cadence movement.
   if (
-    s === "the ending tightens noticeably." ||
-    s === "lines lengthen near the end." ||
-    s === "the cadence alternates between short and long lines."
+    s === norm(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS) ||
+    s === norm(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN) ||
+    s === norm(MIRROR_HEADLINE_CADENCE_ALTERNATION)
   ) {
     return 18;
   }
 
   // Medium-priority hesitation / qualification patterns.
   if (
-    s === "statements are often qualified just after they’re made." ||
-    s === "assertions are often followed by softening." ||
-    s === "statements are often revised or softened."
+    s === norm(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) ||
+    s === norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) ||
+    s === norm(MIRROR_HEADLINE_HESITATION_REVISED)
   ) {
     return 10;
   }

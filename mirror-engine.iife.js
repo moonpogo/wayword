@@ -494,6 +494,32 @@ var WaywordMirror = (() => {
   var MIRROR_GEN_HESITATION_MIN_TOTAL = 6;
   var MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS = 1.5;
 
+  // src/features/mirror/constants/mirrorSessionHeadlines.ts
+  function normMirrorReflectionHeadline(s) {
+    return s.trim().toLowerCase().replace(/\s+/g, " ");
+  }
+  var MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times in this draft";
+  function mirrorHeadlineRepetitionNamed(word) {
+    return `\u201C${word}\u201D ${MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER}.`;
+  }
+  var MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS = "The ending tightens noticeably.";
+  var MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN = "Lines lengthen near the end.";
+  var MIRROR_HEADLINE_CADENCE_ALTERNATION = "The cadence alternates between short and long lines.";
+  var MIRROR_HEADLINE_ABSTRACTION_BALANCE = "Ideas and concrete detail stay in balance.";
+  var MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL = "The back half leans more conceptual than scene-based.";
+  var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER = "Concrete detail carries more of the later passages.";
+  var MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "Ideas dominate over concrete detail.";
+  var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Concrete detail outweighs abstraction.";
+  var MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT = "Both idea-words and image-words appear frequently.";
+  var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER = "Statements are often qualified just after they\u2019re made.";
+  var MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertions are often followed by softening.";
+  var MIRROR_HEADLINE_HESITATION_REVISED = "Statements are often revised or softened.";
+  var MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS = [
+    MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT,
+    MIRROR_HEADLINE_ABSTRACTION_BALANCE,
+    MIRROR_HEADLINE_HESITATION_REVISED
+  ];
+
   // src/features/mirror/generation/buildReflectionCandidates.ts
   function snippetAround(text, needle, radius = 36) {
     const t = text;
@@ -553,7 +579,7 @@ var WaywordMirror = (() => {
     );
     if (tie) namedEv.push(snippetAround(sourceText, tie.word));
     namedEv.push(repetitionTopCountsEvidence(features));
-    const statement = `You return several times to \u201C${picked.word}.\u201D`;
+    const statement = mirrorHeadlineRepetitionNamed(picked.word);
     const multiNamed = list.filter(
       (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
     ).length;
@@ -568,7 +594,7 @@ var WaywordMirror = (() => {
     const lastQ = c.meanSentenceLengthLastQuarterWords;
     const quarterRatio = firstQ != null && lastQ != null && firstQ > 0 ? lastQ / firstQ : null;
     if (c.endCompression && quarterRatio != null && firstQ != null && lastQ != null) {
-      const statement = "The ending tightens noticeably.";
+      const statement = MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS;
       const ev = [
         {
           text: `Opening-quarter mean sentence length ${firstQ.toFixed(1)} words; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
@@ -578,7 +604,7 @@ var WaywordMirror = (() => {
       return candidate("cadence", features.sessionId, statement, ev, rankScore);
     }
     if (c.endExpansion && quarterRatio != null && firstQ != null && lastQ != null) {
-      const statement = "The lines lengthen as the piece moves toward its close.";
+      const statement = MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN;
       const ev = [
         {
           text: `Opening-quarter mean ${firstQ.toFixed(1)} words per sentence; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
@@ -589,7 +615,7 @@ var WaywordMirror = (() => {
     }
     const strongAlternation = features.sentenceCount >= MIRROR_GEN_CADENCE_MIN_SENTENCES && c.shortSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT && c.longSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG && c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
     if (strongAlternation) {
-      const statement = "The cadence alternates between short and extended lines.";
+      const statement = MIRROR_HEADLINE_CADENCE_ALTERNATION;
       const ev = [
         {
           text: `Short sentences (\u2264${MIRROR_SHORT_SENTENCE_MAX_WORDS} words): ${c.shortSentenceCount}; long (\u2265${MIRROR_LONG_SENTENCE_MIN_WORDS} words): ${c.longSentenceCount}; average sentence length ${c.avgSentenceLength.toFixed(1)} words; spread (population variance of sentence word counts) ${c.varianceSentenceLength.toFixed(2)}.`
@@ -610,21 +636,21 @@ var WaywordMirror = (() => {
     const metrics = `Abstract lexicon hits ${a.abstractCount}; concrete ${a.concreteCount}; ratio ${a.abstractConcreteRatio.toFixed(2)}.`;
     if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
       if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
-      const statement = "This piece holds ideas and concrete detail in balance.";
+      const statement = MIRROR_HEADLINE_ABSTRACTION_BALANCE;
       const ev = [{ text: `${metrics} Both half-session rates rise for abstract and concrete lexicon matches (ambiguous direction).` }];
-      const rankScore = 62 + Math.min(34, lex * 2.2);
+      const rankScore = 40 + Math.min(22, lex * 1.6);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
     if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
-      const statement = "The writing leans more conceptual than scene-based toward the back half.";
+      const statement = MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL;
       const ev = [{ text: `${metrics} Abstract-lexicon matches pick up in the second half of tokens.` }];
-      const rankScore = 64 + Math.min(36, a.abstractCount * 3.2);
+      const rankScore = 80 + Math.min(20, a.abstractCount * 2.4);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
     if (a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
-      const statement = "Objects and detail carry more of the late passage than earlier on.";
+      const statement = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER;
       const ev = [{ text: `${metrics} Concrete-lexicon matches pick up in the second half of tokens.` }];
-      const rankScore = 64 + Math.min(36, a.concreteCount * 3.2);
+      const rankScore = 80 + Math.min(20, a.concreteCount * 2.4);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
     if (lex >= MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) {
@@ -632,26 +658,26 @@ var WaywordMirror = (() => {
       const ratioOkIdeasSoft = !ratioOkIdeas && a.abstractCount >= 3 && a.abstractConcreteRatio >= 1.06;
       const ratioOkConcrete = a.concreteCount >= MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO * Math.max(a.abstractCount, 1) && a.concreteCount >= 2;
       if (ratioOkIdeas && !ratioOkConcrete) {
-        const statement2 = "This piece stays mostly in the realm of ideas.";
+        const statement2 = MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE;
         const ev2 = [{ text: metrics }];
-        const rankScore2 = 52 + Math.min(34, lex * 2.5);
+        const rankScore2 = 68 + Math.min(16, lex * 1.8);
         return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
       }
       if (ratioOkIdeasSoft && !ratioOkConcrete) {
-        const statement2 = "This piece stays mostly in the realm of ideas.";
+        const statement2 = MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE;
         const ev2 = [{ text: `${metrics} Idea-leaning lexicon signal is present but below the stricter ratio gate.` }];
-        const rankScore2 = 50 + Math.min(32, lex * 2.5);
+        const rankScore2 = 64 + Math.min(14, lex * 1.8);
         return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
       }
       if (ratioOkConcrete && !ratioOkIdeas) {
-        const statement2 = "The piece is grounded more in objects and detail than in abstraction.";
+        const statement2 = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS;
         const ev2 = [{ text: metrics }];
-        const rankScore2 = 52 + Math.min(34, lex * 2.5);
+        const rankScore2 = 68 + Math.min(16, lex * 1.8);
         return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
       }
-      const statement = "Idea-words and image-words both show up often enough to matter.";
+      const statement = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT;
       const ev = [{ text: metrics }];
-      const rankScore = 47 + Math.min(30, lex * 2.35);
+      const rankScore = 34 + Math.min(14, lex * 1.5);
       return abstractionCandidate(features.sessionId, statement, ev, rankScore);
     }
     return null;
@@ -675,14 +701,14 @@ var WaywordMirror = (() => {
     const tallies = `Qualifiers ${h.qualifierCount}; pivots ${h.pivotCount}; contradiction markers ${h.contradictionMarkers}; uncertainty markers ${h.uncertaintyMarkers}; total ${total}; about ${per100.toFixed(1)} per 100 tokenizer words.`;
     let statement;
     if (soft >= turn && h.qualifierCount >= 2) {
-      statement = "You often qualify a thought just after stating it.";
+      statement = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER;
     } else if (turn >= soft && turn >= 2 && soft >= 2) {
-      statement = "There's a pattern of assertion followed by softening.";
+      statement = MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING;
     } else {
-      statement = "Statements here are often followed by revision or softening.";
+      statement = MIRROR_HEADLINE_HESITATION_REVISED;
     }
     const ev = [{ text: tallies }];
-    let rankScore = Math.min(100, 30 + total * 4 + per100);
+    let rankScore = Math.min(54, 24 + total * 2.2 + per100 * 0.7);
     if (soft < 3 && turn >= 2) rankScore -= 10;
     return candidate("hesitation_qualification", features.sessionId, statement, ev, rankScore);
   }
@@ -708,43 +734,64 @@ var WaywordMirror = (() => {
 
   // src/features/mirror/ranking/statementSpecificity.ts
   var GENERIC_FALLBACK_STATEMENTS = new Set(
-    [
-      "idea-words and image-words both show up often enough to matter.",
-      "statements here are often followed by revision or softening."
-    ].map((s) => s.toLowerCase())
+    MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS.map((h) => normMirrorReflectionHeadline(h))
   );
   function norm(s) {
-    return s.trim().toLowerCase().replace(/\s+/g, " ");
+    return normMirrorReflectionHeadline(s);
   }
   function mirrorStatementSpecificity(statement) {
     const n = norm(statement);
-    if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 25;
-    if (n.startsWith("you return several times to")) return 100;
-    if (n === "the ending tightens noticeably." || n === "the lines lengthen as the piece moves toward its close.") {
-      return 95;
+    if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
+    if (n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) return 100;
+    if (n === norm(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
+      return 110;
     }
-    if (n === "the cadence alternates between short and extended lines.") return 90;
-    if (n === "the writing leans more conceptual than scene-based toward the back half." || n === "objects and detail carry more of the late passage than earlier on.") {
+    if (n === norm(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS) || n === norm(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN)) {
       return 90;
     }
-    if (n === "this piece stays mostly in the realm of ideas." || n === "the piece is grounded more in objects and detail than in abstraction.") {
-      return 85;
+    if (n === norm(MIRROR_HEADLINE_CADENCE_ALTERNATION)) return 84;
+    if (n === norm(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)) {
+      return 82;
     }
-    if (n === "this piece holds ideas and concrete detail in balance.") return 80;
-    if (n === "you often qualify a thought just after stating it.") return 58;
-    if (n === "there's a pattern of assertion followed by softening.") return 58;
-    return 45;
+    if (n === norm(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER)) return 58;
+    if (n === norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)) return 56;
+    return 40;
   }
 
   // src/features/mirror/ranking/rankReflections.ts
+  function norm2(s) {
+    return normMirrorReflectionHeadline(s);
+  }
+  function rankingWeight(candidate2) {
+    const s = norm2(candidate2.statement);
+    if (s === norm2(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
+      return -28;
+    }
+    if (s === norm2(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)) {
+      return 34;
+    }
+    if (s.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) {
+      return 30;
+    }
+    if (s === norm2(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS) || s === norm2(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN) || s === norm2(MIRROR_HEADLINE_CADENCE_ALTERNATION)) {
+      return 18;
+    }
+    if (s === norm2(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) || s === norm2(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) || s === norm2(MIRROR_HEADLINE_HESITATION_REVISED)) {
+      return 10;
+    }
+    return 0;
+  }
   function categoryTiePreference(category) {
-    if (category === "abstraction_concrete" || category === "hesitation_qualification") return 3;
-    if (category === "repetition") return 2;
-    if (category === "cadence") return 0;
+    if (category === "abstraction_concrete") return 4;
+    if (category === "repetition") return 3;
+    if (category === "cadence") return 2;
+    if (category === "hesitation_qualification") return 1;
     return 1;
   }
   function compareRanked(a, b) {
-    const d = b.rankScore - a.rankScore;
+    const weightedA = a.rankScore + rankingWeight(a);
+    const weightedB = b.rankScore + rankingWeight(b);
+    const d = weightedB - weightedA;
     if (Math.abs(d) <= MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA) {
       const sp = mirrorStatementSpecificity(b.statement) - mirrorStatementSpecificity(a.statement);
       if (sp !== 0) return sp;
@@ -889,12 +936,12 @@ var WaywordMirror = (() => {
       case "recent_lexical_anchor": {
         const word = extractLexicalWord(pattern.id);
         if (!word) return null;
-        return `You tend to return to \u201C${word}\u201D`;
+        return `\u201C${word}\u201D recurs across drafts`;
       }
       case "recent_abstraction_lean":
-        return "Your writing leans more toward ideas than concrete scenes";
+        return "Language leans toward ideas over scenes";
       case "recent_hesitation_qualification":
-        return "You often qualify a thought just after stating it";
+        return "Statements are often qualified just after they\u2019re made";
       default:
         return null;
     }
@@ -904,12 +951,12 @@ var WaywordMirror = (() => {
       case "recent_lexical_anchor": {
         const word = extractLexicalWord(pattern.id);
         if (!word) return null;
-        return `You tend to return to \u201C${word}.\u201D`;
+        return `\u201C${word}\u201D recurs across drafts.`;
       }
       case "recent_abstraction_lean":
-        return "Your writing leans more toward ideas than concrete scenes.";
+        return "Language leans toward ideas over scenes.";
       case "recent_hesitation_qualification":
-        return "You often qualify a thought just after stating it.";
+        return "Statements are often qualified just after they\u2019re made.";
       default:
         return null;
     }
@@ -1019,7 +1066,7 @@ var WaywordMirror = (() => {
     return {
       id: `recent_lexical_anchor:${w}`,
       category: "recent_lexical_anchor",
-      statement: `Across recent drafts, you return often to \u201C${w}.\u201D`,
+      statement: `\u201C${w}\u201D recurs across recent drafts.`,
       evidence: promotedEvidence()
     };
   }
@@ -1034,7 +1081,7 @@ var WaywordMirror = (() => {
     return {
       id: "recent_abstraction_lean:promoted",
       category: "recent_abstraction_lean",
-      statement: "Across recent writing, your language leans more toward ideas than scenes.",
+      statement: "Across recent drafts, language leans toward ideas over scenes.",
       evidence: promotedEvidence()
     };
   }
@@ -1047,7 +1094,7 @@ var WaywordMirror = (() => {
     return {
       id: "recent_hesitation_qualification:promoted",
       category: "recent_hesitation_qualification",
-      statement: "Several recent drafts qualify a thought just after stating it.",
+      statement: "Across recent drafts, statements are often qualified just after they appear.",
       evidence: promotedEvidence()
     };
   }
@@ -1213,7 +1260,7 @@ var WaywordMirror = (() => {
     const best = gated[0];
     const n = aggregate.qualifyingSessionCount;
     const rankScore = 42 + best.distinctSessionCount * 14 + Math.min(18, best.totalTopListCount);
-    const statement = `Across recent drafts, you return often to \u201C${best.word}.\u201D`;
+    const statement = `\u201C${best.word}\u201D recurs across recent drafts.`;
     const chrono = sessionChronoIndex(aggregate);
     const ordered = [...best.perSessionCounts].sort(
       (a, b) => (chrono.get(a.sessionId) ?? 0) - (chrono.get(b.sessionId) ?? 0)
@@ -1245,7 +1292,7 @@ var WaywordMirror = (() => {
     const ratios = sessions.map((s) => s.abstractConcreteRatio);
     const meanRatio = ratios.reduce((a, b) => a + b, 0) / Math.max(ratios.length, 1);
     const rankScore = 48 + ideaLean * 11 + Math.min(14, meanRatio * 4);
-    const statement = "Across recent writing, your language leans more toward ideas than scenes.";
+    const statement = "Across recent drafts, language leans toward ideas over scenes.";
     const ev = evidenceLines(`Ideas over scenes in ${ideaLean} of the last ${n} qualifying drafts.`);
     return {
       id: "recent_abstraction_lean:aggregate",
@@ -1264,7 +1311,7 @@ var WaywordMirror = (() => {
     if (qualPattern < MIN_SESSIONS_FOR_CROSS_SESSION_PATTERN) return null;
     const n = aggregate.qualifyingSessionCount;
     const rankScore = 46 + qualPattern * 10;
-    const statement = "Several recent drafts qualify a thought just after stating it.";
+    const statement = "Across recent drafts, statements are often qualified just after they appear.";
     const chrono = sessionChronoIndex(aggregate);
     const ordered = sessions.filter((s) => sessionQualifierPattern2(s)).sort((a, b) => (chrono.get(a.sessionId) ?? 0) - (chrono.get(b.sessionId) ?? 0));
     const counts = ordered.map((s) => String(s.qualifierCount)).join(", ");

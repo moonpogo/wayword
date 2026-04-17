@@ -3,16 +3,27 @@
  * Higher = more text-grounded / less generic fallback (does not change `rankScore` on candidates).
  */
 
+import {
+  MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL,
+  MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER,
+  MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS,
+  MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE,
+  MIRROR_HEADLINE_CADENCE_ALTERNATION,
+  MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
+  MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
+  MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS,
+  MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
+  MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
+  MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER,
+  normMirrorReflectionHeadline
+} from "../constants/mirrorSessionHeadlines.js";
+
 const GENERIC_FALLBACK_STATEMENTS = new Set(
-  [
-    "both idea-words and image-words appear frequently.",
-    "ideas and concrete detail stay in balance.",
-    "statements are often revised or softened."
-  ].map((s) => s.toLowerCase())
+  MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS.map((h) => normMirrorReflectionHeadline(h))
 );
 
 function norm(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
+  return normMirrorReflectionHeadline(s);
 }
 
 /**
@@ -23,32 +34,32 @@ export function mirrorStatementSpecificity(statement: string): number {
   if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
 
   // Named recurrence should beat most non-directional observations.
-  if (n.includes("returns several times in this draft")) return 100;
+  if (n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) return 100;
 
   // Directional abstraction movement should lead when present.
   if (
-    n === "the back half leans more conceptual than scene-based." ||
-    n === "concrete detail carries more of the later passages."
+    n === norm(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) ||
+    n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)
   ) {
     return 110;
   }
 
   // Strong directional cadence changes remain high, but below directional abstraction.
-  if (n === "the ending tightens noticeably." || n === "lines lengthen near the end.") {
+  if (n === norm(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS) || n === norm(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN)) {
     return 90;
   }
-  if (n === "the cadence alternates between short and long lines.") return 84;
+  if (n === norm(MIRROR_HEADLINE_CADENCE_ALTERNATION)) return 84;
 
   // Non-shift directional abstraction beats generic mixed states.
   if (
-    n === "ideas dominate over concrete detail." ||
-    n === "concrete detail outweighs abstraction."
+    n === norm(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) ||
+    n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)
   ) {
     return 82;
   }
 
-  if (n === "statements are often qualified just after they’re made.") return 58;
-  if (n === "assertions are often followed by softening.") return 56;
+  if (n === norm(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER)) return 58;
+  if (n === norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)) return 56;
 
   return 40;
 }

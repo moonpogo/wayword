@@ -14,6 +14,7 @@ export function dedupeReflections(candidates: MirrorReflectionCandidate[]): Mirr
 
   const byStatement = new Map<string, MirrorReflectionCandidate>();
   for (const c of byCategory.values()) {
+    // Dedupe identity is still normalized headline text (not a separate headlineKey).
     const key = c.statement.trim().toLowerCase().replace(/\s+/g, " ");
     const prev = byStatement.get(key);
     if (!prev || compareRanked(c, prev) < 0) byStatement.set(key, c);
