@@ -309,6 +309,15 @@ function isDesktopPatternsViewport() {
   return window.matchMedia("(min-width: 981px)").matches;
 }
 
+/** Review Runs drawer: recent preview cap (full history may be archived later). */
+function recentRunsPreviewCapDrawer() {
+  return isMobileViewport() ? 3 : 4;
+}
+
+function recentRunsPreviewCapRail() {
+  return 4;
+}
+
 function isMobilePatternsVisible() {
   if (!isMobileViewport() || isDesktopPatternsViewport()) return false;
   const profileView = $("profileView");
@@ -4180,9 +4189,26 @@ function formatRunDetailHtml(run) {
 function renderHistory() {
   const drawerList = $("recentDrawerList");
   const railList = $("recentRailList");
+  const drawerFooter = $("recentDrawerFooter");
+  const railFooter = $("recentRailFooter");
   const trigger = $("recentWritingTrigger");
   const allLists = [drawerList, railList].filter(Boolean);
   allLists.forEach((list) => wireRecentEntryRowKeynav(list));
+
+  function setRecentRunsOverflowFooter(footer, totalCount, cap) {
+    if (!footer) return;
+    const show = totalCount > cap;
+    footer.classList.toggle("hidden", !show);
+    footer.setAttribute("aria-hidden", show ? "false" : "true");
+  }
+
+  function hideRecentRunsOverflowFooters() {
+    [drawerFooter, railFooter].forEach((footer) => {
+      if (!footer) return;
+      footer.classList.add("hidden");
+      footer.setAttribute("aria-hidden", "true");
+    });
+  }
 
   function buildRecentEntries(items, listKey) {
     return items
@@ -4238,6 +4264,7 @@ function renderHistory() {
         ? `<div class="recent-drawer-empty">Nothing saved to review yet.</div>`
         : "";
     });
+    hideRecentRunsOverflowFooters();
     if (trigger) {
       trigger.disabled = false;
       trigger.setAttribute("aria-disabled", "false");
@@ -4245,15 +4272,30 @@ function renderHistory() {
     return;
   }
 
-  const items = state.history.slice().reverse().slice(0, 5);
-  allLists.forEach((list) => {
-    const listKey = list.id === "recentRailList" ? "rail" : "draw";
-    list.innerHTML = buildRecentEntries(items, listKey);
-    list.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
+  const reversed = state.history.slice().reverse();
+  const totalCount = reversed.length;
+  const drawerCap = recentRunsPreviewCapDrawer();
+  const railCap = recentRunsPreviewCapRail();
+
+  if (drawerList) {
+    const slice = reversed.slice(0, drawerCap);
+    drawerList.innerHTML = buildRecentEntries(slice, "draw");
+    drawerList.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
       wireMirrorEvidenceToggles(el);
       collapseMirrorEvidenceInRoot(el);
     });
-  });
+    setRecentRunsOverflowFooter(drawerFooter, totalCount, drawerCap);
+  }
+
+  if (railList) {
+    const slice = reversed.slice(0, railCap);
+    railList.innerHTML = buildRecentEntries(slice, "rail");
+    railList.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
+      wireMirrorEvidenceToggles(el);
+      collapseMirrorEvidenceInRoot(el);
+    });
+    setRecentRunsOverflowFooter(railFooter, totalCount, railCap);
+  }
 
   if (trigger) {
     trigger.disabled = false;
@@ -4300,8 +4342,6 @@ function setRecentDrawerOpen(open, options = {}) {
       afterOpen?.();
       if (shouldAutoExpand) {
         state.pendingRecentDrawerExpand = false;
-        const list = $("recentDrawerList");
-        if (list) list.scrollTop = 0;
         if (!skipFocus) $("recentDrawerCloseBtn")?.focus();
       }
       queueViewportSync();
@@ -5692,5 +5732,18 @@ bindAnnotationRowFlagInteraction();
 bindEditorSemanticPicker();
 bindMetricExplainerDelegation("recentDrawerList");
 bindMetricExplainerDelegation("recentRailList");
+
+(function wireRecentRunsMorePlaceholders() {
+  const attach = (btn) => {
+    if (!btn || btn.dataset.recentRunsMoreStub === "1") return;
+    btn.dataset.recentRunsMoreStub = "1";
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      /* Placeholder until a dedicated older-runs archive is wired. */
+    });
+  };
+  attach($("recentDrawerMoreBtn"));
+  attach($("recentRailMoreBtn"));
+})();
 
 queueViewportSync();
