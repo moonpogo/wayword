@@ -4246,46 +4246,27 @@ function formatRunDetailHtml(run) {
   `;
 }
 
-function renderHistory() {
-  const drawerList = $("recentDrawerList");
-  const railList = $("recentRailList");
-  const drawerFooter = $("recentDrawerFooter");
-  const railFooter = $("recentRailFooter");
-  const trigger = $("recentWritingTrigger");
-  const allLists = [drawerList, railList].filter(Boolean);
-  allLists.forEach((list) => wireRecentEntryRowKeynav(list));
-
-  function setRecentRunsOverflowFooter(footer, totalCount, cap) {
-    if (!footer) return;
-    const show = totalCount > cap;
-    footer.classList.toggle("hidden", !show);
-    footer.setAttribute("aria-hidden", show ? "false" : "true");
-  }
-
-  function hideRecentRunsOverflowFooters() {
-    [drawerFooter, railFooter].forEach((footer) => {
-      if (!footer) return;
-      footer.classList.add("hidden");
-      footer.setAttribute("aria-hidden", "true");
-    });
-  }
-
-  function buildRecentEntries(items, listKey) {
-    return items
-      .map((item, idx) => {
-        const excerpt = promptExcerpt(item.prompt);
-        const when = formatRelativeTime(item.savedAt);
-        const meta = when ? `<div class="recent-entry-meta">${escapeHtml(when)}</div>` : "";
-        const detail = formatRunDetailHtml(item);
-        const scoreBlock = formatRecentEntryScoreBlock(item);
-        const idPrefix = `mirror-${listKey}-${idx}-${item.runId || "run"}`;
-        const mirrorBlock = formatRecentEntryMirrorHtml(item, idPrefix);
-        const mirrorWrap = mirrorBlock
-          ? `<div class="recent-entry-reflection" aria-label="Reflection for this run">${mirrorBlock}</div>`
-          : "";
-        const draftRaw = String(item.text || "").trim();
-        const draftDisplay = draftRaw || "Draft text wasn’t kept on this device.";
-        return `
+/**
+ * Review Runs (drawer + rail) — invariants for `renderHistory`:
+ * - Drawer (#recentDrawerList) and rail (#recentRailList) must stay in sync on row shape and per-run data.
+ * - Preview caps differ: `recentRunsPreviewCapDrawer` vs `recentRunsPreviewCapRail`.
+ * - Empty state rules differ (drawer vs rail visibility).
+ * - Some interactions stay surface-specific (drawer open/close, focus) and live outside this renderer.
+ */
+function buildRecentEntryRowHtml(item, idx, listKey) {
+  const excerpt = promptExcerpt(item.prompt);
+  const when = formatRelativeTime(item.savedAt);
+  const meta = when ? `<div class="recent-entry-meta">${escapeHtml(when)}</div>` : "";
+  const detail = formatRunDetailHtml(item);
+  const scoreBlock = formatRecentEntryScoreBlock(item);
+  const idPrefix = `mirror-${listKey}-${idx}-${item.runId || "run"}`;
+  const mirrorBlock = formatRecentEntryMirrorHtml(item, idPrefix);
+  const mirrorWrap = mirrorBlock
+    ? `<div class="recent-entry-reflection" aria-label="Reflection for this run">${mirrorBlock}</div>`
+    : "";
+  const draftRaw = String(item.text || "").trim();
+  const draftDisplay = draftRaw || "Draft text wasn\u2019t kept on this device.";
+  return `
           <div
             class="recent-entry"
             role="button"
@@ -4311,8 +4292,34 @@ function renderHistory() {
             </div>
           </div>
         `;
-      })
-      .join("");
+}
+
+function renderHistory() {
+  const drawerList = $("recentDrawerList");
+  const railList = $("recentRailList");
+  const drawerFooter = $("recentDrawerFooter");
+  const railFooter = $("recentRailFooter");
+  const trigger = $("recentWritingTrigger");
+  const allLists = [drawerList, railList].filter(Boolean);
+  allLists.forEach((list) => wireRecentEntryRowKeynav(list));
+
+  function setRecentRunsOverflowFooter(footer, totalCount, cap) {
+    if (!footer) return;
+    const show = totalCount > cap;
+    footer.classList.toggle("hidden", !show);
+    footer.setAttribute("aria-hidden", show ? "false" : "true");
+  }
+
+  function hideRecentRunsOverflowFooters() {
+    [drawerFooter, railFooter].forEach((footer) => {
+      if (!footer) return;
+      footer.classList.add("hidden");
+      footer.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  function buildRecentEntries(items, listKey) {
+    return items.map((item, idx) => buildRecentEntryRowHtml(item, idx, listKey)).join("");
   }
 
   if (!state.history.length) {
