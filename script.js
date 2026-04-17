@@ -871,50 +871,11 @@ const WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID =
   "wayword-submitted-annotated-typography";
 
 /**
- * Submitted + semantic dots: inject a late document `<style>` with `#editorInput` / `#highlightLayer`
- * rules so nothing in the cascade (focus, media queries) can override. Inline styles were still
- * ineffective for some users; ID selectors + last stylesheet win.
+ * Legacy hook: annotated post-submit must use the same typography as live (no injected overrides).
+ * Removes any stale `#wayword-submitted-annotated-typography` node from older builds.
  */
 function syncSubmittedAnnotatedEditorSurfaces() {
-  const on =
-    state.active &&
-    state.submitted &&
-    state.completedUiActive &&
-    writeDocHasAnySemanticFlags();
-
-  const existing = document.getElementById(WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID);
-  if (!on) {
-    existing?.remove();
-    return;
-  }
-
-  const narrow =
-    typeof window !== "undefined" &&
-    window.matchMedia("(max-width: 680px)").matches;
-  const fontSize = narrow ? "17px" : "18px";
-  const padTop = narrow ? "16px" : "20px";
-  const padInline = narrow ? "18px" : "28px";
-  const padBottom = narrow ? "72px" : "80px";
-
-  let style = existing;
-  if (!style) {
-    style = document.createElement("style");
-    style.id = WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID;
-    document.head.appendChild(style);
-  }
-
-  style.textContent = `
-#editorInput.editor-input,
-#highlightLayer.highlight-layer {
-  font-family: Georgia, "Times New Roman", serif !important;
-  font-size: ${fontSize} !important;
-  font-weight: 400 !important;
-  font-style: normal !important;
-  line-height: 4.25 !important;
-  letter-spacing: normal !important;
-  padding: ${padTop} ${padInline} ${padBottom} !important;
-}
-`;
+  document.getElementById(WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID)?.remove();
 }
 
 function writeDocCanonicalLength(doc) {
@@ -2430,8 +2391,8 @@ function syncEditorDotOverlay() {
     state.submitted &&
     state.completedUiActive &&
     writeDocHasAnySemanticFlags();
-  /* Submitted annotated: gap below glyph/line rect before dot row; keep in sync with CSS line-height slack. */
-  const gapBelowAnchorPx = submittedAnnotatedSpacing ? 20 : 5;
+  /* Gap below token ink box before dot row (px); keep small so dots track line boxes after line-height fix. */
+  const gapBelowAnchorPx = 5;
   const bottomReservePx = submittedAnnotatedSpacing
     ? EDITOR_SEMANTIC_DOT_PX + 36
     : EDITOR_SEMANTIC_DOT_PX + 7;

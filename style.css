@@ -1155,33 +1155,8 @@ html[data-theme="dark"] .theme-moon{
   cursor:default;
 }
 
-/*
- * Submitted + semantic dots — single layout contract (standard + focus).
- * Line box height = 1em + fixed band so dot rows sit inside the line’s slack, not the next line’s text.
- * Use longhands only (no `font:` shorthand) so nothing can reset line-height via cascade.
- */
-.editor-shell--submitted-annotated-spacing{
-  /*
-   * Inter-line clearance for dot rows: half-leading splits `line-height` slack, so the fixed extra
-   * must be large enough that ink→ink gap between lines still clears ~6px dots + ~18px gap (see script).
-   */
-  --ea-annotated-line-extra:58px;
-  --ea-fs:18px;
-  --ea-pad-top:20px;
-  --ea-pad-inline:28px;
-  --ea-pad-bottom:64px;
-}
-
-.editor-shell--submitted-annotated-spacing .highlight-layer,
-.editor-shell--submitted-annotated-spacing .editor-input{
-  font-family:Georgia,"Times New Roman",serif;
-  font-size:var(--ea-fs);
-  font-weight:400;
-  font-style:normal;
-  line-height:max(2.95em, calc(1em + var(--ea-annotated-line-extra)));
-  letter-spacing:normal;
-  padding:var(--ea-pad-top) var(--ea-pad-inline) var(--ea-pad-bottom);
-}
+/* Post-submit annotated runs use the same editor/highlight typography as live (no alternate metrics). */
+/* `.editor-shell--submitted-annotated-spacing` is toggled in JS only for dot-overlay geometry (see script). */
 
 /* Phase 2 step 5: geometry-only token dots (pointer-events none; not text, not selection). */
 .editor-dot-overlay{
@@ -1911,11 +1886,11 @@ body.focus-mode #profileSummarySection,
   display:flex;
   flex-direction:column;
   align-items:stretch;
-  gap:10px;
+  gap:4px;
 }
 
 .below-editor-reflection-stack #reflection-line{
-  margin-top:2px;
+  margin-top:0;
 }
 
 @media (max-width:980px){
@@ -4355,8 +4330,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     padding-bottom:max(4px, env(safe-area-inset-bottom, 0px));
   }
 
-  body.focus-mode.keyboard-open .editor-shell:not(.editor-shell--submitted-annotated-spacing) .highlight-layer,
-  body.focus-mode.keyboard-open .editor-shell:not(.editor-shell--submitted-annotated-spacing) .editor-input{
+  body.focus-mode.keyboard-open .editor-shell .highlight-layer,
+  body.focus-mode.keyboard-open .editor-shell .editor-input{
     padding-top:14px;
     padding-bottom:32px;
   }
@@ -4466,7 +4441,7 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
 
   body.focus-mode .below-editor-stack{
     flex:0 0 auto;
-    margin-top:auto;
+    margin-top:0;
     gap:6px;
     padding-bottom:calc(6px + env(safe-area-inset-bottom));
   }
@@ -4543,8 +4518,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     min-height:160px;
   }
 
-  body.focus-mode .editor-shell:not(.editor-shell--submitted-annotated-spacing) .highlight-layer,
-  body.focus-mode .editor-shell:not(.editor-shell--submitted-annotated-spacing) .editor-input{
+  body.focus-mode .editor-shell .highlight-layer,
+  body.focus-mode .editor-shell .editor-input{
     padding:12px 14px 27px 14px;
     font:16px/1.70 Georgia,"Times New Roman",serif;
   }
@@ -4563,7 +4538,7 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   body.focus-mode .below-editor-stack{
-    margin-top:auto;
+    margin-top:0;
     gap:4px;
   }
 
@@ -4622,8 +4597,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     min-height:130px;
   }
 
-  body.focus-mode .editor-shell:not(.editor-shell--submitted-annotated-spacing) .highlight-layer,
-  body.focus-mode .editor-shell:not(.editor-shell--submitted-annotated-spacing) .editor-input{
+  body.focus-mode .editor-shell .highlight-layer,
+  body.focus-mode .editor-shell .editor-input{
     padding:10px 12px 23px 12px;
     font:15px/1.60 Georgia,"Times New Roman",serif;
   }
@@ -4655,13 +4630,6 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
 }
 
 @media (max-width:680px){
-  .editor-shell--submitted-annotated-spacing{
-    --ea-fs:17px;
-    --ea-pad-top:16px;
-    --ea-pad-inline:18px;
-    --ea-pad-bottom:60px;
-  }
-
   .header-actions{
     position:relative;
     z-index:10;
@@ -4671,8 +4639,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     gap:8px;
   }
 
-  .editor-shell:not(.editor-shell--submitted-annotated-spacing) .highlight-layer,
-  .editor-shell:not(.editor-shell--submitted-annotated-spacing) .editor-input{
+  .editor-shell .highlight-layer,
+  .editor-shell .editor-input{
     padding:16px 18px 38px 18px;
     font:17px/1.82 Georgia,"Times New Roman",serif;
   }
@@ -4900,10 +4868,12 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
 }
 
 #reflection-line.reflection-line--hidden{
+  display:none;
   max-height:0;
   margin:0;
+  padding:0;
   opacity:0;
-  transform:translateY(calc(-1 * var(--motion-shift-tight)));
+  transform:none;
   pointer-events:none;
 }
 
@@ -4986,14 +4956,37 @@ html[data-theme="dark"] .metric-explainer{
 
 /* —— Mirror Engine V1 (post-run): quiet postscript, not a score widget —— */
 .mirror-reflection-section{
-  margin-top:1.5rem;
-  padding-top:1rem;
+  margin-top:0.5rem;
+  padding-top:0.45rem;
   padding-bottom:0.2rem;
   border-top:1px solid color-mix(in srgb, var(--line) 72%, transparent);
 }
 
 .mirror-reflection-section.hidden{
   display:none;
+}
+
+@media (min-width:981px){
+  .mirror-reflection-section:not(.hidden){
+    margin-top:1.1rem;
+    padding-top:0.65rem;
+  }
+}
+
+@media (max-width:980px){
+  .editor-pill-band:has(#editorSemanticStatusBar.hidden){
+    margin-top:2px;
+  }
+
+  .below-editor-stack:has(#editorSemanticStatusBar.hidden) .mirror-reflection-section:not(.hidden){
+    margin-top:0;
+    padding-top:0.3rem;
+  }
+
+  .below-editor-stack:has(#editorSemanticStatusBar:not(.hidden)) .mirror-reflection-section:not(.hidden){
+    margin-top:0.25rem;
+    padding-top:0.3rem;
+  }
 }
 
 .mirror-reflection-root{
