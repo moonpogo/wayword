@@ -13,6 +13,24 @@
       .replace(/"/g, "&quot;");
   }
 
+  var MIRROR_EMPTY_FALLBACK_LINES = [
+    "A clean pass. Try pushing one element further.",
+    "Nothing strong yet. Lean harder in one direction.",
+    "Even a small shift would give this shape.",
+    "Pick one thing and exaggerate it."
+  ];
+
+  function pickMirrorEmptyFallbackLine(seed) {
+    var s = seed != null ? String(seed) : "";
+    var h = 2166136261 >>> 0;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    var lines = MIRROR_EMPTY_FALLBACK_LINES;
+    return lines[h % lines.length];
+  }
+
   function renderMirrorEvidenceLinesHtml(evidence) {
     if (!Array.isArray(evidence) || !evidence.length) {
       return '<p class="mirror-card__evidence-line mirror-card__evidence-line--muted">Nothing quoted from this run for this line.</p>';
@@ -28,28 +46,17 @@
   function mirrorReflectionCardHtml(card, opts) {
     const role = opts && opts.role === "main" ? "main" : "support";
     const firstSupport = Boolean(opts && opts.firstSupportInSupportOnlyStack);
-    const uid =
-      opts && opts.evidencePanelId
-        ? String(opts.evidencePanelId)
-        : `mirror-ev-${Math.random().toString(36).slice(2, 11)}`;
     const stmt = escapeHtmlMirror(card.statement);
-    const evHtml = renderMirrorEvidenceLinesHtml(card.evidence);
     let cls = "mirror-card";
     if (role === "main") cls += " mirror-card--main";
     else {
       cls += " mirror-card--support";
       if (firstSupport) cls += " mirror-card--support-first";
     }
-    return (
-      `<article class="${cls}">` +
-      `<p class="mirror-card__statement">${stmt}</p>` +
-      `<button type="button" class="mirror-card__evidence-toggle" aria-expanded="false" aria-controls="${uid}" aria-label="Show where this line comes from in the run">Context</button>` +
-      `<div class="mirror-card__evidence" id="${uid}" hidden>${evHtml}</div>` +
-      `</article>`
-    );
+    return `<article class="${cls}"><p class="mirror-card__statement">${stmt}</p></article>`;
   }
 
-  function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix }) {
+  function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix, emptyHintSeed }) {
     const pfx = String(idPrefix || "mirror");
     if (loadFailed) {
       return '<p class="mirror-empty">Reflection isn\u2019t available in this build.</p>';
@@ -64,7 +71,8 @@
     const hasSupport = supporting.some((c) => c && String(c.statement || "").trim());
 
     if (!hasMain && !hasSupport) {
-      return '<p class="mirror-empty">Nothing in this run stood out enough to echo back.</p>';
+      const line = escapeHtmlMirror(pickMirrorEmptyFallbackLine(emptyHintSeed));
+      return '<p class="mirror-empty">' + line + "</p>";
     }
 
     const parts = [];
@@ -94,7 +102,7 @@
     return parts.join("");
   }
 
-  /** True when the pipeline has at least one evidence-backed reflection card. */
+  /** True when the pipeline has at least one reflection card (headline present). */
   function mirrorPipelineResultHasEvidenceCards(result) {
     const r = result;
     if (!r || typeof r !== "object") return false;
@@ -122,11 +130,12 @@
    * Review Runs only: one strongest reflection (main if present, else first supporting)
    * plus a non-interactive depth hint when more cards exist. Full stacks stay on post-run / Patterns.
    */
-  function buildReviewRunsMirrorGlanceBodyHtml({ result, idPrefix }) {
+  function buildReviewRunsMirrorGlanceBodyHtml({ result, idPrefix, emptyHintSeed }) {
     const pfx = String(idPrefix || "mirror");
     const r = result;
     if (!r || typeof r !== "object") {
-      return '<p class="mirror-empty">Nothing in this run stood out enough to echo back.</p>';
+      const line0 = escapeHtmlMirror(pickMirrorEmptyFallbackLine(emptyHintSeed));
+      return '<p class="mirror-empty">' + line0 + "</p>";
     }
     const main = r.main;
     const supporting = Array.isArray(r.supporting) ? r.supporting : [];
@@ -145,7 +154,8 @@
       }
     }
     if (!card) {
-      return '<p class="mirror-empty">Nothing in this run stood out enough to echo back.</p>';
+      const line1 = escapeHtmlMirror(pickMirrorEmptyFallbackLine(emptyHintSeed));
+      return '<p class="mirror-empty">' + line1 + "</p>";
     }
     const total = countMirrorReflectionCards(r);
     const moreCount = Math.max(0, total - 1);

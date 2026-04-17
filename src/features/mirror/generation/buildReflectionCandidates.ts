@@ -3,10 +3,12 @@ import {
   MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO,
   MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT,
   MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL,
+  MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT,
   MIRROR_GEN_ABSTRACTION_SHORTFORM_MAX_CONCRETE,
   MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_ABSTRACT,
   MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_RATIO,
   MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_WORDS,
+  MIRROR_GEN_ABSTRACTION_SOFT_IDEA_LEAN_RATIO,
   MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG,
   MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT,
   MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE,
@@ -34,60 +36,45 @@ import {
   MIRROR_HEADLINE_HESITATION_REVISED,
   mirrorHeadlineRepetitionNamed
 } from "../constants/mirrorSessionHeadlines.js";
-import {
-  MIRROR_LONG_SENTENCE_MIN_WORDS,
-  MIRROR_SHORT_SENTENCE_MAX_WORDS
-} from "../constants/thresholds.js";
 import type {
+  MirrorEvidence,
   MirrorFeatures,
-  MirrorReflectionCandidate,
-  MirrorEvidence
+  MirrorReflectionCandidate
 } from "../types/mirrorTypes.js";
-import { normalizeText } from "../utils/normalizeText.js";
-
-function snippetAround(text: string, needle: string, radius = 36): MirrorEvidence {
-  const t = text;
-  const lower = t.toLowerCase();
-  const n = needle.toLowerCase();
-  const idx = lower.indexOf(n);
-  if (idx < 0) {
-    return { text: needle };
-  }
-  const a = Math.max(0, idx - radius);
-  const b = Math.min(t.length, idx + needle.length + radius);
-  const slice = t.slice(a, b).trim();
-  return { text: slice, start: a, end: b };
-}
 
 function candidate(
   category: MirrorReflectionCandidate["category"],
   sessionId: string,
   statement: string,
   evidence: MirrorEvidence[],
-  rankScore: number
+  rankScore: number,
+  supportsPrimary = false
 ): MirrorReflectionCandidate {
-  return {
+  const base: MirrorReflectionCandidate = {
     id: `${category}:${sessionId}`,
     category,
     statement,
     evidence,
     rankScore
   };
+  if (supportsPrimary) base.supportsPrimary = true;
+  return base;
 }
 
 /** Abstraction cards share a selection floor so marginal-but-valid signals still reach support. */
 function abstractionCandidate(
   sessionId: string,
   statement: string,
-  evidence: MirrorEvidence[],
-  rankScore: number
+  rankScore: number,
+  supportsPrimary = false
 ): MirrorReflectionCandidate {
   return candidate(
     "abstraction_concrete",
     sessionId,
     statement,
-    evidence,
-    Math.max(rankScore, 38)
+    [],
+    Math.max(rankScore, 38),
+    supportsPrimary
   );
 }
 
@@ -103,17 +90,7 @@ function repetitionMeetsCountGate(word: string, count: number): boolean {
   return count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
 }
 
-function repetitionTopCountsEvidence(features: MirrorFeatures, depth = 4): MirrorEvidence {
-  const parts = features.topRepeatedWords
-    .slice(0, depth)
-    .map((e) => `"${e.word}" ×${e.count}`);
-  return { text: `Repeated lemmas (tokenizer): ${parts.join("; ")}.` };
-}
-
-function tryRepetition(
-  features: MirrorFeatures,
-  sourceText: string
-): MirrorReflectionCandidate | null {
+function tryRepetition(features: MirrorFeatures): MirrorReflectionCandidate | null {
   if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
   const list = features.topRepeatedWords;
   const picked = list.find(
@@ -121,23 +98,12 @@ function tryRepetition(
   );
   if (!picked) return null;
 
-  const namedEv: MirrorEvidence[] = [snippetAround(sourceText, picked.word)];
-  const tie = list.find(
-    (e) =>
-      e.word !== picked.word &&
-      e.count === picked.count &&
-      repetitionMeetsCountGate(e.word, e.count) &&
-      !repetitionWordIsLowSignal(e.word)
-  );
-  if (tie) namedEv.push(snippetAround(sourceText, tie.word));
-  namedEv.push(repetitionTopCountsEvidence(features));
-
   const statement = mirrorHeadlineRepetitionNamed(picked.word);
   const multiNamed = list.filter(
     (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
   ).length;
   const rankScore = Math.min(100, picked.count * 14 + (multiNamed > 1 ? 5 : 0));
-  return candidate("repetition", features.sessionId, statement, namedEv, rankScore);
+  return candidate("repetition", features.sessionId, statement, [], rankScore);
 }
 
 function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null {
@@ -152,24 +118,14 @@ function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null 
 
   if (c.endCompression && quarterRatio != null && firstQ != null && lastQ != null) {
     const statement = MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS;
-    const ev: MirrorEvidence[] = [
-      {
-        text: `Opening-quarter mean sentence length ${firstQ.toFixed(1)} words; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
-      }
-    ];
     const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
-    return candidate("cadence", features.sessionId, statement, ev, rankScore);
+    return candidate("cadence", features.sessionId, statement, [], rankScore);
   }
 
   if (c.endExpansion && quarterRatio != null && firstQ != null && lastQ != null) {
     const statement = MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN;
-    const ev: MirrorEvidence[] = [
-      {
-        text: `Opening-quarter mean ${firstQ.toFixed(1)} words per sentence; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
-      }
-    ];
     const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
-    return candidate("cadence", features.sessionId, statement, ev, rankScore);
+    return candidate("cadence", features.sessionId, statement, [], rankScore);
   }
 
   const strongAlternation =
@@ -180,13 +136,8 @@ function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null 
 
   if (strongAlternation) {
     const statement = MIRROR_HEADLINE_CADENCE_ALTERNATION;
-    const ev: MirrorEvidence[] = [
-      {
-        text: `Short sentences (≤${MIRROR_SHORT_SENTENCE_MAX_WORDS} words): ${c.shortSentenceCount}; long (≥${MIRROR_LONG_SENTENCE_MIN_WORDS} words): ${c.longSentenceCount}; average sentence length ${c.avgSentenceLength.toFixed(1)} words; spread (population variance of sentence word counts) ${c.varianceSentenceLength.toFixed(2)}.`
-      }
-    ];
     const rankScore = 44 + Math.min(16, c.shortSentenceCount + c.longSentenceCount);
-    return candidate("cadence", features.sessionId, statement, ev, rankScore);
+    return candidate("cadence", features.sessionId, statement, [], rankScore);
   }
 
   return null;
@@ -206,28 +157,31 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
     return null;
   }
 
-  const metrics = `Abstract lexicon hits ${a.abstractCount}; concrete ${a.concreteCount}; ratio ${a.abstractConcreteRatio.toFixed(2)}.`;
-
   if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
     if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
     const statement = MIRROR_HEADLINE_ABSTRACTION_BALANCE;
-    const ev: MirrorEvidence[] = [{ text: `${metrics} Both half-session rates rise for abstract and concrete lexicon matches (ambiguous direction).` }];
     const rankScore = 40 + Math.min(22, lex * 1.6);
-    return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+    return abstractionCandidate(features.sessionId, statement, rankScore);
   }
 
-  if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
+  if (
+    a.shiftsTowardAbstract &&
+    lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT &&
+    a.abstractCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT
+  ) {
     const statement = MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL;
-    const ev: MirrorEvidence[] = [{ text: `${metrics} Abstract-lexicon matches pick up in the second half of tokens.` }];
     const rankScore = 80 + Math.min(20, a.abstractCount * 2.4);
-    return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+    return abstractionCandidate(features.sessionId, statement, rankScore);
   }
 
-  if (a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
+  if (
+    a.shiftsTowardConcrete &&
+    lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT &&
+    a.concreteCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT
+  ) {
     const statement = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER;
-    const ev: MirrorEvidence[] = [{ text: `${metrics} Concrete-lexicon matches pick up in the second half of tokens.` }];
     const rankScore = 80 + Math.min(20, a.concreteCount * 2.4);
-    return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+    return abstractionCandidate(features.sessionId, statement, rankScore);
   }
 
   if (lex >= MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) {
@@ -236,34 +190,30 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
     const ratioOkIdeasSoft =
       !ratioOkIdeas &&
       a.abstractCount >= 3 &&
-      a.abstractConcreteRatio >= 1.06;
+      a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_SOFT_IDEA_LEAN_RATIO;
     const ratioOkConcrete =
       a.concreteCount >= MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO * Math.max(a.abstractCount, 1) &&
       a.concreteCount >= 2;
 
     if (ratioOkIdeas && !ratioOkConcrete) {
       const statement = MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE;
-      const ev: MirrorEvidence[] = [{ text: metrics }];
       const rankScore = 68 + Math.min(16, lex * 1.8);
-      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
     }
     if (ratioOkIdeasSoft && !ratioOkConcrete) {
       const statement = MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE;
-      const ev: MirrorEvidence[] = [{ text: `${metrics} Idea-leaning lexicon signal is present but below the stricter ratio gate.` }];
       const rankScore = 64 + Math.min(14, lex * 1.8);
-      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
     }
     if (ratioOkConcrete && !ratioOkIdeas) {
       const statement = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS;
-      const ev: MirrorEvidence[] = [{ text: metrics }];
       const rankScore = 68 + Math.min(16, lex * 1.8);
-      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
     }
 
     const statement = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT;
-    const ev: MirrorEvidence[] = [{ text: metrics }];
     const rankScore = 34 + Math.min(14, lex * 1.5);
-    return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+    return abstractionCandidate(features.sessionId, statement, rankScore);
   }
 
   return null;
@@ -292,8 +242,6 @@ function tryHesitation(features: MirrorFeatures): MirrorReflectionCandidate | nu
     return null;
   }
 
-  const tallies = `Qualifiers ${h.qualifierCount}; pivots ${h.pivotCount}; contradiction markers ${h.contradictionMarkers}; uncertainty markers ${h.uncertaintyMarkers}; total ${total}; about ${per100.toFixed(1)} per 100 tokenizer words.`;
-
   let statement: string;
   if (soft >= turn && h.qualifierCount >= 2) {
     statement = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER;
@@ -303,10 +251,9 @@ function tryHesitation(features: MirrorFeatures): MirrorReflectionCandidate | nu
     statement = MIRROR_HEADLINE_HESITATION_REVISED;
   }
 
-  const ev: MirrorEvidence[] = [{ text: tallies }];
   let rankScore = Math.min(54, 24 + total * 2.2 + per100 * 0.7);
   if (soft < 3 && turn >= 2) rankScore -= 10;
-  return candidate("hesitation_qualification", features.sessionId, statement, ev, rankScore);
+  return candidate("hesitation_qualification", features.sessionId, statement, [], rankScore);
 }
 
 /**
@@ -314,12 +261,11 @@ function tryHesitation(features: MirrorFeatures): MirrorReflectionCandidate | nu
  */
 export function buildReflectionCandidates(
   features: MirrorFeatures,
-  sourceText: string
+  _sourceText?: string
 ): MirrorReflectionCandidate[] {
-  const text = normalizeText(sourceText);
   const out: MirrorReflectionCandidate[] = [];
 
-  const rep = tryRepetition(features, text);
+  const rep = tryRepetition(features);
   if (rep) out.push(rep);
 
   const abs = tryAbstraction(features);

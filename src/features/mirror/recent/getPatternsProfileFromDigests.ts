@@ -1,10 +1,5 @@
 import { buildReflectiveProfile } from "./buildReflectiveProfile.js";
-import type {
-  MirrorRecentTrend,
-  MirrorRecentTrendEvidence,
-  MirrorSessionDigest,
-  PatternsProfileFromDigestsResult
-} from "./types.js";
+import type { MirrorRecentTrend, MirrorSessionDigest, PatternsProfileFromDigestsResult } from "./types.js";
 import {
   MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO,
   MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO,
@@ -69,10 +64,6 @@ function sessionQualifierPattern(d: MirrorSessionDigest): boolean {
   return q >= 2 && per100 >= 1.5;
 }
 
-function promotedEvidence(): ReadonlyArray<MirrorRecentTrendEvidence> {
-  return [{ text: "Recurrent across recent qualifying drafts." }];
-}
-
 /**
  * Newest slice of up to `MIRROR_PROMOTION_WINDOW_QUALIFYING` qualifying digests (`v === 1`,
  * `qualifiesForRecent`). Shared by recent-trends aggregation and pattern promotion.
@@ -129,7 +120,7 @@ function promoteLexicalFromWindow(window: ReadonlyArray<MirrorSessionDigest>): M
     id: `recent_lexical_anchor:${w}`,
     category: "recent_lexical_anchor",
     statement: `“${w}” recurs across recent drafts.`,
-    evidence: promotedEvidence()
+    evidence: []
   };
 }
 
@@ -145,7 +136,7 @@ function promoteAbstractionFromWindow(window: ReadonlyArray<MirrorSessionDigest>
     id: "recent_abstraction_lean:promoted",
     category: "recent_abstraction_lean",
     statement: "Across recent drafts, language leans toward ideas over scenes.",
-    evidence: promotedEvidence()
+    evidence: []
   };
 }
 
@@ -159,7 +150,7 @@ function promoteHesitationFromWindow(window: ReadonlyArray<MirrorSessionDigest>)
     id: "recent_hesitation_qualification:promoted",
     category: "recent_hesitation_qualification",
     statement: "Across recent drafts, statements are often qualified just after they appear.",
-    evidence: promotedEvidence()
+    evidence: []
   };
 }
 

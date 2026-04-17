@@ -2,7 +2,8 @@ export type MirrorCategoryV1 =
   | "repetition"
   | "abstraction_concrete"
   | "cadence"
-  | "hesitation_qualification";
+  | "hesitation_qualification"
+  | "fallback";
 
 export interface MirrorSessionInput {
   text: string;
@@ -18,7 +19,7 @@ export interface MirrorEvidence {
   end?: number;
 }
 
-/** Evidence-backed line; no scores, no prescriptive advice. */
+/** Headline line; `evidence` is always empty in V1 UI (internal scoring only). */
 export interface MirrorReflection {
   id: string;
   category: MirrorCategoryV1;
@@ -30,6 +31,11 @@ export interface MirrorReflection {
 export interface MirrorReflectionCandidate extends MirrorReflection {
   /** Internal only — higher means stronger signal for downstream ranking/selection. */
   rankScore: number;
+  /**
+   * When true, this card may appear as supporting alongside the single primary if it clears
+   * the support floor. Defaults unset/false; generation sets only when explicitly paired.
+   */
+  supportsPrimary?: boolean;
 }
 
 /** Public extraction payload for generation (analysis only). */
@@ -143,10 +149,13 @@ export interface MirrorSelectedReflection {
 /** Final pipeline output after rank, dedupe, and selection. */
 export interface MirrorPipelineResult {
   /**
-   * Strongest card when it clears the main `rankScore` floor; otherwise null.
-   * Supporting cards may still appear without a main when only the support floor is met.
+   * Exactly one line per run: strongest qualifying signal, or a soft `fallback` line when none
+   * clear the support floor. Null only if the pipeline cannot run (e.g. bundle failure upstream).
    */
   main: MirrorSelectedReflection | null;
-  /** Up to four cards, distinct categories, each meeting the support floor (`role` is always `support` here). */
+  /**
+   * Optional secondary lines only when `MirrorReflectionCandidate.supportsPrimary` is set on the
+   * candidate; each must meet the support floor and use a distinct category from `main`.
+   */
   supporting: MirrorSelectedReflection[];
 }

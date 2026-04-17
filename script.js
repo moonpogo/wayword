@@ -41,6 +41,122 @@ const promptFamilies = {
   ]
 };
 
+/** Ritual Loop V1 — internal family tags only (not shown in UI). */
+function biasTagsForPromptFamily(familyKey) {
+  const key = String(familyKey || "").trim();
+  return key ? [`family:${key}`] : [];
+}
+
+function ritualPickIndex(seed, modulus) {
+  const s = String(seed != null ? seed : "");
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return modulus <= 0 ? 0 : h % modulus;
+}
+
+const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
+  Observation: [
+    "Keep this in one place.",
+    "Stay with one moment.",
+    "Use only what can be seen.",
+    "Pick one detail and stay with it."
+  ],
+  Indirection: [
+    "Don't name the feeling yet.",
+    "Show what happened. Don't name the feeling.",
+    "Leave the obvious label out.",
+    "Leave the main feeling unnamed."
+  ],
+  Social: [
+    "Use only spoken lines.",
+    "Two people. One exchange.",
+    "No summary of how they feel.",
+    "Keep it to one room and one moment."
+  ],
+  Object: [
+    "One object. Come back to it once.",
+    "Start with what a hand is touching.",
+    "Keep one ordinary thing in view.",
+    "Describe one thing as simply as you can."
+  ],
+  Tension: [
+    "Stop before it blows up.",
+    "Keep one worry present. Don't solve it.",
+    "Let someone almost say the hard thing.",
+    "Stop before anyone wins."
+  ]
+});
+
+const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
+  repetition: [
+    "Use the same word twice, but change what it does.",
+    "Repeat one word once, then move on.",
+    "Swap a repeated word for a plainer one.",
+    "Repeat one word once, then leave it."
+  ],
+  abstraction_concrete: [
+    "Keep this in what can be seen.",
+    "Three sentences on one thing someone can touch.",
+    "Add one line that shows only action.",
+    "Trade one vague line for one clear image."
+  ],
+  cadence: [
+    "Keep the sentences short.",
+    "Write one long sentence, then two short ones.",
+    "Make the first sentence short. Let the next one open up.",
+    "Let the sentences change length as you go."
+  ],
+  hesitation_qualification: [
+    "Say it plainly.",
+    "Say it without maybe or kind of.",
+    "Open with one plain sentence.",
+    "One straight fact. No cushion."
+  ],
+  fallback: [
+    "Keep this in one place.",
+    "Stay with one moment.",
+    "Don't explain anything.",
+    "Let the ending stay open."
+  ]
+});
+
+/**
+ * Ritual nudge for the run after this one. Deterministic; never quotes mirror text.
+ * @param {{ priorPromptFamily: string, hadMainReflection: boolean, mainCategory: string | null, seed: string }} input
+ */
+
+/** One line per new writing session; picked in `startWriting` / `restartRunWithCurrentSettings`. */
+const EDITOR_START_PLACEHOLDER_LINES = Object.freeze([
+  "Start anywhere.",
+  "One sentence is enough.",
+  "Just begin.",
+  "Pick a detail and go.",
+  "Don't plan it. Write it."
+]);
+
+function pickRandomStartPlaceholderLine() {
+  const lines = EDITOR_START_PLACEHOLDER_LINES;
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+function buildRitualNudgeV1({ priorPromptFamily, hadMainReflection, mainCategory, seed }) {
+  const family = String(priorPromptFamily || "").trim() || "Observation";
+  const s = seed != null ? String(seed) : "";
+  if (!hadMainReflection) {
+    const pool = RITUAL_NO_MAIN_NUDGE_BY_FAMILY[family] || RITUAL_NO_MAIN_NUDGE_BY_FAMILY.Observation;
+    const idx = ritualPickIndex(`${s}|no-main|${family}`, pool.length);
+    return pool[idx];
+  }
+  let cat = mainCategory != null ? String(mainCategory) : "fallback";
+  if (!RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY[cat]) cat = "fallback";
+  const pool = RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY[cat];
+  const idx = ritualPickIndex(`${s}|with-main|${cat}|${family}`, pool.length);
+  return pool[idx];
+}
+
 const bannedSets = [
   ["like","just","really","very","thing","stuff","something","maybe","kind","sort"],
   ["very","really","just","quite","perhaps","somehow"],
@@ -158,6 +274,14 @@ const state = {
   prompt: "",
   promptFamily: "",
   lastPromptKey: "",
+  /** Shown under the prompt for the full next active run; replaced only after the next saved run. */
+  pendingNudgeLine: "",
+  /** Family-level bias only; set in `generatePrompt`. */
+  promptBiasTags: [],
+  /** Editor empty-state hint; new pick each `startWriting` / restart run. */
+  startSessionPlaceholder: "",
+  /** Seeds rotating mirror empty copy for the last submit’s panel. */
+  mirrorEmptyFallbackSeed: "",
   theme: localStorage.getItem("wayword-theme") || "light",
   history: JSON.parse(localStorage.getItem("wayword-history") || "[]"),
   savedRunIds: new Set(JSON.parse(localStorage.getItem("wayword-runids") || "[]")),
@@ -1526,6 +1650,10 @@ function waywordDevResetCalibrationForTesting() {
   state.lastMirrorPipelineResult = null;
   state.lastMirrorLoadFailed = false;
   state.pendingRecentDrawerExpand = false;
+  state.pendingNudgeLine = "";
+  state.promptBiasTags = [];
+  state.startSessionPlaceholder = "";
+  state.mirrorEmptyFallbackSeed = "";
   localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
 
   state.progressionLevel = 1;
@@ -1723,6 +1851,7 @@ function generatePrompt() {
 
   state.lastPromptKey = key;
   state.promptFamily = family;
+  state.promptBiasTags = biasTagsForPromptFamily(family);
   return prompt;
 }
 
@@ -3011,6 +3140,16 @@ function renderMeta() {
   if (promptText) promptText.textContent = state.prompt || "";
   if (promptFamily) promptFamily.textContent = state.promptFamily || "Prompt";
 
+  const promptNudge = $("promptNudge");
+  if (promptNudge) {
+    const nudge = String(state.pendingNudgeLine || "").trim();
+    /** Nudge belongs to the next writing session only, not under the post-run prompt. */
+    const visible = Boolean(nudge && state.active && !state.submitted);
+    promptNudge.textContent = nudge;
+    promptNudge.classList.toggle("hidden", !visible);
+    promptNudge.setAttribute("aria-hidden", visible ? "false" : "true");
+  }
+
   if (bannedPill) {
     const bannedText = state.banned.length ? state.banned.join(", ") : "none";
     bannedPill.textContent = `avoid: ${bannedText}`;
@@ -3081,7 +3220,7 @@ function renderWritingState(options = {}) {
   editorInput.setAttribute(
     "data-placeholder",
     state.active && !state.submitted && !getEditorText().trim()
-      ? "Write freely. Submit when you're done. Highlights flag filler, repetition, and openings in this run."
+      ? state.startSessionPlaceholder || EDITOR_START_PLACEHOLDER_LINES[0]
       : ""
   );
   editorInput.classList.toggle("is-empty", !getEditorText().trim());
@@ -3578,7 +3717,7 @@ function buildMirrorPanelBodyHtml(args) {
   return globalThis.WaywordMirrorDom.buildMirrorPanelBodyHtml(args);
 }
 
-/** True when the pipeline has at least one evidence-backed reflection card. */
+/** True when the pipeline has at least one reflection card (headline present). */
 function mirrorPipelineResultHasEvidenceCards(result) {
   return globalThis.WaywordMirrorDom.mirrorPipelineResultHasEvidenceCards(result);
 }
@@ -3739,7 +3878,8 @@ function formatRecentEntryMirrorHtml(run, idPrefix) {
   if (mirrorPipelineResultHasEvidenceCards(run.mirrorPipelineResult)) {
     const body = buildReviewRunsMirrorGlanceBodyHtml({
       result: run.mirrorPipelineResult,
-      idPrefix: pfx
+      idPrefix: pfx,
+      emptyHintSeed: run.runId || String(run.savedAt || run.timestamp || "")
     });
     return `<div class="${glanceRoot}">${body}</div>`;
   }
@@ -3796,7 +3936,8 @@ function computeMirrorPostRunPanelParts() {
   const v1Body = buildMirrorPanelBodyHtml({
     loadFailed: state.lastMirrorLoadFailed,
     result: state.lastMirrorPipelineResult,
-    idPrefix: "mirror-postrun"
+    idPrefix: "mirror-postrun",
+    emptyHintSeed: state.mirrorEmptyFallbackSeed
   });
   const recentBody = buildMirrorRecentTrendsBlockHtml("mirror-postrun-recent");
   return { v1Body, recentBody };
@@ -4783,6 +4924,7 @@ function restartRunWithCurrentSettings(options = {}) {
   state.promptRerollsUsed = 0;
   state.prompt = generatePrompt();
   setEditorText("");
+  state.startSessionPlaceholder = pickRandomStartPlaceholderLine();
 
   const fb = $("feedbackBox");
   if (fb) {
@@ -4914,6 +5056,8 @@ function startWriting(options = {}) {
   state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
   state.prompt = generatePrompt();
   setEditorText("");
+  state.startSessionPlaceholder = pickRandomStartPlaceholderLine();
+  state.mirrorEmptyFallbackSeed = "";
 
   const fb = $("feedbackBox");
   if (fb) {
@@ -5076,8 +5220,19 @@ function submitWriting(fromTimer = false) {
   handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
 
   computeAndStoreMirrorPipelineResult(currentText, run);
+  state.mirrorEmptyFallbackSeed = run.runId;
 
   if (runWasSaved) {
+    const main = state.lastMirrorPipelineResult && state.lastMirrorPipelineResult.main;
+    const stmt = main && String(main.statement || "").trim();
+    const hadMainReflection = Boolean(stmt);
+    const mainCategory = hadMainReflection ? main.category ?? null : null;
+    state.pendingNudgeLine = buildRitualNudgeV1({
+      priorPromptFamily: state.promptFamily,
+      hadMainReflection,
+      mainCategory,
+      seed: run.runId
+    });
     attachMirrorSnapshotToRunFromState(run);
     if (mirrorSessionDigestAvailable()) {
       try {

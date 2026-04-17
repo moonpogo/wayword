@@ -8,8 +8,8 @@
  * - hesitation_qualification
  *
  * **Voice**
- * - Headline (`statement`): one observation-first sentence; plain, restrained; no metrics.
- * - Evidence: counts, ratios, means, snippets — everything that “proves” the line lives here.
+ * - Headline (`statement`): one observation-first sentence; plain, restrained; no metrics in the UI.
+ * - Cards ship headline only; counts, ratios, snippets, and tokenizer notes stay internal to the engine.
  * - No advice, no diagnosis, no personality claims, no feigned certainty.
  *
  * **repetition**
@@ -17,19 +17,18 @@
  *   that passes count gates and is not dull/ultra-short; otherwise no repetition card.
  *
  * **abstraction_concrete**
- * - Ambiguous movement (both shift flags): balance-only headline; metrics + note in evidence.
- * - Single-direction shift: conceptual vs concrete leaning in the back half (headline); metrics in evidence.
+ * - Ambiguous movement (both shift flags): balance-only headline.
+ * - Single-direction shift: conceptual vs concrete leaning in the back half (headline).
  * - Density-only: mostly-ideas / mostly-grounded / mixed middle line; ratio gates in thresholds file.
  *
  * **cadence**
- * - End compression / expansion: stricter quarter mean ratio + minimum sentence count; quarter
- *   means and ratio in evidence; lower rank weight than earlier V1.
- * - Alternation: only when short/long counts and sentence-length variance all clear explicit floors;
- *   counts and spread in evidence. No separate “even rhythm” or “changing length” headlines.
+ * - End compression / expansion: stricter quarter mean ratio + minimum sentence count (internal).
+ * - Alternation: only when short/long counts and sentence-length variance all clear explicit floors.
+ *   No separate “even rhythm” or “changing length” headlines.
  *
  * **hesitation_qualification**
  * - Headline chosen from a small set by bucket balance (qualify-after-state vs turn/soften vs general).
- * - Full bucket tallies and rate live in evidence only.
+ * - Bucket tallies inform selection internally only.
  *
  * **headline style rules**
  * - Avoid filler subjects like "this piece" or "the writing" unless necessary.

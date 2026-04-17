@@ -120,9 +120,10 @@ var WaywordMirror = (() => {
   var MIRROR_SHORT_SENTENCE_MAX_WORDS = 7;
   var MIRROR_LONG_SENTENCE_MIN_WORDS = 18;
   var MIRROR_CADENCE_MIN_SENTENCES_FOR_END_SHAPE = 6;
-  var MIRROR_END_COMPRESSION_RATIO = 0.72;
-  var MIRROR_END_EXPANSION_RATIO = 1.28;
-  var MIRROR_ABSTRACTION_SHIFT_RATIO = 1.1;
+  var MIRROR_END_COMPRESSION_RATIO = 0.68;
+  var MIRROR_END_EXPANSION_RATIO = 1.34;
+  var MIRROR_ABSTRACTION_SHIFT_RATIO = 1.32;
+  var MIRROR_ABSTRACTION_SHIFT_MIN_RATE_DELTA = 0.015;
 
   // src/features/mirror/utils/tokenizeText.ts
   function tokenizeText(text) {
@@ -168,8 +169,8 @@ var WaywordMirror = (() => {
     let shiftsTowardAbstract = false;
     let shiftsTowardConcrete = false;
     if (contentTokenCount >= 2 && firstTokens >= 1 && secondTokens >= 1) {
-      shiftsTowardAbstract = d2a > d1a * MIRROR_ABSTRACTION_SHIFT_RATIO;
-      shiftsTowardConcrete = d2c > d1c * MIRROR_ABSTRACTION_SHIFT_RATIO;
+      shiftsTowardAbstract = d2a > d1a * MIRROR_ABSTRACTION_SHIFT_RATIO && d2a - d1a >= MIRROR_ABSTRACTION_SHIFT_MIN_RATE_DELTA;
+      shiftsTowardConcrete = d2c > d1c * MIRROR_ABSTRACTION_SHIFT_RATIO && d2c - d1c >= MIRROR_ABSTRACTION_SHIFT_MIN_RATE_DELTA;
     }
     return {
       abstractCount,
@@ -382,7 +383,75 @@ var WaywordMirror = (() => {
     "this",
     "that",
     "these",
-    "those"
+    "those",
+    "about",
+    "above",
+    "across",
+    "after",
+    "against",
+    "again",
+    "all",
+    "also",
+    "among",
+    "another",
+    "any",
+    "around",
+    "because",
+    "before",
+    "below",
+    "between",
+    "both",
+    "down",
+    "during",
+    "each",
+    "even",
+    "ever",
+    "every",
+    "few",
+    "from",
+    "further",
+    "here",
+    "how",
+    "into",
+    "just",
+    "like",
+    "more",
+    "most",
+    "much",
+    "nor",
+    "not",
+    "off",
+    "once",
+    "only",
+    "onto",
+    "other",
+    "out",
+    "over",
+    "own",
+    "same",
+    "some",
+    "such",
+    "than",
+    "then",
+    "there",
+    "through",
+    "too",
+    "under",
+    "until",
+    "up",
+    "upon",
+    "very",
+    "what",
+    "when",
+    "where",
+    "which",
+    "while",
+    "who",
+    "whom",
+    "whose",
+    "why",
+    "without",
+    "within"
   ]);
 
   // src/features/mirror/analysis/extractRepetition.ts
@@ -450,10 +519,10 @@ var WaywordMirror = (() => {
   }
 
   // src/features/mirror/constants/generationThresholds.ts
-  var MIRROR_GEN_MIN_WORDS_FOR_ANY = 28;
-  var MIRROR_GEN_REPETITION_TOP_MIN_COUNT = 3;
+  var MIRROR_GEN_MIN_WORDS_FOR_ANY = 32;
+  var MIRROR_GEN_REPETITION_TOP_MIN_COUNT = 4;
   var MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN = 4;
-  var MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT = 5;
+  var MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT = 6;
   var MIRROR_GEN_REPETITION_DULL_WORDS = /* @__PURE__ */ new Set([
     "thing",
     "things",
@@ -482,23 +551,26 @@ var WaywordMirror = (() => {
   var MIRROR_GEN_CADENCE_MIN_SENTENCES = 5;
   var MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT = 3;
   var MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG = 2;
-  var MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE = 16;
-  var MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL = 3;
-  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_WORDS = 24;
-  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_ABSTRACT = 3;
-  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_RATIO = 2;
+  var MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE = 20;
+  var MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL = 4;
+  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_WORDS = 26;
+  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_ABSTRACT = 4;
+  var MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_RATIO = 2.25;
   var MIRROR_GEN_ABSTRACTION_SHORTFORM_MAX_CONCRETE = 1;
-  var MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT = 3;
-  var MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO = 1.28;
-  var MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO = 1.28;
-  var MIRROR_GEN_HESITATION_MIN_TOTAL = 6;
-  var MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS = 1.5;
+  var MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT = 6;
+  var MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT = 5;
+  var MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO = 1.35;
+  var MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO = 1.35;
+  var MIRROR_GEN_ABSTRACTION_SOFT_IDEA_LEAN_RATIO = 1.12;
+  var MIRROR_GEN_HESITATION_MIN_TOTAL = 8;
+  var MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS = 2;
 
   // src/features/mirror/constants/mirrorSessionHeadlines.ts
   function normMirrorReflectionHeadline(s) {
     return s.trim().toLowerCase().replace(/\s+/g, " ");
   }
   var MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times in this draft";
+  var MIRROR_HEADLINE_FALLBACK_SOFT = "The draft holds steady from start to finish.";
   function mirrorHeadlineRepetitionNamed(word) {
     return `\u201C${word}\u201D ${MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER}.`;
   }
@@ -521,35 +593,25 @@ var WaywordMirror = (() => {
   ];
 
   // src/features/mirror/generation/buildReflectionCandidates.ts
-  function snippetAround(text, needle, radius = 36) {
-    const t = text;
-    const lower = t.toLowerCase();
-    const n = needle.toLowerCase();
-    const idx = lower.indexOf(n);
-    if (idx < 0) {
-      return { text: needle };
-    }
-    const a = Math.max(0, idx - radius);
-    const b = Math.min(t.length, idx + needle.length + radius);
-    const slice = t.slice(a, b).trim();
-    return { text: slice, start: a, end: b };
-  }
-  function candidate(category, sessionId, statement, evidence, rankScore) {
-    return {
+  function candidate(category, sessionId, statement, evidence, rankScore, supportsPrimary = false) {
+    const base = {
       id: `${category}:${sessionId}`,
       category,
       statement,
       evidence,
       rankScore
     };
+    if (supportsPrimary) base.supportsPrimary = true;
+    return base;
   }
-  function abstractionCandidate(sessionId, statement, evidence, rankScore) {
+  function abstractionCandidate(sessionId, statement, rankScore, supportsPrimary = false) {
     return candidate(
       "abstraction_concrete",
       sessionId,
       statement,
-      evidence,
-      Math.max(rankScore, 38)
+      [],
+      Math.max(rankScore, 38),
+      supportsPrimary
     );
   }
   function repetitionWordIsLowSignal(word) {
@@ -562,29 +624,19 @@ var WaywordMirror = (() => {
     if (repetitionWordIsLowSignal(word)) return count >= MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT;
     return count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
   }
-  function repetitionTopCountsEvidence(features, depth = 4) {
-    const parts = features.topRepeatedWords.slice(0, depth).map((e) => `"${e.word}" \xD7${e.count}`);
-    return { text: `Repeated lemmas (tokenizer): ${parts.join("; ")}.` };
-  }
-  function tryRepetition(features, sourceText) {
+  function tryRepetition(features) {
     if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
     const list = features.topRepeatedWords;
     const picked = list.find(
       (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
     );
     if (!picked) return null;
-    const namedEv = [snippetAround(sourceText, picked.word)];
-    const tie = list.find(
-      (e) => e.word !== picked.word && e.count === picked.count && repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
-    );
-    if (tie) namedEv.push(snippetAround(sourceText, tie.word));
-    namedEv.push(repetitionTopCountsEvidence(features));
     const statement = mirrorHeadlineRepetitionNamed(picked.word);
     const multiNamed = list.filter(
       (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
     ).length;
     const rankScore = Math.min(100, picked.count * 14 + (multiNamed > 1 ? 5 : 0));
-    return candidate("repetition", features.sessionId, statement, namedEv, rankScore);
+    return candidate("repetition", features.sessionId, statement, [], rankScore);
   }
   function tryCadence(features) {
     const c = features.cadenceProfile;
@@ -595,34 +647,19 @@ var WaywordMirror = (() => {
     const quarterRatio = firstQ != null && lastQ != null && firstQ > 0 ? lastQ / firstQ : null;
     if (c.endCompression && quarterRatio != null && firstQ != null && lastQ != null) {
       const statement = MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS;
-      const ev = [
-        {
-          text: `Opening-quarter mean sentence length ${firstQ.toFixed(1)} words; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
-        }
-      ];
       const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
-      return candidate("cadence", features.sessionId, statement, ev, rankScore);
+      return candidate("cadence", features.sessionId, statement, [], rankScore);
     }
     if (c.endExpansion && quarterRatio != null && firstQ != null && lastQ != null) {
       const statement = MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN;
-      const ev = [
-        {
-          text: `Opening-quarter mean ${firstQ.toFixed(1)} words per sentence; closing-quarter mean ${lastQ.toFixed(1)} words; closing/opening mean ratio ${quarterRatio.toFixed(2)}; ${features.sentenceCount} sentences.`
-        }
-      ];
       const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
-      return candidate("cadence", features.sessionId, statement, ev, rankScore);
+      return candidate("cadence", features.sessionId, statement, [], rankScore);
     }
     const strongAlternation = features.sentenceCount >= MIRROR_GEN_CADENCE_MIN_SENTENCES && c.shortSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT && c.longSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG && c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
     if (strongAlternation) {
       const statement = MIRROR_HEADLINE_CADENCE_ALTERNATION;
-      const ev = [
-        {
-          text: `Short sentences (\u2264${MIRROR_SHORT_SENTENCE_MAX_WORDS} words): ${c.shortSentenceCount}; long (\u2265${MIRROR_LONG_SENTENCE_MIN_WORDS} words): ${c.longSentenceCount}; average sentence length ${c.avgSentenceLength.toFixed(1)} words; spread (population variance of sentence word counts) ${c.varianceSentenceLength.toFixed(2)}.`
-        }
-      ];
       const rankScore = 44 + Math.min(16, c.shortSentenceCount + c.longSentenceCount);
-      return candidate("cadence", features.sessionId, statement, ev, rankScore);
+      return candidate("cadence", features.sessionId, statement, [], rankScore);
     }
     return null;
   }
@@ -633,52 +670,44 @@ var WaywordMirror = (() => {
     if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && !shortFormAbstractionEligible) {
       return null;
     }
-    const metrics = `Abstract lexicon hits ${a.abstractCount}; concrete ${a.concreteCount}; ratio ${a.abstractConcreteRatio.toFixed(2)}.`;
     if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
       if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
       const statement = MIRROR_HEADLINE_ABSTRACTION_BALANCE;
-      const ev = [{ text: `${metrics} Both half-session rates rise for abstract and concrete lexicon matches (ambiguous direction).` }];
       const rankScore = 40 + Math.min(22, lex * 1.6);
-      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
     }
-    if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
+    if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT && a.abstractCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT) {
       const statement = MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL;
-      const ev = [{ text: `${metrics} Abstract-lexicon matches pick up in the second half of tokens.` }];
       const rankScore = 80 + Math.min(20, a.abstractCount * 2.4);
-      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
     }
-    if (a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
+    if (a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT && a.concreteCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT) {
       const statement = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER;
-      const ev = [{ text: `${metrics} Concrete-lexicon matches pick up in the second half of tokens.` }];
       const rankScore = 80 + Math.min(20, a.concreteCount * 2.4);
-      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
     }
     if (lex >= MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) {
       const ratioOkIdeas = a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO && a.abstractCount >= 2;
-      const ratioOkIdeasSoft = !ratioOkIdeas && a.abstractCount >= 3 && a.abstractConcreteRatio >= 1.06;
+      const ratioOkIdeasSoft = !ratioOkIdeas && a.abstractCount >= 3 && a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_SOFT_IDEA_LEAN_RATIO;
       const ratioOkConcrete = a.concreteCount >= MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO * Math.max(a.abstractCount, 1) && a.concreteCount >= 2;
       if (ratioOkIdeas && !ratioOkConcrete) {
         const statement2 = MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE;
-        const ev2 = [{ text: metrics }];
         const rankScore2 = 68 + Math.min(16, lex * 1.8);
-        return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
+        return abstractionCandidate(features.sessionId, statement2, rankScore2);
       }
       if (ratioOkIdeasSoft && !ratioOkConcrete) {
         const statement2 = MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE;
-        const ev2 = [{ text: `${metrics} Idea-leaning lexicon signal is present but below the stricter ratio gate.` }];
         const rankScore2 = 64 + Math.min(14, lex * 1.8);
-        return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
+        return abstractionCandidate(features.sessionId, statement2, rankScore2);
       }
       if (ratioOkConcrete && !ratioOkIdeas) {
         const statement2 = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS;
-        const ev2 = [{ text: metrics }];
         const rankScore2 = 68 + Math.min(16, lex * 1.8);
-        return abstractionCandidate(features.sessionId, statement2, ev2, rankScore2);
+        return abstractionCandidate(features.sessionId, statement2, rankScore2);
       }
       const statement = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT;
-      const ev = [{ text: metrics }];
       const rankScore = 34 + Math.min(14, lex * 1.5);
-      return abstractionCandidate(features.sessionId, statement, ev, rankScore);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
     }
     return null;
   }
@@ -698,7 +727,6 @@ var WaywordMirror = (() => {
     if (total < MIRROR_GEN_HESITATION_MIN_TOTAL && per100 < MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS) {
       return null;
     }
-    const tallies = `Qualifiers ${h.qualifierCount}; pivots ${h.pivotCount}; contradiction markers ${h.contradictionMarkers}; uncertainty markers ${h.uncertaintyMarkers}; total ${total}; about ${per100.toFixed(1)} per 100 tokenizer words.`;
     let statement;
     if (soft >= turn && h.qualifierCount >= 2) {
       statement = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER;
@@ -707,15 +735,13 @@ var WaywordMirror = (() => {
     } else {
       statement = MIRROR_HEADLINE_HESITATION_REVISED;
     }
-    const ev = [{ text: tallies }];
     let rankScore = Math.min(54, 24 + total * 2.2 + per100 * 0.7);
     if (soft < 3 && turn >= 2) rankScore -= 10;
-    return candidate("hesitation_qualification", features.sessionId, statement, ev, rankScore);
+    return candidate("hesitation_qualification", features.sessionId, statement, [], rankScore);
   }
-  function buildReflectionCandidates(features, sourceText) {
-    const text = normalizeText(sourceText);
+  function buildReflectionCandidates(features, _sourceText) {
     const out = [];
-    const rep = tryRepetition(features, text);
+    const rep = tryRepetition(features);
     if (rep) out.push(rep);
     const abs = tryAbstraction(features);
     if (abs) out.push(abs);
@@ -727,7 +753,6 @@ var WaywordMirror = (() => {
   }
 
   // src/features/mirror/constants/selectionThresholds.ts
-  var MIRROR_SELECTION_MIN_RANK_SCORE_FOR_MAIN = 40;
   var MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT = 34;
   var MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA = 5;
   var MIRROR_SELECTION_MAX_SUPPORTING = 4;
@@ -741,6 +766,7 @@ var WaywordMirror = (() => {
   }
   function mirrorStatementSpecificity(statement) {
     const n = norm(statement);
+    if (n === norm(MIRROR_HEADLINE_FALLBACK_SOFT)) return 5;
     if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
     if (n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) return 100;
     if (n === norm(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
@@ -764,6 +790,9 @@ var WaywordMirror = (() => {
   }
   function rankingWeight(candidate2) {
     const s = norm2(candidate2.statement);
+    if (candidate2.category === "fallback" || s === norm2(MIRROR_HEADLINE_FALLBACK_SOFT)) {
+      return -40;
+    }
     if (s === norm2(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
       return -28;
     }
@@ -786,6 +815,7 @@ var WaywordMirror = (() => {
     if (category === "repetition") return 3;
     if (category === "cadence") return 2;
     if (category === "hesitation_qualification") return 1;
+    if (category === "fallback") return 0;
     return 1;
   }
   function compareRanked(a, b) {
@@ -837,38 +867,78 @@ var WaywordMirror = (() => {
       rankScore: c.rankScore
     };
   }
-  function selectFinalReflections(rankedDeduped) {
+  function norm3(s) {
+    return normMirrorReflectionHeadline(s);
+  }
+  function interpretiveStrengthTier(c) {
+    if (c.category === "fallback") {
+      return 99;
+    }
+    const n = norm3(c.statement);
+    if (n === norm3(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || n === norm3(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
+      return 0;
+    }
+    if (n === norm3(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || n === norm3(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)) {
+      return 1;
+    }
+    if (c.category === "repetition" || n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) {
+      return 2;
+    }
+    if (c.category === "cadence") {
+      return 3;
+    }
+    if (c.category === "hesitation_qualification") {
+      return 4;
+    }
+    if (n === norm3(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || n === norm3(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
+      return 5;
+    }
+    return 6;
+  }
+  function categoryTieOrder(cat) {
+    if (cat === "abstraction_concrete") return 0;
+    if (cat === "repetition") return 1;
+    if (cat === "cadence") return 2;
+    if (cat === "hesitation_qualification") return 3;
+    if (cat === "fallback") return 4;
+    return 5;
+  }
+  function compareInterpretivePrimaryOrder(a, b) {
+    const ta = interpretiveStrengthTier(a);
+    const tb = interpretiveStrengthTier(b);
+    if (ta !== tb) return ta - tb;
+    if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
+    return categoryTieOrder(a.category) - categoryTieOrder(b.category);
+  }
+  function buildFallbackCandidate(sessionId) {
+    return {
+      id: `fallback:${sessionId}`,
+      category: "fallback",
+      statement: MIRROR_HEADLINE_FALLBACK_SOFT,
+      evidence: [],
+      rankScore: 0
+    };
+  }
+  function selectFinalReflections(rankedDeduped, sessionId) {
     if (rankedDeduped.length === 0) {
-      return { main: null, supporting: [] };
+      return { main: asSelected(buildFallbackCandidate(sessionId), "main"), supporting: [] };
     }
-    const supportEligible = rankedDeduped.filter(
-      (c) => c.rankScore >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT
-    );
-    if (supportEligible.length === 0) {
-      return { main: null, supporting: [] };
-    }
-    const best = rankedDeduped[0];
+    const ordered = [...rankedDeduped].sort(compareInterpretivePrimaryOrder);
+    const primary = ordered.find((c) => c.rankScore >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT) ?? null;
+    const chosen = primary ?? buildFallbackCandidate(sessionId);
+    const main = asSelected(chosen, "main");
     const supporting = [];
-    const used = /* @__PURE__ */ new Set();
-    if (best.rankScore >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_MAIN) {
-      const main = asSelected(best, "main");
-      used.add(best.category);
-      for (const c of rankedDeduped.slice(1)) {
-        if (supporting.length >= MIRROR_SELECTION_MAX_SUPPORTING) break;
-        if (used.has(c.category)) continue;
-        if (c.rankScore < MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT) continue;
-        supporting.push(asSelected(c, "support"));
-        used.add(c.category);
-      }
-      return { main, supporting };
-    }
-    for (const c of supportEligible) {
+    const used = /* @__PURE__ */ new Set([chosen.category]);
+    for (const c of ordered) {
       if (supporting.length >= MIRROR_SELECTION_MAX_SUPPORTING) break;
+      if (c === chosen) continue;
       if (used.has(c.category)) continue;
+      if (!c.supportsPrimary) continue;
+      if (c.rankScore < MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT) continue;
       supporting.push(asSelected(c, "support"));
       used.add(c.category);
     }
-    return { main: null, supporting };
+    return { main, supporting };
   }
 
   // src/features/mirror/pipeline/runMirrorPipeline.ts
@@ -877,7 +947,7 @@ var WaywordMirror = (() => {
     const raw = buildReflectionCandidates(features, normalizeText(input.text));
     const ranked = rankReflections(raw);
     const deduped = dedupeReflections(ranked);
-    return selectFinalReflections(deduped);
+    return selectFinalReflections(deduped, features.sessionId);
   }
 
   // src/features/mirror/recent/buildMirrorSessionDigest.ts
@@ -1026,9 +1096,6 @@ var WaywordMirror = (() => {
     if (q >= 3 && per100 >= 1) return true;
     return q >= 2 && per100 >= 1.5;
   }
-  function promotedEvidence() {
-    return [{ text: "Recurrent across recent qualifying drafts." }];
-  }
   function sliceLastQualifyingMirrorDigests(digests) {
     const qualifying = digests.filter((d) => d.v === 1 && d.qualifiesForRecent).sort((a, b) => a.timestamp - b.timestamp);
     if (qualifying.length === 0) return [];
@@ -1067,7 +1134,7 @@ var WaywordMirror = (() => {
       id: `recent_lexical_anchor:${w}`,
       category: "recent_lexical_anchor",
       statement: `\u201C${w}\u201D recurs across recent drafts.`,
-      evidence: promotedEvidence()
+      evidence: []
     };
   }
   function promoteAbstractionFromWindow(window) {
@@ -1082,7 +1149,7 @@ var WaywordMirror = (() => {
       id: "recent_abstraction_lean:promoted",
       category: "recent_abstraction_lean",
       statement: "Across recent drafts, language leans toward ideas over scenes.",
-      evidence: promotedEvidence()
+      evidence: []
     };
   }
   function promoteHesitationFromWindow(window) {
@@ -1095,7 +1162,7 @@ var WaywordMirror = (() => {
       id: "recent_hesitation_qualification:promoted",
       category: "recent_hesitation_qualification",
       statement: "Across recent drafts, statements are often qualified just after they appear.",
-      evidence: promotedEvidence()
+      evidence: []
     };
   }
   function promoteRecentTrendsToPatternsFromWindow(window) {
@@ -1230,14 +1297,6 @@ var WaywordMirror = (() => {
     if (q >= 3 && per100 >= 1) return true;
     return q >= 2 && per100 >= 1.5;
   }
-  function evidenceLines(...lines) {
-    return lines.map((text) => ({ text }));
-  }
-  function sessionChronoIndex(aggregate) {
-    const m = /* @__PURE__ */ new Map();
-    aggregate.abstractionSessions.forEach((s, i) => m.set(s.sessionId, i));
-    return m;
-  }
   function tryLexicalCandidate(aggregate) {
     const gated = aggregate.lexicalWords.map((row) => {
       const hits = row.perSessionCounts.filter((p) => lexicalWordCountsForSession2(row.word, p.count));
@@ -1261,20 +1320,11 @@ var WaywordMirror = (() => {
     const n = aggregate.qualifyingSessionCount;
     const rankScore = 42 + best.distinctSessionCount * 14 + Math.min(18, best.totalTopListCount);
     const statement = `\u201C${best.word}\u201D recurs across recent drafts.`;
-    const chrono = sessionChronoIndex(aggregate);
-    const ordered = [...best.perSessionCounts].sort(
-      (a, b) => (chrono.get(a.sessionId) ?? 0) - (chrono.get(b.sessionId) ?? 0)
-    );
-    const parts = ordered.map((p) => `${p.count}\xD7`).join(", ");
-    const ev = evidenceLines(
-      `Seen in ${best.distinctSessionCount} of the last ${n} qualifying drafts.`,
-      `Recent counts: ${parts}.`
-    );
     return {
       id: `recent_lexical_anchor:${best.word}`,
       category: "recent_lexical_anchor",
       statement,
-      evidence: ev,
+      evidence: [],
       rankScore
     };
   }
@@ -1288,17 +1338,15 @@ var WaywordMirror = (() => {
     }
     if (ideaLean < MIN_SESSIONS_FOR_CROSS_SESSION_PATTERN) return null;
     if (ideaLean <= concreteLean) return null;
-    const n = aggregate.qualifyingSessionCount;
     const ratios = sessions.map((s) => s.abstractConcreteRatio);
     const meanRatio = ratios.reduce((a, b) => a + b, 0) / Math.max(ratios.length, 1);
     const rankScore = 48 + ideaLean * 11 + Math.min(14, meanRatio * 4);
     const statement = "Across recent drafts, language leans toward ideas over scenes.";
-    const ev = evidenceLines(`Ideas over scenes in ${ideaLean} of the last ${n} qualifying drafts.`);
     return {
       id: "recent_abstraction_lean:aggregate",
       category: "recent_abstraction_lean",
       statement,
-      evidence: ev,
+      evidence: [],
       rankScore
     };
   }
@@ -1309,21 +1357,13 @@ var WaywordMirror = (() => {
       if (sessionQualifierPattern2(s)) qualPattern += 1;
     }
     if (qualPattern < MIN_SESSIONS_FOR_CROSS_SESSION_PATTERN) return null;
-    const n = aggregate.qualifyingSessionCount;
     const rankScore = 46 + qualPattern * 10;
     const statement = "Across recent drafts, statements are often qualified just after they appear.";
-    const chrono = sessionChronoIndex(aggregate);
-    const ordered = sessions.filter((s) => sessionQualifierPattern2(s)).sort((a, b) => (chrono.get(a.sessionId) ?? 0) - (chrono.get(b.sessionId) ?? 0));
-    const counts = ordered.map((s) => String(s.qualifierCount)).join(", ");
-    const ev = evidenceLines(
-      `Qualifier-heavy in ${qualPattern} of the last ${n} qualifying drafts.`,
-      `Recent drafts: ${counts} qualifiers.`
-    );
     return {
       id: "recent_hesitation_qualification:aggregate",
       category: "recent_hesitation_qualification",
       statement,
-      evidence: ev,
+      evidence: [],
       rankScore
     };
   }

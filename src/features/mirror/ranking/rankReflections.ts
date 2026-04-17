@@ -8,6 +8,7 @@ import {
   MIRROR_HEADLINE_CADENCE_ALTERNATION,
   MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
   MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
+  MIRROR_HEADLINE_FALLBACK_SOFT,
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
   MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
   MIRROR_HEADLINE_HESITATION_REVISED,
@@ -24,10 +25,14 @@ function norm(s: string): string {
 
 /**
  * Explicit ordering weights so lead cards prefer directional observations over balanced/mixed lines.
- * This layer does not alter extraction thresholds or evidence; it only affects rank ordering.
+ * This layer does not alter extraction thresholds; it only affects rank ordering.
  */
 function rankingWeight(candidate: MirrorReflectionCandidate): number {
   const s = norm(candidate.statement);
+
+  if (candidate.category === "fallback" || s === norm(MIRROR_HEADLINE_FALLBACK_SOFT)) {
+    return -40;
+  }
 
   // Lower-priority abstraction states should not outrank directional observations.
   if (
@@ -82,6 +87,7 @@ function categoryTiePreference(category: MirrorCategoryV1): number {
   if (category === "repetition") return 3;
   if (category === "cadence") return 2;
   if (category === "hesitation_qualification") return 1;
+  if (category === "fallback") return 0;
   return 1;
 }
 

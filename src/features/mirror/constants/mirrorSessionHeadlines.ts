@@ -12,6 +12,9 @@ export function normMirrorReflectionHeadline(s: string): string {
 /** Substring shared by all named-repetition headlines; rank/specificity match on this fragment. */
 export const MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times in this draft";
 
+/** When no category clears selection floors: one soft, observational line (not diagnostic). */
+export const MIRROR_HEADLINE_FALLBACK_SOFT = "The draft holds steady from start to finish.";
+
 export function mirrorHeadlineRepetitionNamed(word: string): string {
   return `\u201c${word}\u201d ${MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER}.`;
 }

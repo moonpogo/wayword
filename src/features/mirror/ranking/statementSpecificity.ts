@@ -11,6 +11,7 @@ import {
   MIRROR_HEADLINE_CADENCE_ALTERNATION,
   MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
   MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
+  MIRROR_HEADLINE_FALLBACK_SOFT,
   MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS,
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
   MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
@@ -31,6 +32,7 @@ function norm(s: string): string {
  */
 export function mirrorStatementSpecificity(statement: string): number {
   const n = norm(statement);
+  if (n === norm(MIRROR_HEADLINE_FALLBACK_SOFT)) return 5;
   if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
 
   // Named recurrence should beat most non-directional observations.

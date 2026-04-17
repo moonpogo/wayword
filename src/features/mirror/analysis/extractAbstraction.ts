@@ -1,6 +1,9 @@
 import { MIRROR_ABSTRACT_WORDS } from "../constants/abstractWords.js";
 import { MIRROR_CONCRETE_WORDS } from "../constants/concreteWords.js";
-import { MIRROR_ABSTRACTION_SHIFT_RATIO } from "../constants/thresholds.js";
+import {
+  MIRROR_ABSTRACTION_SHIFT_MIN_RATE_DELTA,
+  MIRROR_ABSTRACTION_SHIFT_RATIO
+} from "../constants/thresholds.js";
 import type { MirrorAbstractionExtraction, MirrorSessionInput } from "../types/mirrorTypes.js";
 import { tokenizeText } from "../utils/tokenizeText.js";
 
@@ -53,8 +56,12 @@ export function extractAbstraction(input: MirrorSessionInput): MirrorAbstraction
   let shiftsTowardAbstract = false;
   let shiftsTowardConcrete = false;
   if (contentTokenCount >= 2 && firstTokens >= 1 && secondTokens >= 1) {
-    shiftsTowardAbstract = d2a > d1a * MIRROR_ABSTRACTION_SHIFT_RATIO;
-    shiftsTowardConcrete = d2c > d1c * MIRROR_ABSTRACTION_SHIFT_RATIO;
+    shiftsTowardAbstract =
+      d2a > d1a * MIRROR_ABSTRACTION_SHIFT_RATIO &&
+      d2a - d1a >= MIRROR_ABSTRACTION_SHIFT_MIN_RATE_DELTA;
+    shiftsTowardConcrete =
+      d2c > d1c * MIRROR_ABSTRACTION_SHIFT_RATIO &&
+      d2c - d1c >= MIRROR_ABSTRACTION_SHIFT_MIN_RATE_DELTA;
   }
 
   return {
