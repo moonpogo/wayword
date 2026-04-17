@@ -776,8 +776,8 @@ button,input,textarea{
 
 .subhed{
   color:var(--ink);
-  opacity:.82;
-  font-size:16px;
+  opacity:.74;
+  font-size:12px;
 }
 
 button{
@@ -4708,7 +4708,7 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   body.focus-mode .subhed{
-    font-size:13px;
+    font-size:11px;
   }
 
   body.focus-mode .prompt-card{
@@ -4798,7 +4798,7 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   body.focus-mode .subhed{
-    font-size:12px;
+    font-size:10px;
   }
 
   body.focus-mode .prompt-text{
