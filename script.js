@@ -3671,19 +3671,232 @@ function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix }) {
   return parts.join("");
 }
 
+/** True when the pipeline has at least one evidence-backed reflection card. */
+function mirrorPipelineResultHasEvidenceCards(result) {
+  const r = result;
+  if (!r || typeof r !== "object") return false;
+  const main = r.main;
+  const supporting = Array.isArray(r.supporting) ? r.supporting : [];
+  const hasMain = Boolean(main && String(main.statement || "").trim());
+  const hasSupport = supporting.some((c) => c && String(c.statement || "").trim());
+  return hasMain || hasSupport;
+}
+
+function countMirrorReflectionCards(result) {
+  const r = result;
+  if (!r || typeof r !== "object") return 0;
+  const main = r.main;
+  const supporting = Array.isArray(r.supporting) ? r.supporting : [];
+  let n = 0;
+  if (main && String(main.statement || "").trim()) n += 1;
+  supporting.forEach((c) => {
+    if (c && String(c.statement || "").trim()) n += 1;
+  });
+  return n;
+}
+
+/**
+ * Review Runs only: one strongest reflection (main if present, else first supporting)
+ * plus a non-interactive depth hint when more cards exist. Full stacks stay on post-run / Patterns.
+ */
+function buildReviewRunsMirrorGlanceBodyHtml({ result, idPrefix }) {
+  const pfx = String(idPrefix || "mirror");
+  const r = result;
+  if (!r || typeof r !== "object") {
+    return '<p class="mirror-empty">Nothing in this run stood out enough to echo back.</p>';
+  }
+  const main = r.main;
+  const supporting = Array.isArray(r.supporting) ? r.supporting : [];
+  const hasMain = Boolean(main && String(main.statement || "").trim());
+  let card = null;
+  let role = "support";
+  let firstSupportInSupportOnlyStack = false;
+  if (hasMain) {
+    card = main;
+    role = "main";
+  } else {
+    const idx = supporting.findIndex((c) => c && String(c.statement || "").trim());
+    if (idx >= 0) {
+      card = supporting[idx];
+      firstSupportInSupportOnlyStack = true;
+    }
+  }
+  if (!card) {
+    return '<p class="mirror-empty">Nothing in this run stood out enough to echo back.</p>';
+  }
+  const total = countMirrorReflectionCards(r);
+  const moreCount = Math.max(0, total - 1);
+  const parts = [];
+  parts.push('<div class="mirror-reflection-eyebrow">Reflection</div>');
+  const stackClass =
+    "mirror-stack mirror-stack--glance-one" +
+    (!hasMain ? " mirror-stack--support-only" : "");
+  parts.push(`<div class="${stackClass}">`);
+  parts.push(
+    mirrorReflectionCardHtml(card, {
+      role,
+      firstSupportInSupportOnlyStack,
+      evidencePanelId: `${pfx}-glance`
+    })
+  );
+  if (moreCount > 0) {
+    parts.push(
+      `<p class="recent-entry-reflection-depth">${escapeHtmlMirror(`+${moreCount} more`)}</p>`
+    );
+  }
+  parts.push("</div>");
+  return parts.join("");
+}
+
+const REVIEW_RUN_REFLECTION_MAX = 3;
+const REVIEW_RUN_MIN_WORDS = 28;
+const REVIEW_RUN_DULL_REPEATS = new Set([
+  "thing",
+  "things",
+  "stuff",
+  "something",
+  "anything",
+  "nothing",
+  "way",
+  "ways",
+  "kind",
+  "sort",
+  "time",
+  "life",
+  "world",
+  "people",
+  "person",
+  "moment",
+  "day",
+  "night"
+]);
+
+function reviewRunSentenceCount(text) {
+  return String(text || "")
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean).length;
+}
+
+/**
+ * Metric-only reflection lines for Review Runs when Mirror cards are absent.
+ * Each line maps to one aspect; order is repetition → openings → structure → language.
+ */
+function buildReviewRunReflectionLines(run) {
+  const aspects = new Set();
+  const candidates = [];
+  const wc = Math.max(0, Number(run.wordCount) || Number(run.words) || 0);
+  if (wc < REVIEW_RUN_MIN_WORDS) {
+    return ["No strong patterns surfaced in this run."];
+  }
+
+  const repeated = Array.isArray(run.repeatedWords) ? run.repeatedWords : [];
+  let bestRep = null;
+  for (const row of repeated) {
+    if (!Array.isArray(row) || row.length < 2) continue;
+    const display = String(row[0] || "").trim();
+    const c = Number(row[1]);
+    if (!display || !Number.isFinite(c)) continue;
+    const nw = normalizeWord(display);
+    if (!nw || REVIEW_RUN_DULL_REPEATS.has(nw)) continue;
+    const len = nw.length;
+    const strong = (len >= 5 && c >= 3) || (len >= 4 && c >= 5);
+    if (!strong) continue;
+    if (!bestRep || c > bestRep.c || (c === bestRep.c && len > bestRep.len)) {
+      bestRep = { display, c, len };
+    }
+  }
+  if (bestRep) {
+    candidates.push({
+      aspect: "repetition",
+      line: `“${bestRep.display}” appears repeatedly across the run.`
+    });
+  }
+
+  const starters = Array.isArray(run.repeatedStarters) ? run.repeatedStarters : [];
+  let openingMax = 0;
+  for (const row of starters) {
+    if (!Array.isArray(row) || row.length < 2) continue;
+    const c = Number(row[1]);
+    if (Number.isFinite(c)) openingMax = Math.max(openingMax, c);
+  }
+  if (openingMax >= 3) {
+    candidates.push({ aspect: "openings", line: "Several sentences begin the same way." });
+  }
+
+  const text = String(run.text || "");
+  const sc = reviewRunSentenceCount(text);
+  const avg = Number(run.avgSentenceLength);
+  if (wc >= 35 && sc >= 5 && Number.isFinite(avg) && avg > 0 && avg <= 12) {
+    candidates.push({
+      aspect: "structure",
+      line: "The writing leans toward short, contained sentences."
+    });
+  }
+
+  const fillerHits = Array.isArray(run.bannedHits)
+    ? run.bannedHits.reduce((sum, h) => sum + (h && !h.isExercise ? Number(h.count) || 0 : 0), 0)
+    : Math.max(0, Number(run.fillerCount) || 0);
+  const per100Filler = (fillerHits / wc) * 100;
+  if (fillerHits >= 6 || per100Filler >= 5) {
+    candidates.push({
+      aspect: "language",
+      line: "The language stays mostly functional, with few concrete images."
+    });
+  }
+
+  const out = [];
+  for (const c of candidates) {
+    if (aspects.has(c.aspect)) continue;
+    aspects.add(c.aspect);
+    out.push(c.line);
+    if (out.length >= REVIEW_RUN_REFLECTION_MAX) break;
+  }
+
+  if (out.length === 0) {
+    return ["No strong patterns surfaced in this run."];
+  }
+  return out;
+}
+
+/** Review Runs: strongest metric line only + optional depth cue (no multi-line stack). */
+function formatReviewRunReflectionGlanceHtml(lines, idPrefix) {
+  const pfx = String(idPrefix || "mirror-review");
+  const safe = Array.isArray(lines) ? lines.map((s) => String(s || "").trim()).filter(Boolean) : [];
+  const bodyLines =
+    safe.length > 0 ? safe : ["No strong patterns surfaced in this run."];
+  const primary = bodyLines[0];
+  const moreCount = bodyLines.length - 1;
+  const depth =
+    moreCount > 0
+      ? `<p class="recent-entry-reflection-depth">${escapeHtmlMirror(`+${moreCount} more`)}</p>`
+      : "";
+  return (
+    `<div class="recent-entry-mirror-root recent-entry-mirror recent-entry-mirror--glance recent-entry-reflection-lines">` +
+    `<div class="mirror-reflection-eyebrow">Reflection</div>` +
+    `<div class="recent-entry-reflection-line-stack recent-entry-reflection-line-stack--single">` +
+    `<p class="recent-entry-reflection-line" id="${pfx}-line-0">${escapeHtmlMirror(primary)}</p>` +
+    depth +
+    `</div>` +
+    `</div>`
+  );
+}
+
 function formatRecentEntryMirrorHtml(run, idPrefix) {
   if (!run || typeof run !== "object") return "";
+  const glanceRoot = "recent-entry-mirror-root recent-entry-mirror recent-entry-mirror--glance";
   if (run.mirrorLoadFailed) {
-    return `<div class="recent-entry-mirror-root recent-entry-mirror"><p class="mirror-empty">Reflection isn’t available in this build.</p></div>`;
+    return `<div class="${glanceRoot}"><p class="mirror-empty">Reflection isn’t available in this build.</p></div>`;
   }
-  if (run.mirrorPipelineResult == null) return "";
-  const body = buildMirrorPanelBodyHtml({
-    loadFailed: false,
-    result: run.mirrorPipelineResult,
-    idPrefix
-  });
-  if (!body) return "";
-  return `<div class="recent-entry-mirror-root recent-entry-mirror">${body}</div>`;
+  const pfx = String(idPrefix || "mirror");
+  if (mirrorPipelineResultHasEvidenceCards(run.mirrorPipelineResult)) {
+    const body = buildReviewRunsMirrorGlanceBodyHtml({
+      result: run.mirrorPipelineResult,
+      idPrefix: pfx
+    });
+    return `<div class="${glanceRoot}">${body}</div>`;
+  }
+  return formatReviewRunReflectionGlanceHtml(buildReviewRunReflectionLines(run), pfx);
 }
 
 /** Collapse all Mirror evidence panels under `root` (Recent drawer, rail, post-run, Patterns). */
@@ -4377,12 +4590,14 @@ function toggleRecentEntry(entry) {
   document.querySelectorAll(".recent-entry.is-open").forEach((el) => {
     if (el === entry) return;
     el.classList.remove("is-open");
+    el.classList.remove("recent-entry--active");
     el.setAttribute("aria-expanded", "false");
     const other = el.querySelector(".recent-entry-expanded");
     if (other) other.hidden = true;
   });
 
   entry.classList.toggle("is-open", !isOpen);
+  entry.classList.toggle("recent-entry--active", !isOpen);
   expanded.hidden = isOpen;
   entry.setAttribute("aria-expanded", String(!isOpen));
   entry.querySelectorAll(".recent-entry-mirror-root").forEach(collapseMirrorEvidenceInRoot);
