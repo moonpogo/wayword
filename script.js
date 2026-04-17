@@ -3520,27 +3520,7 @@ function buildMirrorRecentTrendsBlockHtml(idPrefix) {
     return "";
   }
 
-  const pfx = String(idPrefix || "mirror-recent");
-  const parts = [];
-  parts.push('<div class="mirror-recent-block">');
-  parts.push(
-    '<div class="mirror-reflection-eyebrow mirror-recent-pattern-eyebrow">Across recent runs</div>'
-  );
-  parts.push('<div class="mirror-stack mirror-stack--recent mirror-stack--support-only">');
-  rows.forEach((t, i) => {
-    parts.push(
-      mirrorReflectionCardHtml(
-        { statement: t.statement, evidence: t.evidence },
-        {
-          role: "support",
-          firstSupportInSupportOnlyStack: i === 0,
-          evidencePanelId: `${pfx}-t-${i}`
-        }
-      )
-    );
-  });
-  parts.push("</div></div>");
-  return parts.join("");
+  return globalThis.WaywordMirrorDom.buildMirrorRecentTrendsBlockBodyHtml(rows, idPrefix);
 }
 
 function computeAndStoreMirrorPipelineResult(text, run) {

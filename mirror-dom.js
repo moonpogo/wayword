@@ -171,6 +171,33 @@
     return parts.join("");
   }
 
+  /**
+   * Post-run “Across recent runs” block: markup for pre-filtered trend rows only (no pipeline/history).
+   */
+  function buildMirrorRecentTrendsBlockBodyHtml(rows, idPrefix) {
+    const pfx = String(idPrefix || "mirror-recent");
+    const parts = [];
+    parts.push('<div class="mirror-recent-block">');
+    parts.push(
+      '<div class="mirror-reflection-eyebrow mirror-recent-pattern-eyebrow">Across recent runs</div>'
+    );
+    parts.push('<div class="mirror-stack mirror-stack--recent mirror-stack--support-only">');
+    rows.forEach((t, i) => {
+      parts.push(
+        mirrorReflectionCardHtml(
+          { statement: t.statement, evidence: t.evidence },
+          {
+            role: "support",
+            firstSupportInSupportOnlyStack: i === 0,
+            evidencePanelId: `${pfx}-t-${i}`
+          }
+        )
+      );
+    });
+    parts.push("</div></div>");
+    return parts.join("");
+  }
+
   globalThis.WaywordMirrorDom = {
     escapeHtmlMirror,
     renderMirrorEvidenceLinesHtml,
@@ -178,6 +205,7 @@
     buildMirrorPanelBodyHtml,
     mirrorPipelineResultHasEvidenceCards,
     countMirrorReflectionCards,
-    buildReviewRunsMirrorGlanceBodyHtml
+    buildReviewRunsMirrorGlanceBodyHtml,
+    buildMirrorRecentTrendsBlockBodyHtml
   };
 })();
