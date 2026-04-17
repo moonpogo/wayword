@@ -21,12 +21,12 @@ function clauseFor(pattern: MirrorRecentTrend): string | null {
     case "recent_lexical_anchor": {
       const word = extractLexicalWord(pattern.id);
       if (!word) return null;
-      return `You tend to return to \u201c${word}\u201d`;
+      return `\u201c${word}\u201d recurs across drafts`;
     }
     case "recent_abstraction_lean":
-      return "Your writing leans more toward ideas than concrete scenes";
+      return "Language leans toward ideas over scenes";
     case "recent_hesitation_qualification":
-      return "You often qualify a thought just after stating it";
+      return "Statements are often qualified just after they appear";
     default:
       return null;
   }
@@ -38,12 +38,12 @@ function standaloneSentence(pattern: MirrorRecentTrend): string | null {
     case "recent_lexical_anchor": {
       const word = extractLexicalWord(pattern.id);
       if (!word) return null;
-      return `You tend to return to \u201c${word}.\u201d`;
+      return `\u201c${word}\u201d recurs across drafts.`;
     }
     case "recent_abstraction_lean":
-      return "Your writing leans more toward ideas than concrete scenes.";
+      return "Language leans toward ideas over scenes.";
     case "recent_hesitation_qualification":
-      return "You often qualify a thought just after stating it.";
+      return "Statements are often qualified just after they appear.";
     default:
       return null;
   }

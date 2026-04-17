@@ -117,7 +117,7 @@ function tryRepetition(
   if (tie) namedEv.push(snippetAround(sourceText, tie.word));
   namedEv.push(repetitionTopCountsEvidence(features));
 
-  const statement = `You return several times to “${picked.word}.”`;
+  const statement = `“${picked.word}” returns several times in this draft.`;
   const multiNamed = list.filter(
     (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
   ).length;
@@ -202,7 +202,7 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
   }
 
   if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT) {
-    const statement = "The writing leans more conceptual than scene-based toward the back half.";
+    const statement = "Language grows more conceptual than scene-based toward the back half.";
     const ev: MirrorEvidence[] = [{ text: `${metrics} Abstract-lexicon matches pick up in the second half of tokens.` }];
     const rankScore = 64 + Math.min(36, a.abstractCount * 3.2);
     return abstractionCandidate(features.sessionId, statement, ev, rankScore);
@@ -281,11 +281,11 @@ function tryHesitation(features: MirrorFeatures): MirrorReflectionCandidate | nu
 
   let statement: string;
   if (soft >= turn && h.qualifierCount >= 2) {
-    statement = "You often qualify a thought just after stating it.";
+    statement = "Statements are often qualified just after they appear.";
   } else if (turn >= soft && turn >= 2 && soft >= 2) {
-    statement = "There's a pattern of assertion followed by softening.";
+    statement = "Assertions are often followed by softening.";
   } else {
-    statement = "Statements here are often followed by revision or softening.";
+    statement = "Statements are often followed by revision or softening.";
   }
 
   const ev: MirrorEvidence[] = [{ text: tallies }];

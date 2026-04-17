@@ -99,7 +99,7 @@ function tryLexicalCandidate(aggregate: MirrorRecentDigestsAggregate): MirrorRec
   const best = gated[0];
   const n = aggregate.qualifyingSessionCount;
   const rankScore = 42 + best.distinctSessionCount * 14 + Math.min(18, best.totalTopListCount);
-  const statement = `Across recent drafts, you return often to “${best.word}.”`;
+  const statement = `“${best.word}” recurs across recent drafts.`;
   const chrono = sessionChronoIndex(aggregate);
   const ordered = [...best.perSessionCounts].sort(
     (a, b) => (chrono.get(a.sessionId) ?? 0) - (chrono.get(b.sessionId) ?? 0)
@@ -133,7 +133,7 @@ function tryAbstractionCandidate(aggregate: MirrorRecentDigestsAggregate): Mirro
   const ratios = sessions.map((s) => s.abstractConcreteRatio);
   const meanRatio = ratios.reduce((a, b) => a + b, 0) / Math.max(ratios.length, 1);
   const rankScore = 48 + ideaLean * 11 + Math.min(14, meanRatio * 4);
-  const statement = "Across recent writing, your language leans more toward ideas than scenes.";
+  const statement = "Across recent drafts, language leans toward ideas over scenes.";
   const ev = evidenceLines(`Ideas over scenes in ${ideaLean} of the last ${n} qualifying drafts.`);
   return {
     id: "recent_abstraction_lean:aggregate",
@@ -154,7 +154,7 @@ function tryHesitationCandidate(aggregate: MirrorRecentDigestsAggregate): Mirror
 
   const n = aggregate.qualifyingSessionCount;
   const rankScore = 46 + qualPattern * 10;
-  const statement = "Several recent drafts qualify a thought just after stating it.";
+  const statement = "Across recent drafts, statements are often qualified just after they appear.";
   const chrono = sessionChronoIndex(aggregate);
   const ordered = sessions
     .filter((s) => sessionQualifierPattern(s))

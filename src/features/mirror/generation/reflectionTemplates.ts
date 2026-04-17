@@ -13,7 +13,7 @@
  * - No advice, no diagnosis, no personality claims, no feigned certainty.
  *
  * **repetition**
- * - Named return only: “You return several times to ‘lemma.’” for the first top repeated lemma
+ * - Named return only: the repeated lemma in quotes + “returns several times in this draft.”
  *   that passes count gates and is not dull/ultra-short; otherwise no repetition card.
  *
  * **abstraction_concrete**

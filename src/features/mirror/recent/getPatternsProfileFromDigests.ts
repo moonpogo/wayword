@@ -128,7 +128,7 @@ function promoteLexicalFromWindow(window: ReadonlyArray<MirrorSessionDigest>): M
   return {
     id: `recent_lexical_anchor:${w}`,
     category: "recent_lexical_anchor",
-    statement: `Across recent drafts, you return often to “${w}.”`,
+    statement: `“${w}” recurs across recent drafts.`,
     evidence: promotedEvidence()
   };
 }
@@ -144,7 +144,7 @@ function promoteAbstractionFromWindow(window: ReadonlyArray<MirrorSessionDigest>
   return {
     id: "recent_abstraction_lean:promoted",
     category: "recent_abstraction_lean",
-    statement: "Across recent writing, your language leans more toward ideas than scenes.",
+    statement: "Across recent drafts, language leans toward ideas over scenes.",
     evidence: promotedEvidence()
   };
 }
@@ -158,7 +158,7 @@ function promoteHesitationFromWindow(window: ReadonlyArray<MirrorSessionDigest>)
   return {
     id: "recent_hesitation_qualification:promoted",
     category: "recent_hesitation_qualification",
-    statement: "Several recent drafts qualify a thought just after stating it.",
+    statement: "Across recent drafts, statements are often qualified just after they appear.",
     evidence: promotedEvidence()
   };
 }
