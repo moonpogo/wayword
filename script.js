@@ -388,44 +388,6 @@ function isMobilePatternsVisible() {
   return Boolean(profileView && !profileView.classList.contains("hidden"));
 }
 
-function syncPatternsLayoutMode() {
-  const appView = $("appView");
-  const writeView = $("writeView");
-  const profileView = $("profileView");
-  const sideColumn = document.querySelector("#writeView .side-column");
-  const defaultRail = $("desktopRailDefault");
-  const styleTab = $("styleTab");
-  if (!writeView || !profileView) return;
-
-  const useDesktopRail = isDesktopPatternsViewport();
-  const profileVisible = !profileView.classList.contains("hidden");
-  const useDesktopPatterns = profileVisible && useDesktopRail;
-  const useMobilePatterns = profileVisible && !useDesktopRail;
-
-  if (useDesktopRail && sideColumn && profileView.parentElement !== sideColumn) {
-    sideColumn.appendChild(profileView);
-  } else if (!useDesktopRail && appView && profileView.parentElement !== appView) {
-    appView.appendChild(profileView);
-  }
-
-  writeView.classList.toggle("hidden", profileVisible && !useDesktopRail);
-  document.body.classList.toggle("patterns-open", useMobilePatterns);
-  appView?.classList.toggle("desktop-patterns-open", useDesktopPatterns);
-  sideColumn?.classList.toggle("rail-mode-patterns", useDesktopPatterns);
-  if (defaultRail) defaultRail.classList.toggle("hidden", useDesktopPatterns);
-
-  if (styleTab) {
-    styleTab.classList.toggle("is-active", profileVisible);
-    styleTab.setAttribute("aria-expanded", profileVisible ? "true" : "false");
-  }
-  logPatternsTransitionSnapshot("syncPatternsLayoutMode:after", {
-    useDesktopRail,
-    profileVisible,
-    useDesktopPatterns,
-    useMobilePatterns
-  });
-}
-
 /**
  * Clears wordmark completion timers, idle lift loop, and transform CSS vars so header chrome
  * does not keep animating after focus exit (or re-enter) — avoids repeat-cycle stagger from
@@ -548,7 +510,7 @@ function settleNonFocusBaselineAfterPatternsClose() {
   document.body.classList.remove("focus-mode", "expanded-field", "keyboard-open", "patterns-open");
   document.documentElement.classList.remove("focus-mode-layout-snap");
   state.isExpandedField = false;
-  syncPatternsLayoutMode();
+  window.waywordViewController.syncPatternsLayoutMode();
   renderProfile();
   syncExpandedFieldClass();
 }
@@ -722,7 +684,7 @@ function queueViewportSync() {
       syncEditorShellChamferEdge();
       syncEditorCalibrationOverlayClip();
       if (!isMobileViewport()) setFocusMode(false);
-      syncPatternsLayoutMode();
+      window.waywordViewController.syncPatternsLayoutMode();
       renderHistory();
       syncSubmittedAnnotatedEditorSurfaces();
       scheduleEditorDotOverlaySync();
@@ -1241,12 +1203,7 @@ function scheduleDeferredEditorFocus(focusCaret = "end") {
 }
 
 function enterLandingState() {
-  const shell = document.querySelector(".app-shell");
-  const app = $("appView");
-  shell?.classList.add("app-shell--landing");
-  shell?.classList.remove("app-shell--landing-out");
-  $("landingView")?.classList.remove("hidden");
-  app?.setAttribute("aria-hidden", "true");
+  window.waywordViewController.enterLandingState();
 }
 
 let landingToAppExitTimer = null;
@@ -1271,9 +1228,7 @@ function enterAppState(options = {}) {
       window.clearTimeout(landingToAppExitTimer);
       landingToAppExitTimer = null;
     }
-    shell.classList.remove("app-shell--landing", "app-shell--landing-out");
-    landing.classList.add("hidden");
-    app.removeAttribute("aria-hidden");
+    window.waywordViewController.applyLandingExitToAppDom({ shell, landing, app });
     showProfile(false);
     setOptionsOpen(false);
     afterEnter?.();
@@ -1492,7 +1447,7 @@ function setOptionsOpen(open) {
   const panel = $("editorOptionsPanel");
   const backdrop = $("editorOptionsBackdrop");
   if (!panel) return;
-  document.body.classList.toggle("settings-open", open);
+  window.waywordViewController.applyBodySettingsOpenClass(open);
 
   if (open) {
     optionsPanelDismissGuardUntil = Date.now() + OPTIONS_PANEL_DISMISS_GUARD_MS;
@@ -1524,11 +1479,7 @@ function setOptionsOpen(open) {
     panel.style.removeProperty("max-width");
   }
 
-  panel.setAttribute("aria-hidden", open ? "false" : "true");
-  if (backdrop) {
-    backdrop.classList.toggle("hidden", !open);
-    backdrop.setAttribute("aria-hidden", open ? "false" : "true");
-  }
+  window.waywordViewController.applyEditorOptionsPanelAriaAndBackdrop({ open, panel, backdrop });
 
   if (!open && wasOpen) {
     requestAnimationFrame(() => {
@@ -3857,11 +3808,12 @@ function setRecentDrawerOpen(open, options = {}) {
   const skipFocus = Boolean(options.skipFocus);
   const afterOpen = typeof options.afterOpen === "function" ? options.afterOpen : null;
 
-  backdrop?.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
-  drawer?.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
-  trigger?.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
-
-  document.body.classList.toggle("recent-drawer-open", shouldOpen);
+  window.waywordViewController.applyRecentDrawerDomState({
+    shouldOpen,
+    backdrop,
+    drawer,
+    trigger
+  });
 
   if (shouldOpen) {
     recentDrawerDismissGuardUntil = Date.now() + RECENT_DRAWER_DISMISS_GUARD_MS;
@@ -3909,29 +3861,8 @@ function wireRecentEntryRowKeynav(list) {
     const ae = document.activeElement;
     if (!ae || !ae.classList.contains("recent-entry") || !list.contains(ae)) return;
     e.preventDefault();
-    toggleRecentEntry(ae);
+    window.waywordViewController.toggleRecentEntry(ae, collapseMirrorEvidenceInRoot);
   });
-}
-
-function toggleRecentEntry(entry) {
-  const expanded = entry.querySelector(".recent-entry-expanded");
-  if (!expanded) return;
-
-  const isOpen = entry.classList.contains("is-open");
-  document.querySelectorAll(".recent-entry.is-open").forEach((el) => {
-    if (el === entry) return;
-    el.classList.remove("is-open");
-    el.classList.remove("recent-entry--active");
-    el.setAttribute("aria-expanded", "false");
-    const other = el.querySelector(".recent-entry-expanded");
-    if (other) other.hidden = true;
-  });
-
-  entry.classList.toggle("is-open", !isOpen);
-  entry.classList.toggle("recent-entry--active", !isOpen);
-  expanded.hidden = isOpen;
-  entry.setAttribute("aria-expanded", String(!isOpen));
-  entry.querySelectorAll(".recent-entry-mirror-root").forEach(collapseMirrorEvidenceInRoot);
 }
 
 function aggregateProfile() {
@@ -4518,7 +4449,7 @@ function showProfile(show = true) {
       state.isExpandedField = false;
       syncExpandedFieldClass();
     }
-    syncPatternsLayoutMode();
+    window.waywordViewController.syncPatternsLayoutMode();
     renderProfile();
     syncViewportHeightVar();
     syncKeyboardOpenClass();
@@ -4541,7 +4472,7 @@ function showProfile(show = true) {
 
   if (!motion) {
     profileView.classList.toggle("hidden", !show);
-    syncPatternsLayoutMode();
+    window.waywordViewController.syncPatternsLayoutMode();
     renderProfile();
     queueViewportSync();
     logPatternsTransitionSnapshot("showProfile:no-motion-return", { show });
@@ -4552,7 +4483,7 @@ function showProfile(show = true) {
     profileView.classList.remove("profile-view--recede");
     profileView.classList.add("profile-view--enter-from");
     profileView.classList.remove("hidden");
-    syncPatternsLayoutMode();
+    window.waywordViewController.syncPatternsLayoutMode();
     renderProfile();
     void profileView.offsetWidth;
     requestAnimationFrame(() => {
@@ -4569,7 +4500,7 @@ function showProfile(show = true) {
       setFocusMode(false);
       profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
       profileView.classList.add("hidden");
-      syncPatternsLayoutMode();
+      window.waywordViewController.syncPatternsLayoutMode();
       renderProfile();
       queueViewportSync();
       logPatternsTransitionSnapshot("showProfile:close-mobile-return");
@@ -4587,7 +4518,7 @@ function showProfile(show = true) {
       settled = true;
       profileView.classList.add("hidden");
       profileView.classList.remove("profile-view--recede");
-      syncPatternsLayoutMode();
+      window.waywordViewController.syncPatternsLayoutMode();
       renderProfile();
       queueViewportSync();
       logPatternsTransitionSnapshot("showProfile:close-desktop-settle");
@@ -4606,7 +4537,7 @@ function showProfile(show = true) {
 
   profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
   profileView.classList.toggle("hidden", !show);
-  syncPatternsLayoutMode();
+  window.waywordViewController.syncPatternsLayoutMode();
   renderProfile();
   queueViewportSync();
   logPatternsTransitionSnapshot("showProfile:fallthrough-return", { show });
@@ -4860,13 +4791,13 @@ $("recentDrawerList")?.addEventListener("click", (e) => {
   const entry = e.target.closest(".recent-entry");
   if (!entry) return;
   if (e.target.closest("button, a")) return;
-  toggleRecentEntry(entry);
+  window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
 });
 $("recentRailList")?.addEventListener("click", (e) => {
   const entry = e.target.closest(".recent-entry");
   if (!entry) return;
   if (e.target.closest("button, a")) return;
-  toggleRecentEntry(entry);
+  window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
 });
 
 document.addEventListener("keydown", (e) => {
@@ -5149,7 +5080,7 @@ scheduleEditorDotOverlaySync();
 renderSidebar();
 renderHistory();
 renderProfile();
-syncPatternsLayoutMode();
+window.waywordViewController.syncPatternsLayoutMode();
 renderCalibration();
 renderProfileSummaryStrip();
 updateEnterButtonVisibility();
