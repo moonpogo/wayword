@@ -3389,6 +3389,10 @@ function collapseMirrorEvidenceInRoot(root) {
   });
 }
 
+function toggleRecentEntry(entry) {
+  return window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
+}
+
 function wireMirrorEvidenceToggles(root) {
   if (!root) return;
   root.querySelectorAll(".mirror-card__evidence-toggle").forEach((btn) => {
@@ -3556,6 +3560,12 @@ function showMetricExplainer(key, anchorEl) {
   positionMetricExplainer(anchorEl, pop);
 }
 
+/** `Event.target` may be a Text node; `Element#closest` is undefined there (e.g. Safari on excerpt text). */
+function domEventTargetElement(ev) {
+  const t = ev.target;
+  return t && t.nodeType === 1 ? /** @type {Element} */ (t) : t && t.parentElement;
+}
+
 function bindMetricExplainerDelegation(listId = "recentDrawerList") {
   const list = $(listId);
   if (!list || list.dataset.metricExplainerBound === "1") return;
@@ -3564,7 +3574,9 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
   list.addEventListener(
     "pointerdown",
     (e) => {
-      const anchor = e.target.closest("[data-metric-explainer]");
+      const origin = domEventTargetElement(e);
+      if (!origin) return;
+      const anchor = origin.closest("[data-metric-explainer]");
       if (!anchor || !list.contains(anchor)) return;
       const key = anchor.getAttribute("data-metric-explainer");
       if (!METRIC_EXPLAINER_KEYS.has(key)) return;
@@ -3576,7 +3588,9 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
   list.addEventListener(
     "click",
     (e) => {
-      const anchor = e.target.closest("[data-metric-explainer]");
+      const origin = domEventTargetElement(e);
+      if (!origin) return;
+      const anchor = origin.closest("[data-metric-explainer]");
       if (!anchor || !list.contains(anchor)) return;
       const key = anchor.getAttribute("data-metric-explainer");
       if (!METRIC_EXPLAINER_KEYS.has(key)) return;
@@ -3601,7 +3615,9 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
 
   list.addEventListener("mouseover", (e) => {
     if (metricExplainerIsCoarsePointer()) return;
-    const anchor = e.target.closest("[data-metric-explainer]");
+    const origin = domEventTargetElement(e);
+    if (!origin) return;
+    const anchor = origin.closest("[data-metric-explainer]");
     if (!anchor || !list.contains(anchor)) return;
     const key = anchor.getAttribute("data-metric-explainer");
     if (!METRIC_EXPLAINER_KEYS.has(key)) return;
@@ -3614,7 +3630,9 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
 
   list.addEventListener("mouseout", (e) => {
     if (metricExplainerIsCoarsePointer()) return;
-    const anchor = e.target.closest("[data-metric-explainer]");
+    const origin = domEventTargetElement(e);
+    if (!origin) return;
+    const anchor = origin.closest("[data-metric-explainer]");
     if (!anchor || !list.contains(anchor)) return;
     const rel = e.relatedTarget;
     const pop = $("metricExplainerPopover");
@@ -3631,7 +3649,8 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
       const pop = $("metricExplainerPopover");
       if (!pop || pop.classList.contains("hidden")) return;
       if (pop.contains(e.target)) return;
-      if (e.target.closest("[data-metric-explainer]")) return;
+      const origin = domEventTargetElement(e);
+      if (origin && origin.closest("[data-metric-explainer]")) return;
       hideMetricExplainer();
     },
     true
@@ -3644,7 +3663,8 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
       const pop = $("metricExplainerPopover");
       if (!pop || pop.classList.contains("hidden")) return;
       if (pop.contains(e.target)) return;
-      const onExplainer = e.target.closest("[data-metric-explainer]");
+      const origin = domEventTargetElement(e);
+      const onExplainer = origin && origin.closest("[data-metric-explainer]");
       if (onExplainer && list.contains(onExplainer)) return;
       hideMetricExplainer();
     },
@@ -4152,6 +4172,7 @@ window.waywordRunController.registerDeps({
   renderHistory,
   renderProfileSummaryStrip,
   renderProfile,
+  renderHighlight,
   renderWritingState,
   renderMeta,
   renderSidebar,
@@ -4545,15 +4566,19 @@ $("recentDrawerBackdrop")?.addEventListener("click", () => {
 });
 
 $("recentDrawerList")?.addEventListener("click", (e) => {
-  const entry = e.target.closest(".recent-entry");
+  const origin = domEventTargetElement(e);
+  if (!origin) return;
+  const entry = origin.closest(".recent-entry");
   if (!entry) return;
-  if (e.target.closest("button, a")) return;
+  if (origin.closest("button, a")) return;
   window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
 });
 $("recentRailList")?.addEventListener("click", (e) => {
-  const entry = e.target.closest(".recent-entry");
+  const origin = domEventTargetElement(e);
+  if (!origin) return;
+  const entry = origin.closest(".recent-entry");
   if (!entry) return;
-  if (e.target.closest("button, a")) return;
+  if (origin.closest("button, a")) return;
   window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
 });
 
