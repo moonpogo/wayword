@@ -40,7 +40,7 @@
   }
 
   /**
-   * Same HTML parts post-run mirror panel uses (V1 body + recent trends).
+   * Same HTML parts post-run mirror panel uses (V1 body + next-pass nudge + recent trends).
    * @param {{
    *   submitted: boolean;
    *   completedUiActive: boolean;
@@ -52,7 +52,7 @@
    */
   function computeMirrorPostRunPanelParts(input) {
     if (!input.submitted || !input.completedUiActive) {
-      return { v1Body: "", recentBody: "" };
+      return { v1Body: "", recentBody: "", nextPassHtml: "" };
     }
     const v1Body = globalThis.WaywordMirrorDom.buildMirrorPanelBodyHtml({
       loadFailed: input.lastMirrorLoadFailed,
@@ -64,7 +64,22 @@
       input.sessionDigestsForTrends,
       "mirror-postrun-recent"
     );
-    return { v1Body, recentBody };
+
+    let nextPassHtml = "";
+    if (v1Body) {
+      const mirror = globalThis.WaywordMirror;
+      const line =
+        mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function"
+          ? mirror.nextPassInstructionFromMirrorPipelineResult(
+              input.lastMirrorPipelineResult,
+              input.lastMirrorLoadFailed
+            )
+          : "Write it again. Change one thing.";
+      const esc = escapeHtml(String(line || "").trim() || "Write it again. Change one thing.");
+      nextPassHtml = `<button type="button" class="mirror-next-pass-nudge" data-mirror-next-pass="1" aria-label="Start another pass with the same prompt">${esc}</button>`;
+    }
+
+    return { v1Body, recentBody, nextPassHtml };
   }
 
   /**
@@ -158,11 +173,13 @@
    *   completedUiActive: boolean;
    *   v1Body: string;
    *   recentBody: string;
+   *   nextPassHtml: string;
    * }} opts
    * @returns {{ shouldWireEvidence: boolean }}
    */
   function updateMirrorReflectionSection(opts) {
-    const { sectionEl, rootEl, submitted, completedUiActive, v1Body, recentBody } = opts;
+    const { sectionEl, rootEl, submitted, completedUiActive, v1Body, recentBody, nextPassHtml } =
+      opts;
 
     if (!submitted || !completedUiActive) {
       sectionEl.classList.add("hidden");
@@ -177,7 +194,7 @@
     }
 
     sectionEl.classList.remove("hidden");
-    rootEl.innerHTML = (v1Body || "") + recentBody;
+    rootEl.innerHTML = (v1Body || "") + (nextPassHtml || "") + recentBody;
     return { shouldWireEvidence: true };
   }
 

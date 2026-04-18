@@ -1884,13 +1884,23 @@ function ensurePromptRerollButton() {
 function updateWordProgress() {
   const fill = $("editorProgressFill");
   const progressRoot = fill?.closest(".editor-progress");
+  const track = fill?.closest(".editor-progress-track");
+  const meterBg = $("editorProgressMeterBg");
+  const meterFg = $("editorProgressMeterFg");
   if (!fill) return;
 
   const words = state.active ? tokenize(getEditorText()).length : 0;
 
+  const setMeterLabel = (text) => {
+    if (meterBg) meterBg.textContent = text;
+    if (meterFg) meterFg.textContent = text;
+  };
+
   if (!state.targetWords) {
     fill.style.width = "0%";
     fill.style.background = "var(--ink)";
+    track?.style.setProperty("--editor-progress-pct", "0");
+    setMeterLabel("");
     progressRoot?.classList.toggle("editor-progress--empty", words === 0);
     progressRoot?.classList.add("editor-progress--no-target");
     progressRoot?.setAttribute("data-phase", "none");
@@ -1900,6 +1910,8 @@ function updateWordProgress() {
   const target = state.targetWords;
   const clampedPercent = Math.min((words / target) * 100, 100);
   fill.style.width = `${clampedPercent}%`;
+  track?.style.setProperty("--editor-progress-pct", String(clampedPercent));
+  setMeterLabel(`${words} / ${target}`);
   progressRoot?.classList.toggle("editor-progress--empty", words === 0);
   progressRoot?.classList.remove("editor-progress--no-target");
 
@@ -3448,7 +3460,8 @@ function renderMirrorReflectionPanel(precomputedParts) {
     submitted: state.submitted,
     completedUiActive: state.completedUiActive,
     v1Body: parts.v1Body,
-    recentBody: parts.recentBody
+    recentBody: parts.recentBody,
+    nextPassHtml: parts.nextPassHtml
   });
   if (shouldWireEvidence) {
     wireMirrorEvidenceToggles(root);
@@ -4534,6 +4547,13 @@ editorShell?.addEventListener("pointerdown", (e) => {
 });
 
 let suppressRecentTriggerClickOpen = false;
+$("mirrorReflectionSection")?.addEventListener("click", (e) => {
+  const origin = domEventTargetElement(e);
+  if (!origin || !origin.closest("[data-mirror-next-pass]")) return;
+  e.preventDefault();
+  restartRunWithCurrentSettings({ reuseCurrentPrompt: true });
+});
+
 $("recentWritingTrigger")?.addEventListener(
   "pointerdown",
   (e) => {

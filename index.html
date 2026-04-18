@@ -393,9 +393,18 @@
                 </div>
                 <div class="editor-bottom-chrome-center">
                   <div class="editor-progress" aria-hidden="true">
+                    <span class="editor-progress-caption">words</span>
                     <div class="editor-progress-track">
                       <div id="editorProgressMarkers" class="editor-progress-markers"></div>
                       <div id="editorProgressFill" class="editor-progress-fill"></div>
+                      <div class="editor-progress-meter">
+                        <span id="editorProgressMeterBg" class="editor-progress-meter__value editor-progress-meter__value--track"></span>
+                        <div class="editor-progress-meter__clip">
+                          <div class="editor-progress-meter__clip-inner">
+                            <span id="editorProgressMeterFg" class="editor-progress-meter__value editor-progress-meter__value--fill"></span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

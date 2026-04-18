@@ -69,14 +69,17 @@
   function restartRunWithCurrentSettings(options = {}) {
     const d = D();
     const keepOptionsPanelOpen = Boolean(options.keepOptionsPanelOpen);
+    const reuseCurrentPrompt = Boolean(options.reuseCurrentPrompt);
     if (!d.state.active) return;
 
     d.state.submitted = false;
     d.state.completedUiActive = false;
     d.state.promptRerollsUsed = 0;
-    d.state.prompt = d.generatePrompt();
+    if (!reuseCurrentPrompt) {
+      d.state.prompt = d.generatePrompt();
+    }
     d.setEditorText("");
-    d.state.startSessionPlaceholder = d.pickRandomStartPlaceholderLine();
+    d.state.startSessionPlaceholder = reuseCurrentPrompt ? "" : d.pickRandomStartPlaceholderLine();
 
     const fb = d.$("feedbackBox");
     if (fb) {

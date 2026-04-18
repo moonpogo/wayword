@@ -7,3 +7,7 @@ export { buildMirrorSessionDigest } from "./recent/buildMirrorSessionDigest.js";
 export { buildReflectiveProfile } from "./recent/buildReflectiveProfile.js";
 export { getPatternsProfileFromDigests } from "./recent/getPatternsProfileFromDigests.js";
 export { runMirrorRecentTrendsPipeline } from "./recent/runMirrorRecentTrendsPipeline.js";
+export {
+  MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION,
+  nextPassInstructionFromMirrorPipelineResult
+} from "./nudges/nextPassInstruction.js";

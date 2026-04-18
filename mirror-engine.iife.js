@@ -21,9 +21,11 @@ var WaywordMirror = (() => {
   // src/features/mirror/entry-iife.ts
   var entry_iife_exports = {};
   __export(entry_iife_exports, {
+    MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION: () => MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION,
     buildMirrorSessionDigest: () => buildMirrorSessionDigest,
     buildReflectiveProfile: () => buildReflectiveProfile,
     getPatternsProfileFromDigests: () => getPatternsProfileFromDigests,
+    nextPassInstructionFromMirrorPipelineResult: () => nextPassInstructionFromMirrorPipelineResult,
     runMirrorPipeline: () => runMirrorPipeline,
     runMirrorRecentTrendsPipeline: () => runMirrorRecentTrendsPipeline
   });
@@ -1436,6 +1438,60 @@ var WaywordMirror = (() => {
     const aggregate = aggregateRecentDigests(qualifying);
     const candidates = buildRecentTrendCandidates(aggregate);
     return selectRecentTrends(candidates);
+  }
+
+  // src/features/mirror/nudges/nextPassInstruction.ts
+  var MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION = "Write it again. Change one thing.";
+  function normStatement(s) {
+    return normMirrorReflectionHeadline(s);
+  }
+  function pickDriverReflection(result) {
+    const main = result.main;
+    if (main && String(main.statement || "").trim()) {
+      return main;
+    }
+    const supporting = Array.isArray(result.supporting) ? result.supporting : [];
+    const first = supporting.find((c) => c && String(c.statement || "").trim());
+    return first ?? null;
+  }
+  function nextPassInstructionFromMirrorPipelineResult(result, loadFailed) {
+    if (loadFailed || !result || typeof result !== "object") {
+      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+    }
+    const driver = pickDriverReflection(result);
+    if (!driver) {
+      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+    }
+    const cat = driver.category;
+    const n = normStatement(driver.statement);
+    if (cat === "fallback" || n === normStatement(MIRROR_HEADLINE_FALLBACK_SOFT)) {
+      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+    }
+    if (cat === "repetition") {
+      return "Avoid that word. Find another path.";
+    }
+    if (cat === "cadence") {
+      return "Let the whole piece move like that.";
+    }
+    if (cat === "hesitation_qualification") {
+      if (n === normStatement(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) || n === normStatement(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) || n === normStatement(MIRROR_HEADLINE_HESITATION_REVISED)) {
+        return "Say it once. Don't soften it.";
+      }
+      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+    }
+    if (cat === "abstraction_concrete") {
+      if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL)) {
+        return "Keep the idea. Anchor it in a scene.";
+      }
+      if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
+        return "Keep the scene. Let an idea surface.";
+      }
+      if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
+        return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+      }
+      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+    }
+    return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
   }
   return __toCommonJS(entry_iife_exports);
 })();

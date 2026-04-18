@@ -126,4 +126,20 @@ Mirror V1 **does not**:
 
 ---
 
+## Mirror V1 UI Note (Override)
+
+For the current product surface (V1 UI):
+
+- Reflection cards display only the headline sentence.
+- No excerpts, counts, ratios, or internal metrics are shown.
+- No “context” or supporting text is rendered in the card.
+
+Evidence remains part of the internal generation pipeline,
+but is not exposed in the UI.
+
+This override takes precedence over any earlier sections
+that describe visible evidence in cards.
+
+---
+
 *This document encodes the **intended product contract** implied by Mirror V1 as implemented. It is internal; it does not supersede legal, accessibility, or editorial policies elsewhere.*
