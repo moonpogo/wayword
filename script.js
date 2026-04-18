@@ -128,20 +128,6 @@ const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
  * @param {{ priorPromptFamily: string, hadMainReflection: boolean, mainCategory: string | null, seed: string }} input
  */
 
-/** One line per new writing session; picked in `startWriting` / `restartRunWithCurrentSettings`. */
-const EDITOR_START_PLACEHOLDER_LINES = Object.freeze([
-  "Start anywhere.",
-  "One sentence is enough.",
-  "Just begin.",
-  "Pick a detail and go.",
-  "Don't plan it. Write it."
-]);
-
-function pickRandomStartPlaceholderLine() {
-  const lines = EDITOR_START_PLACEHOLDER_LINES;
-  return lines[Math.floor(Math.random() * lines.length)];
-}
-
 function buildRitualNudgeV1({ priorPromptFamily, hadMainReflection, mainCategory, seed }) {
   const family = String(priorPromptFamily || "").trim() || "Observation";
   const s = seed != null ? String(seed) : "";
@@ -155,6 +141,23 @@ function buildRitualNudgeV1({ priorPromptFamily, hadMainReflection, mainCategory
   const pool = RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY[cat];
   const idx = ritualPickIndex(`${s}|with-main|${cat}|${family}`, pool.length);
   return pool[idx];
+}
+
+/** Ritual line under the prompt for the current run: carryover after submit, else cold-start pool for this prompt. */
+function getActivePromptNudgeLineForRender() {
+  const carried = String(state.pendingNudgeLine || "").trim();
+  if (carried) return carried;
+  const family = String(state.promptFamily || "").trim() || "Observation";
+  const seed =
+    String(state.lastPromptKey || "").trim() ||
+    String(state.prompt || "").trim() ||
+    "wayword";
+  return buildRitualNudgeV1({
+    priorPromptFamily: family,
+    hadMainReflection: false,
+    mainCategory: null,
+    seed
+  });
 }
 
 const bannedSets = [
@@ -1505,7 +1508,6 @@ function waywordDevResetCalibrationForTesting() {
   state.pendingRecentDrawerExpand = false;
   state.pendingNudgeLine = "";
   state.promptBiasTags = [];
-  state.startSessionPlaceholder = "";
   state.mirrorEmptyFallbackSeed = "";
   window.waywordStorage.removeInactivityEaseRun(INACTIVITY_EASE_RUN_KEY);
 
@@ -2991,9 +2993,8 @@ function renderMeta() {
 
   const promptNudge = $("promptNudge");
   if (promptNudge) {
-    const nudge = String(state.pendingNudgeLine || "").trim();
-    /** Nudge belongs to the next writing session only, not under the post-run prompt. */
-    const visible = Boolean(nudge && state.active && !state.submitted);
+    const visible = Boolean(state.active && !state.submitted);
+    const nudge = visible ? getActivePromptNudgeLineForRender() : "";
     promptNudge.textContent = nudge;
     promptNudge.classList.toggle("hidden", !visible);
     promptNudge.setAttribute("aria-hidden", visible ? "false" : "true");
@@ -3066,12 +3067,7 @@ function renderWritingState(options = {}) {
   const isLocked = !state.active || state.submitted;
 
   editorInput.setAttribute("contenteditable", isLocked ? "false" : "true");
-  editorInput.setAttribute(
-    "data-placeholder",
-    state.active && !state.submitted && !getEditorText().trim()
-      ? state.startSessionPlaceholder || EDITOR_START_PLACEHOLDER_LINES[0]
-      : ""
-  );
+  editorInput.setAttribute("data-placeholder", "");
   editorInput.classList.toggle("is-empty", !getEditorText().trim());
 
   updateSubmitButtonState();
@@ -3353,7 +3349,8 @@ function postRunMirrorPanelInputs() {
     lastMirrorLoadFailed: state.lastMirrorLoadFailed,
     lastMirrorPipelineResult: state.lastMirrorPipelineResult,
     mirrorEmptyFallbackSeed: state.mirrorEmptyFallbackSeed,
-    sessionDigestsForTrends: collectMirrorSessionDigestsFromHistory()
+    sessionDigestsForTrends: collectMirrorSessionDigestsFromHistory(),
+    submittedRunText: getEditorText()
   };
 }
 
@@ -3460,7 +3457,11 @@ function renderMirrorReflectionPanel(precomputedParts) {
     submitted: state.submitted,
     completedUiActive: state.completedUiActive,
     v1Body: parts.v1Body,
-    recentBody: parts.recentBody,
+    recentBody: parts.recentBody
+  });
+  window.waywordPostRunRenderer.updateMirrorNextPassSlot({
+    submitted: state.submitted,
+    completedUiActive: state.completedUiActive,
     nextPassHtml: parts.nextPassHtml
   });
   if (shouldWireEvidence) {
@@ -4193,7 +4194,6 @@ window.waywordRunController.registerDeps({
   setExerciseWords,
   generatePrompt,
   setEditorText,
-  pickRandomStartPlaceholderLine,
   setBannedEditorOpen,
   setOptionsOpen,
   showProfile,
@@ -4561,7 +4561,7 @@ editorShell?.addEventListener("pointerdown", (e) => {
 });
 
 let suppressRecentTriggerClickOpen = false;
-$("mirrorReflectionSection")?.addEventListener("click", (e) => {
+$("promptCard")?.addEventListener("click", (e) => {
   const origin = domEventTargetElement(e);
   if (!origin || !origin.closest("[data-mirror-next-pass]")) return;
   e.preventDefault();

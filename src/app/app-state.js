@@ -25,8 +25,6 @@
       pendingNudgeLine: "",
       /** Family-level bias only; set in `generatePrompt`. */
       promptBiasTags: [],
-      /** Editor empty-state hint; new pick each `startWriting` / restart run. */
-      startSessionPlaceholder: "",
       /** Seeds rotating mirror empty copy for the last submit’s panel. */
       mirrorEmptyFallbackSeed: "",
       theme: window.waywordStorage.loadTheme(),

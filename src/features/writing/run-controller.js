@@ -79,7 +79,6 @@
       d.state.prompt = d.generatePrompt();
     }
     d.setEditorText("");
-    d.state.startSessionPlaceholder = reuseCurrentPrompt ? "" : d.pickRandomStartPlaceholderLine();
 
     const fb = d.$("feedbackBox");
     if (fb) {
@@ -138,7 +137,6 @@
     d.state.timerWaitingForFirstInput = Boolean(d.state.timerSeconds);
     d.state.prompt = d.generatePrompt();
     d.setEditorText("");
-    d.state.startSessionPlaceholder = d.pickRandomStartPlaceholderLine();
     d.state.mirrorEmptyFallbackSeed = "";
 
     const fb = d.$("feedbackBox");
