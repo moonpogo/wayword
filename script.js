@@ -716,35 +716,6 @@ let animFrame = null;
 let completionTimer = null;
 let settleTimer = null;
 
-let postSubmitAutoRunTimer = null;
-
-function clearPostSubmitAutoRunTimer() {
-  if (postSubmitAutoRunTimer != null) {
-    clearTimeout(postSubmitAutoRunTimer);
-    postSubmitAutoRunTimer = null;
-  }
-}
-
-function runPostSubmitAutoNewRunNow() {
-  clearPostSubmitAutoRunTimer();
-  document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
-  if (state.optionsOpen) return;
-  if (!state.submitted || !state.completedUiActive) return;
-  startWriting({ focusCaret: "start" });
-}
-
-/** After submit: shell completion pulse only (post-run UI stays until the user begins again). */
-function pulseEditorShellAfterSubmit() {
-  clearPostSubmitAutoRunTimer();
-  const shell = document.querySelector(".editor-shell");
-  shell?.classList.add("editor-shell--submit-complete");
-
-  scheduleEditorDotOverlaySync();
-  requestAnimationFrame(() => {
-    scheduleEditorDotOverlaySync();
-  });
-}
-
 /* -----------------------------
    landing/app state
 ----------------------------- */
@@ -3481,34 +3452,6 @@ function renderMirrorReflectionPanel(precomputedParts) {
   }
 }
 
-function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibration = false) {
-  try {
-    if (insufficientCalibration) {
-      const step = Math.min(priorEntries.length + 1, CALIBRATION_THRESHOLD);
-      state.calibrationPostRun = {
-        step,
-        observation: CALIBRATION_INSUFFICIENT_COPY,
-        insufficient: true
-      };
-      state.lastRunFeedback = "";
-      return;
-    }
-    if (!runWasSaved) return;
-    const step = priorEntries.length + 1;
-    const observation = String(selectCalibrationObservation(text, priorEntries) || "").trim();
-    if (step <= CALIBRATION_THRESHOLD) {
-      state.calibrationPostRun = { step, observation, insufficient: false };
-      state.lastRunFeedback = "";
-    } else {
-      state.calibrationPostRun = null;
-      state.lastRunFeedback = observation;
-    }
-  } catch (e) {
-    state.lastRunFeedback = "";
-    state.calibrationPostRun = null;
-  }
-}
-
 const METRIC_EXPLAINER_COPY = {
   filler: {
     title: "Filler",
@@ -4089,48 +4032,6 @@ function cycleRepeatLimit() {
   renderSidebar();
 }
 
-function restartRunWithCurrentSettings(options = {}) {
-  const keepOptionsPanelOpen = Boolean(options.keepOptionsPanelOpen);
-  if (!state.active) return;
-
-  state.submitted = false;
-  state.completedUiActive = false;
-  state.promptRerollsUsed = 0;
-  state.prompt = generatePrompt();
-  setEditorText("");
-  state.startSessionPlaceholder = pickRandomStartPlaceholderLine();
-
-  const fb = $("feedbackBox");
-  if (fb) {
-    fb.dataset.calibrationRenderKey = "";
-    fb.className = "result-card empty";
-    fb.innerHTML = "";
-  }
-  state.lastRunFeedback = "";
-  state.lastMirrorPipelineResult = null;
-  state.lastMirrorLoadFailed = false;
-  state.calibrationPostRun = null;
-  window.waywordPostRunRenderer.renderReflectionLine("");
-
-  stopTimer();
-  state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
-  if (!keepOptionsPanelOpen) {
-    setOptionsOpen(false);
-  }
-
-  renderMeta();
-  renderWritingState();
-  renderHighlight();
-  renderSidebar();
-  updateEnterButtonVisibility();
-
-  if (!keepOptionsPanelOpen) {
-    requestAnimationFrame(() => {
-      focusEditorToStart();
-    });
-  }
-}
-
 function saveBannedInline() {
   const input = $("bannedInlineInput");
   if (!input) return;
@@ -4200,219 +4101,75 @@ function clearExerciseIfCompleted(text) {
 }
 
 function startWriting(options = {}) {
-  const {
-    preserveActiveChallenge = false,
-    focusCaret = "end",
-    deferEditorFocus = false,
-  } = options;
-  clearPostSubmitAutoRunTimer();
-  document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
-  stopTimer();
-  if (!preserveActiveChallenge) {
-    setExerciseWords([]);
-  }
-  state.active = true;
-  state.submitted = false;
-  state.completedUiActive = false;
-  state.promptRerollsUsed = 0;
-  state.pendingRecentDrawerExpand = false;
-
-  $("editorOverlay")?.classList.add("hidden");
-  $("editorOverlayCard")?.classList.remove("editor-overlay-card--calibration-dismiss");
-
-  applyProgressionToState();
-  state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
-  state.prompt = generatePrompt();
-  setEditorText("");
-  state.startSessionPlaceholder = pickRandomStartPlaceholderLine();
-  state.mirrorEmptyFallbackSeed = "";
-
-  const fb = $("feedbackBox");
-  if (fb) {
-    fb.dataset.calibrationRenderKey = "";
-    fb.className = "result-card empty";
-    fb.innerHTML = "";
-  }
-  state.lastRunFeedback = "";
-  state.lastMirrorPipelineResult = null;
-  state.lastMirrorLoadFailed = false;
-  state.calibrationPostRun = null;
-  window.waywordPostRunRenderer.renderReflectionLine("");
-
-  setBannedEditorOpen(false);
-  setOptionsOpen(false);
-  showProfile(false);
-
-  renderMeta();
-  renderWritingState();
-  renderHighlight();
-  renderSidebar();
-  syncEditorBottomChromeForCalibrationOverlay();
-  updateEnterButtonVisibility();
-
-  if (!deferEditorFocus) {
-    scheduleDeferredEditorFocus(focusCaret);
-  }
+  return window.waywordRunController.startWriting(options);
 }
 
-/**
- * Timer reached zero with no words: no run payload to save — still a hard boundary for timed mode.
- * Starts a fresh run so the user cannot keep typing in an expired session.
- */
 function finalizeTimedRunExpiredWithNoText() {
-  if (!state.active || state.submitted) return;
-  stopTimer();
-  state.timeRemaining = 0;
-  updateTimeFill();
-  startWriting({ focusCaret: "start" });
-  queueViewportSync();
+  return window.waywordRunController.finalizeTimedRunExpiredWithNoText();
 }
 
 function submitWriting(fromTimer = false) {
-  if (!state.active) return;
-
-  if (state.submitted) {
-    if (postSubmitAutoRunTimer != null) {
-      clearPostSubmitAutoRunTimer();
-      document.querySelector(".editor-shell")?.classList.remove("editor-shell--submit-complete");
-      runPostSubmitAutoNewRunNow();
-    }
-    return;
-  }
-
-  if (editorInput && !editorSurfaceComposing) {
-    flushEditorSurfaceIntoWriteDocOnce();
-  }
-
-  const currentText = getEditorText();
-  const analysis = analyze(currentText);
-
-  if (analysis.totalWords === 0) {
-    if (fromTimer) {
-      finalizeTimedRunExpiredWithNoText();
-    }
-    return;
-  }
-
-  const timeRemainingSnapshot =
-    state.timerSeconds && state.timerWaitingForFirstInput
-      ? state.timerSeconds
-      : state.timeRemaining;
-  const timerConfigured = Boolean(state.timerSeconds);
-  const activeTimerSecondsForRun = timerConfigured ? state.timerSeconds : null;
-
-  const challengeWordsSnapshot = [...state.exerciseWords];
-  const challengeActive = challengeWordsSnapshot.length > 0;
-  clearExerciseIfCompleted(currentText);
-  const challengeCompleted = challengeActive && state.exerciseWords.length === 0;
-
-  state.submitted = true;
-  state.completedUiActive = true;
-  applyWriteDocSemanticFlagsFromAnalysisCore(analysis);
-
-  updateEnterButtonVisibility();
-  stopTimer();
-  completeWordmark();
-
-  const activeTargetWords = getActiveTargetWordsForScoring();
-  const { runScore, scoreBreakdown } = computeRunScoreV1(
-    analysis,
-    state.repeatLimit,
-    activeTargetWords
-  );
-
-  const finishedWithinTime = !timerConfigured || !fromTimer;
-  const wasSuccessful =
-    analysis.totalWords >= activeTargetWords &&
-    runScore >= 70 &&
-    finishedWithinTime;
-
-  const now = Date.now();
-  const run = window.waywordRunModel.createSubmittedRun({
-    makeRunId,
-    now,
-    currentText,
-    prompt: state.prompt,
-    analysis,
-    runScore,
-    scoreBreakdown,
-    challengeActive,
-    challengeCompleted,
-    challengeWordsSnapshot,
-    wasSuccessful,
-    activeTargetWords,
-    activeTimerSecondsForRun,
-    finishedWithinTime,
-    timeRemainingSnapshot,
-    timerConfigured,
-    repeatLimitAtRun: state.repeatLimit,
-  });
-
-  const priorEntries = getRecentEntries();
-  const nextCalibrationStep = priorEntries.length + 1;
-  const inCalibrationWindow = nextCalibrationStep <= CALIBRATION_THRESHOLD;
-  const signalOkForCalibration =
-    !inCalibrationWindow || calibrationSubmissionHasMinimumSignal(currentText, analysis);
-
-  let runWasSaved = false;
-  let insufficientCalibration = false;
-
-  if (!state.savedRunIds.has(run.runId)) {
-    if (inCalibrationWindow && !signalOkForCalibration) {
-      insufficientCalibration = true;
-    } else {
-      runWasSaved = true;
-    }
-  }
-
-  handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
-
-  computeAndStoreMirrorPipelineResult(currentText, run);
-  state.mirrorEmptyFallbackSeed = run.runId;
-
-  if (runWasSaved) {
-    const main = state.lastMirrorPipelineResult && state.lastMirrorPipelineResult.main;
-    const stmt = main && String(main.statement || "").trim();
-    const hadMainReflection = Boolean(stmt);
-    const mainCategory = hadMainReflection ? main.category ?? null : null;
-    state.pendingNudgeLine = buildRitualNudgeV1({
-      priorPromptFamily: state.promptFamily,
-      hadMainReflection,
-      mainCategory,
-      seed: run.runId
-    });
-    window.waywordRunModel.attachMirrorSnapshotToRun(
-      run,
-      state.lastMirrorPipelineResult,
-      state.lastMirrorLoadFailed
-    );
-    window.waywordMirrorController.assignMirrorSessionDigestToRunIfAvailable(run, {
-      text: String(currentText || ""),
-      sessionId: String(run.runId),
-      startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
-      endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
-    });
-    state.history.push({ ...run });
-    state.savedRunIds.add(run.runId);
-    state.pendingRecentDrawerExpand = true;
-    window.waywordStorage.removeInactivityEaseRun(INACTIVITY_EASE_RUN_KEY);
-    persist();
-    renderHistory();
-    renderProfileSummaryStrip();
-
-    recomputeProgressionLevel({ afterRun: true });
-    applyProgressionToState();
-    renderProfile();
-  }
-
-  renderWritingState({ deferPostRunOverlaySync: false });
-  renderMeta();
-  renderSidebar();
-
-  queueViewportSync();
-
-  pulseEditorShellAfterSubmit();
+  return window.waywordRunController.submitWriting(fromTimer);
 }
+
+function restartRunWithCurrentSettings(options = {}) {
+  return window.waywordRunController.restartRunWithCurrentSettings(options);
+}
+
+function runPostSubmitAutoNewRunNow() {
+  return window.waywordRunController.runPostSubmitAutoNewRunNow();
+}
+
+window.waywordRunController.registerDeps({
+  state,
+  $,
+  editorInput,
+  getEditorSurfaceComposing() {
+    return editorSurfaceComposing;
+  },
+  flushEditorSurfaceIntoWriteDocOnce,
+  getEditorText,
+  analyze,
+  getRecentEntries,
+  makeRunId,
+  persist,
+  CALIBRATION_THRESHOLD,
+  CALIBRATION_INSUFFICIENT_COPY,
+  INACTIVITY_EASE_RUN_KEY,
+  selectCalibrationObservation,
+  calibrationSubmissionHasMinimumSignal,
+  clearExerciseIfCompleted,
+  applyWriteDocSemanticFlagsFromAnalysisCore,
+  updateEnterButtonVisibility,
+  stopTimer,
+  completeWordmark,
+  getActiveTargetWordsForScoring,
+  computeRunScoreV1,
+  computeAndStoreMirrorPipelineResult,
+  buildRitualNudgeV1,
+  recomputeProgressionLevel,
+  applyProgressionToState,
+  renderHistory,
+  renderProfileSummaryStrip,
+  renderProfile,
+  renderWritingState,
+  renderMeta,
+  renderSidebar,
+  queueViewportSync,
+  setExerciseWords,
+  generatePrompt,
+  setEditorText,
+  pickRandomStartPlaceholderLine,
+  setBannedEditorOpen,
+  setOptionsOpen,
+  showProfile,
+  scheduleDeferredEditorFocus,
+  scheduleEditorDotOverlaySync,
+  syncEditorBottomChromeForCalibrationOverlay,
+  focusEditorToStart,
+  updateTimeFill,
+  waywordPostRunRenderer: window.waywordPostRunRenderer
+});
 
 function showProfile(show = true) {
   const profileView = $("profileView");
