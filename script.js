@@ -3651,25 +3651,6 @@ function computeAndStoreMirrorPipelineResult(text, run) {
   }
 }
 
-function cloneMirrorPipelineResultForStorage(src) {
-  if (src == null || typeof src !== "object") return null;
-  try {
-    return JSON.parse(JSON.stringify(src));
-  } catch (_) {
-    return null;
-  }
-}
-
-function attachMirrorSnapshotToRunFromState(run) {
-  if (state.lastMirrorLoadFailed) {
-    run.mirrorLoadFailed = true;
-    run.mirrorPipelineResult = null;
-    return;
-  }
-  run.mirrorLoadFailed = false;
-  run.mirrorPipelineResult = cloneMirrorPipelineResultForStorage(state.lastMirrorPipelineResult);
-}
-
 function escapeHtmlMirror(s) {
   return globalThis.WaywordMirrorDom.escapeHtmlMirror(s);
 }
@@ -5084,11 +5065,6 @@ function submitWriting(fromTimer = false) {
   stopTimer();
   completeWordmark();
 
-  const starterExamplesMap = {};
-  analysis.starterExampleList.forEach(item => {
-    if (!starterExamplesMap[item.starter]) starterExamplesMap[item.starter] = item.excerpt;
-  });
-
   const activeTargetWords = getActiveTargetWordsForScoring();
   const { runScore, scoreBreakdown } = computeRunScoreV1(
     analysis,
@@ -5103,40 +5079,25 @@ function submitWriting(fromTimer = false) {
     finishedWithinTime;
 
   const now = Date.now();
-  const run = {
-    runId: makeRunId(),
-    savedAt: now,
-    timestamp: now,
-    text: currentText,
+  const run = window.waywordRunModel.createSubmittedRun({
+    makeRunId,
+    now,
+    currentText,
     prompt: state.prompt,
-    repeatedWords: analysis.repeated,
-    bannedHits: analysis.bannedHits,
-    repeatedStarters: analysis.repeatedStarters,
-    score: runScore,
+    analysis,
     runScore,
     scoreBreakdown,
     challengeActive,
     challengeCompleted,
-    challengeWords: challengeWordsSnapshot,
+    challengeWordsSnapshot,
     wasSuccessful,
     activeTargetWords,
-    activeTimerSeconds: activeTimerSecondsForRun,
+    activeTimerSecondsForRun,
     finishedWithinTime,
-    timeRemaining: timerConfigured ? timeRemainingSnapshot : null,
-    wordCount: analysis.totalWords,
+    timeRemainingSnapshot,
+    timerConfigured,
     repeatLimitAtRun: state.repeatLimit,
-    words: analysis.totalWords,
-    unique: analysis.uniqueCount,
-    uniqueRatio: analysis.uniqueRatio,
-    avgSentenceLength: analysis.avgSentenceLength,
-    repeatedCount: analysis.repeated.length,
-    fillerCount: analysis.bannedHits.reduce((sum, item) => sum + item.count, 0),
-    wordFreq: analysis.counts,
-    starterFreq: analysis.starterCounts,
-    starterExamples: starterExamplesMap,
-    punctuation: analysis.punctuation,
-    perspective: analysis.perspective
-  };
+  });
 
   const priorEntries = getRecentEntries();
   const nextCalibrationStep = priorEntries.length + 1;
@@ -5171,7 +5132,11 @@ function submitWriting(fromTimer = false) {
       mainCategory,
       seed: run.runId
     });
-    attachMirrorSnapshotToRunFromState(run);
+    window.waywordRunModel.attachMirrorSnapshotToRun(
+      run,
+      state.lastMirrorPipelineResult,
+      state.lastMirrorLoadFailed
+    );
     if (mirrorSessionDigestAvailable()) {
       try {
         run.mirrorSessionDigest = globalThis.WaywordMirror.buildMirrorSessionDigest({
