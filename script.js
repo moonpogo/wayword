@@ -4387,6 +4387,7 @@ if (editorInput) {
       (rt.closest("#optionsTrigger") ||
         rt.closest("#editorOptionsPanel") ||
         rt.closest("#editorOptionsBackdrop") ||
+        rt.closest("#enterSubmitBtn") ||
         rt.closest("#recentWritingTrigger") ||
         rt.closest("#recentDrawer") ||
         rt.closest("#recentDrawerBackdrop") ||
@@ -4413,6 +4414,7 @@ if (editorInput) {
         (ae.closest("#optionsTrigger") ||
           ae.closest("#editorOptionsPanel") ||
           ae.closest("#editorOptionsBackdrop") ||
+          ae.closest("#enterSubmitBtn") ||
           ae.closest("#recentWritingTrigger") ||
           ae.closest("#recentDrawer") ||
           ae.closest("#recentDrawerBackdrop") ||
