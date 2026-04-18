@@ -4537,6 +4537,18 @@ editorShell?.addEventListener("pointerdown", (e) => {
     e.target.closest("#recentDrawerBackdrop");
 
   if (blocked) return;
+  /* Post-run overlay is hidden after calibration; desktop uses Enter / overlay click to begin the next run.
+     Mobile must get the same `runPostSubmitAutoNewRunNow` path when the user taps the writing surface. */
+  if (
+    state.active &&
+    state.submitted &&
+    state.completedUiActive &&
+    !state.optionsOpen &&
+    e.target.closest("#editorInput")
+  ) {
+    runPostSubmitAutoNewRunNow();
+    return;
+  }
   if (!state.active || state.submitted) return;
   /* Clicks on the editable surface must use native caret/selection; only chrome hits focus the end. */
   if (e.target.closest("#editorInput")) return;
