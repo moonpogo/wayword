@@ -361,13 +361,14 @@ state.patternSelectedWords = loadPersistedPatternSelectedWords();
 /** Selection snapshot before annotation slot takes focus away from the editor (canonical offsets). */
 let annotationRowPendingEditorSel = null;
 
-const input = document.querySelector('.editor-input');
-
-const editorInput = $("editorInput");
-const editorDotOverlay = $("editorDotOverlay");
-const editorSemanticPicker = $("editorSemanticPicker");
-const highlightLayer = $("highlightLayer");
-const wordmark = $("wordmark");
+const {
+  input,
+  editorInput,
+  editorDotOverlay,
+  editorSemanticPicker,
+  highlightLayer,
+  wordmark,
+} = window.waywordDomElements.resolveCore();
 
 function getViewportHeight() {
   if (window.visualViewport && window.visualViewport.height) {
@@ -5580,7 +5581,7 @@ if (editorInput) {
   });
 }
 
-const editorShell = document.querySelector(".editor-shell");
+const { editorShell } = window.waywordDomElements.resolveEditorShell();
 
 editorShell?.addEventListener("pointerdown", (e) => {
   if (e.target.closest("#editorInput")) {
