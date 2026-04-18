@@ -185,15 +185,33 @@ const punctuationMarks = {
   quotes: { regex: /["“”]/g, label: "“”" }
 };
 
-const CALIBRATION_THRESHOLD = 5;
-/** Minimum material for a run to count toward calibration (avoid fake insight). */
-const CALIBRATION_MIN_WORDS = 40;
-const CALIBRATION_MIN_SENTENCE_UNITS = 3;
-const CALIBRATION_INSUFFICIENT_COPY =
-  "Add a little more writing so the next save has enough to echo back clearly.";
-
-/** Zen garden entry (wordmark toggle). Set to true when the garden is ready to ship. */
-const ZEN_GARDEN_OPENABLE = false;
+const {
+  CALIBRATION_THRESHOLD,
+  CALIBRATION_MIN_WORDS,
+  CALIBRATION_MIN_SENTENCE_UNITS,
+  CALIBRATION_INSUFFICIENT_COPY,
+  ZEN_GARDEN_OPENABLE,
+  PROMPT_REROLL_LIMIT,
+  PROGRESSION_LEVELS,
+  PROGRESSION_LEVEL_KEY,
+  INACTIVITY_EASE_RUN_KEY,
+  CATEGORY_ACCENT_CSS_VARS,
+  CATEGORY_COLOR_CSS,
+  SEMANTIC_FLAG_IDS,
+  WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID,
+  OPTIONS_PANEL_DISMISS_GUARD_MS,
+  RECENT_DRAWER_DISMISS_GUARD_MS,
+  BANNED_PANEL_DEBOUNCE_MS,
+  EDITOR_SEMANTIC_DOT_PX,
+  EDITOR_SEMANTIC_DOT_GAP_PX,
+  BOTTOM_CHROME_CALIBRATION_HIDE_MS,
+  REVIEW_RUN_REFLECTION_MAX,
+  REVIEW_RUN_MIN_WORDS,
+  REVIEW_RUN_DULL_REPEATS,
+  METRIC_EXPLAINER_KEYS,
+  SHUFFLE_TARGET_WORDS,
+  SHUFFLE_TIMER_SECONDS,
+} = window.waywordConfig;
 
 /** Bumped when opening Patterns so an in-flight close animation cannot hide the panel after reopen. */
 let profilePanelCloseMotionToken = 0;
@@ -216,34 +234,9 @@ function logPatternsTransitionSnapshot(_label, _extra = {}) {
   /* Intentionally empty: patterns layout snapshots were removed from default builds. */
 }
 
-const PROMPT_REROLL_LIMIT = 2;
-
-const PROGRESSION_LEVELS = [
-  { level: 1, targetWords: 60, timerSeconds: 0 },
-  { level: 2, targetWords: 75, timerSeconds: 120 },
-  { level: 3, targetWords: 90, timerSeconds: 90 }
-];
-const PROGRESSION_LEVEL_KEY = "wayword-progression-level";
-const INACTIVITY_EASE_RUN_KEY = "wayword-inactivity-eased-for-run";
-
 const $ = (id) => document.getElementById(id);
 
-/**
- * Category accent colors — canonical values live in category-colors.css; JS must not hardcode hex.
- * Use getCategoryAccentColor() when a runtime string is needed (e.g. canvas); otherwise rely on CSS classes.
- */
-const CATEGORY_ACCENT_CSS_VARS = Object.freeze({
-  filler: "--color-filler",
-  repetition: "--color-repetition",
-  openings: "--color-openings",
-  challenge: "--color-challenge",
-});
-
-/** `var(--color-*)` strings — same tokens as category-colors.css; use with styles or resolve via getCategoryAccentColor. */
-const CATEGORY_COLOR_CSS = Object.freeze(
-  Object.fromEntries(Object.entries(CATEGORY_ACCENT_CSS_VARS).map(([k, prop]) => [k, `var(${prop})`]))
-);
-
+/** Category accent tokens live in category-colors.css; resolved at runtime via getCategoryAccentColor. */
 function getCategoryAccentCssVarName(key) {
   return CATEGORY_ACCENT_CSS_VARS[key] || "";
 }
@@ -863,9 +856,6 @@ function serializeWriteDoc(doc) {
   return doc.lines.map(writeDocLineSegmentString).join("\n");
 }
 
-/** Supported semantic ids; stable merge / render order (must match CSS .editor-token-dot--* / .annotation-dot--*). */
-const SEMANTIC_FLAG_IDS = ["filler", "repetition", "opening", "challenge"];
-
 /** Deduped subset of SEMANTIC_FLAG_IDS in canonical order (not serialized into text). */
 function normalizeSemanticFlagsArray(flags) {
   if (!Array.isArray(flags)) return [];
@@ -928,9 +918,6 @@ function writeDocHasAnySemanticFlags(writeDoc = state.writeDoc) {
   }
   return false;
 }
-
-const WAYWORD_SUBMITTED_ANNOTATED_TYPOGRAPHY_STYLE_ID =
-  "wayword-submitted-annotated-typography";
 
 /**
  * Legacy hook: annotated post-submit must use the same typography as live (no injected overrides).
@@ -1466,13 +1453,10 @@ function completeWordmark() {
 ----------------------------- */
 
 /** Ignore backdrop/outside dismiss briefly after open (same tap would otherwise “ghost click” the backdrop). */
-const OPTIONS_PANEL_DISMISS_GUARD_MS = 380;
 let optionsPanelDismissGuardUntil = 0;
-const RECENT_DRAWER_DISMISS_GUARD_MS = 260;
 let recentDrawerDismissGuardUntil = 0;
 
 let bannedPanelPersistTimer = null;
-const BANNED_PANEL_DEBOUNCE_MS = 220;
 
 function bannedWordsListFromPanelFieldValue(str) {
   return String(str || "")
@@ -2400,10 +2384,6 @@ function pickDotAnchorMetricsFromClientRects(rects) {
   return { cx: widest.left + widest.width / 2, anchorBottom };
 }
 
-/** Must match `.editor-token-dot` width and `.editor-token-dot-group` gap in CSS. */
-const EDITOR_SEMANTIC_DOT_PX = 6;
-const EDITOR_SEMANTIC_DOT_GAP_PX = 4;
-
 function editorSemanticDotGroupHalfWidthPx(flagCount) {
   const n = Math.max(0, Math.floor(Number(flagCount)) || 0);
   if (n <= 0) return 0;
@@ -2925,7 +2905,6 @@ function showEditorOverlay(message = "Submitted", persist = false) {
   }
 }
 
-const BOTTOM_CHROME_CALIBRATION_HIDE_MS = 200;
 let bottomChromeCalibrationSettleTimer = null;
 
 function clearBottomChromeCalibrationSettleTimer() {
@@ -3735,29 +3714,6 @@ function buildReviewRunsMirrorGlanceBodyHtml(args) {
   return globalThis.WaywordMirrorDom.buildReviewRunsMirrorGlanceBodyHtml(args);
 }
 
-const REVIEW_RUN_REFLECTION_MAX = 3;
-const REVIEW_RUN_MIN_WORDS = 28;
-const REVIEW_RUN_DULL_REPEATS = new Set([
-  "thing",
-  "things",
-  "stuff",
-  "something",
-  "anything",
-  "nothing",
-  "way",
-  "ways",
-  "kind",
-  "sort",
-  "time",
-  "life",
-  "world",
-  "people",
-  "person",
-  "moment",
-  "day",
-  "night"
-]);
-
 function reviewRunSentenceCount(text) {
   return String(text || "")
     .split(/[.!?]+/)
@@ -4010,8 +3966,6 @@ function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibra
     state.calibrationPostRun = null;
   }
 }
-
-const METRIC_EXPLAINER_KEYS = new Set(["filler", "repetition", "openings"]);
 
 const METRIC_EXPLAINER_COPY = {
   filler: {
@@ -4977,9 +4931,6 @@ function saveBannedInline() {
   renderHighlight();
   renderSidebar();
 }
-
-const SHUFFLE_TARGET_WORDS = [60, 75, 90];
-const SHUFFLE_TIMER_SECONDS = [60, 180, 300];
 
 function triggerShuffle() {
   state.targetWords =
