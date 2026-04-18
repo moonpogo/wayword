@@ -628,6 +628,7 @@ button,input,textarea{
 /* header */
 
 .header{
+  --header-divider-pad:12px;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
   grid-template-areas:
@@ -635,8 +636,8 @@ button,input,textarea{
     "context context";
   gap:12px 16px;
   border-bottom:1px solid var(--ink);
-  padding-bottom:12px;
-  margin-bottom:14px;
+  padding-bottom:var(--header-divider-pad);
+  margin-bottom:17px;
   align-items:start;
 }
 
@@ -692,18 +693,20 @@ button,input,textarea{
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  margin:0;
-  padding:7px 16px 6px;
+  align-self:end;
+  /* Sit on the header bottom rule: overlap padding + border, but pull up a few px so the tab
+     mounts to the upper rule instead of sitting deep in the gap above the prompt border. */
+  margin:0 0 calc(-1 * var(--header-divider-pad) - 1px + 6px) 0;
+  padding:2px 11px 3px;
   min-width:86px;
-  font-size:13px;
-  letter-spacing:.04em;
+  font-size:12px;
+  letter-spacing:.06em;
   color:var(--ink);
   background:var(--paper);
   border:1px solid var(--line);
   border-bottom:none;
-  border-radius:12px 12px 0 0;
-  transform:translateY(50px);
-  z-index:4;
+  border-radius:3px 3px 0 0;
+  z-index:2;
 }
 
 /* Fast-moving utility controls: avoid shadow/filter feedback that can ghost on mobile. */
@@ -4570,8 +4573,9 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   .header{
+    --header-divider-pad:10px;
     margin-bottom:10px;
-    padding-bottom:10px;
+    padding-bottom:var(--header-divider-pad);
     gap:10px;
   }
 
@@ -4603,8 +4607,9 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   body.keyboard-open .header{
+    --header-divider-pad:6px;
     margin-bottom:6px;
-    padding-bottom:6px;
+    padding-bottom:var(--header-divider-pad);
     gap:6px;
   }
 
@@ -4755,8 +4760,9 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   body.focus-mode.expanded-field .header{
+    --header-divider-pad:10px;
     margin-bottom:10px;
-    padding-bottom:10px;
+    padding-bottom:var(--header-divider-pad);
     border-bottom:1px solid var(--ink);
     overflow:visible;
     pointer-events:auto;
