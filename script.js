@@ -540,7 +540,7 @@ function setExpandedField(expanded) {
   if (!isMobileViewport()) return;
   state.isExpandedField = Boolean(expanded);
   syncExpandedFieldClass();
-  renderReflection(getPostRunReflectionLineText());
+  window.waywordPostRunRenderer.renderReflectionLine(getPostRunReflectionLineText());
 }
 
 function setFocusMode(enabled) {
@@ -554,7 +554,7 @@ function setFocusMode(enabled) {
     setRecentDrawerOpen(false);
     renderProfileSummaryStrip();
     syncExpandedFieldClass();
-    renderReflection(getPostRunReflectionLineText());
+    window.waywordPostRunRenderer.renderReflectionLine(getPostRunReflectionLineText());
     queueViewportSync();
     logPatternsTransitionSnapshot("setFocusMode:after-enable");
     return;
@@ -1653,8 +1653,8 @@ function waywordDevResetCalibrationForTesting() {
     startWriting();
   } else {
     renderMeta();
-    renderReflection("");
-    renderPostRunFeedbackContainer();
+    window.waywordPostRunRenderer.renderReflectionLine("");
+    window.waywordPostRunRenderer.resetPostRunFeedbackBox();
     if (editorInput) {
       renderWritingState();
       renderHighlight();
@@ -2976,21 +2976,11 @@ function syncEditorPostRunOverlay() {
       overlay.classList.add("editor-overlay--calibration");
       overlay.classList.remove("hidden");
       card.className = "editor-overlay-card editor-overlay-card--calibration";
-      const pct = Math.min(100, Math.round((step / CALIBRATION_THRESHOLD) * 100));
-      const mod = insufficient ? " editor-overlay-calibration--insufficient" : "";
-      card.innerHTML = `
-      <div class="editor-overlay-calibration${mod}" role="dialog" aria-labelledby="editorCalibProgress">
-        <div class="editor-overlay-calibration-head">
-          <span class="editor-overlay-calibration-label">Finding your baseline</span>
-          <span id="editorCalibProgress" class="editor-overlay-calibration-progress">${step} of ${CALIBRATION_THRESHOLD}</span>
-        </div>
-        <div class="editor-overlay-calibration-meter-wrap">
-          <div class="editor-overlay-calibration-meter" role="presentation">
-            <div class="editor-overlay-calibration-meter-fill" style="width:${pct}%"></div>
-          </div>
-        </div>
-        <p class="editor-overlay-calibration-observation" aria-live="polite">${escapeHtml(observation)}</p>
-      </div>`;
+      card.innerHTML = window.waywordPostRunRenderer.buildCalibrationPostRunOverlayCardHtml({
+        step,
+        observation,
+        insufficient
+      });
       scheduleCalibrationOverlayGeometrySync();
       return;
     }
@@ -3198,9 +3188,11 @@ function renderWritingState(options = {}) {
   updateWordProgress();
   updateTimeFill();
   renderAnnotationRow();
-  const mirrorPostRunParts = computeMirrorPostRunPanelParts();
-  renderReflection(getPostRunReflectionLineText(mirrorPostRunParts));
-  renderPostRunFeedbackContainer();
+  const mirrorPostRunParts = window.waywordPostRunRenderer.computeMirrorPostRunPanelParts(
+    postRunMirrorPanelInputs()
+  );
+  window.waywordPostRunRenderer.renderReflectionLine(getPostRunReflectionLineText(mirrorPostRunParts));
+  window.waywordPostRunRenderer.resetPostRunFeedbackBox();
   renderMirrorReflectionPanel(mirrorPostRunParts);
   if (!deferPostRunOverlaySync) {
     syncEditorPostRunOverlay();
@@ -3451,62 +3443,6 @@ function selectCalibrationObservation(text, priorEntries) {
   return "";
 }
 
-function renderReflection(text) {
-  const el = document.getElementById("reflection-line");
-  const editorLine = $("editorPostRunLine");
-  const trimmed = String(text || "").trim();
-  const useEditorSlot =
-    isMobileViewport() &&
-    document.body.classList.contains("focus-mode") &&
-    editorLine;
-
-  if (useEditorSlot) {
-    if (el) {
-      el.textContent = "";
-      el.classList.add("reflection-line--hidden");
-      el.setAttribute("aria-hidden", "true");
-    }
-    if (!trimmed) {
-      editorLine.textContent = "";
-      editorLine.classList.add("editor-post-run-line--empty");
-      editorLine.setAttribute("aria-hidden", "true");
-    } else {
-      editorLine.textContent = trimmed;
-      editorLine.classList.remove("editor-post-run-line--empty");
-      editorLine.setAttribute("aria-hidden", "false");
-    }
-    return;
-  }
-
-  if (editorLine) {
-    editorLine.textContent = "";
-    editorLine.classList.add("editor-post-run-line--empty");
-    editorLine.setAttribute("aria-hidden", "true");
-  }
-
-  if (!el) return;
-
-  if (!trimmed) {
-    el.textContent = "";
-    el.classList.add("reflection-line--hidden");
-    el.setAttribute("aria-hidden", "true");
-    return;
-  }
-
-  el.textContent = trimmed;
-  el.classList.remove("reflection-line--hidden");
-  el.setAttribute("aria-hidden", "false");
-}
-
-/** #feedbackBox: kept empty; post-run calibration uses the in-editor overlay. */
-function renderPostRunFeedbackContainer() {
-  const fb = $("feedbackBox");
-  if (!fb) return;
-  fb.dataset.calibrationRenderKey = "";
-  fb.className = "result-card empty";
-  fb.innerHTML = "";
-}
-
 /** Digests from saved runs (newest last in `state.history`); pipeline sorts internally. */
 function collectMirrorSessionDigestsFromHistory() {
   if (!Array.isArray(state.history)) return [];
@@ -3520,29 +3456,15 @@ function collectMirrorSessionDigestsFromHistory() {
   return out;
 }
 
-/**
- * Recent-pattern block for post-run (V1.1). Returns "" when pipeline unavailable, errors, or no trends.
- */
-function buildMirrorRecentTrendsBlockHtml(idPrefix) {
-  if (!window.waywordMirrorController.mirrorRecentTrendsPipelineAvailable()) return "";
-  let result;
-  try {
-    result = window.waywordMirrorController.runMirrorRecentTrendsPipeline(
-      collectMirrorSessionDigestsFromHistory()
-    );
-  } catch (_) {
-    return "";
-  }
-  if (!result || !Array.isArray(result.trends) || result.trends.length === 0) {
-    return "";
-  }
-
-  const rows = result.trends.filter((t) => t && String(t.statement || "").trim());
-  if (!rows.length) {
-    return "";
-  }
-
-  return globalThis.WaywordMirrorDom.buildMirrorRecentTrendsBlockBodyHtml(rows, idPrefix);
+function postRunMirrorPanelInputs() {
+  return {
+    submitted: state.submitted,
+    completedUiActive: state.completedUiActive,
+    lastMirrorLoadFailed: state.lastMirrorLoadFailed,
+    lastMirrorPipelineResult: state.lastMirrorPipelineResult,
+    mirrorEmptyFallbackSeed: state.mirrorEmptyFallbackSeed,
+    sessionDigestsForTrends: collectMirrorSessionDigestsFromHistory()
+  };
 }
 
 function computeAndStoreMirrorPipelineResult(text, run) {
@@ -3613,21 +3535,6 @@ function wireMirrorEvidenceToggles(root) {
   });
 }
 
-/** Same HTML parts `renderMirrorReflectionPanel` uses (V1 body + recent trends). */
-function computeMirrorPostRunPanelParts() {
-  if (!state.submitted || !state.completedUiActive) {
-    return { v1Body: "", recentBody: "" };
-  }
-  const v1Body = buildMirrorPanelBodyHtml({
-    loadFailed: state.lastMirrorLoadFailed,
-    result: state.lastMirrorPipelineResult,
-    idPrefix: "mirror-postrun",
-    emptyHintSeed: state.mirrorEmptyFallbackSeed
-  });
-  const recentBody = buildMirrorRecentTrendsBlockHtml("mirror-postrun-recent");
-  return { v1Body, recentBody };
-}
-
 /**
  * One-line calibration read for #reflection-line / mobile post-run slot.
  * Suppressed when the Mirror block would be visible (including empty-state copy).
@@ -3636,7 +3543,9 @@ function getPostRunReflectionLineText(precomputedParts) {
   if (!state.submitted || state.calibrationPostRun) {
     return "";
   }
-  const parts = precomputedParts || computeMirrorPostRunPanelParts();
+  const parts =
+    precomputedParts ||
+    window.waywordPostRunRenderer.computeMirrorPostRunPanelParts(postRunMirrorPanelInputs());
   if (state.completedUiActive && Boolean(parts.v1Body || parts.recentBody)) {
     return "";
   }
@@ -3648,23 +3557,21 @@ function renderMirrorReflectionPanel(precomputedParts) {
   const root = $("mirrorReflectionRoot");
   if (!section || !root) return;
 
-  if (!state.submitted || !state.completedUiActive) {
-    section.classList.add("hidden");
-    root.innerHTML = "";
-    return;
+  const parts =
+    precomputedParts ||
+    window.waywordPostRunRenderer.computeMirrorPostRunPanelParts(postRunMirrorPanelInputs());
+  const { shouldWireEvidence } = window.waywordPostRunRenderer.updateMirrorReflectionSection({
+    sectionEl: section,
+    rootEl: root,
+    submitted: state.submitted,
+    completedUiActive: state.completedUiActive,
+    v1Body: parts.v1Body,
+    recentBody: parts.recentBody
+  });
+  if (shouldWireEvidence) {
+    wireMirrorEvidenceToggles(root);
+    collapseMirrorEvidenceInRoot(root);
   }
-
-  const { v1Body, recentBody } = precomputedParts || computeMirrorPostRunPanelParts();
-  if (!v1Body && !recentBody) {
-    section.classList.add("hidden");
-    root.innerHTML = "";
-    return;
-  }
-
-  section.classList.remove("hidden");
-  root.innerHTML = (v1Body || "") + recentBody;
-  wireMirrorEvidenceToggles(root);
-  collapseMirrorEvidenceInRoot(root);
 }
 
 function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibration = false) {
@@ -4316,7 +4223,7 @@ function restartRunWithCurrentSettings(options = {}) {
   state.lastMirrorPipelineResult = null;
   state.lastMirrorLoadFailed = false;
   state.calibrationPostRun = null;
-  renderReflection("");
+  window.waywordPostRunRenderer.renderReflectionLine("");
 
   stopTimer();
   state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
@@ -4443,7 +4350,7 @@ function startWriting(options = {}) {
   state.lastMirrorPipelineResult = null;
   state.lastMirrorLoadFailed = false;
   state.calibrationPostRun = null;
-  renderReflection("");
+  window.waywordPostRunRenderer.renderReflectionLine("");
 
   setBannedEditorOpen(false);
   setOptionsOpen(false);
