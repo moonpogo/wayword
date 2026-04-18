@@ -275,14 +275,12 @@ const state = {
   startSessionPlaceholder: "",
   /** Seeds rotating mirror empty copy for the last submit’s panel. */
   mirrorEmptyFallbackSeed: "",
-  theme: localStorage.getItem("wayword-theme") || "light",
-  history: JSON.parse(localStorage.getItem("wayword-history") || "[]"),
-  savedRunIds: new Set(JSON.parse(localStorage.getItem("wayword-runids") || "[]")),
+  theme: window.waywordStorage.loadTheme(),
+  history: window.waywordStorage.loadHistory(),
+  savedRunIds: window.waywordStorage.loadSavedRunIdsSet(),
   exerciseWords: [],
   patternSelectedWords: [],
-  completedChallenges: new Set(
-  JSON.parse(localStorage.getItem("wayword-completed-challenges") || "[]")
-),
+  completedChallenges: window.waywordStorage.loadCompletedChallengesSet(),
   bannedEditorOpen: false,
   optionsOpen: false,
   promptRerollsUsed: 0,
@@ -318,37 +316,29 @@ function normalizeExerciseWords(words) {
 function setExerciseWords(words) {
   state.exerciseWords = normalizeExerciseWords(words);
   if (state.exerciseWords.length) {
-    localStorage.setItem("wayword-exercise-words", JSON.stringify(state.exerciseWords));
-    localStorage.setItem("wayword-exercise-word", state.exerciseWords[0]);
+    window.waywordStorage.saveExerciseWords(state.exerciseWords);
   } else {
-    localStorage.removeItem("wayword-exercise-words");
-    localStorage.removeItem("wayword-exercise-word");
+    window.waywordStorage.removeExerciseWords();
   }
 }
 
 function loadPersistedPatternSelectedWords() {
-  try {
-    const stored = JSON.parse(localStorage.getItem("wayword-pattern-selected-words") || "[]");
-    return normalizeExerciseWords(stored);
-  } catch (_) {
-    return [];
-  }
+  return normalizeExerciseWords(window.waywordStorage.loadPatternSelectedWordsJson());
 }
 
 function setPatternSelectedWords(words) {
   state.patternSelectedWords = normalizeExerciseWords(words);
   if (state.patternSelectedWords.length) {
-    localStorage.setItem("wayword-pattern-selected-words", JSON.stringify(state.patternSelectedWords));
+    window.waywordStorage.savePatternSelectedWords(state.patternSelectedWords);
   } else {
-    localStorage.removeItem("wayword-pattern-selected-words");
+    window.waywordStorage.removePatternSelectedWords();
   }
 }
 
 // Active challenge is intentionally session/run-scoped.
 // Never restore from previous sessions.
 state.exerciseWords = [];
-localStorage.removeItem("wayword-exercise-words");
-localStorage.removeItem("wayword-exercise-word");
+window.waywordStorage.removeExerciseWords();
 state.patternSelectedWords = loadPersistedPatternSelectedWords();
 
 /** Selection snapshot before annotation slot takes focus away from the editor (canonical offsets). */
@@ -1594,7 +1584,7 @@ function setOptionsOpen(open) {
 function applyTheme(theme) {
   state.theme = theme;
   document.documentElement.setAttribute("data-theme", theme);
-  localStorage.setItem("wayword-theme", theme);
+  window.waywordStorage.saveTheme(theme);
 }
 
 function toggleTheme() {
@@ -1639,7 +1629,7 @@ function waywordDevResetCalibrationForTesting() {
   state.promptBiasTags = [];
   state.startSessionPlaceholder = "";
   state.mirrorEmptyFallbackSeed = "";
-  localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
+  window.waywordStorage.removeInactivityEaseRun(INACTIVITY_EASE_RUN_KEY);
 
   state.progressionLevel = 1;
   persistProgressionLevel();
@@ -1682,8 +1672,7 @@ function waywordDevResetCalibrationForTesting() {
 }
 
 function persist() {
-  localStorage.setItem("wayword-history", JSON.stringify(state.history));
-  localStorage.setItem("wayword-runids", JSON.stringify(Array.from(state.savedRunIds)));
+  window.waywordStorage.saveHistoryAndRunIds(state.history, state.savedRunIds);
 }
 
 function clampProgressionLevel(n) {
@@ -1693,11 +1682,11 @@ function clampProgressionLevel(n) {
 }
 
 function loadStoredProgressionLevel() {
-  return clampProgressionLevel(Number(localStorage.getItem(PROGRESSION_LEVEL_KEY)) || 1);
+  return clampProgressionLevel(window.waywordStorage.readProgressionLevelOrDefault(PROGRESSION_LEVEL_KEY));
 }
 
 function persistProgressionLevel() {
-  localStorage.setItem(PROGRESSION_LEVEL_KEY, String(state.progressionLevel));
+  window.waywordStorage.saveProgressionLevel(PROGRESSION_LEVEL_KEY, state.progressionLevel);
 }
 
 function getProgressionConfig(level) {
@@ -1723,10 +1712,10 @@ function recomputeProgressionLevel(options = {}) {
     const newest = runs[runs.length - 1];
     const age = Date.now() - (newest.savedAt || 0);
     if (age > 7 * 86400000) {
-      const marker = localStorage.getItem(INACTIVITY_EASE_RUN_KEY);
+      const marker = window.waywordStorage.getInactivityEaseRunMarker(INACTIVITY_EASE_RUN_KEY);
       if (marker !== newest.runId) {
         level = Math.max(1, level - 1);
-        localStorage.setItem(INACTIVITY_EASE_RUN_KEY, newest.runId);
+        window.waywordStorage.setInactivityEaseRunMarker(INACTIVITY_EASE_RUN_KEY, newest.runId);
       }
     }
   }
@@ -4975,10 +4964,7 @@ function clearExerciseIfCompleted(text) {
   const tokens = tokenize(text);
   if (state.exerciseWords.some((word) => tokens.includes(word))) return;
   state.exerciseWords.forEach((word) => state.completedChallenges.add(word));
-  localStorage.setItem(
-    "wayword-completed-challenges",
-    JSON.stringify(Array.from(state.completedChallenges))
-  );
+  window.waywordStorage.saveCompletedChallengesFromSet(state.completedChallenges);
 
   setExerciseWords([]);
 }
@@ -5201,7 +5187,7 @@ function submitWriting(fromTimer = false) {
     state.history.push({ ...run });
     state.savedRunIds.add(run.runId);
     state.pendingRecentDrawerExpand = true;
-    localStorage.removeItem(INACTIVITY_EASE_RUN_KEY);
+    window.waywordStorage.removeInactivityEaseRun(INACTIVITY_EASE_RUN_KEY);
     persist();
     renderHistory();
     renderProfileSummaryStrip();
