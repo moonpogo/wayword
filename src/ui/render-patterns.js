@@ -1,0 +1,183 @@
+(function () {
+  function patternsMirrorHeroEmptyHtml() {
+    return (
+      '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
+      '<p class="patterns-mirror-empty">Nothing across your saved runs stood out enough to echo back yet.</p>' +
+      "</div>"
+    );
+  }
+
+  /**
+   * Patterns hero: digest-backed profile line + promoted reflection cards, or a quiet empty state.
+   * Returns `null` only when the mirror bundle does not expose `getPatternsProfileFromDigests` (legacy builds).
+   */
+  function buildPatternsMirrorHeroHtml(digests) {
+    if (!window.waywordMirrorController.mirrorPatternsProfileAvailable()) {
+      return null;
+    }
+    let result;
+    try {
+      result = window.waywordMirrorController.getPatternsProfileFromDigests(digests);
+    } catch (_) {
+      return patternsMirrorHeroEmptyHtml();
+    }
+    if (!result || typeof result !== "object") {
+      return patternsMirrorHeroEmptyHtml();
+    }
+
+    const promoted = Array.isArray(result.promotedPatterns) ? result.promotedPatterns : [];
+    const profile = result.profile != null ? String(result.profile).trim() : "";
+
+    if (promoted.length > 0) {
+      const parts = ['<div class="patterns-mirror-hero">'];
+      if (profile) {
+        parts.push(`<p class="patterns-mirror-profile">${escapeHtml(profile)}</p>`);
+      }
+      parts.push('<div class="mirror-stack mirror-stack--patterns-promoted mirror-stack--support-only">');
+      promoted.slice(0, 3).forEach((card, i) => {
+        if (!card || !String(card.statement || "").trim()) return;
+        parts.push(
+          mirrorReflectionCardHtml(
+            { statement: card.statement, evidence: card.evidence },
+            {
+              role: "support",
+              firstSupportInSupportOnlyStack: i === 0,
+              evidencePanelId: `patterns-promoted-${i}`,
+            }
+          )
+        );
+      });
+      parts.push("</div></div>");
+      return parts.join("");
+    }
+
+    return patternsMirrorHeroEmptyHtml();
+  }
+
+  function buildChallengeCopy(words) {
+    if (!words.length) return "";
+    if (words.length === 1) {
+      return `Start one run without using the word <strong>${escapeHtml(words[0])}</strong>.`;
+    }
+    const wordsText = words.map((word) => `<strong>${escapeHtml(word)}</strong>`).join(", ");
+    return `Start one run without using these words: ${wordsText}.`;
+  }
+
+  function buildPatternCallouts(agg, avgUniqueRatio, avgFiller, topWords, topStarters, completedChallenges) {
+    if (
+      topWords[0] &&
+      topWords[0][1] >= 4 &&
+      !completedChallenges.has(topWords[0][0])
+    ) {
+      return {
+        headline: "Repetition is one of your clearest signatures.",
+        support: `Your most repeated word so far is "${topWords[0][0]}".`,
+        direction: "",
+        suggestedExerciseWord: topWords[0][0],
+      };
+    }
+
+    if (topStarters[0] && topStarters[0][1] >= 3) {
+      return {
+        headline: "Your sentences tend to enter the same way.",
+        support: `You most often begin with "${topStarters[0][0]}".`,
+        direction: "Try changing how you start sentences before you change their content.",
+        suggestedExerciseWord: "",
+      };
+    }
+
+    if (avgFiller > 2) {
+      return {
+        headline: "You use filler to keep movement going.",
+        support: "The writing moves, but some of that movement is padded by softening words.",
+        direction: "Try a stricter run and let silence force a cleaner next word.",
+        suggestedExerciseWord: "",
+      };
+    }
+
+    if (avgUniqueRatio > 0.72) {
+      return {
+        headline: "Your vocabulary spread stays relatively open.",
+        support: "You are not writing with a tiny palette.",
+        direction: "Watch whether variety sharpens precision or hides repetition.",
+        suggestedExerciseWord: "",
+      };
+    }
+
+    return {
+      headline: "Not much to echo back yet.",
+      support: "There is enough to continue, but not enough saved material yet for a sharper read.",
+      direction: "A few more saved drafts give reflection across runs more to hold onto.",
+      suggestedExerciseWord: "",
+    };
+  }
+
+  function buildProfileLockedPanelInnerHtml(remaining, runs) {
+    return `
+    <div class="profile-locked">
+      <div class="profile-locked-title">Almost there</div>
+      <div class="profile-locked-copy">Save ${remaining} more ${remaining === 1 ? "run" : "runs"} to open reflection across your saved drafts here.</div>
+      <div class="profile-locked-copy">${runs} of ${window.waywordConfig.CALIBRATION_THRESHOLD} saved.</div>
+    </div>
+  `;
+  }
+
+  function buildPatternCalloutsLegacySectionHtml(calloutsWithStarters) {
+    return `
+      <div class="history-item"><strong>${calloutsWithStarters.headline}</strong></div>
+      <div class="history-item">${calloutsWithStarters.support}</div>
+      ${calloutsWithStarters.direction ? `<div class="history-item">${calloutsWithStarters.direction}</div>` : ""}
+    `;
+  }
+
+  function buildPatternsRepeatedChallengeRootInnerHtml({ topWords, selectedChallengeSet, draftChallengeWords }) {
+    const wordsHtml = topWords.length
+      ? `<div class="patterns-word-map">
+          ${topWords
+            .map(([w, c]) => {
+              const sel = selectedChallengeSet.has(w);
+              const fs = (12.25 + Math.min(c * 0.42, 3.25)).toFixed(2);
+              return `
+            <button
+              type="button"
+              class="patterns-word-chip ${sel ? "is-selected" : ""}"
+              data-challenge-word="${escapeHtml(w)}"
+              aria-pressed="${sel ? "true" : "false"}"
+              style="font-size:${fs}px"
+            >${escapeHtml(w)}</button>`;
+            })
+            .join("")}
+         </div>`
+      : `<p class="patterns-repeated-empty">No repeated words in your saved runs yet.</p>`;
+
+    const challengeHtml = draftChallengeWords.length
+      ? `<div class="patterns-challenge-block">
+          <div class="patterns-challenge-label">Challenge from your repeats</div>
+          <div class="challenge-copy">${buildChallengeCopy(draftChallengeWords)}</div>
+          <button id="startExerciseBtn" class="exercise-btn" type="button">
+            <span class="exercise-dot"></span>
+            Begin challenge
+          </button>
+        </div>`
+      : topWords.length
+        ? `<p class="patterns-challenge-hint">Tap a word above to try leaving it out for one run.</p>`
+        : "";
+
+    return `
+      <div class="section-title card-section-title patterns-repeated-challenge__title">Repeated words</div>
+      <p class="patterns-repeated-tool-note">Saved-run word counts — for choosing a practice challenge below.</p>
+      ${wordsHtml}
+      ${challengeHtml}
+    `;
+  }
+
+  window.waywordPatternsRenderer = {
+    patternsMirrorHeroEmptyHtml,
+    buildPatternsMirrorHeroHtml,
+    buildChallengeCopy,
+    buildPatternCallouts,
+    buildProfileLockedPanelInnerHtml,
+    buildPatternCalloutsLegacySectionHtml,
+    buildPatternsRepeatedChallengeRootInnerHtml,
+  };
+})();
