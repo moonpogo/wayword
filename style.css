@@ -1850,6 +1850,28 @@ html[data-theme="dark"] .editor-time-fill{
   will-change:opacity, transform;
 }
 
+.editor-progress-caption{
+  position:absolute;
+  left:50%;
+  bottom:calc(100% + 2px);
+  transform:translateX(-50%);
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:8px;
+  line-height:1;
+  font-style:italic;
+  font-weight:400;
+  letter-spacing:0.06em;
+  color:color-mix(in srgb, var(--muted) 90%, var(--ink) 10%);
+  opacity:0.34;
+  white-space:nowrap;
+  pointer-events:none;
+  user-select:none;
+}
+
+.editor-progress--no-target .editor-progress-caption{
+  visibility:hidden;
+}
+
 @media (min-width:720px){
   .editor-bottom-chrome{
     left:14px;
@@ -1866,6 +1888,7 @@ html[data-theme="dark"] .editor-time-fill{
 }
 
 .editor-progress-track{
+  --editor-progress-pct:0;
   position:relative;
   width:100%;
   height:100%;
@@ -1903,11 +1926,81 @@ html[data-theme="dark"] .editor-progress-track{
   width:0%;
   min-width:0;
   max-width:100%;
-  background:var(--ink);
+  background:color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
   border-radius:inherit;
   /* ease-out only — no springy overshoot on width (settles at target). */
   transition:width 0.12s cubic-bezier(0.25, 0.46, 0.45, 1), background .18s ease-out, opacity .2s ease-out;
   z-index:1;
+}
+
+.editor-progress-meter{
+  position:absolute;
+  inset:0;
+  z-index:3;
+  pointer-events:none;
+}
+
+.editor-progress-meter__value{
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:11px;
+  line-height:1;
+  font-weight:400;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:0.02em;
+  white-space:nowrap;
+  opacity:0.86;
+}
+
+.editor-progress-meter__value--track{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:color-mix(in srgb, var(--ink) 42%, var(--muted));
+}
+
+.editor-progress-meter__clip{
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:calc(var(--editor-progress-pct) * 1%);
+  overflow:hidden;
+  transition:width 0.12s cubic-bezier(0.25, 0.46, 0.45, 1);
+}
+
+.editor-progress-meter__clip-inner{
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:calc(100% * 100 / max(var(--editor-progress-pct), 0.001));
+}
+
+.editor-progress-meter__value--fill{
+  color:rgba(255, 255, 255, 0.88);
+}
+
+html[data-theme="dark"] .editor-progress:not([data-phase="done"]) .editor-progress-meter__value--fill{
+  color:rgba(22, 22, 22, 0.88);
+}
+
+.editor-progress[data-phase="done"]:not(.editor-progress--empty) .editor-progress-meter__value--fill{
+  color:rgba(255, 252, 248, 0.9);
+}
+
+.editor-progress--no-target .editor-progress-meter{
+  visibility:hidden;
+}
+
+@media (prefers-reduced-motion:reduce){
+  .editor-progress-meter__clip{
+    transition-duration:0.01ms;
+  }
 }
 
 /* Full bar: short ease to rest on submit; micro opacity settle (no bounce). */
@@ -1918,8 +2011,8 @@ html[data-theme="dark"] .editor-progress-track{
 }
 
 @keyframes wayword-progress-fill-settle{
-  0%{ opacity:0.94; }
-  100%{ opacity:1; }
+  0%{ opacity:0.9; }
+  100%{ opacity:0.98; }
 }
 
 @media (prefers-reduced-motion:reduce){
@@ -5460,6 +5553,31 @@ html[data-theme="dark"] .metric-explainer{
   color:var(--muted);
   font-style:normal;
   opacity:0.9;
+}
+
+.mirror-next-pass-nudge{
+  display:block;
+  width:100%;
+  margin:0.85rem 0 0;
+  padding:0.5rem 0 0;
+  border:none;
+  border-top:1px solid color-mix(in srgb, var(--line) 45%, transparent);
+  background:transparent;
+  font:inherit;
+  font-size:0.84rem;
+  line-height:1.45;
+  letter-spacing:0.01em;
+  color:var(--muted);
+  text-align:left;
+  cursor:pointer;
+  opacity:0.92;
+}
+
+.mirror-next-pass-nudge:hover{
+  color:var(--ink);
+  opacity:1;
+  text-decoration:underline;
+  text-underline-offset:0.14em;
 }
 
 /* Post-run mirror block: minimal upward settle when panel body mounts. */
