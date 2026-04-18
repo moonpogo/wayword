@@ -143,23 +143,6 @@ function buildRitualNudgeV1({ priorPromptFamily, hadMainReflection, mainCategory
   return pool[idx];
 }
 
-/** Ritual line under the prompt for the current run: carryover after submit, else cold-start pool for this prompt. */
-function getActivePromptNudgeLineForRender() {
-  const carried = String(state.pendingNudgeLine || "").trim();
-  if (carried) return carried;
-  const family = String(state.promptFamily || "").trim() || "Observation";
-  const seed =
-    String(state.lastPromptKey || "").trim() ||
-    String(state.prompt || "").trim() ||
-    "wayword";
-  return buildRitualNudgeV1({
-    priorPromptFamily: family,
-    hadMainReflection: false,
-    mainCategory: null,
-    seed
-  });
-}
-
 const bannedSets = [
   ["like","just","really","very","thing","stuff","something","maybe","kind","sort"],
   ["very","really","just","quite","perhaps","somehow"],
@@ -256,6 +239,23 @@ function getCategoryAccentColor(key) {
 }
 
 const state = window.waywordAppState.initState(bannedSets[0]);
+
+/** Ritual line under the prompt for the current run: carryover after submit, else cold-start pool for this prompt. */
+function getActivePromptNudgeLineForRender() {
+  const carried = String(state.pendingNudgeLine || "").trim();
+  if (carried) return carried;
+  const family = String(state.promptFamily || "").trim() || "Observation";
+  const seed =
+    String(state.lastPromptKey || "").trim() ||
+    String(state.prompt || "").trim() ||
+    "wayword";
+  return buildRitualNudgeV1({
+    priorPromptFamily: family,
+    hadMainReflection: false,
+    mainCategory: null,
+    seed
+  });
+}
 
 let editorSurfaceComposing = false;
 
@@ -2992,12 +2992,16 @@ function renderMeta() {
   if (promptFamily) promptFamily.textContent = state.promptFamily || "Prompt";
 
   const promptNudge = $("promptNudge");
+  const promptMain = promptCard?.querySelector(".prompt-main") ?? null;
+  const nudgeRowVisible = Boolean(state.active && !state.submitted);
   if (promptNudge) {
-    const visible = Boolean(state.active && !state.submitted);
-    const nudge = visible ? getActivePromptNudgeLineForRender() : "";
+    const nudge = nudgeRowVisible ? getActivePromptNudgeLineForRender() : "";
     promptNudge.textContent = nudge;
-    promptNudge.classList.toggle("hidden", !visible);
-    promptNudge.setAttribute("aria-hidden", visible ? "false" : "true");
+    promptNudge.classList.toggle("hidden", !nudgeRowVisible);
+    promptNudge.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
+  }
+  if (promptMain) {
+    promptMain.classList.toggle("prompt-main--with-nudge", nudgeRowVisible);
   }
 
   if (bannedPill) {
@@ -4656,14 +4660,14 @@ document.addEventListener("keydown", (e) => {
 });
 
 $("beginBtn")?.addEventListener("click", () => {
-  if (isMobileViewport()) {
-    setFocusMode(true);
-  }
-  startWriting({ deferEditorFocus: true });
   enterAppState({
     afterEnter: () => scheduleDeferredEditorFocus("end"),
     dockFocusModeForMobile: false,
   });
+  if (isMobileViewport()) {
+    setFocusMode(true);
+  }
+  startWriting({ deferEditorFocus: true });
 });
 $("themeToggleInPanel")?.addEventListener("click", toggleTheme);
 $("styleTab")?.addEventListener("pointerdown", () => {

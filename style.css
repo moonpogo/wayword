@@ -929,8 +929,8 @@ html[data-theme="dark"] .theme-moon{
   margin:0 0 2px;
 }
 
-/* When the ritual nudge is visible, tuck it closer to the prompt so it reads as meta, not a second line of copy. */
-.prompt-main:has(.prompt-nudge:not(.hidden)) .prompt-text{
+/* When the ritual nudge is visible, tuck it closer to the prompt (class toggled in renderMeta; avoid :has for WebKit + fixed landing hit-testing). */
+.prompt-main--with-nudge .prompt-text{
   margin-bottom:0;
 }
 
