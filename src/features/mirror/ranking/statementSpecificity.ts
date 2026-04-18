@@ -12,7 +12,14 @@ import {
   MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
   MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
   MIRROR_HEADLINE_FALLBACK_SOFT,
+  MIRROR_HEADLINE_OPENING_DIRECT,
+  MIRROR_HEADLINE_OPENING_LOOSE,
+  MIRROR_HEADLINE_OPENING_MOMENT,
+  MIRROR_HEADLINE_SHIFT_HOLDS,
+  MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
+  MIRROR_HEADLINE_SHIFT_TURNS,
   MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS,
+  MIRROR_HEADLINE_LOW_SIGNAL,
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
   MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
   MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER,
@@ -33,6 +40,7 @@ function norm(s: string): string {
 export function mirrorStatementSpecificity(statement: string): number {
   const n = norm(statement);
   if (n === norm(MIRROR_HEADLINE_FALLBACK_SOFT)) return 5;
+  if (n === norm(MIRROR_HEADLINE_LOW_SIGNAL)) return 6;
   if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
 
   // Named recurrence should beat most non-directional observations.
@@ -51,6 +59,21 @@ export function mirrorStatementSpecificity(statement: string): number {
     return 90;
   }
   if (n === norm(MIRROR_HEADLINE_CADENCE_ALTERNATION)) return 84;
+
+  if (
+    n === norm(MIRROR_HEADLINE_OPENING_DIRECT) ||
+    n === norm(MIRROR_HEADLINE_OPENING_MOMENT) ||
+    n === norm(MIRROR_HEADLINE_OPENING_LOOSE)
+  ) {
+    return 86;
+  }
+  if (
+    n === norm(MIRROR_HEADLINE_SHIFT_TURNS) ||
+    n === norm(MIRROR_HEADLINE_SHIFT_HOLDS) ||
+    n === norm(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)
+  ) {
+    return 86;
+  }
 
   // Non-shift directional abstraction beats generic mixed states.
   if (

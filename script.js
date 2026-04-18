@@ -109,6 +109,18 @@ const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
     "Make the first sentence short. Let the next one open up.",
     "Let the sentences change length as you go."
   ],
+  opening: [
+    "Let the first beat land before you widen the lens.",
+    "Hold the opening image one beat longer.",
+    "Start with one clear motion, then widen.",
+    "Keep the first paragraph to one room of attention."
+  ],
+  shift: [
+    "Let one turn stay sharp before the next move.",
+    "After one pivot, stay with the new angle a while.",
+    "Hold the lane change long enough to feel it.",
+    "One swerve, then commit to the new line."
+  ],
   hesitation_qualification: [
     "Say it plainly.",
     "Say it without maybe or kind of.",
@@ -120,6 +132,12 @@ const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
     "Stay with one moment.",
     "Don't explain anything.",
     "Let the ending stay open."
+  ],
+  low_signal: [
+    "Write a few more sentences, then look again.",
+    "Add a little more on the page before the next run.",
+    "Give the next stretch a bit more room to land.",
+    "Let the next pass carry a little more language."
   ]
 });
 
@@ -3354,7 +3372,8 @@ function postRunMirrorPanelInputs() {
     lastMirrorPipelineResult: state.lastMirrorPipelineResult,
     mirrorEmptyFallbackSeed: state.mirrorEmptyFallbackSeed,
     sessionDigestsForTrends: collectMirrorSessionDigestsFromHistory(),
-    submittedRunText: getEditorText()
+    submittedRunText: getEditorText(),
+    promptFamily: state.promptFamily
   };
 }
 
@@ -4184,7 +4203,6 @@ window.waywordRunController.registerDeps({
   getActiveTargetWordsForScoring,
   computeRunScoreV1,
   computeAndStoreMirrorPipelineResult,
-  buildRitualNudgeV1,
   recomputeProgressionLevel,
   applyProgressionToState,
   renderHistory,
@@ -4569,7 +4587,7 @@ $("promptCard")?.addEventListener("click", (e) => {
   const origin = domEventTargetElement(e);
   if (!origin || !origin.closest("[data-mirror-next-pass]")) return;
   e.preventDefault();
-  restartRunWithCurrentSettings({ reuseCurrentPrompt: true });
+  runPostSubmitAutoNewRunNow();
 });
 
 $("recentWritingTrigger")?.addEventListener(

@@ -23,8 +23,14 @@
         </h1>
 
         <div class="landing-copy">
-          <p>Wayword reflects your writing as it happens, so you can notice what surfaces in the moment.</p>
-          <p>You get a prompt and a short run.<br>Write freely, submit when you're done, then review what surfaced.</p>
+          <div class="landing-copy-block landing-copy-block--value">
+            <p>Wayword reflects your writing as it happens.</p>
+            <p>So you can see what you're doing.</p>
+          </div>
+          <div class="landing-copy-block landing-copy-block--mechanics">
+            <p>You get a prompt and a short run.</p>
+            <p>Write freely, submit when you're done, then see what surfaces.</p>
+          </div>
         </div>
 
         <button id="beginBtn" class="landing-enter-btn primary" type="button" aria-label="Enter Wayword">
@@ -272,6 +278,12 @@
                   </div>
                 </div>
                 <div class="prompt-text" id="promptText"></div>
+                <div
+                  id="mirrorNextPassSlot"
+                  class="mirror-next-pass-slot hidden"
+                  aria-live="polite"
+                  aria-hidden="true"
+                ></div>
                 <p id="promptNudge" class="prompt-nudge hidden" aria-hidden="true"></p>
               </div>
             </div>

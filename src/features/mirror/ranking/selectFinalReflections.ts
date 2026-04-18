@@ -44,7 +44,7 @@ function norm(s: string): string {
  * Order: shift > dominance > repetition > cadence > hesitation > mixed/balance.
  */
 function interpretiveStrengthTier(c: MirrorReflectionCandidate): number {
-  if (c.category === "fallback") {
+  if (c.category === "fallback" || c.category === "low_signal") {
     return 99;
   }
   const n = norm(c.statement);
@@ -63,7 +63,7 @@ function interpretiveStrengthTier(c: MirrorReflectionCandidate): number {
   if (c.category === "repetition" || n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) {
     return 2;
   }
-  if (c.category === "cadence") {
+  if (c.category === "cadence" || c.category === "opening" || c.category === "shift") {
     return 3;
   }
   if (c.category === "hesitation_qualification") {
@@ -79,9 +79,12 @@ function categoryTieOrder(cat: MirrorCategoryV1): number {
   if (cat === "abstraction_concrete") return 0;
   if (cat === "repetition") return 1;
   if (cat === "cadence") return 2;
-  if (cat === "hesitation_qualification") return 3;
-  if (cat === "fallback") return 4;
-  return 5;
+  if (cat === "opening") return 3;
+  if (cat === "shift") return 4;
+  if (cat === "hesitation_qualification") return 5;
+  if (cat === "fallback") return 6;
+  if (cat === "low_signal") return 7;
+  return 8;
 }
 
 function compareInterpretivePrimaryOrder(a: MirrorReflectionCandidate, b: MirrorReflectionCandidate): number {

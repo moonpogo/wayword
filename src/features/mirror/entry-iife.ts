@@ -9,5 +9,6 @@ export { getPatternsProfileFromDigests } from "./recent/getPatternsProfileFromDi
 export { runMirrorRecentTrendsPipeline } from "./recent/runMirrorRecentTrendsPipeline.js";
 export {
   MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION,
+  MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK,
   nextPassInstructionFromMirrorPipelineResult
 } from "./nudges/nextPassInstruction.js";

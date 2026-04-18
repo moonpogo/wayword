@@ -3,6 +3,18 @@
  * Below these, that category is skipped (fewer candidates, no filler).
  */
 
+/**
+ * Low-signal guard (pipeline): below this tokenizer word count, skip headline selection and
+ * emit `MIRROR_HEADLINE_LOW_SIGNAL` instead of category lines or the soft fallback headline.
+ */
+export const MIRROR_LOW_SIGNAL_MAX_WORDS_EXCLUSIVE = 8;
+
+/**
+ * When there is only one sentence segment and word count is still below this, treat as
+ * insufficient structure for mirror headlines (same low-signal path as word floor).
+ */
+export const MIRROR_LOW_SIGNAL_STRUCTURE_MIN_WORDS = 24;
+
 /** Minimum tokenizer words before any reflection category is considered. */
 export const MIRROR_GEN_MIN_WORDS_FOR_ANY = 32;
 
@@ -47,6 +59,25 @@ export const MIRROR_GEN_REPETITION_DULL_WORDS: ReadonlySet<string> = new Set([
 
 /** Minimum sentences before any cadence candidate (end shape or alternation) is considered. */
 export const MIRROR_GEN_CADENCE_MIN_SENTENCES = 5;
+
+/** Opening lens: minimum sentences before first/last quarter means exist (matches cadence quarter gates). */
+export const MIRROR_GEN_OPENING_MIN_SENTENCES = 6;
+
+/** Opening “slow start” line: first-quarter mean sentence length (words) and vs last-quarter ratio. */
+export const MIRROR_GEN_OPENING_LONG_FIRST_Q = 14;
+export const MIRROR_GEN_OPENING_MOMENT_RATIO = 1.18;
+
+/** Opening “loose then settles”: variance floor and first quarter longer than last. */
+export const MIRROR_GEN_OPENING_MIN_VARIANCE_LOOSE = 24;
+export const MIRROR_GEN_OPENING_LOOSE_RATIO = 1.08;
+export const MIRROR_GEN_OPENING_LOOSE_FIRSTQ_MIN = 10;
+
+/** Opening “direct”: short opening quarter, not longer than the close. */
+export const MIRROR_GEN_OPENING_DIRECT_MAX_FIRST_Q = 10;
+export const MIRROR_GEN_OPENING_DIRECT_LAST_RATIO = 1.05;
+
+/** Shift lens: minimum lexicon hits when a sole half-session shift flag is set. */
+export const MIRROR_GEN_SHIFT_MIN_LEX = 4;
 
 /** Minimum short-sentence count for the alternation headline (with long count + variance floor). */
 export const MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT = 3;

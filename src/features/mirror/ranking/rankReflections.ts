@@ -9,6 +9,12 @@ import {
   MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
   MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
   MIRROR_HEADLINE_FALLBACK_SOFT,
+  MIRROR_HEADLINE_OPENING_DIRECT,
+  MIRROR_HEADLINE_OPENING_LOOSE,
+  MIRROR_HEADLINE_OPENING_MOMENT,
+  MIRROR_HEADLINE_SHIFT_HOLDS,
+  MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
+  MIRROR_HEADLINE_SHIFT_TURNS,
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
   MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
   MIRROR_HEADLINE_HESITATION_REVISED,
@@ -30,7 +36,11 @@ function norm(s: string): string {
 function rankingWeight(candidate: MirrorReflectionCandidate): number {
   const s = norm(candidate.statement);
 
-  if (candidate.category === "fallback" || s === norm(MIRROR_HEADLINE_FALLBACK_SOFT)) {
+  if (
+    candidate.category === "fallback" ||
+    candidate.category === "low_signal" ||
+    s === norm(MIRROR_HEADLINE_FALLBACK_SOFT)
+  ) {
     return -40;
   }
 
@@ -57,11 +67,17 @@ function rankingWeight(candidate: MirrorReflectionCandidate): number {
     return 30;
   }
 
-  // Medium-priority cadence movement.
+  // Medium-priority cadence / opening / shift movement.
   if (
     s === norm(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS) ||
     s === norm(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN) ||
-    s === norm(MIRROR_HEADLINE_CADENCE_ALTERNATION)
+    s === norm(MIRROR_HEADLINE_CADENCE_ALTERNATION) ||
+    s === norm(MIRROR_HEADLINE_OPENING_DIRECT) ||
+    s === norm(MIRROR_HEADLINE_OPENING_MOMENT) ||
+    s === norm(MIRROR_HEADLINE_OPENING_LOOSE) ||
+    s === norm(MIRROR_HEADLINE_SHIFT_TURNS) ||
+    s === norm(MIRROR_HEADLINE_SHIFT_HOLDS) ||
+    s === norm(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)
   ) {
     return 18;
   }
@@ -85,9 +101,9 @@ function rankingWeight(candidate: MirrorReflectionCandidate): number {
 function categoryTiePreference(category: MirrorCategoryV1): number {
   if (category === "abstraction_concrete") return 4;
   if (category === "repetition") return 3;
-  if (category === "cadence") return 2;
+  if (category === "cadence" || category === "opening" || category === "shift") return 2;
   if (category === "hesitation_qualification") return 1;
-  if (category === "fallback") return 0;
+  if (category === "fallback" || category === "low_signal") return 0;
   return 1;
 }
 

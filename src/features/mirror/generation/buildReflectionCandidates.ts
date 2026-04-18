@@ -16,10 +16,19 @@ import {
   MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS,
   MIRROR_GEN_HESITATION_MIN_TOTAL,
   MIRROR_GEN_MIN_WORDS_FOR_ANY,
+  MIRROR_GEN_OPENING_DIRECT_LAST_RATIO,
+  MIRROR_GEN_OPENING_DIRECT_MAX_FIRST_Q,
+  MIRROR_GEN_OPENING_LONG_FIRST_Q,
+  MIRROR_GEN_OPENING_LOOSE_FIRSTQ_MIN,
+  MIRROR_GEN_OPENING_LOOSE_RATIO,
+  MIRROR_GEN_OPENING_MIN_SENTENCES,
+  MIRROR_GEN_OPENING_MIN_VARIANCE_LOOSE,
+  MIRROR_GEN_OPENING_MOMENT_RATIO,
   MIRROR_GEN_REPETITION_DULL_WORDS,
   MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN,
   MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT,
-  MIRROR_GEN_REPETITION_TOP_MIN_COUNT
+  MIRROR_GEN_REPETITION_TOP_MIN_COUNT,
+  MIRROR_GEN_SHIFT_MIN_LEX
 } from "../constants/generationThresholds.js";
 import {
   MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL,
@@ -34,6 +43,12 @@ import {
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
   MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
   MIRROR_HEADLINE_HESITATION_REVISED,
+  MIRROR_HEADLINE_OPENING_DIRECT,
+  MIRROR_HEADLINE_OPENING_LOOSE,
+  MIRROR_HEADLINE_OPENING_MOMENT,
+  MIRROR_HEADLINE_SHIFT_HOLDS,
+  MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
+  MIRROR_HEADLINE_SHIFT_TURNS,
   mirrorHeadlineRepetitionNamed
 } from "../constants/mirrorSessionHeadlines.js";
 import type {
@@ -90,6 +105,26 @@ function repetitionMeetsCountGate(word: string, count: number): boolean {
   return count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
 }
 
+function pickVariantIndex(sessionId: string, salt: string): number {
+  const s = `${sessionId}|${salt}`;
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h ^= s.charCodeAt(i) >>> 0;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function cadenceStrongAlternation(features: MirrorFeatures): boolean {
+  const c = features.cadenceProfile;
+  return (
+    features.sentenceCount >= MIRROR_GEN_CADENCE_MIN_SENTENCES &&
+    c.shortSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT &&
+    c.longSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG &&
+    c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE
+  );
+}
+
 function tryRepetition(features: MirrorFeatures): MirrorReflectionCandidate | null {
   if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
   const list = features.topRepeatedWords;
@@ -128,19 +163,78 @@ function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null 
     return candidate("cadence", features.sessionId, statement, [], rankScore);
   }
 
-  const strongAlternation =
-    features.sentenceCount >= MIRROR_GEN_CADENCE_MIN_SENTENCES &&
-    c.shortSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT &&
-    c.longSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG &&
-    c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
-
-  if (strongAlternation) {
+  if (cadenceStrongAlternation(features)) {
     const statement = MIRROR_HEADLINE_CADENCE_ALTERNATION;
     const rankScore = 44 + Math.min(16, c.shortSentenceCount + c.longSentenceCount);
     return candidate("cadence", features.sessionId, statement, [], rankScore);
   }
 
   return null;
+}
+
+function tryOpening(features: MirrorFeatures): MirrorReflectionCandidate | null {
+  if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
+  if (features.sentenceCount < MIRROR_GEN_OPENING_MIN_SENTENCES) return null;
+  const c = features.cadenceProfile;
+  const firstQ = c.meanSentenceLengthFirstQuarterWords;
+  const lastQ = c.meanSentenceLengthLastQuarterWords;
+  if (firstQ == null || lastQ == null || firstQ <= 0) return null;
+  if (c.endCompression || c.endExpansion) return null;
+  if (cadenceStrongAlternation(features)) return null;
+
+  const eligible: Array<{ key: "moment" | "loose" | "direct"; statement: string }> = [];
+  if (firstQ >= MIRROR_GEN_OPENING_LONG_FIRST_Q && firstQ >= lastQ * MIRROR_GEN_OPENING_MOMENT_RATIO) {
+    eligible.push({ key: "moment", statement: MIRROR_HEADLINE_OPENING_MOMENT });
+  }
+  if (
+    c.varianceSentenceLength >= MIRROR_GEN_OPENING_MIN_VARIANCE_LOOSE &&
+    firstQ > lastQ * MIRROR_GEN_OPENING_LOOSE_RATIO &&
+    firstQ > MIRROR_GEN_OPENING_LOOSE_FIRSTQ_MIN
+  ) {
+    eligible.push({ key: "loose", statement: MIRROR_HEADLINE_OPENING_LOOSE });
+  }
+  if (firstQ <= MIRROR_GEN_OPENING_DIRECT_MAX_FIRST_Q && firstQ <= lastQ * MIRROR_GEN_OPENING_DIRECT_LAST_RATIO) {
+    eligible.push({ key: "direct", statement: MIRROR_HEADLINE_OPENING_DIRECT });
+  }
+  if (!eligible.length) return null;
+
+  const order: Array<"moment" | "loose" | "direct"> = ["moment", "loose", "direct"];
+  const ordered = order
+    .map((k) => eligible.find((e) => e.key === k))
+    .filter((e): e is { key: "moment" | "loose" | "direct"; statement: string } => Boolean(e));
+  const pick = ordered[pickVariantIndex(features.sessionId, "opening") % ordered.length]!;
+  const rankScore = 46 + Math.min(10, (firstQ + lastQ) * 0.8);
+  return candidate("opening", features.sessionId, pick.statement, [], rankScore);
+}
+
+function tryShift(features: MirrorFeatures): MirrorReflectionCandidate | null {
+  const a = features.abstractionProfile;
+  if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
+
+  const soleHalfShift = a.shiftsTowardAbstract !== a.shiftsTowardConcrete;
+  if (!soleHalfShift) return null;
+
+  const lex = a.abstractCount + a.concreteCount;
+  if (lex < MIRROR_GEN_SHIFT_MIN_LEX) return null;
+
+  const strongAbstractMove =
+    a.shiftsTowardAbstract &&
+    lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT &&
+    a.abstractCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT;
+  const strongConcreteMove =
+    a.shiftsTowardConcrete &&
+    lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT &&
+    a.concreteCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT;
+  if (strongAbstractMove || strongConcreteMove) return null;
+
+  const statements = [
+    MIRROR_HEADLINE_SHIFT_TURNS,
+    MIRROR_HEADLINE_SHIFT_HOLDS,
+    MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER
+  ] as const;
+  const statement = statements[pickVariantIndex(features.sessionId, "shift") % statements.length]!;
+  const rankScore = 44 + Math.min(12, lex * 1.2);
+  return candidate("shift", features.sessionId, statement, [], rankScore);
 }
 
 function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | null {
@@ -273,6 +367,12 @@ export function buildReflectionCandidates(
 
   const cad = tryCadence(features);
   if (cad) out.push(cad);
+
+  const opn = tryOpening(features);
+  if (opn) out.push(opn);
+
+  const shf = tryShift(features);
+  if (shf) out.push(shf);
 
   const hes = tryHesitation(features);
   if (hes) out.push(hes);

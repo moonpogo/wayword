@@ -285,16 +285,32 @@
     d.state.mirrorEmptyFallbackSeed = run.runId;
 
     if (runWasSaved) {
-      const main = d.state.lastMirrorPipelineResult && d.state.lastMirrorPipelineResult.main;
-      const stmt = main && String(main.statement || "").trim();
-      const hadMainReflection = Boolean(stmt);
-      const mainCategory = hadMainReflection ? main.category ?? null : null;
-      d.state.pendingNudgeLine = d.buildRitualNudgeV1({
-        priorPromptFamily: d.state.promptFamily,
-        hadMainReflection,
-        mainCategory,
-        seed: run.runId
-      });
+      const mirror = globalThis.WaywordMirror;
+      const nudgeLowSig =
+        typeof window.waywordPostRunRenderer?.computeMirrorAttentionalNudgeLowSignal === "function"
+          ? window.waywordPostRunRenderer.computeMirrorAttentionalNudgeLowSignal(
+              String(currentText || ""),
+              d.state.lastMirrorPipelineResult,
+              d.state.lastMirrorLoadFailed
+            )
+          : false;
+      const fallbackLine =
+        mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
+          ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
+          : "What stands out to you in what you just wrote?";
+      const line =
+        mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function"
+          ? mirror.nextPassInstructionFromMirrorPipelineResult(
+              d.state.lastMirrorPipelineResult,
+              d.state.lastMirrorLoadFailed,
+              {
+                promptFamily: d.state.promptFamily,
+                lowSignal: nudgeLowSig,
+                seed: run.runId
+              }
+            )
+          : fallbackLine;
+      d.state.pendingNudgeLine = String(line || "").trim() || fallbackLine;
       window.waywordRunModel.attachMirrorSnapshotToRun(
         run,
         d.state.lastMirrorPipelineResult,

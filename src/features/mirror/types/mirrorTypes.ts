@@ -2,8 +2,11 @@ export type MirrorCategoryV1 =
   | "repetition"
   | "abstraction_concrete"
   | "cadence"
+  | "opening"
+  | "shift"
   | "hesitation_qualification"
-  | "fallback";
+  | "fallback"
+  | "low_signal";
 
 export interface MirrorSessionInput {
   text: string;
@@ -149,8 +152,9 @@ export interface MirrorSelectedReflection {
 /** Final pipeline output after rank, dedupe, and selection. */
 export interface MirrorPipelineResult {
   /**
-   * Exactly one line per run: strongest qualifying signal, or a soft `fallback` line when none
-   * clear the support floor. Null only if the pipeline cannot run (e.g. bundle failure upstream).
+   * Exactly one line per run: strongest qualifying signal, a soft `fallback` line when none
+   * clear the support floor, or `low_signal` when the submission is too thin for pattern copy.
+   * Null only if the pipeline cannot run (e.g. bundle failure upstream).
    */
   main: MirrorSelectedReflection | null;
   /**

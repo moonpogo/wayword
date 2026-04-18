@@ -22,6 +22,7 @@ var WaywordMirror = (() => {
   var entry_iife_exports = {};
   __export(entry_iife_exports, {
     MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION: () => MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION,
+    MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK: () => MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK,
     buildMirrorSessionDigest: () => buildMirrorSessionDigest,
     buildReflectiveProfile: () => buildReflectiveProfile,
     getPatternsProfileFromDigests: () => getPatternsProfileFromDigests,
@@ -521,6 +522,8 @@ var WaywordMirror = (() => {
   }
 
   // src/features/mirror/constants/generationThresholds.ts
+  var MIRROR_LOW_SIGNAL_MAX_WORDS_EXCLUSIVE = 8;
+  var MIRROR_LOW_SIGNAL_STRUCTURE_MIN_WORDS = 24;
   var MIRROR_GEN_MIN_WORDS_FOR_ANY = 32;
   var MIRROR_GEN_REPETITION_TOP_MIN_COUNT = 4;
   var MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN = 4;
@@ -551,6 +554,15 @@ var WaywordMirror = (() => {
     "door"
   ]);
   var MIRROR_GEN_CADENCE_MIN_SENTENCES = 5;
+  var MIRROR_GEN_OPENING_MIN_SENTENCES = 6;
+  var MIRROR_GEN_OPENING_LONG_FIRST_Q = 14;
+  var MIRROR_GEN_OPENING_MOMENT_RATIO = 1.18;
+  var MIRROR_GEN_OPENING_MIN_VARIANCE_LOOSE = 24;
+  var MIRROR_GEN_OPENING_LOOSE_RATIO = 1.08;
+  var MIRROR_GEN_OPENING_LOOSE_FIRSTQ_MIN = 10;
+  var MIRROR_GEN_OPENING_DIRECT_MAX_FIRST_Q = 10;
+  var MIRROR_GEN_OPENING_DIRECT_LAST_RATIO = 1.05;
+  var MIRROR_GEN_SHIFT_MIN_LEX = 4;
   var MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT = 3;
   var MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG = 2;
   var MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE = 20;
@@ -571,21 +583,28 @@ var WaywordMirror = (() => {
   function normMirrorReflectionHeadline(s) {
     return s.trim().toLowerCase().replace(/\s+/g, " ");
   }
-  var MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times in this draft";
-  var MIRROR_HEADLINE_FALLBACK_SOFT = "The draft holds steady from start to finish.";
+  var MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times on the page";
+  var MIRROR_HEADLINE_FALLBACK_SOFT = "It stays on one line the whole way through.";
+  var MIRROR_HEADLINE_LOW_SIGNAL = "Not enough here to notice a pattern yet.";
   function mirrorHeadlineRepetitionNamed(word) {
     return `\u201C${word}\u201D ${MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER}.`;
   }
   var MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS = "The ending tightens noticeably.";
   var MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN = "Lines lengthen near the end.";
-  var MIRROR_HEADLINE_CADENCE_ALTERNATION = "The cadence alternates between short and long lines.";
+  var MIRROR_HEADLINE_CADENCE_ALTERNATION = "Short and long lines trade places.";
+  var MIRROR_HEADLINE_OPENING_DIRECT = "It opens directly.";
+  var MIRROR_HEADLINE_OPENING_MOMENT = "The opening takes a moment before anything lands.";
+  var MIRROR_HEADLINE_OPENING_LOOSE = "It starts loose before settling.";
+  var MIRROR_HEADLINE_SHIFT_TURNS = "It turns partway through.";
+  var MIRROR_HEADLINE_SHIFT_HOLDS = "The direction shifts once, then holds.";
+  var MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER = "It starts one way, then leans another.";
   var MIRROR_HEADLINE_ABSTRACTION_BALANCE = "Ideas and concrete detail stay in balance.";
   var MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL = "The back half leans more conceptual than scene-based.";
   var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER = "Concrete detail carries more of the later passages.";
-  var MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "Ideas dominate over concrete detail.";
-  var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Concrete detail outweighs abstraction.";
+  var MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "It leans more on ideas than on what can be seen.";
+  var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Concrete detail carries more than the ideas here.";
   var MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT = "Both idea-words and image-words appear frequently.";
-  var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER = "Statements are often qualified just after they\u2019re made.";
+  var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER = "A statement appears, then softens right after.";
   var MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertions are often followed by softening.";
   var MIRROR_HEADLINE_HESITATION_REVISED = "Statements are often revised or softened.";
   var MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS = [
@@ -626,6 +645,19 @@ var WaywordMirror = (() => {
     if (repetitionWordIsLowSignal(word)) return count >= MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT;
     return count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
   }
+  function pickVariantIndex(sessionId, salt) {
+    const s = `${sessionId}|${salt}`;
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < s.length; i += 1) {
+      h ^= s.charCodeAt(i) >>> 0;
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+  function cadenceStrongAlternation(features) {
+    const c = features.cadenceProfile;
+    return features.sentenceCount >= MIRROR_GEN_CADENCE_MIN_SENTENCES && c.shortSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT && c.longSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG && c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
+  }
   function tryRepetition(features) {
     if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
     const list = features.topRepeatedWords;
@@ -657,13 +689,57 @@ var WaywordMirror = (() => {
       const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
       return candidate("cadence", features.sessionId, statement, [], rankScore);
     }
-    const strongAlternation = features.sentenceCount >= MIRROR_GEN_CADENCE_MIN_SENTENCES && c.shortSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT && c.longSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG && c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
-    if (strongAlternation) {
+    if (cadenceStrongAlternation(features)) {
       const statement = MIRROR_HEADLINE_CADENCE_ALTERNATION;
       const rankScore = 44 + Math.min(16, c.shortSentenceCount + c.longSentenceCount);
       return candidate("cadence", features.sessionId, statement, [], rankScore);
     }
     return null;
+  }
+  function tryOpening(features) {
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
+    if (features.sentenceCount < MIRROR_GEN_OPENING_MIN_SENTENCES) return null;
+    const c = features.cadenceProfile;
+    const firstQ = c.meanSentenceLengthFirstQuarterWords;
+    const lastQ = c.meanSentenceLengthLastQuarterWords;
+    if (firstQ == null || lastQ == null || firstQ <= 0) return null;
+    if (c.endCompression || c.endExpansion) return null;
+    if (cadenceStrongAlternation(features)) return null;
+    const eligible = [];
+    if (firstQ >= MIRROR_GEN_OPENING_LONG_FIRST_Q && firstQ >= lastQ * MIRROR_GEN_OPENING_MOMENT_RATIO) {
+      eligible.push({ key: "moment", statement: MIRROR_HEADLINE_OPENING_MOMENT });
+    }
+    if (c.varianceSentenceLength >= MIRROR_GEN_OPENING_MIN_VARIANCE_LOOSE && firstQ > lastQ * MIRROR_GEN_OPENING_LOOSE_RATIO && firstQ > MIRROR_GEN_OPENING_LOOSE_FIRSTQ_MIN) {
+      eligible.push({ key: "loose", statement: MIRROR_HEADLINE_OPENING_LOOSE });
+    }
+    if (firstQ <= MIRROR_GEN_OPENING_DIRECT_MAX_FIRST_Q && firstQ <= lastQ * MIRROR_GEN_OPENING_DIRECT_LAST_RATIO) {
+      eligible.push({ key: "direct", statement: MIRROR_HEADLINE_OPENING_DIRECT });
+    }
+    if (!eligible.length) return null;
+    const order = ["moment", "loose", "direct"];
+    const ordered = order.map((k) => eligible.find((e) => e.key === k)).filter((e) => Boolean(e));
+    const pick = ordered[pickVariantIndex(features.sessionId, "opening") % ordered.length];
+    const rankScore = 46 + Math.min(10, (firstQ + lastQ) * 0.8);
+    return candidate("opening", features.sessionId, pick.statement, [], rankScore);
+  }
+  function tryShift(features) {
+    const a = features.abstractionProfile;
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
+    const soleHalfShift = a.shiftsTowardAbstract !== a.shiftsTowardConcrete;
+    if (!soleHalfShift) return null;
+    const lex = a.abstractCount + a.concreteCount;
+    if (lex < MIRROR_GEN_SHIFT_MIN_LEX) return null;
+    const strongAbstractMove = a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT && a.abstractCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT;
+    const strongConcreteMove = a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT && a.concreteCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT;
+    if (strongAbstractMove || strongConcreteMove) return null;
+    const statements = [
+      MIRROR_HEADLINE_SHIFT_TURNS,
+      MIRROR_HEADLINE_SHIFT_HOLDS,
+      MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER
+    ];
+    const statement = statements[pickVariantIndex(features.sessionId, "shift") % statements.length];
+    const rankScore = 44 + Math.min(12, lex * 1.2);
+    return candidate("shift", features.sessionId, statement, [], rankScore);
   }
   function tryAbstraction(features) {
     const a = features.abstractionProfile;
@@ -749,6 +825,10 @@ var WaywordMirror = (() => {
     if (abs) out.push(abs);
     const cad = tryCadence(features);
     if (cad) out.push(cad);
+    const opn = tryOpening(features);
+    if (opn) out.push(opn);
+    const shf = tryShift(features);
+    if (shf) out.push(shf);
     const hes = tryHesitation(features);
     if (hes) out.push(hes);
     return out;
@@ -769,6 +849,7 @@ var WaywordMirror = (() => {
   function mirrorStatementSpecificity(statement) {
     const n = norm(statement);
     if (n === norm(MIRROR_HEADLINE_FALLBACK_SOFT)) return 5;
+    if (n === norm(MIRROR_HEADLINE_LOW_SIGNAL)) return 6;
     if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
     if (n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) return 100;
     if (n === norm(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
@@ -778,6 +859,12 @@ var WaywordMirror = (() => {
       return 90;
     }
     if (n === norm(MIRROR_HEADLINE_CADENCE_ALTERNATION)) return 84;
+    if (n === norm(MIRROR_HEADLINE_OPENING_DIRECT) || n === norm(MIRROR_HEADLINE_OPENING_MOMENT) || n === norm(MIRROR_HEADLINE_OPENING_LOOSE)) {
+      return 86;
+    }
+    if (n === norm(MIRROR_HEADLINE_SHIFT_TURNS) || n === norm(MIRROR_HEADLINE_SHIFT_HOLDS) || n === norm(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)) {
+      return 86;
+    }
     if (n === norm(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)) {
       return 82;
     }
@@ -792,7 +879,7 @@ var WaywordMirror = (() => {
   }
   function rankingWeight(candidate2) {
     const s = norm2(candidate2.statement);
-    if (candidate2.category === "fallback" || s === norm2(MIRROR_HEADLINE_FALLBACK_SOFT)) {
+    if (candidate2.category === "fallback" || candidate2.category === "low_signal" || s === norm2(MIRROR_HEADLINE_FALLBACK_SOFT)) {
       return -40;
     }
     if (s === norm2(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
@@ -804,7 +891,7 @@ var WaywordMirror = (() => {
     if (s.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) {
       return 30;
     }
-    if (s === norm2(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS) || s === norm2(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN) || s === norm2(MIRROR_HEADLINE_CADENCE_ALTERNATION)) {
+    if (s === norm2(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS) || s === norm2(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN) || s === norm2(MIRROR_HEADLINE_CADENCE_ALTERNATION) || s === norm2(MIRROR_HEADLINE_OPENING_DIRECT) || s === norm2(MIRROR_HEADLINE_OPENING_MOMENT) || s === norm2(MIRROR_HEADLINE_OPENING_LOOSE) || s === norm2(MIRROR_HEADLINE_SHIFT_TURNS) || s === norm2(MIRROR_HEADLINE_SHIFT_HOLDS) || s === norm2(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)) {
       return 18;
     }
     if (s === norm2(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) || s === norm2(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) || s === norm2(MIRROR_HEADLINE_HESITATION_REVISED)) {
@@ -815,9 +902,9 @@ var WaywordMirror = (() => {
   function categoryTiePreference(category) {
     if (category === "abstraction_concrete") return 4;
     if (category === "repetition") return 3;
-    if (category === "cadence") return 2;
+    if (category === "cadence" || category === "opening" || category === "shift") return 2;
     if (category === "hesitation_qualification") return 1;
-    if (category === "fallback") return 0;
+    if (category === "fallback" || category === "low_signal") return 0;
     return 1;
   }
   function compareRanked(a, b) {
@@ -873,7 +960,7 @@ var WaywordMirror = (() => {
     return normMirrorReflectionHeadline(s);
   }
   function interpretiveStrengthTier(c) {
-    if (c.category === "fallback") {
+    if (c.category === "fallback" || c.category === "low_signal") {
       return 99;
     }
     const n = norm3(c.statement);
@@ -886,7 +973,7 @@ var WaywordMirror = (() => {
     if (c.category === "repetition" || n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) {
       return 2;
     }
-    if (c.category === "cadence") {
+    if (c.category === "cadence" || c.category === "opening" || c.category === "shift") {
       return 3;
     }
     if (c.category === "hesitation_qualification") {
@@ -901,9 +988,12 @@ var WaywordMirror = (() => {
     if (cat === "abstraction_concrete") return 0;
     if (cat === "repetition") return 1;
     if (cat === "cadence") return 2;
-    if (cat === "hesitation_qualification") return 3;
-    if (cat === "fallback") return 4;
-    return 5;
+    if (cat === "opening") return 3;
+    if (cat === "shift") return 4;
+    if (cat === "hesitation_qualification") return 5;
+    if (cat === "fallback") return 6;
+    if (cat === "low_signal") return 7;
+    return 8;
   }
   function compareInterpretivePrimaryOrder(a, b) {
     const ta = interpretiveStrengthTier(a);
@@ -943,9 +1033,32 @@ var WaywordMirror = (() => {
     return { main, supporting };
   }
 
+  // src/features/mirror/pipeline/mirrorLowSignalGuard.ts
+  function mirrorFeaturesAreLowSignal(features) {
+    if (features.wordCount < MIRROR_LOW_SIGNAL_MAX_WORDS_EXCLUSIVE) return true;
+    if (features.sentenceCount < 2 && features.wordCount < MIRROR_LOW_SIGNAL_STRUCTURE_MIN_WORDS) {
+      return true;
+    }
+    return false;
+  }
+  function buildLowSignalMirrorPipelineResult(sessionId) {
+    const main = {
+      id: `low_signal:${sessionId}`,
+      category: "low_signal",
+      statement: MIRROR_HEADLINE_LOW_SIGNAL,
+      evidence: [],
+      role: "main",
+      rankScore: 0
+    };
+    return { main, supporting: [] };
+  }
+
   // src/features/mirror/pipeline/runMirrorPipeline.ts
   function runMirrorPipeline(input) {
     const features = analyzeText(input);
+    if (mirrorFeaturesAreLowSignal(features)) {
+      return buildLowSignalMirrorPipelineResult(features.sessionId);
+    }
     const raw = buildReflectionCandidates(features, normalizeText(input.text));
     const ranked = rankReflections(raw);
     const deduped = dedupeReflections(ranked);
@@ -1441,9 +1554,31 @@ var WaywordMirror = (() => {
   }
 
   // src/features/mirror/nudges/nextPassInstruction.ts
-  var MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION = "Write it again. Change one thing.";
+  var PROMPT_FAMILIES = /* @__PURE__ */ new Set(["Observation", "Indirection", "Social", "Object", "Tension"]);
+  var MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK = "With a little more language on the page, patterns get easier to notice.";
+  var MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION = "What stands out to you in what you just wrote?";
   function normStatement(s) {
     return normMirrorReflectionHeadline(s);
+  }
+  function pickIndex(seed, modulus) {
+    const s = String(seed ?? "");
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return modulus <= 0 ? 0 : h % modulus;
+  }
+  function pickLine(seedKey, lines) {
+    if (!lines.length) return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+    return lines[pickIndex(seedKey, lines.length)] ?? MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+  }
+  function normPromptFamily(f) {
+    const t = String(f ?? "").trim();
+    return PROMPT_FAMILIES.has(t) ? t : null;
+  }
+  function seedWithFamily(base, family) {
+    return family ? `${base}|fam:${family}` : `${base}|fam:na`;
   }
   function pickDriverReflection(result) {
     const main = result.main;
@@ -1454,44 +1589,126 @@ var WaywordMirror = (() => {
     const first = supporting.find((c) => c && String(c.statement || "").trim());
     return first ?? null;
   }
-  function nextPassInstructionFromMirrorPipelineResult(result, loadFailed) {
+  var NUDGE_LOW_SIGNAL = [
+    MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK,
+    "A fuller stretch of writing usually gives the mirror more to work with.",
+    "What becomes a little easier to see with a few more sentences on the page?",
+    "When the page has more on it, small echoes are easier to hear."
+  ];
+  var NUDGE_GENERIC = [
+    MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION,
+    "Where does the thread invite another glance?",
+    "What detail keeps catching your attention?",
+    "What remains unattended in what you wrote?"
+  ];
+  var NUDGE_REPETITION = [
+    "What shifts if the same pressure shows up somewhere else?",
+    "Where does the return feel different when you look again?",
+    "What happens if that insistence loosens without vanishing?",
+    "What opens if another word carries a slice of that weight?"
+  ];
+  var NUDGE_CADENCE_TIGHTENS = [
+    "What if a later stretch lets the breath lengthen again?",
+    "Where could the motion redistribute after that late tightening?",
+    "What changes if one paragraph lets the line run a little longer?"
+  ];
+  var NUDGE_CADENCE_LENGTHEN = [
+    "What happens if a middle passage holds a shorter beat for a moment?",
+    "Where does a tighter line change the glide of what follows?",
+    "What shifts if length gathers earlier instead of at the edge?"
+  ];
+  var NUDGE_CADENCE_ALTERNATION = [
+    "What happens if one section holds a steadier stride?",
+    "Where does the alternation want a softer hand in what follows?",
+    "What remains if the swing between long and short quiets for a beat?"
+  ];
+  var NUDGE_CADENCE_DEFAULT = [
+    "Where would you redistribute the motion?",
+    "What changes if the pulse of the lines shifts mid-piece?",
+    "What shows up if you follow the cadence into a neighboring texture?"
+  ];
+  var NUDGE_ABSTRACT_LEANS = [
+    "What becomes touchable if the ideas rest in one place a little longer?",
+    "Where does a single image want to carry more of the thinking?",
+    "What surfaces if the abstractions lean toward one scene-stain?"
+  ];
+  var NUDGE_CONCRETE_LEANS = [
+    "Where does the idea begin to surface behind the detail?",
+    "What shifts if the objects fall away for a breath\u2014not erased, just quieter?",
+    "What remains if the scene quiets further and something else hums?"
+  ];
+  var NUDGE_ABSTRACTION_BALANCED = [
+    "What interests you if idea and image keep trading places?",
+    "Where does one kind of attention want a little more room?",
+    "What would you watch for in the handoff between scene and thought?"
+  ];
+  var NUDGE_HESITATION = [
+    "What changes when the cushioning thins\u2014without forcing a harder voice?",
+    "Where does a line want to stand without the immediate softener?",
+    "What clarity appears if the qualification arrives a beat later?",
+    "What shifts if you let one assertion stay unaccompanied for a line?"
+  ];
+  function nextPassInstructionFromMirrorPipelineResult(result, loadFailed, opts) {
+    const seed = String(opts?.seed ?? "").trim() || "wayword";
+    const family = normPromptFamily(opts?.promptFamily);
+    const lowSignal = Boolean(opts?.lowSignal);
     if (loadFailed || !result || typeof result !== "object") {
-      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+      return pickLine(seedWithFamily(`${seed}|load-fail`, family), NUDGE_GENERIC);
+    }
+    if (lowSignal) {
+      return pickLine(seedWithFamily(`${seed}|low-signal`, family), NUDGE_LOW_SIGNAL);
     }
     const driver = pickDriverReflection(result);
     if (!driver) {
-      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+      return pickLine(seedWithFamily(`${seed}|no-driver`, family), NUDGE_GENERIC);
     }
     const cat = driver.category;
     const n = normStatement(driver.statement);
+    if (cat === "low_signal") {
+      return pickLine(seedWithFamily(`${seed}|mirror-low-signal`, family), NUDGE_LOW_SIGNAL);
+    }
     if (cat === "fallback" || n === normStatement(MIRROR_HEADLINE_FALLBACK_SOFT)) {
-      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+      return pickLine(seedWithFamily(`${seed}|fallback-soft`, family), NUDGE_GENERIC);
     }
+    let line = "";
     if (cat === "repetition") {
-      return "Avoid that word. Find another path.";
-    }
-    if (cat === "cadence") {
-      return "Let the whole piece move like that.";
-    }
-    if (cat === "hesitation_qualification") {
+      line = pickLine(seedWithFamily(`${seed}|repetition`, family), NUDGE_REPETITION);
+    } else if (cat === "cadence") {
+      if (n === normStatement(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS)) {
+        line = pickLine(seedWithFamily(`${seed}|cadence-tightens`, family), NUDGE_CADENCE_TIGHTENS);
+      } else if (n === normStatement(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN)) {
+        line = pickLine(seedWithFamily(`${seed}|cadence-lengthen`, family), NUDGE_CADENCE_LENGTHEN);
+      } else if (n === normStatement(MIRROR_HEADLINE_CADENCE_ALTERNATION)) {
+        line = pickLine(seedWithFamily(`${seed}|cadence-alt`, family), NUDGE_CADENCE_ALTERNATION);
+      } else {
+        line = pickLine(seedWithFamily(`${seed}|cadence`, family), NUDGE_CADENCE_DEFAULT);
+      }
+    } else if (cat === "opening" || cat === "shift") {
+      if (n === normStatement(MIRROR_HEADLINE_OPENING_DIRECT) || n === normStatement(MIRROR_HEADLINE_OPENING_MOMENT) || n === normStatement(MIRROR_HEADLINE_OPENING_LOOSE) || n === normStatement(MIRROR_HEADLINE_SHIFT_TURNS) || n === normStatement(MIRROR_HEADLINE_SHIFT_HOLDS) || n === normStatement(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)) {
+        line = pickLine(seedWithFamily(`${seed}|shape-${cat}`, family), NUDGE_CADENCE_DEFAULT);
+      } else {
+        line = pickLine(seedWithFamily(`${seed}|shape-unknown`, family), NUDGE_GENERIC);
+      }
+    } else if (cat === "hesitation_qualification") {
       if (n === normStatement(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) || n === normStatement(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) || n === normStatement(MIRROR_HEADLINE_HESITATION_REVISED)) {
-        return "Say it once. Don't soften it.";
+        line = pickLine(seedWithFamily(`${seed}|hesitation`, family), NUDGE_HESITATION);
+      } else {
+        line = pickLine(seedWithFamily(`${seed}|hesitation-unknown`, family), NUDGE_GENERIC);
       }
-      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
-    }
-    if (cat === "abstraction_concrete") {
+    } else if (cat === "abstraction_concrete") {
       if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL)) {
-        return "Keep the idea. Anchor it in a scene.";
+        line = pickLine(seedWithFamily(`${seed}|abstraction-ideas`, family), NUDGE_ABSTRACT_LEANS);
+      } else if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
+        line = pickLine(seedWithFamily(`${seed}|abstraction-concrete`, family), NUDGE_CONCRETE_LEANS);
+      } else if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
+        line = pickLine(seedWithFamily(`${seed}|abstraction-balance`, family), NUDGE_ABSTRACTION_BALANCED);
+      } else {
+        line = pickLine(seedWithFamily(`${seed}|abstraction-other`, family), NUDGE_GENERIC);
       }
-      if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
-        return "Keep the scene. Let an idea surface.";
-      }
-      if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
-        return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
-      }
-      return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+    } else {
+      line = pickLine(seedWithFamily(`${seed}|unknown-cat`, family), NUDGE_GENERIC);
     }
-    return MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
+    return String(line || "").trim() || MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION;
   }
   return __toCommonJS(entry_iife_exports);
 })();

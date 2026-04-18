@@ -14,6 +14,50 @@
       .replace(/>/g, "&gt;");
   }
 
+  /** Conservative: too little surface text to treat mirror output as grounded observation. */
+  function isLowSignalMirrorSubmission(text) {
+    const normalized = String(text || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!normalized) return true;
+    const tokens = normalized.split(" ").filter(Boolean);
+    if (normalized.length < 18) return true;
+    if (tokens.length <= 1 && normalized.length <= 36) return true;
+    return false;
+  }
+
+  var LOW_SIGNAL_REFLECTION_BODY_HTML =
+    '<div class="mirror-reflection-eyebrow">Reflection</div>' +
+    '<p class="mirror-empty mirror-empty--low-signal">Not enough language yet to notice a pattern.</p>';
+
+  function mirrorPostRunHasSubstantiveMain(result) {
+    const r = result;
+    if (!r || typeof r !== "object") return false;
+    const main = r.main;
+    if (!main || !String(main.statement || "").trim()) return false;
+    if (main.category === "fallback") return false;
+    return true;
+  }
+
+  /**
+   * Same predicate as the low-signal reflection swap: short text and weak/absent mirror grounding.
+   * Used for Nudge v2 so the under-prompt line does not overclaim when the mirror is thin.
+   * @param {string} textForSignal
+   * @param {unknown} lastMirrorPipelineResult
+   * @param {unknown} lastMirrorLoadFailed
+   */
+  function computeMirrorAttentionalNudgeLowSignal(textForSignal, lastMirrorPipelineResult, lastMirrorLoadFailed) {
+    if (lastMirrorLoadFailed) return false;
+    const main = lastMirrorPipelineResult && lastMirrorPipelineResult.main;
+    if (main && main.category === "low_signal") return true;
+    const text = textForSignal != null ? String(textForSignal) : "";
+    const hasCards = globalThis.WaywordMirrorDom.mirrorPipelineResultHasEvidenceCards(
+      lastMirrorPipelineResult
+    );
+    const substantiveMain = mirrorPostRunHasSubstantiveMain(lastMirrorPipelineResult);
+    return isLowSignalMirrorSubmission(text) && (!hasCards || !substantiveMain);
+  }
+
   /**
    * Recent-pattern block for post-run (V1.1). Returns "" when pipeline unavailable, errors, or no trends.
    * @param {unknown[]} sessionDigests
@@ -40,7 +84,7 @@
   }
 
   /**
-   * Same HTML parts post-run mirror panel uses (V1 body + next-pass nudge + recent trends).
+   * Same HTML parts post-run mirror panel uses (V1 body + recent trends; next-pass HTML is separate).
    * @param {{
    *   submitted: boolean;
    *   completedUiActive: boolean;
@@ -48,13 +92,15 @@
    *   lastMirrorPipelineResult: unknown;
    *   mirrorEmptyFallbackSeed: unknown;
    *   sessionDigestsForTrends: unknown[];
+   *   submittedRunText?: string;
+   *   promptFamily?: string;
    * }} input
    */
   function computeMirrorPostRunPanelParts(input) {
     if (!input.submitted || !input.completedUiActive) {
       return { v1Body: "", recentBody: "", nextPassHtml: "" };
     }
-    const v1Body = globalThis.WaywordMirrorDom.buildMirrorPanelBodyHtml({
+    let v1Body = globalThis.WaywordMirrorDom.buildMirrorPanelBodyHtml({
       loadFailed: input.lastMirrorLoadFailed,
       result: input.lastMirrorPipelineResult,
       idPrefix: "mirror-postrun",
@@ -65,18 +111,45 @@
       "mirror-postrun-recent"
     );
 
+    const textForSignal = input.submittedRunText != null ? input.submittedRunText : "";
+    const hasCards = globalThis.WaywordMirrorDom.mirrorPipelineResultHasEvidenceCards(
+      input.lastMirrorPipelineResult
+    );
+    const substantiveMain = mirrorPostRunHasSubstantiveMain(input.lastMirrorPipelineResult);
+    const attentionalLowSignal = computeMirrorAttentionalNudgeLowSignal(
+      textForSignal,
+      input.lastMirrorPipelineResult,
+      input.lastMirrorLoadFailed
+    );
+    const useLowSignalReflection =
+      !input.lastMirrorLoadFailed &&
+      isLowSignalMirrorSubmission(textForSignal) &&
+      (!hasCards || !substantiveMain);
+    if (useLowSignalReflection && v1Body) {
+      v1Body = LOW_SIGNAL_REFLECTION_BODY_HTML;
+    }
+
     let nextPassHtml = "";
     if (v1Body) {
       const mirror = globalThis.WaywordMirror;
+      const fallbackLine =
+        mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
+          ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
+          : "What stands out to you in what you just wrote?";
       const line =
         mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function"
           ? mirror.nextPassInstructionFromMirrorPipelineResult(
               input.lastMirrorPipelineResult,
-              input.lastMirrorLoadFailed
+              input.lastMirrorLoadFailed,
+              {
+                promptFamily: input.promptFamily,
+                lowSignal: attentionalLowSignal,
+                seed: input.mirrorEmptyFallbackSeed
+              }
             )
-          : "Write it again. Change one thing.";
-      const esc = escapeHtml(String(line || "").trim() || "Write it again. Change one thing.");
-      nextPassHtml = `<button type="button" class="mirror-next-pass-nudge" data-mirror-next-pass="1" aria-label="Start another pass with the same prompt">${esc}</button>`;
+          : fallbackLine;
+      const esc = escapeHtml(String(line || "").trim() || fallbackLine);
+      nextPassHtml = `<button type="button" class="mirror-next-pass-nudge" data-mirror-next-pass="1" aria-label="Begin a new writing run">${esc}</button>`;
     }
 
     return { v1Body, recentBody, nextPassHtml };
@@ -173,13 +246,11 @@
    *   completedUiActive: boolean;
    *   v1Body: string;
    *   recentBody: string;
-   *   nextPassHtml: string;
    * }} opts
    * @returns {{ shouldWireEvidence: boolean }}
    */
   function updateMirrorReflectionSection(opts) {
-    const { sectionEl, rootEl, submitted, completedUiActive, v1Body, recentBody, nextPassHtml } =
-      opts;
+    const { sectionEl, rootEl, submitted, completedUiActive, v1Body, recentBody } = opts;
 
     if (!submitted || !completedUiActive) {
       sectionEl.classList.add("hidden");
@@ -194,16 +265,41 @@
     }
 
     sectionEl.classList.remove("hidden");
-    rootEl.innerHTML = (v1Body || "") + (nextPassHtml || "") + recentBody;
+    rootEl.innerHTML = (v1Body || "") + recentBody;
     return { shouldWireEvidence: true };
+  }
+
+  /**
+   * Continuation / next-pass control: lives under the prompt (not inside the reflection stack).
+   * @param {{
+   *   submitted: boolean;
+   *   completedUiActive: boolean;
+   *   nextPassHtml: string;
+   * }} opts
+   */
+  function updateMirrorNextPassSlot(opts) {
+    const slot = $id("mirrorNextPassSlot");
+    if (!slot) return;
+    const html = String(opts.nextPassHtml || "").trim();
+    if (!opts.submitted || !opts.completedUiActive || !html) {
+      slot.innerHTML = "";
+      slot.classList.add("hidden");
+      slot.setAttribute("aria-hidden", "true");
+      return;
+    }
+    slot.innerHTML = html;
+    slot.classList.remove("hidden");
+    slot.setAttribute("aria-hidden", "false");
   }
 
   window.waywordPostRunRenderer = {
     buildMirrorRecentTrendsBlockHtml,
+    computeMirrorAttentionalNudgeLowSignal,
     computeMirrorPostRunPanelParts,
     buildCalibrationPostRunOverlayCardHtml,
     resetPostRunFeedbackBox,
     renderReflectionLine,
-    updateMirrorReflectionSection
+    updateMirrorReflectionSection,
+    updateMirrorNextPassSlot
   };
 })();
