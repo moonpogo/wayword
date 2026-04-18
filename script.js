@@ -3507,30 +3507,6 @@ function renderPostRunFeedbackContainer() {
   fb.innerHTML = "";
 }
 
-function mirrorPipelineAvailable() {
-  return Boolean(
-    typeof globalThis !== "undefined" &&
-      globalThis.WaywordMirror &&
-      typeof globalThis.WaywordMirror.runMirrorPipeline === "function"
-  );
-}
-
-function mirrorSessionDigestAvailable() {
-  return Boolean(
-    typeof globalThis !== "undefined" &&
-      globalThis.WaywordMirror &&
-      typeof globalThis.WaywordMirror.buildMirrorSessionDigest === "function"
-  );
-}
-
-function mirrorRecentTrendsPipelineAvailable() {
-  return Boolean(
-    typeof globalThis !== "undefined" &&
-      globalThis.WaywordMirror &&
-      typeof globalThis.WaywordMirror.runMirrorRecentTrendsPipeline === "function"
-  );
-}
-
 /** Digests from saved runs (newest last in `state.history`); pipeline sorts internally. */
 function collectMirrorSessionDigestsFromHistory() {
   if (!Array.isArray(state.history)) return [];
@@ -3542,14 +3518,6 @@ function collectMirrorSessionDigestsFromHistory() {
     }
   }
   return out;
-}
-
-function mirrorPatternsProfileAvailable() {
-  return Boolean(
-    typeof globalThis !== "undefined" &&
-      globalThis.WaywordMirror &&
-      typeof globalThis.WaywordMirror.getPatternsProfileFromDigests === "function"
-  );
 }
 
 /** Quiet Patterns hero when digest-backed reflection has nothing to echo yet. */
@@ -3566,12 +3534,14 @@ function patternsMirrorHeroEmptyHtml() {
  * Returns `null` only when the mirror bundle does not expose `getPatternsProfileFromDigests` (legacy builds).
  */
 function renderPatternsMirrorHeroHtml() {
-  if (!mirrorPatternsProfileAvailable()) {
+  if (!window.waywordMirrorController.mirrorPatternsProfileAvailable()) {
     return null;
   }
   let result;
   try {
-    result = globalThis.WaywordMirror.getPatternsProfileFromDigests(collectMirrorSessionDigestsFromHistory());
+    result = window.waywordMirrorController.getPatternsProfileFromDigests(
+      collectMirrorSessionDigestsFromHistory()
+    );
   } catch (_) {
     return patternsMirrorHeroEmptyHtml();
   }
@@ -3612,10 +3582,12 @@ function renderPatternsMirrorHeroHtml() {
  * Recent-pattern block for post-run (V1.1). Returns "" when pipeline unavailable, errors, or no trends.
  */
 function buildMirrorRecentTrendsBlockHtml(idPrefix) {
-  if (!mirrorRecentTrendsPipelineAvailable()) return "";
+  if (!window.waywordMirrorController.mirrorRecentTrendsPipelineAvailable()) return "";
   let result;
   try {
-    result = globalThis.WaywordMirror.runMirrorRecentTrendsPipeline(collectMirrorSessionDigestsFromHistory());
+    result = window.waywordMirrorController.runMirrorRecentTrendsPipeline(
+      collectMirrorSessionDigestsFromHistory()
+    );
   } catch (_) {
     return "";
   }
@@ -3632,23 +3604,9 @@ function buildMirrorRecentTrendsBlockHtml(idPrefix) {
 }
 
 function computeAndStoreMirrorPipelineResult(text, run) {
-  state.lastMirrorPipelineResult = null;
-  state.lastMirrorLoadFailed = false;
-  if (!mirrorPipelineAvailable()) {
-    state.lastMirrorLoadFailed = true;
-    return;
-  }
-  try {
-    state.lastMirrorPipelineResult = globalThis.WaywordMirror.runMirrorPipeline({
-      text: String(text || ""),
-      sessionId: run && run.runId ? String(run.runId) : undefined,
-      startedAt: run && typeof run.timestamp === "number" ? run.timestamp : undefined,
-      endedAt: Date.now(),
-    });
-  } catch (_) {
-    state.lastMirrorPipelineResult = null;
-    state.lastMirrorLoadFailed = true;
-  }
+  const out = window.waywordMirrorController.computeMirrorPipelineOutcome(text, run);
+  state.lastMirrorPipelineResult = out.result;
+  state.lastMirrorLoadFailed = out.loadFailed;
 }
 
 function escapeHtmlMirror(s) {
@@ -4800,7 +4758,7 @@ function renderProfile() {
   }
 
   if ($("patternCallouts")) {
-    if (mirrorPatternsProfileAvailable()) {
+    if (window.waywordMirrorController.mirrorPatternsProfileAvailable()) {
       const patternsMirrorHero = renderPatternsMirrorHeroHtml();
       $("patternCallouts").innerHTML =
         patternsMirrorHero != null ? patternsMirrorHero : patternsMirrorHeroEmptyHtml();
@@ -5137,18 +5095,12 @@ function submitWriting(fromTimer = false) {
       state.lastMirrorPipelineResult,
       state.lastMirrorLoadFailed
     );
-    if (mirrorSessionDigestAvailable()) {
-      try {
-        run.mirrorSessionDigest = globalThis.WaywordMirror.buildMirrorSessionDigest({
-          text: String(currentText || ""),
-          sessionId: String(run.runId),
-          startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
-          endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
-        });
-      } catch (_) {
-        run.mirrorSessionDigest = undefined;
-      }
-    }
+    window.waywordMirrorController.assignMirrorSessionDigestToRunIfAvailable(run, {
+      text: String(currentText || ""),
+      sessionId: String(run.runId),
+      startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
+      endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
+    });
     state.history.push({ ...run });
     state.savedRunIds.add(run.runId);
     state.pendingRecentDrawerExpand = true;
