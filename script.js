@@ -707,6 +707,7 @@ function queueViewportSync() {
       if (!isMobileViewport()) setFocusMode(false);
       window.waywordViewController.syncPatternsLayoutMode();
       renderHistory();
+      requestAnimationFrame(() => syncRecentRailExpandedLayoutMetrics());
       syncSubmittedAnnotatedEditorSurfaces();
       scheduleEditorDotOverlaySync();
       renderProfileSummaryStrip();
@@ -2949,6 +2950,87 @@ function isRecentDrawerOpen() {
   return Boolean(document.body?.classList.contains("recent-drawer-open"));
 }
 
+function syncRecentRailExpandedChrome() {
+  const expanded = Boolean(state.recentRunsHistoryExpanded);
+  const desktop = isDesktopPatternsViewport();
+  const drawerOpen = isRecentDrawerOpen();
+  const show = expanded && desktop && !drawerOpen;
+  const writeView = $("writeView");
+  const backdrop = $("recentRailExpandedBackdrop");
+  const closeBtn = $("recentRailExpandedCloseBtn");
+  if (backdrop) {
+    backdrop.classList.toggle("hidden", !show);
+    backdrop.setAttribute("aria-hidden", show ? "false" : "true");
+  }
+  if (closeBtn) {
+    closeBtn.classList.toggle("hidden", !show);
+  }
+
+  /* Clear the bounded-height custom property before dropping the body class so we never paint a stale cap. */
+  if (!show) {
+    writeView?.style.removeProperty("--review-runs-rail-expanded-max-h");
+  } else {
+    /* Measure + set `--review-runs-rail-expanded-max-h` before `recent-rail-expanded` so the first frame is already capped. */
+    syncRecentRailExpandedLayoutMetrics({ forceExpanded: true });
+  }
+
+  document.body.classList.toggle("recent-rail-expanded", show);
+
+  if (show) {
+    requestAnimationFrame(() => syncRecentRailExpandedLayoutMetrics());
+  }
+}
+
+/**
+ * Desktop expanded Review Runs: cap rail height to the editor chamfer box (measured), still bounded by the
+ * viewport band in CSS (`--review-runs-rail-desktop-viewport-floor`). Sets `--review-runs-rail-expanded-max-h`
+ * on `#writeView` for `body.recent-rail-expanded #writeView .side-column`.
+ */
+function syncRecentRailExpandedLayoutMetrics(options = {}) {
+  const writeView = $("writeView");
+  if (!writeView) return;
+  const forceExpanded = Boolean(options.forceExpanded);
+  const railExpanded = document.body.classList.contains("recent-rail-expanded");
+  if (!isDesktopPatternsViewport()) {
+    writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
+    return;
+  }
+  if (!railExpanded && !forceExpanded) {
+    writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
+    return;
+  }
+
+  const col = writeView.querySelector(".side-column");
+  const textBox = editorInput || writeView.querySelector(".editor-input");
+  if (!col || !textBox) {
+    writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
+    return;
+  }
+
+  const colRect = col.getBoundingClientRect();
+  const textRect = textBox.getBoundingClientRect();
+  const vv = window.visualViewport;
+  const vh = vv && Number.isFinite(vv.height) ? vv.height : window.innerHeight;
+
+  /**
+   * Keep in sync with `style.css` `--review-runs-rail-desktop-viewport-floor` intent (~sticky + buffer + safe).
+   * Slightly conservative so we do not reintroduce page-level vertical strain from a too-tall rail.
+   */
+  const viewportCapPx = Math.max(0, vh - colRect.top - 92);
+
+  /** Align to the main text surface (`#editorInput`), not the chamfered shell box (corner curve sits below text). */
+  const railAlignToEditorPx = 8;
+  const alignmentCapPx = textRect.bottom - colRect.top - railAlignToEditorPx;
+
+  const maxH = Math.min(viewportCapPx, alignmentCapPx);
+  if (!Number.isFinite(maxH) || maxH < 160) {
+    writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
+    return;
+  }
+
+  writeView.style.setProperty("--review-runs-rail-expanded-max-h", `${Math.round(maxH)}px`);
+}
+
 function initEditorCompletedFlow() {
   const overlay = $("editorOverlay");
   const card = $("editorOverlayCard");
@@ -3837,6 +3919,7 @@ function renderHistory() {
       trigger.disabled = false;
       trigger.setAttribute("aria-disabled", "false");
     }
+    syncRecentRailExpandedChrome();
     return;
   }
 
@@ -3879,6 +3962,7 @@ function renderHistory() {
     trigger.disabled = false;
     trigger.setAttribute("aria-disabled", "false");
   }
+  syncRecentRailExpandedChrome();
 }
 
 function setRecentDrawerOpen(open, options = {}) {
@@ -3936,6 +4020,7 @@ function setRecentDrawerOpen(open, options = {}) {
       queueViewportSync();
     });
   }
+  syncRecentRailExpandedChrome();
 }
 
 function wireRecentEntryRowKeynav(list) {
@@ -4499,7 +4584,9 @@ if (editorInput) {
         rt.closest("#recentWritingTrigger") ||
         rt.closest("#recentDrawer") ||
         rt.closest("#recentDrawerBackdrop") ||
+        rt.closest("#recentRailExpandedBackdrop") ||
         rt.closest("#recentDrawerCloseBtn") ||
+        rt.closest("#recentRailExpandedCloseBtn") ||
         rt.closest("#recentDrawerList") ||
         rt.closest("#styleTab") ||
         rt.closest("#profileView") ||
@@ -4526,7 +4613,9 @@ if (editorInput) {
           ae.closest("#recentWritingTrigger") ||
           ae.closest("#recentDrawer") ||
           ae.closest("#recentDrawerBackdrop") ||
+          ae.closest("#recentRailExpandedBackdrop") ||
           ae.closest("#recentDrawerCloseBtn") ||
+          ae.closest("#recentRailExpandedCloseBtn") ||
           ae.closest("#recentDrawerList") ||
           ae.closest("#styleTab") ||
           ae.closest("#profileView") ||
@@ -4758,8 +4847,15 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   }
+  if (document.body.classList.contains("recent-rail-expanded")) {
+    state.recentRunsHistoryExpanded = false;
+    renderHistory();
+    e.preventDefault();
+    return;
+  }
   if (isRecentDrawerOpen()) {
     setRecentDrawerOpen(false);
+    e.preventDefault();
   }
 });
 
@@ -5043,6 +5139,24 @@ bindMetricExplainerDelegation("recentRailList");
     railBtn.addEventListener("click", (e) => {
       e.preventDefault();
       state.recentRunsHistoryExpanded = !state.recentRunsHistoryExpanded;
+      renderHistory();
+    });
+  }
+  const railBackdrop = $("recentRailExpandedBackdrop");
+  if (railBackdrop && railBackdrop.dataset.recentRailDismissBound !== "1") {
+    railBackdrop.dataset.recentRailDismissBound = "1";
+    railBackdrop.addEventListener("click", () => {
+      if (!document.body.classList.contains("recent-rail-expanded")) return;
+      state.recentRunsHistoryExpanded = false;
+      renderHistory();
+    });
+  }
+  const railClose = $("recentRailExpandedCloseBtn");
+  if (railClose && railClose.dataset.recentRailDismissBound !== "1") {
+    railClose.dataset.recentRailDismissBound = "1";
+    railClose.addEventListener("click", () => {
+      if (!document.body.classList.contains("recent-rail-expanded")) return;
+      state.recentRunsHistoryExpanded = false;
       renderHistory();
     });
   }

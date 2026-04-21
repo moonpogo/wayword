@@ -495,8 +495,16 @@
               <section class="desktop-rail-panel" aria-label="Review saved runs">
                 <div class="desktop-rail-panel-head">
                   <div class="desktop-rail-panel-title">Review runs</div>
+                  <button
+                    type="button"
+                    id="recentRailExpandedCloseBtn"
+                    class="recent-rail-expanded-close hidden"
+                    aria-label="Close expanded run list"
+                  >✕</button>
                 </div>
-                <div id="recentRailList" class="recent-drawer-list recent-rail-list"></div>
+                <div class="recent-rail-list-clip">
+                  <div id="recentRailList" class="recent-drawer-list recent-rail-list"></div>
+                </div>
                 <div id="recentRailFooter" class="recent-runs-more-footer hidden" aria-hidden="true">
                   <button type="button" id="recentRailMoreBtn" class="recent-runs-more-btn">View older runs</button>
                 </div>
@@ -508,6 +516,11 @@
       </section>
       </div>
 
+      <div
+        id="recentRailExpandedBackdrop"
+        class="recent-drawer-backdrop recent-rail-expanded-backdrop hidden"
+        aria-hidden="true"
+      ></div>
       <div id="recentDrawerBackdrop" class="recent-drawer-backdrop" aria-hidden="true"></div>
       <div id="recentDrawer" class="recent-drawer" role="dialog" aria-modal="true" aria-labelledby="recentDrawerTitle" aria-hidden="true">
         <div class="recent-drawer-header">
