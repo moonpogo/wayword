@@ -68,7 +68,13 @@
     }
 
     function upsertDocument(doc) {
-      if (!doc || typeof doc !== "object" || !doc.runId) return;
+      if (!doc || typeof doc !== "object") {
+        throw new Error("waywordRunDocumentRepository.upsertDocument: document is required");
+      }
+      if (!window.waywordRunDocumentsModel || typeof window.waywordRunDocumentsModel.validateRunDocumentForPersist !== "function") {
+        throw new Error("waywordRunDocumentRepository.upsertDocument: waywordRunDocumentsModel.validateRunDocumentForPersist unavailable");
+      }
+      window.waywordRunDocumentsModel.validateRunDocumentForPersist(doc);
       var md = window.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown(doc);
       var env = readEnvelope(storage);
       var idx = -1;
@@ -88,7 +94,15 @@
 
     function upsertFromLegacyRun(run) {
       var doc = window.waywordRunDocumentsModel.createRunDocumentFromLegacyRun(run);
-      upsertDocument(doc);
+      try {
+        upsertDocument(doc);
+      } catch (e) {
+        console.warn("waywordRunDocumentRepository.upsertFromLegacyRun: skipped run", run && run.runId, e && e.message);
+      }
+    }
+
+    function clearAllDocuments() {
+      writeEnvelope(storage, { storeEnvelopeVersion: STORE_ENVELOPE_VERSION, items: [] });
     }
 
     return {
@@ -97,6 +111,7 @@
       getDocumentByRunId: getDocumentByRunId,
       upsertDocument: upsertDocument,
       upsertFromLegacyRun: upsertFromLegacyRun,
+      clearAllDocuments: clearAllDocuments,
     };
   }
 

@@ -57,7 +57,7 @@
       candidates.push({ aspect: "openings", line: "Several sentences begin the same way." });
     }
 
-    const text = String(run.text || "");
+    const text = String(run.text != null && run.text !== "" ? run.text : run.body || "");
     const sc = reviewRunSentenceCount(text);
     const avg = Number(run.avgSentenceLength);
     if (wc >= 35 && sc >= 5 && Number.isFinite(avg) && avg > 0 && avg <= 12) {
@@ -311,7 +311,7 @@
     const mirrorWrap = mirrorBlock
       ? `<div class="recent-entry-reflection" aria-label="Reflection for this run">${mirrorBlock}</div>`
       : "";
-    const draftRaw = String(item.text || "").trim();
+    const draftRaw = String(item.text != null && item.text !== "" ? item.text : item.body || "").trim();
     const draftDisplay = draftRaw || "Draft text wasn\u2019t kept on this device.";
     return `
           <div

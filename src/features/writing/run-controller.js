@@ -322,17 +322,76 @@
         startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
         endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
       });
-      d.state.history.push({ ...run });
+
+      var canonicalDoc = null;
+      var legacyRowForHistory = null;
+      if (
+        window.waywordRunDocumentsModel &&
+        typeof window.waywordRunDocumentsModel.assembleRunDocumentForSuccessfulSave === "function"
+      ) {
+        try {
+          canonicalDoc = window.waywordRunDocumentsModel.assembleRunDocumentForSuccessfulSave({
+            runId: run.runId,
+            savedAt: run.savedAt,
+            timestamp: run.timestamp,
+            body: currentText,
+            prompt: d.state.prompt,
+            analysis: analysis,
+            runScore: runScore,
+            scoreBreakdown: scoreBreakdown,
+            challengeActive: challengeActive,
+            challengeCompleted: challengeCompleted,
+            challengeWordsSnapshot: challengeWordsSnapshot,
+            wasSuccessful: wasSuccessful,
+            activeTargetWords: activeTargetWords,
+            activeTimerSecondsForRun: activeTimerSecondsForRun,
+            finishedWithinTime: finishedWithinTime,
+            timeRemainingSnapshot: timeRemainingSnapshot,
+            timerConfigured: timerConfigured,
+            repeatLimitAtRun: d.state.repeatLimit,
+            mirrorLoadFailed: Boolean(run.mirrorLoadFailed),
+            mirrorPipelineResult: run.mirrorPipelineResult,
+            mirrorSessionDigest: run.mirrorSessionDigest,
+          });
+        } catch (assembleErr) {
+          console.error("wayword: assembleRunDocumentForSuccessfulSave failed; using legacy run row for session only", assembleErr);
+        }
+      }
+      if (
+        canonicalDoc &&
+        window.waywordRunDocumentsModel &&
+        typeof window.waywordRunDocumentsModel.legacyHistoryRowFromCanonicalDocument === "function"
+      ) {
+        try {
+          legacyRowForHistory = window.waywordRunDocumentsModel.legacyHistoryRowFromCanonicalDocument(canonicalDoc);
+        } catch (projErr) {
+          console.error("wayword: legacyHistoryRowFromCanonicalDocument failed; using legacy run row", projErr);
+        }
+      }
+      if (!legacyRowForHistory) {
+        legacyRowForHistory = { ...run };
+      }
+
+      if (
+        canonicalDoc &&
+        window.waywordRunDocumentRepo &&
+        typeof window.waywordRunDocumentRepo.upsertDocument === "function"
+      ) {
+        try {
+          window.waywordRunDocumentRepo.upsertDocument(canonicalDoc);
+        } catch (persistErr) {
+          console.error("wayword: canonical repository upsert failed", persistErr);
+          console.warn(
+            "wayword: legacy history/localStorage will still be updated; canonical store may be out of sync until repaired"
+          );
+        }
+      }
+
+      d.state.history.push({ ...legacyRowForHistory });
       d.state.savedRunIds.add(run.runId);
       d.state.pendingRecentDrawerExpand = true;
       window.waywordStorage.removeInactivityEaseRun(d.INACTIVITY_EASE_RUN_KEY);
       d.persist();
-      try {
-        if (window.waywordRunDocumentRepo && window.waywordRunDocumentsModel && typeof window.waywordRunDocumentsModel.createRunDocumentFromLegacyRun === "function") {
-          var runDoc = window.waywordRunDocumentsModel.createRunDocumentFromLegacyRun(run);
-          window.waywordRunDocumentRepo.upsertDocument(runDoc);
-        }
-      } catch (_) {}
       d.renderHistory();
       d.renderProfileSummaryStrip();
 

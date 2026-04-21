@@ -151,6 +151,128 @@
    * @param {Object} run
    * @returns {WaywordRunDocument}
    */
+  /**
+   * @param {WaywordRunDocument|Record<string, unknown>} doc
+   */
+  function validateRunDocumentForPersist(doc) {
+    if (!doc || typeof doc !== "object") {
+      throw new Error("validateRunDocumentForPersist: document is required");
+    }
+    var v = window.WAYWORD_RUN_DOCUMENT_SCHEMA_VERSION;
+    if (typeof doc.schemaVersion !== "number" || doc.schemaVersion !== v) {
+      throw new Error("validateRunDocumentForPersist: invalid or missing schemaVersion (expected " + v + ")");
+    }
+    if (!doc.runId || typeof doc.runId !== "string" || !String(doc.runId).trim()) {
+      throw new Error("validateRunDocumentForPersist: runId is required");
+    }
+    if (typeof doc.savedAt !== "number" || !Number.isFinite(doc.savedAt)) {
+      throw new Error("validateRunDocumentForPersist: savedAt must be a finite number");
+    }
+    if (typeof doc.timestamp !== "number" || !Number.isFinite(doc.timestamp)) {
+      throw new Error("validateRunDocumentForPersist: timestamp must be a finite number");
+    }
+    if (typeof doc.body !== "string") {
+      throw new Error("validateRunDocumentForPersist: body must be a string");
+    }
+  }
+
+  /**
+   * Single submit-time assembly: canonical document from analysis + scoring + mirror snapshot fields.
+   * Does not depend on a legacy history row object.
+   *
+   * @param {Object} input Same shape as `createRunDocument` plus mirror fields after pipeline.
+   * @returns {WaywordRunDocument}
+   */
+  function assembleRunDocumentForSuccessfulSave(input) {
+    if (!input || typeof input !== "object") {
+      throw new Error("assembleRunDocumentForSuccessfulSave: input is required");
+    }
+    var rm = window.waywordRunModel;
+    var loadFailed = Boolean(input.mirrorLoadFailed);
+    var mirrorClone = null;
+    if (!loadFailed && input.mirrorPipelineResult != null && rm && typeof rm.cloneMirrorPipelineResultForStorage === "function") {
+      mirrorClone = rm.cloneMirrorPipelineResultForStorage(input.mirrorPipelineResult);
+    }
+    var doc = createRunDocument({
+      runId: input.runId,
+      savedAt: input.savedAt,
+      timestamp: input.timestamp,
+      body: String(input.body == null ? "" : input.body),
+      prompt: input.prompt,
+      analysis: input.analysis,
+      runScore: input.runScore,
+      scoreBreakdown: input.scoreBreakdown,
+      challengeActive: input.challengeActive,
+      challengeCompleted: input.challengeCompleted,
+      challengeWordsSnapshot: input.challengeWordsSnapshot,
+      wasSuccessful: input.wasSuccessful,
+      activeTargetWords: input.activeTargetWords,
+      activeTimerSecondsForRun: input.activeTimerSecondsForRun,
+      finishedWithinTime: input.finishedWithinTime,
+      timeRemainingSnapshot: input.timeRemainingSnapshot,
+      timerConfigured: input.timerConfigured,
+      repeatLimitAtRun: input.repeatLimitAtRun,
+      mirrorLoadFailed: loadFailed,
+      mirrorPipelineResult: loadFailed ? null : mirrorClone,
+      mirrorSessionDigest: input.mirrorSessionDigest,
+    });
+    validateRunDocumentForPersist(doc);
+    return doc;
+  }
+
+  /**
+   * Projects a canonical document to the legacy `wayword-history` row shape (`text`, no `body` / `schemaVersion`).
+   * @param {WaywordRunDocument} doc
+   * @returns {Record<string, unknown>}
+   */
+  function legacyHistoryRowFromCanonicalDocument(doc) {
+    validateRunDocumentForPersist(doc);
+    var body = String(doc.body == null ? "" : doc.body);
+    var row = {
+      runId: doc.runId,
+      savedAt: doc.savedAt,
+      timestamp: doc.timestamp,
+      text: body,
+      prompt: doc.prompt,
+      repeatedWords: doc.repeatedWords,
+      bannedHits: doc.bannedHits,
+      repeatedStarters: doc.repeatedStarters,
+      score: doc.score,
+      runScore: doc.runScore,
+      scoreBreakdown: doc.scoreBreakdown,
+      challengeActive: doc.challengeActive,
+      challengeCompleted: doc.challengeCompleted,
+      challengeWords: Array.isArray(doc.challengeWords) ? doc.challengeWords.slice() : [],
+      wasSuccessful: doc.wasSuccessful,
+      activeTargetWords: doc.activeTargetWords,
+      activeTimerSeconds: doc.activeTimerSeconds,
+      finishedWithinTime: doc.finishedWithinTime,
+      timeRemaining: doc.timeRemaining,
+      wordCount: doc.wordCount,
+      repeatLimitAtRun: doc.repeatLimitAtRun,
+      words: doc.words,
+      unique: doc.unique,
+      uniqueRatio: doc.uniqueRatio,
+      avgSentenceLength: doc.avgSentenceLength,
+      repeatedCount: doc.repeatedCount,
+      fillerCount: doc.fillerCount,
+      wordFreq: doc.wordFreq,
+      starterFreq: doc.starterFreq,
+      starterExamples: doc.starterExamples,
+      punctuation: doc.punctuation,
+      perspective: doc.perspective,
+    };
+    if (doc.mirrorLoadFailed) {
+      row.mirrorLoadFailed = true;
+      row.mirrorPipelineResult = null;
+    } else {
+      row.mirrorLoadFailed = false;
+      row.mirrorPipelineResult = doc.mirrorPipelineResult;
+    }
+    if (doc.mirrorSessionDigest !== undefined) row.mirrorSessionDigest = doc.mirrorSessionDigest;
+    return row;
+  }
+
   function createRunDocumentFromLegacyRun(run) {
     if (!run || typeof run !== "object") throw new Error("createRunDocumentFromLegacyRun: expected run object");
     var U = utils();
@@ -212,5 +334,8 @@
   window.waywordRunDocumentsModel = {
     createRunDocument: createRunDocument,
     createRunDocumentFromLegacyRun: createRunDocumentFromLegacyRun,
+    validateRunDocumentForPersist: validateRunDocumentForPersist,
+    assembleRunDocumentForSuccessfulSave: assembleRunDocumentForSuccessfulSave,
+    legacyHistoryRowFromCanonicalDocument: legacyHistoryRowFromCanonicalDocument,
   };
 })();

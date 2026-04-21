@@ -1490,8 +1490,29 @@ function toggleTheme() {
   applyTheme(state.theme === "light" ? "dark" : "light");
 }
 
+/**
+ * Saved runs for UI/analysis: canonical document repo (`waywordSavedRunsRead`), oldest → newest.
+ * Matches legacy `state.history` index order. Falls back to `state.history` if the read module is absent.
+ */
+function readSavedRunsChronological() {
+  if (window.waywordSavedRunsRead && typeof window.waywordSavedRunsRead.listSavedRunsChronological === "function") {
+    return window.waywordSavedRunsRead.listSavedRunsChronological();
+  }
+  return Array.isArray(state.history) ? state.history.slice() : [];
+}
+
+/**
+ * Saved runs newest → oldest (same iteration order as `state.history.slice().reverse()`).
+ */
+function readSavedRunsNewestFirst() {
+  if (window.waywordSavedRunsRead && typeof window.waywordSavedRunsRead.listSavedRunsNewestFirst === "function") {
+    return window.waywordSavedRunsRead.listSavedRunsNewestFirst();
+  }
+  return Array.isArray(state.history) ? state.history.slice().reverse() : [];
+}
+
 function completedRuns() {
-  return state.history.length;
+  return readSavedRunsChronological().length;
 }
 
 function countCalibrationSentenceLikeUnits(text) {
@@ -1532,6 +1553,9 @@ function waywordDevResetCalibrationForTesting() {
   state.progressionLevel = 1;
   persistProgressionLevel();
   persist();
+  if (window.waywordRunDocumentRepo && typeof window.waywordRunDocumentRepo.clearAllDocuments === "function") {
+    window.waywordRunDocumentRepo.clearAllDocuments();
+  }
 
   const fb = $("feedbackBox");
   if (fb) {
@@ -1602,7 +1626,7 @@ function recomputeProgressionLevel(options = {}) {
   const afterRun = Boolean(options.afterRun);
   let level = clampProgressionLevel(state.progressionLevel);
 
-  const runs = state.history
+  const runs = readSavedRunsChronological()
     .slice()
     .sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
 
@@ -3176,7 +3200,7 @@ function renderSidebar() {
 }
 
 function getRecentEntries() {
-  return state.history.map((entry) => ({ text: String(entry?.text || "") }));
+  return readSavedRunsChronological().map((entry) => ({ text: String(entry?.text || "") }));
 }
 
 function analyzeDraftStats(text) {
@@ -3354,11 +3378,12 @@ function selectCalibrationObservation(text, priorEntries) {
   return "";
 }
 
-/** Digests from saved runs (newest last in `state.history`); pipeline sorts internally. */
+/** Digests from saved runs (chronological, oldest → newest); pipeline sorts internally. */
 function collectMirrorSessionDigestsFromHistory() {
-  if (!Array.isArray(state.history)) return [];
+  const rows = readSavedRunsChronological();
+  if (!Array.isArray(rows)) return [];
   const out = [];
-  for (const entry of state.history) {
+  for (const entry of rows) {
     const d = entry && entry.mirrorSessionDigest;
     if (d && typeof d === "object" && d.v === 1) {
       out.push(d);
@@ -3382,7 +3407,7 @@ function postRunMirrorPanelInputs() {
 
 /**
  * Main-line reflection family keys from prior runs (newest first) for mirror recency suppression.
- * The run being submitted is not in `state.history` yet.
+ * The run being submitted is not yet in the saved-run list returned here.
  */
 function collectRecentMirrorFamilyKeys(maxRuns) {
   const keys = [];
@@ -3392,10 +3417,10 @@ function collectRecentMirrorFamilyKeys(maxRuns) {
   ) {
     return keys;
   }
-  const hist = state.history;
-  if (!Array.isArray(hist) || !hist.length) return keys;
-  for (let i = hist.length - 1; i >= 0 && keys.length < maxRuns; i -= 1) {
-    const run = hist[i];
+  const newestFirst = readSavedRunsNewestFirst();
+  if (!Array.isArray(newestFirst) || !newestFirst.length) return keys;
+  for (let i = 0; i < newestFirst.length && keys.length < maxRuns; i += 1) {
+    const run = newestFirst[i];
     const main = run && run.mirrorPipelineResult && run.mirrorPipelineResult.main;
     if (!main || typeof main.statement !== "string") continue;
     try {
@@ -3757,6 +3782,7 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
  * - Expanded history (`recentRunsHistoryExpanded`) grows the drawer height (~max 88vh) with a scrolling list.
  * - Empty state rules differ (drawer vs rail visibility).
  * - Some interactions stay surface-specific (drawer open/close, focus) and live outside this renderer.
+ * - Row data comes from the canonical run document repo via `readSavedRunsNewestFirst()` (newest first).
  */
 function renderHistory() {
   const drawerList = $("recentDrawerList");
@@ -3793,7 +3819,8 @@ function renderHistory() {
     });
   }
 
-  if (!state.history.length) {
+  const runsNewestFirst = readSavedRunsNewestFirst();
+  if (!runsNewestFirst.length) {
     state.recentRunsHistoryExpanded = false;
     document.body.classList.remove("recent-drawer-runs-expanded");
     const drawerOpen = isRecentDrawerOpen();
@@ -3813,7 +3840,7 @@ function renderHistory() {
     return;
   }
 
-  const reversed = state.history.slice().reverse();
+  const reversed = runsNewestFirst;
   const totalCount = reversed.length;
   const expanded = Boolean(state.recentRunsHistoryExpanded);
   const drawerCap = expanded ? totalCount : recentRunsPreviewCapDrawer();
@@ -3924,8 +3951,9 @@ function wireRecentEntryRowKeynav(list) {
 }
 
 function aggregateProfile() {
+  const runs = readSavedRunsChronological();
   const agg = {
-    totalRuns: state.history.length,
+    totalRuns: runs.length,
     totalWords: 0,
     totalUniqueRatio: 0,
     avgSentenceLength: 0,
@@ -3938,7 +3966,7 @@ function aggregateProfile() {
     perspective: { first: 0, second: 0, third: 0 }
   };
 
-  state.history.forEach(run => {
+  runs.forEach(run => {
     agg.totalWords += run.wordCount ?? run.words ?? 0;
     agg.totalUniqueRatio += run.uniqueRatio || 0;
     agg.avgSentenceLength += run.avgSentenceLength || 0;
