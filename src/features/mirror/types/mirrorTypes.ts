@@ -14,6 +14,11 @@ export interface MirrorSessionInput {
   sessionId?: string;
   startedAt?: number;
   endedAt?: number;
+  /**
+   * Main-line reflection family keys from prior completed runs, most recent first.
+   * Used to down-rank near-duplicate “families” across the review loop.
+   */
+  recentReflectionFamilyKeys?: string[];
 }
 
 export interface MirrorEvidence {

@@ -18,5 +18,7 @@ export function runMirrorPipeline(input: MirrorSessionInput): MirrorPipelineResu
   const raw = buildReflectionCandidates(features, normalizeText(input.text));
   const ranked = rankReflections(raw);
   const deduped = dedupeReflections(ranked);
-  return selectFinalReflections(deduped, features.sessionId);
+  return selectFinalReflections(deduped, features.sessionId, {
+    recentReflectionFamilyKeys: input.recentReflectionFamilyKeys
+  });
 }

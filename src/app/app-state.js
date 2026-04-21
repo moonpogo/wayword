@@ -37,6 +37,8 @@
       optionsOpen: false,
       promptRerollsUsed: 0,
       pendingRecentDrawerExpand: false,
+      /** Review runs: when true, drawer + rail show full history (drawer uses tall scrollable layout). */
+      recentRunsHistoryExpanded: false,
       writeDoc: { lines: [{ tokens: [], trailingSpace: false }] },
       lastRunFeedback: "",
       /** Last `runMirrorPipeline` result after submit; cleared on new run. */

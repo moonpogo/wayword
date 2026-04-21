@@ -135,7 +135,7 @@
       const fallbackLine =
         mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
           ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
-          : "What stands out to you in what you just wrote?";
+          : "What stands out in the draft you just wrote?";
       const line =
         mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function"
           ? mirror.nextPassInstructionFromMirrorPipelineResult(

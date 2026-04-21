@@ -32,8 +32,6 @@ import {
 } from "../constants/generationThresholds.js";
 import {
   MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL,
-  MIRROR_HEADLINE_ABSTRACTION_BALANCE,
-  MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT,
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER,
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS,
   MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE,
@@ -49,7 +47,9 @@ import {
   MIRROR_HEADLINE_SHIFT_HOLDS,
   MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
   MIRROR_HEADLINE_SHIFT_TURNS,
-  mirrorHeadlineRepetitionNamed
+  mirrorHeadlineRepetitionNamed,
+  pickMirrorAbstractionBalanceStatement,
+  pickMirrorAbstractionBothFrequentStatement
 } from "../constants/mirrorSessionHeadlines.js";
 import type {
   MirrorEvidence,
@@ -253,7 +253,7 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
 
   if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
     if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
-    const statement = MIRROR_HEADLINE_ABSTRACTION_BALANCE;
+    const statement = pickMirrorAbstractionBalanceStatement(features.sessionId);
     const rankScore = 40 + Math.min(22, lex * 1.6);
     return abstractionCandidate(features.sessionId, statement, rankScore);
   }
@@ -305,7 +305,7 @@ function tryAbstraction(features: MirrorFeatures): MirrorReflectionCandidate | n
       return abstractionCandidate(features.sessionId, statement, rankScore);
     }
 
-    const statement = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT;
+    const statement = pickMirrorAbstractionBothFrequentStatement(features.sessionId);
     const rankScore = 34 + Math.min(14, lex * 1.5);
     return abstractionCandidate(features.sessionId, statement, rankScore);
   }

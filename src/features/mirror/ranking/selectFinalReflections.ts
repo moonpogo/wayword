@@ -4,14 +4,14 @@ import {
 } from "../constants/selectionThresholds.js";
 import {
   MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL,
-  MIRROR_HEADLINE_ABSTRACTION_BALANCE,
-  MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT,
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER,
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS,
   MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE,
-  MIRROR_HEADLINE_FALLBACK_SOFT,
   MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER,
-  normMirrorReflectionHeadline
+  isMirrorAbstractionBalanceStatement,
+  isMirrorAbstractionBothFrequentStatement,
+  normMirrorReflectionHeadline,
+  pickMirrorFallbackSoftStatement
 } from "../constants/mirrorSessionHeadlines.js";
 import type {
   MirrorCategoryV1,
@@ -20,6 +20,7 @@ import type {
   MirrorReflectionRole,
   MirrorSelectedReflection
 } from "../types/mirrorTypes.js";
+import { mirrorCandidateFamilyKey } from "./reflectionFamilyKey.js";
 
 function asSelected(
   c: MirrorReflectionCandidate,
@@ -69,7 +70,10 @@ function interpretiveStrengthTier(c: MirrorReflectionCandidate): number {
   if (c.category === "hesitation_qualification") {
     return 4;
   }
-  if (n === norm(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || n === norm(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
+  if (
+    isMirrorAbstractionBalanceStatement(c.statement) ||
+    isMirrorAbstractionBothFrequentStatement(c.statement)
+  ) {
     return 5;
   }
   return 6;
@@ -87,19 +91,52 @@ function categoryTieOrder(cat: MirrorCategoryV1): number {
   return 8;
 }
 
-function compareInterpretivePrimaryOrder(a: MirrorReflectionCandidate, b: MirrorReflectionCandidate): number {
-  const ta = interpretiveStrengthTier(a);
-  const tb = interpretiveStrengthTier(b);
-  if (ta !== tb) return ta - tb;
-  if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
-  return categoryTieOrder(a.category) - categoryTieOrder(b.category);
+/** Penalties by recency slot: most recent prior run → older (index 3). */
+const REFLECTION_RECENCY_PENALTY_BY_INDEX = [88, 64, 42, 24] as const;
+
+function effectivePrimaryRank(
+  c: MirrorReflectionCandidate,
+  recentKeys: string[] | undefined,
+  pool: MirrorReflectionCandidate[]
+): number {
+  const base = c.rankScore;
+  if (!recentKeys?.length) return base;
+  const fam = mirrorCandidateFamilyKey(c);
+  const idx = recentKeys.indexOf(fam);
+  if (idx < 0) return base;
+  let penalty = REFLECTION_RECENCY_PENALTY_BY_INDEX[idx] ?? 14;
+  const sortedByRaw = [...pool].sort((a, b) => b.rankScore - a.rankScore);
+  const top = sortedByRaw[0];
+  if (top && top.id === c.id && c.rankScore >= 85) {
+    const second = sortedByRaw.find((x) => x.id !== c.id);
+    if (!second || c.rankScore - second.rankScore >= 28) {
+      penalty = Math.floor(penalty * 0.18);
+    }
+  }
+  return base - penalty;
+}
+
+function buildCompareInterpretivePrimaryOrder(
+  recentKeys: string[] | undefined,
+  pool: MirrorReflectionCandidate[]
+) {
+  return (a: MirrorReflectionCandidate, b: MirrorReflectionCandidate): number => {
+    const ta = interpretiveStrengthTier(a);
+    const tb = interpretiveStrengthTier(b);
+    if (ta !== tb) return ta - tb;
+    const eb = effectivePrimaryRank(b, recentKeys, pool);
+    const ea = effectivePrimaryRank(a, recentKeys, pool);
+    if (eb !== ea) return eb - ea;
+    if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
+    return categoryTieOrder(a.category) - categoryTieOrder(b.category);
+  };
 }
 
 function buildFallbackCandidate(sessionId: string): MirrorReflectionCandidate {
   return {
     id: `fallback:${sessionId}`,
     category: "fallback",
-    statement: MIRROR_HEADLINE_FALLBACK_SOFT,
+    statement: pickMirrorFallbackSoftStatement(sessionId),
     evidence: [],
     rankScore: 0
   };
@@ -111,16 +148,22 @@ function buildFallbackCandidate(sessionId: string): MirrorReflectionCandidate {
  */
 export function selectFinalReflections(
   rankedDeduped: MirrorReflectionCandidate[],
-  sessionId: string
+  sessionId: string,
+  options?: { recentReflectionFamilyKeys?: string[] }
 ): MirrorPipelineResult {
   if (rankedDeduped.length === 0) {
     return { main: asSelected(buildFallbackCandidate(sessionId), "main"), supporting: [] };
   }
 
-  const ordered = [...rankedDeduped].sort(compareInterpretivePrimaryOrder);
+  const recentKeys = options?.recentReflectionFamilyKeys;
+  const pool = rankedDeduped;
+  const ordered = [...pool].sort(buildCompareInterpretivePrimaryOrder(recentKeys, pool));
 
   const primary =
-    ordered.find((c) => c.rankScore >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT) ?? null;
+    ordered.find(
+      (c) =>
+        effectivePrimaryRank(c, recentKeys, pool) >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT
+    ) ?? null;
 
   const chosen = primary ?? buildFallbackCandidate(sessionId);
   const main = asSelected(chosen, "main");

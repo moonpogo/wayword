@@ -14,6 +14,15 @@
 - **Remote branches:** `origin/main`, `origin/feature/mirror-engine` (`origin/HEAD` → `origin/main`)
 - **`feature/mirror-engine`:** tip `7facfde` is an **ancestor** of `main`; `git log main..feature/mirror-engine` is empty (no commits on that branch that are not on `main`).
 
+## Recent Structural Changes
+
+- Single-sourced session mirror headlines into `src/features/mirror/constants/mirrorSessionHeadlines.ts` so generation, ranking, and specificity now reference one canonical source for runtime session headline copy.
+- Verified post-refactor that ranking and specificity still cover the full canonical session headline set with no intended behavior change.
+- Extracted pure mirror card/stack presentation helpers from `script.js` into `mirror-dom.js`, leaving orchestration, state, and event wiring in `script.js`.
+- Extracted pure recent-trends mirror HTML assembly from `script.js` into `mirror-dom.js`, keeping history access, pipeline invocation, and empty/error handling in `script.js`.
+- Added a mirror bundle verification so step so changes in'src/features/mirror**' cannot drift silently from the committed 'mirror-engine.iife.js' artifact. 
+- Extracted Review Runs row HTML into a single helper inside `script.js`, keeping `renderHistory` as the orchestrator for drawer/rail differences and empty-state rules.
+
 ## Recent Changes (Last 72 Hours)
 
 Window: commits **after** `2026-04-14 11:20:07 -0700` (72 hours before `fc158c8` author time). **About 44 commits** on `main` in that window.
@@ -28,6 +37,8 @@ Newest first (sample):
 - `70516b1` / `0bb9f58` / `eb7a5c1` — Merges and product clarity pass around mirror v1.1
 - `7facfde` — Mirror engine v1.1 checkpoint (ancestor of current `main`)
 - Earlier in window: mirror pipeline + README + layout/mobile/focus work (`git log --since='2026-04-14 11:20:07 -0700' --oneline` for the full list)
+- Structural: single-sourced session mirror headlines into canonical constants module to remove cross-file literal duplication in generation, ranking, and specificity layers.
+
 
 ## What Appears Merged on Main
 

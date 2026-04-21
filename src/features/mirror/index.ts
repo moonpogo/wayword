@@ -95,6 +95,7 @@ export { MIRROR_REFLECTION_TEMPLATE_RULES_DOC } from "./generation/reflectionTem
 export { dedupeReflections } from "./ranking/dedupeReflections.js";
 export { rankReflections, compareRanked } from "./ranking/rankReflections.js";
 export { selectFinalReflections } from "./ranking/selectFinalReflections.js";
+export { mirrorReflectionFamilyKey } from "./ranking/reflectionFamilyKey.js";
 export { mirrorStatementSpecificity } from "./ranking/statementSpecificity.js";
 
 export { normalizeText } from "./utils/normalizeText.js";

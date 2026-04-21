@@ -11,7 +11,7 @@ import {
   MIRROR_HEADLINE_CADENCE_ALTERNATION,
   MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
   MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
-  MIRROR_HEADLINE_FALLBACK_SOFT,
+  isMirrorFallbackSoftStatement,
   MIRROR_HEADLINE_OPENING_DIRECT,
   MIRROR_HEADLINE_OPENING_LOOSE,
   MIRROR_HEADLINE_OPENING_MOMENT,
@@ -39,7 +39,7 @@ function norm(s: string): string {
  */
 export function mirrorStatementSpecificity(statement: string): number {
   const n = norm(statement);
-  if (n === norm(MIRROR_HEADLINE_FALLBACK_SOFT)) return 5;
+  if (isMirrorFallbackSoftStatement(statement)) return 5;
   if (n === norm(MIRROR_HEADLINE_LOW_SIGNAL)) return 6;
   if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
 

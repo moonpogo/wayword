@@ -26,6 +26,7 @@ var WaywordMirror = (() => {
     buildMirrorSessionDigest: () => buildMirrorSessionDigest,
     buildReflectiveProfile: () => buildReflectiveProfile,
     getPatternsProfileFromDigests: () => getPatternsProfileFromDigests,
+    mirrorReflectionFamilyKey: () => mirrorReflectionFamilyKey,
     nextPassInstructionFromMirrorPipelineResult: () => nextPassInstructionFromMirrorPipelineResult,
     runMirrorPipeline: () => runMirrorPipeline,
     runMirrorRecentTrendsPipeline: () => runMirrorRecentTrendsPipeline
@@ -584,7 +585,33 @@ var WaywordMirror = (() => {
     return s.trim().toLowerCase().replace(/\s+/g, " ");
   }
   var MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times on the page";
-  var MIRROR_HEADLINE_FALLBACK_SOFT = "It stays on one line the whole way through.";
+  var MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS = [
+    "It stays on one line the whole way through.",
+    "The shape stays steady from start to finish.",
+    "Line length stays even the whole way through.",
+    "It holds a single, even line across the piece.",
+    "Sentence length barely shifts from line to line."
+  ];
+  var MIRROR_HEADLINE_FALLBACK_SOFT = MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS[0];
+  function hashSessionSalt(sessionId, salt) {
+    const s = `${sessionId}|${salt}`;
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < s.length; i += 1) {
+      h ^= s.charCodeAt(i) >>> 0;
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+  function pickMirrorFallbackSoftStatement(sessionId) {
+    const idx = hashSessionSalt(sessionId, "mirrorFallbackSoft") % MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS.length;
+    return MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS[idx];
+  }
+  var FALLBACK_SOFT_NORM_SET = new Set(
+    MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS.map((line) => normMirrorReflectionHeadline(line))
+  );
+  function isMirrorFallbackSoftStatement(statement) {
+    return FALLBACK_SOFT_NORM_SET.has(normMirrorReflectionHeadline(statement));
+  }
   var MIRROR_HEADLINE_LOW_SIGNAL = "Not enough here to notice a pattern yet.";
   function mirrorHeadlineRepetitionNamed(word) {
     return `\u201C${word}\u201D ${MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER}.`;
@@ -598,18 +625,46 @@ var WaywordMirror = (() => {
   var MIRROR_HEADLINE_SHIFT_TURNS = "It turns partway through.";
   var MIRROR_HEADLINE_SHIFT_HOLDS = "The direction shifts once, then holds.";
   var MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER = "It starts one way, then leans another.";
-  var MIRROR_HEADLINE_ABSTRACTION_BALANCE = "Ideas and concrete detail stay in balance.";
+  var MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS = [
+    "Ideas and concrete detail stay in balance.",
+    "Abstract language and concrete detail hold about the same weight."
+  ];
+  var MIRROR_HEADLINE_ABSTRACTION_BALANCE = MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS[0];
+  function pickMirrorAbstractionBalanceStatement(sessionId) {
+    const idx = hashSessionSalt(sessionId, "abstractionBalance") % MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS.length;
+    return MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS[idx];
+  }
+  var ABSTRACTION_BALANCE_NORM_SET = new Set(
+    MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS.map((line) => normMirrorReflectionHeadline(line))
+  );
+  function isMirrorAbstractionBalanceStatement(statement) {
+    return ABSTRACTION_BALANCE_NORM_SET.has(normMirrorReflectionHeadline(statement));
+  }
+  var MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS = [
+    "Both idea-words and image-words appear frequently.",
+    "Idea language and image language both show up often."
+  ];
+  var MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS[0];
+  function pickMirrorAbstractionBothFrequentStatement(sessionId) {
+    const idx = hashSessionSalt(sessionId, "abstractionBothFrequent") % MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS.length;
+    return MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS[idx];
+  }
+  var ABSTRACTION_BOTH_FREQUENT_NORM_SET = new Set(
+    MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS.map((line) => normMirrorReflectionHeadline(line))
+  );
+  function isMirrorAbstractionBothFrequentStatement(statement) {
+    return ABSTRACTION_BOTH_FREQUENT_NORM_SET.has(normMirrorReflectionHeadline(statement));
+  }
   var MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL = "The back half leans more conceptual than scene-based.";
   var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER = "Concrete detail carries more of the later passages.";
   var MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "It leans more on ideas than on what can be seen.";
   var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Concrete detail carries more than the ideas here.";
-  var MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT = "Both idea-words and image-words appear frequently.";
   var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER = "A statement appears, then softens right after.";
   var MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertions are often followed by softening.";
   var MIRROR_HEADLINE_HESITATION_REVISED = "Statements are often revised or softened.";
   var MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS = [
-    MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT,
-    MIRROR_HEADLINE_ABSTRACTION_BALANCE,
+    ...MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS,
+    ...MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS,
     MIRROR_HEADLINE_HESITATION_REVISED
   ];
 
@@ -750,7 +805,7 @@ var WaywordMirror = (() => {
     }
     if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
       if (lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL) return null;
-      const statement = MIRROR_HEADLINE_ABSTRACTION_BALANCE;
+      const statement = pickMirrorAbstractionBalanceStatement(features.sessionId);
       const rankScore = 40 + Math.min(22, lex * 1.6);
       return abstractionCandidate(features.sessionId, statement, rankScore);
     }
@@ -783,7 +838,7 @@ var WaywordMirror = (() => {
         const rankScore2 = 68 + Math.min(16, lex * 1.8);
         return abstractionCandidate(features.sessionId, statement2, rankScore2);
       }
-      const statement = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT;
+      const statement = pickMirrorAbstractionBothFrequentStatement(features.sessionId);
       const rankScore = 34 + Math.min(14, lex * 1.5);
       return abstractionCandidate(features.sessionId, statement, rankScore);
     }
@@ -848,7 +903,7 @@ var WaywordMirror = (() => {
   }
   function mirrorStatementSpecificity(statement) {
     const n = norm(statement);
-    if (n === norm(MIRROR_HEADLINE_FALLBACK_SOFT)) return 5;
+    if (isMirrorFallbackSoftStatement(statement)) return 5;
     if (n === norm(MIRROR_HEADLINE_LOW_SIGNAL)) return 6;
     if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
     if (n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) return 100;
@@ -879,11 +934,11 @@ var WaywordMirror = (() => {
   }
   function rankingWeight(candidate2) {
     const s = norm2(candidate2.statement);
-    if (candidate2.category === "fallback" || candidate2.category === "low_signal" || s === norm2(MIRROR_HEADLINE_FALLBACK_SOFT)) {
-      return -40;
+    if (candidate2.category === "fallback" || candidate2.category === "low_signal" || isMirrorFallbackSoftStatement(candidate2.statement)) {
+      return -58;
     }
-    if (s === norm2(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
-      return -28;
+    if (isMirrorAbstractionBalanceStatement(candidate2.statement) || isMirrorAbstractionBothFrequentStatement(candidate2.statement)) {
+      return -38;
     }
     if (s === norm2(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || s === norm2(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)) {
       return 34;
@@ -908,8 +963,8 @@ var WaywordMirror = (() => {
     return 1;
   }
   function compareRanked(a, b) {
-    const weightedA = a.rankScore + rankingWeight(a);
-    const weightedB = b.rankScore + rankingWeight(b);
+    const weightedA = a.rankScore + rankingWeight(a) + mirrorStatementSpecificity(a.statement) * 0.06;
+    const weightedB = b.rankScore + rankingWeight(b) + mirrorStatementSpecificity(b.statement) * 0.06;
     const d = weightedB - weightedA;
     if (Math.abs(d) <= MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA) {
       const sp = mirrorStatementSpecificity(b.statement) - mirrorStatementSpecificity(a.statement);
@@ -945,6 +1000,55 @@ var WaywordMirror = (() => {
     return rankReflections([...byStatement.values()]);
   }
 
+  // src/features/mirror/ranking/reflectionFamilyKey.ts
+  function norm3(s) {
+    return normMirrorReflectionHeadline(s);
+  }
+  var NORM_TO_FAMILY = {
+    [norm3(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL)]: "abstraction:back_half_conceptual",
+    [norm3(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)]: "abstraction:concrete_later",
+    [norm3(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE)]: "abstraction:ideas_dominate",
+    [norm3(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)]: "abstraction:concrete_outweighs",
+    [norm3(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS)]: "cadence:ending_tightens",
+    [norm3(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN)]: "cadence:lines_lengthen",
+    [norm3(MIRROR_HEADLINE_CADENCE_ALTERNATION)]: "cadence:alternation",
+    [norm3(MIRROR_HEADLINE_OPENING_DIRECT)]: "opening:direct",
+    [norm3(MIRROR_HEADLINE_OPENING_MOMENT)]: "opening:moment",
+    [norm3(MIRROR_HEADLINE_OPENING_LOOSE)]: "opening:loose",
+    [norm3(MIRROR_HEADLINE_SHIFT_TURNS)]: "shift:turns",
+    [norm3(MIRROR_HEADLINE_SHIFT_HOLDS)]: "shift:holds",
+    [norm3(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)]: "shift:leans_another",
+    [norm3(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER)]: "hesitation:qualified_after",
+    [norm3(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)]: "hesitation:assertions_softening",
+    [norm3(MIRROR_HEADLINE_HESITATION_REVISED)]: "hesitation:revised"
+  };
+  for (const line of MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS) {
+    NORM_TO_FAMILY[norm3(line)] = "abstraction:balance";
+  }
+  for (const line of MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS) {
+    NORM_TO_FAMILY[norm3(line)] = "abstraction:both_frequent";
+  }
+  function mirrorReflectionFamilyKey(reflection) {
+    const n = norm3(reflection.statement);
+    if (reflection.category === "fallback") {
+      return "fallback:steady_line";
+    }
+    if (reflection.category === "low_signal") {
+      return "low_signal";
+    }
+    if (reflection.category === "repetition") {
+      const m = reflection.statement.match(/\u201c([^\u201d]+)\u201d/i);
+      const w = m ? norm3(m[1] ?? "") : "";
+      return w ? `repetition:named:${w}` : "repetition:named";
+    }
+    const mapped = NORM_TO_FAMILY[n];
+    if (mapped) return mapped;
+    return `${reflection.category}:${n}`;
+  }
+  function mirrorCandidateFamilyKey(candidate2) {
+    return mirrorReflectionFamilyKey(candidate2);
+  }
+
   // src/features/mirror/ranking/selectFinalReflections.ts
   function asSelected(c, role) {
     return {
@@ -956,18 +1060,18 @@ var WaywordMirror = (() => {
       rankScore: c.rankScore
     };
   }
-  function norm3(s) {
+  function norm4(s) {
     return normMirrorReflectionHeadline(s);
   }
   function interpretiveStrengthTier(c) {
     if (c.category === "fallback" || c.category === "low_signal") {
       return 99;
     }
-    const n = norm3(c.statement);
-    if (n === norm3(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || n === norm3(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
+    const n = norm4(c.statement);
+    if (n === norm4(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || n === norm4(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
       return 0;
     }
-    if (n === norm3(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || n === norm3(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)) {
+    if (n === norm4(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || n === norm4(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)) {
       return 1;
     }
     if (c.category === "repetition" || n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) {
@@ -979,7 +1083,7 @@ var WaywordMirror = (() => {
     if (c.category === "hesitation_qualification") {
       return 4;
     }
-    if (n === norm3(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || n === norm3(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
+    if (isMirrorAbstractionBalanceStatement(c.statement) || isMirrorAbstractionBothFrequentStatement(c.statement)) {
       return 5;
     }
     return 6;
@@ -995,28 +1099,55 @@ var WaywordMirror = (() => {
     if (cat === "low_signal") return 7;
     return 8;
   }
-  function compareInterpretivePrimaryOrder(a, b) {
-    const ta = interpretiveStrengthTier(a);
-    const tb = interpretiveStrengthTier(b);
-    if (ta !== tb) return ta - tb;
-    if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
-    return categoryTieOrder(a.category) - categoryTieOrder(b.category);
+  var REFLECTION_RECENCY_PENALTY_BY_INDEX = [88, 64, 42, 24];
+  function effectivePrimaryRank(c, recentKeys, pool) {
+    const base = c.rankScore;
+    if (!recentKeys?.length) return base;
+    const fam = mirrorCandidateFamilyKey(c);
+    const idx = recentKeys.indexOf(fam);
+    if (idx < 0) return base;
+    let penalty = REFLECTION_RECENCY_PENALTY_BY_INDEX[idx] ?? 14;
+    const sortedByRaw = [...pool].sort((a, b) => b.rankScore - a.rankScore);
+    const top = sortedByRaw[0];
+    if (top && top.id === c.id && c.rankScore >= 85) {
+      const second = sortedByRaw.find((x) => x.id !== c.id);
+      if (!second || c.rankScore - second.rankScore >= 28) {
+        penalty = Math.floor(penalty * 0.18);
+      }
+    }
+    return base - penalty;
+  }
+  function buildCompareInterpretivePrimaryOrder(recentKeys, pool) {
+    return (a, b) => {
+      const ta = interpretiveStrengthTier(a);
+      const tb = interpretiveStrengthTier(b);
+      if (ta !== tb) return ta - tb;
+      const eb = effectivePrimaryRank(b, recentKeys, pool);
+      const ea = effectivePrimaryRank(a, recentKeys, pool);
+      if (eb !== ea) return eb - ea;
+      if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
+      return categoryTieOrder(a.category) - categoryTieOrder(b.category);
+    };
   }
   function buildFallbackCandidate(sessionId) {
     return {
       id: `fallback:${sessionId}`,
       category: "fallback",
-      statement: MIRROR_HEADLINE_FALLBACK_SOFT,
+      statement: pickMirrorFallbackSoftStatement(sessionId),
       evidence: [],
       rankScore: 0
     };
   }
-  function selectFinalReflections(rankedDeduped, sessionId) {
+  function selectFinalReflections(rankedDeduped, sessionId, options) {
     if (rankedDeduped.length === 0) {
       return { main: asSelected(buildFallbackCandidate(sessionId), "main"), supporting: [] };
     }
-    const ordered = [...rankedDeduped].sort(compareInterpretivePrimaryOrder);
-    const primary = ordered.find((c) => c.rankScore >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT) ?? null;
+    const recentKeys = options?.recentReflectionFamilyKeys;
+    const pool = rankedDeduped;
+    const ordered = [...pool].sort(buildCompareInterpretivePrimaryOrder(recentKeys, pool));
+    const primary = ordered.find(
+      (c) => effectivePrimaryRank(c, recentKeys, pool) >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT
+    ) ?? null;
     const chosen = primary ?? buildFallbackCandidate(sessionId);
     const main = asSelected(chosen, "main");
     const supporting = [];
@@ -1062,7 +1193,9 @@ var WaywordMirror = (() => {
     const raw = buildReflectionCandidates(features, normalizeText(input.text));
     const ranked = rankReflections(raw);
     const deduped = dedupeReflections(ranked);
-    return selectFinalReflections(deduped, features.sessionId);
+    return selectFinalReflections(deduped, features.sessionId, {
+      recentReflectionFamilyKeys: input.recentReflectionFamilyKeys
+    });
   }
 
   // src/features/mirror/recent/buildMirrorSessionDigest.ts
@@ -1556,7 +1689,7 @@ var WaywordMirror = (() => {
   // src/features/mirror/nudges/nextPassInstruction.ts
   var PROMPT_FAMILIES = /* @__PURE__ */ new Set(["Observation", "Indirection", "Social", "Object", "Tension"]);
   var MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK = "With a little more language on the page, patterns get easier to notice.";
-  var MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION = "What stands out to you in what you just wrote?";
+  var MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION = "What stands out in the draft you just wrote?";
   function normStatement(s) {
     return normMirrorReflectionHeadline(s);
   }
@@ -1667,7 +1800,7 @@ var WaywordMirror = (() => {
     if (cat === "low_signal") {
       return pickLine(seedWithFamily(`${seed}|mirror-low-signal`, family), NUDGE_LOW_SIGNAL);
     }
-    if (cat === "fallback" || n === normStatement(MIRROR_HEADLINE_FALLBACK_SOFT)) {
+    if (cat === "fallback" || isMirrorFallbackSoftStatement(driver.statement)) {
       return pickLine(seedWithFamily(`${seed}|fallback-soft`, family), NUDGE_GENERIC);
     }
     let line = "";
@@ -1700,7 +1833,7 @@ var WaywordMirror = (() => {
         line = pickLine(seedWithFamily(`${seed}|abstraction-ideas`, family), NUDGE_ABSTRACT_LEANS);
       } else if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
         line = pickLine(seedWithFamily(`${seed}|abstraction-concrete`, family), NUDGE_CONCRETE_LEANS);
-      } else if (n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BALANCE) || n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)) {
+      } else if (isMirrorAbstractionBalanceStatement(driver.statement) || isMirrorAbstractionBothFrequentStatement(driver.statement)) {
         line = pickLine(seedWithFamily(`${seed}|abstraction-balance`, family), NUDGE_ABSTRACTION_BALANCED);
       } else {
         line = pickLine(seedWithFamily(`${seed}|abstraction-other`, family), NUDGE_GENERIC);

@@ -297,7 +297,7 @@
       const fallbackLine =
         mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
           ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
-          : "What stands out to you in what you just wrote?";
+          : "What stands out in the draft you just wrote?";
       const line =
         mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function"
           ? mirror.nextPassInstructionFromMirrorPipelineResult(
@@ -327,6 +327,12 @@
       d.state.pendingRecentDrawerExpand = true;
       window.waywordStorage.removeInactivityEaseRun(d.INACTIVITY_EASE_RUN_KEY);
       d.persist();
+      try {
+        if (window.waywordRunDocumentRepo && window.waywordRunDocumentsModel && typeof window.waywordRunDocumentsModel.createRunDocumentFromLegacyRun === "function") {
+          var runDoc = window.waywordRunDocumentsModel.createRunDocumentFromLegacyRun(run);
+          window.waywordRunDocumentRepo.upsertDocument(runDoc);
+        }
+      } catch (_) {}
       d.renderHistory();
       d.renderProfileSummaryStrip();
 

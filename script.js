@@ -1728,6 +1728,9 @@ function generatePrompt() {
 }
 
 function makeRunId() {
+  if (window.waywordRunDocumentUtils && typeof window.waywordRunDocumentUtils.generateRunId === "function") {
+    return window.waywordRunDocumentUtils.generateRunId();
+  }
   return "run_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
 }
 
@@ -3377,8 +3380,37 @@ function postRunMirrorPanelInputs() {
   };
 }
 
+/**
+ * Main-line reflection family keys from prior runs (newest first) for mirror recency suppression.
+ * The run being submitted is not in `state.history` yet.
+ */
+function collectRecentMirrorFamilyKeys(maxRuns) {
+  const keys = [];
+  if (!Number.isFinite(maxRuns) || maxRuns <= 0) return keys;
+  if (
+    typeof globalThis.WaywordMirror?.mirrorReflectionFamilyKey !== "function"
+  ) {
+    return keys;
+  }
+  const hist = state.history;
+  if (!Array.isArray(hist) || !hist.length) return keys;
+  for (let i = hist.length - 1; i >= 0 && keys.length < maxRuns; i -= 1) {
+    const run = hist[i];
+    const main = run && run.mirrorPipelineResult && run.mirrorPipelineResult.main;
+    if (!main || typeof main.statement !== "string") continue;
+    try {
+      const k = globalThis.WaywordMirror.mirrorReflectionFamilyKey(main);
+      if (k) keys.push(k);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return keys;
+}
+
 function computeAndStoreMirrorPipelineResult(text, run) {
-  const out = window.waywordMirrorController.computeMirrorPipelineOutcome(text, run);
+  const recentKeys = collectRecentMirrorFamilyKeys(4);
+  const out = window.waywordMirrorController.computeMirrorPipelineOutcome(text, run, recentKeys);
   state.lastMirrorPipelineResult = out.result;
   state.lastMirrorLoadFailed = out.loadFailed;
 }
@@ -3722,6 +3754,7 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
  * Review Runs (drawer + rail) — invariants for `renderHistory`:
  * - Drawer (#recentDrawerList) and rail (#recentRailList) must stay in sync on row shape and per-run data.
  * - Preview caps differ: `recentRunsPreviewCapDrawer` vs `recentRunsPreviewCapRail`.
+ * - Expanded history (`recentRunsHistoryExpanded`) grows the drawer height (~max 88vh) with a scrolling list.
  * - Empty state rules differ (drawer vs rail visibility).
  * - Some interactions stay surface-specific (drawer open/close, focus) and live outside this renderer.
  */
@@ -3734,11 +3767,22 @@ function renderHistory() {
   const allLists = [drawerList, railList].filter(Boolean);
   allLists.forEach((list) => wireRecentEntryRowKeynav(list));
 
-  function setRecentRunsOverflowFooter(footer, totalCount, cap) {
+  function setRecentRunsOverflowFooter(footer, totalCount, cap, hideOverflowLink) {
     if (!footer) return;
-    const show = totalCount > cap;
+    const show = !hideOverflowLink && totalCount > cap;
     footer.classList.toggle("hidden", !show);
     footer.setAttribute("aria-hidden", show ? "false" : "true");
+  }
+
+  function syncRecentRunsMoreButtonLabels(expanded) {
+    const drawerBtn = $("recentDrawerMoreBtn");
+    if (drawerBtn) {
+      drawerBtn.textContent = expanded ? "Show fewer" : "View older runs";
+    }
+    const railBtn = $("recentRailMoreBtn");
+    if (railBtn) {
+      railBtn.textContent = expanded ? "Show fewer" : "View older runs";
+    }
   }
 
   function hideRecentRunsOverflowFooters() {
@@ -3750,6 +3794,8 @@ function renderHistory() {
   }
 
   if (!state.history.length) {
+    state.recentRunsHistoryExpanded = false;
+    document.body.classList.remove("recent-drawer-runs-expanded");
     const drawerOpen = isRecentDrawerOpen();
     allLists.forEach((list) => {
       const isDrawer = list.id === "recentDrawerList";
@@ -3769,8 +3815,9 @@ function renderHistory() {
 
   const reversed = state.history.slice().reverse();
   const totalCount = reversed.length;
-  const drawerCap = recentRunsPreviewCapDrawer();
-  const railCap = recentRunsPreviewCapRail();
+  const expanded = Boolean(state.recentRunsHistoryExpanded);
+  const drawerCap = expanded ? totalCount : recentRunsPreviewCapDrawer();
+  const railCap = expanded ? totalCount : recentRunsPreviewCapRail();
 
   if (drawerList) {
     const slice = reversed.slice(0, drawerCap);
@@ -3779,7 +3826,12 @@ function renderHistory() {
       wireMirrorEvidenceToggles(el);
       collapseMirrorEvidenceInRoot(el);
     });
-    setRecentRunsOverflowFooter(drawerFooter, totalCount, drawerCap);
+    setRecentRunsOverflowFooter(
+      drawerFooter,
+      totalCount,
+      recentRunsPreviewCapDrawer(),
+      expanded
+    );
   }
 
   if (railList) {
@@ -3789,8 +3841,12 @@ function renderHistory() {
       wireMirrorEvidenceToggles(el);
       collapseMirrorEvidenceInRoot(el);
     });
-    setRecentRunsOverflowFooter(railFooter, totalCount, railCap);
+    setRecentRunsOverflowFooter(railFooter, totalCount, recentRunsPreviewCapRail(), expanded);
   }
+
+  document.body.classList.toggle("recent-drawer-runs-expanded", expanded && totalCount > 0);
+
+  syncRecentRunsMoreButtonLabels(expanded);
 
   if (trigger) {
     trigger.disabled = false;
@@ -3845,7 +3901,9 @@ function setRecentDrawerOpen(open, options = {}) {
   } else {
     recentDrawerDismissGuardUntil = 0;
     state.pendingRecentDrawerExpand = false;
+    state.recentRunsHistoryExpanded = false;
     hideMetricExplainer();
+    renderHistory();
     if (!skipFocus) trigger?.focus();
     requestAnimationFrame(() => {
       queueViewportSync();
@@ -4941,17 +4999,25 @@ bindEditorSemanticPicker();
 bindMetricExplainerDelegation("recentDrawerList");
 bindMetricExplainerDelegation("recentRailList");
 
-(function wireRecentRunsMorePlaceholders() {
-  const attach = (btn) => {
-    if (!btn || btn.dataset.recentRunsMoreStub === "1") return;
-    btn.dataset.recentRunsMoreStub = "1";
-    btn.addEventListener("click", (e) => {
+(function wireRecentRunsExpandToggle() {
+  const drawerBtn = $("recentDrawerMoreBtn");
+  if (drawerBtn && drawerBtn.dataset.recentRunsExpandBound !== "1") {
+    drawerBtn.dataset.recentRunsExpandBound = "1";
+    drawerBtn.addEventListener("click", (e) => {
       e.preventDefault();
-      /* Placeholder until a dedicated older-runs archive is wired. */
+      state.recentRunsHistoryExpanded = !state.recentRunsHistoryExpanded;
+      renderHistory();
     });
-  };
-  attach($("recentDrawerMoreBtn"));
-  attach($("recentRailMoreBtn"));
+  }
+  const railBtn = $("recentRailMoreBtn");
+  if (railBtn && railBtn.dataset.recentRunsExpandBound !== "1") {
+    railBtn.dataset.recentRunsExpandBound = "1";
+    railBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      state.recentRunsHistoryExpanded = !state.recentRunsHistoryExpanded;
+      renderHistory();
+    });
+  }
 })();
 
 queueViewportSync();

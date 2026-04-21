@@ -3,7 +3,7 @@
 Scope: `main` as source of truth. Focus is seams, coupling, and regression risk — not new product ideas. Observations below are tied to files that were opened or searched in this audit (`script.js`, `index.html`, `style.css`, `src/features/mirror/**`, `package.json`).
 
 ---
-
+ 
 ## 1) System-by-system structure
 
 ### Prompt system

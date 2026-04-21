@@ -1,14 +1,14 @@
 import {
   MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL,
-  MIRROR_HEADLINE_ABSTRACTION_BALANCE,
-  MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT,
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER,
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS,
   MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE,
   MIRROR_HEADLINE_CADENCE_ALTERNATION,
   MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
   MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
-  MIRROR_HEADLINE_FALLBACK_SOFT,
+  isMirrorAbstractionBalanceStatement,
+  isMirrorAbstractionBothFrequentStatement,
+  isMirrorFallbackSoftStatement,
   MIRROR_HEADLINE_OPENING_DIRECT,
   MIRROR_HEADLINE_OPENING_LOOSE,
   MIRROR_HEADLINE_OPENING_MOMENT,
@@ -39,17 +39,17 @@ function rankingWeight(candidate: MirrorReflectionCandidate): number {
   if (
     candidate.category === "fallback" ||
     candidate.category === "low_signal" ||
-    s === norm(MIRROR_HEADLINE_FALLBACK_SOFT)
+    isMirrorFallbackSoftStatement(candidate.statement)
   ) {
-    return -40;
+    return -58;
   }
 
   // Lower-priority abstraction states should not outrank directional observations.
   if (
-    s === norm(MIRROR_HEADLINE_ABSTRACTION_BALANCE) ||
-    s === norm(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)
+    isMirrorAbstractionBalanceStatement(candidate.statement) ||
+    isMirrorAbstractionBothFrequentStatement(candidate.statement)
   ) {
-    return -28;
+    return -38;
   }
 
   // Highest-priority directional abstraction movement and directional abstraction dominance.
@@ -108,8 +108,10 @@ function categoryTiePreference(category: MirrorCategoryV1): number {
 }
 
 export function compareRanked(a: MirrorReflectionCandidate, b: MirrorReflectionCandidate): number {
-  const weightedA = a.rankScore + rankingWeight(a);
-  const weightedB = b.rankScore + rankingWeight(b);
+  const weightedA =
+    a.rankScore + rankingWeight(a) + mirrorStatementSpecificity(a.statement) * 0.06;
+  const weightedB =
+    b.rankScore + rankingWeight(b) + mirrorStatementSpecificity(b.statement) * 0.06;
   const d = weightedB - weightedA;
   if (Math.abs(d) <= MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA) {
     const sp =

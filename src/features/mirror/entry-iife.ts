@@ -3,6 +3,7 @@
  * Build: `npm run build:mirror` → `mirror-engine.iife.js`
  */
 export { runMirrorPipeline } from "./pipeline/runMirrorPipeline.js";
+export { mirrorReflectionFamilyKey } from "./ranking/reflectionFamilyKey.js";
 export { buildMirrorSessionDigest } from "./recent/buildMirrorSessionDigest.js";
 export { buildReflectiveProfile } from "./recent/buildReflectiveProfile.js";
 export { getPatternsProfileFromDigests } from "./recent/getPatternsProfileFromDigests.js";

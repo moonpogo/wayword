@@ -1,14 +1,14 @@
 import {
   MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL,
-  MIRROR_HEADLINE_ABSTRACTION_BALANCE,
-  MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT,
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER,
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS,
   MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE,
   MIRROR_HEADLINE_CADENCE_ALTERNATION,
   MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
   MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
-  MIRROR_HEADLINE_FALLBACK_SOFT,
+  isMirrorAbstractionBalanceStatement,
+  isMirrorAbstractionBothFrequentStatement,
+  isMirrorFallbackSoftStatement,
   MIRROR_HEADLINE_OPENING_DIRECT,
   MIRROR_HEADLINE_OPENING_LOOSE,
   MIRROR_HEADLINE_OPENING_MOMENT,
@@ -36,7 +36,7 @@ export const MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK =
  * Observation-shaped, not a “do this next” brief.
  */
 export const MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION =
-  "What stands out to you in what you just wrote?";
+  "What stands out in the draft you just wrote?";
 
 export type MirrorAttentionalNudgeOpts = {
   /** Prompt family label from the active ritual (keeps phrasing in the same world). */
@@ -191,7 +191,7 @@ export function nextPassInstructionFromMirrorPipelineResult(
     return pickLine(seedWithFamily(`${seed}|mirror-low-signal`, family), NUDGE_LOW_SIGNAL);
   }
 
-  if (cat === "fallback" || n === normStatement(MIRROR_HEADLINE_FALLBACK_SOFT)) {
+  if (cat === "fallback" || isMirrorFallbackSoftStatement(driver.statement)) {
     return pickLine(seedWithFamily(`${seed}|fallback-soft`, family), NUDGE_GENERIC);
   }
 
@@ -244,8 +244,8 @@ export function nextPassInstructionFromMirrorPipelineResult(
     ) {
       line = pickLine(seedWithFamily(`${seed}|abstraction-concrete`, family), NUDGE_CONCRETE_LEANS);
     } else if (
-      n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BALANCE) ||
-      n === normStatement(MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT)
+      isMirrorAbstractionBalanceStatement(driver.statement) ||
+      isMirrorAbstractionBothFrequentStatement(driver.statement)
     ) {
       line = pickLine(seedWithFamily(`${seed}|abstraction-balance`, family), NUDGE_ABSTRACTION_BALANCED);
     } else {
