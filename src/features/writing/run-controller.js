@@ -298,6 +298,13 @@
         mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
           ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
           : "What stands out in the draft you just wrote?";
+      const submissionWordCount =
+        mirror && typeof mirror.tokenizeText === "function"
+          ? mirror.tokenizeText(String(currentText || "")).length
+          : String(currentText || "")
+              .trim()
+              .split(/\s+/)
+              .filter(Boolean).length;
       const line =
         mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function"
           ? mirror.nextPassInstructionFromMirrorPipelineResult(
@@ -306,7 +313,8 @@
               {
                 promptFamily: d.state.promptFamily,
                 lowSignal: nudgeLowSig,
-                seed: run.runId
+                seed: run.runId,
+                submissionWordCount
               }
             )
           : fallbackLine;

@@ -39,6 +39,63 @@ Newest first (sample):
 - Earlier in window: mirror pipeline + README + layout/mobile/focus work (`git log --since='2026-04-14 11:20:07 -0700' --oneline` for the full list)
 - Structural: single-sourced session mirror headlines into canonical constants module to remove cross-file literal duplication in generation, ranking, and specificity layers.
 
+## Canonical run document store (saved-run architecture) — implementation note
+
+**What was added**
+
+- **Canonical run document model** (`WaywordRunDocument`): JSDoc-defined shape in `src/data/runs/runDocumentModel.js` — run id, timestamps, `body`, prompt, scoring/analysis fields, optional mirror pipeline result / digest / load-failed flags, `characterCount`, etc.
+- **Schema / version constants:** `window.WAYWORD_RUN_DOCUMENT_SCHEMA_VERSION` and `window.WAYWORD_RUN_DOCUMENTS_STORAGE_KEY` in `src/data/runs/schemaVersion.js`.
+- **Markdown serialization:** `window.waywordRunDocumentMarkdown` — `serializeRunDocumentToMarkdown` / `deserializeRunDocumentFromMarkdown`; front block is JSON (YAML 1.2–compatible) with `{ kind, schemaVersion, record }`, trailing section is raw draft body.
+- **Utilities:** `window.waywordRunDocumentUtils` — `generateRunId`, `computeWordCount`, `computeCharacterCount`, `sortRunsNewestFirst` (`src/data/runs/runDocumentUtils.js`).
+- **Run repository:** `window.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository()` — `listDocumentsParsed`, `getDocumentByRunId`, `upsertDocument`, `upsertFromLegacyRun`, `clearAllDocuments` (`src/data/runs/runDocumentRepository.js`).
+- **Bootstrap + migration:** `runDocumentInit.js` creates `window.waywordRunDocumentRepo` and runs `waywordRunMigration.mergeLegacyHistoryMissingIntoCanonicalStore` (read-only merge from legacy history into the repo; `LEGACY_RUN_STORAGE_KEYS_READ` documents reads).
+- **Submit / validation helpers (same model module):** `assembleRunDocumentForSuccessfulSave`, `validateRunDocumentForPersist`, `legacyHistoryRowFromCanonicalDocument` on `window.waywordRunDocumentsModel`.
+- **Shared canonical read path for UI/analysis:** `window.waywordSavedRunsRead` — `listSavedRunsChronological` (oldest → newest), `listSavedRunsNewestFirst` (newest first), `toLegacyHistoryRow` (`src/data/runs/savedRunsCanonicalRead.js`); `script.js` exposes `readSavedRunsChronological` / `readSavedRunsNewestFirst` with fallback to `state.history` only if that module is absent.
+
+**What changed**
+
+- **Reads:** Major saved-run consumers in `script.js` use the canonical repo via `readSavedRuns*` / `waywordSavedRunsRead` instead of `state.history` — same ordering semantics as before (chronological vs newest-first preserved).
+- **Writes:** On successful save, `assembleRunDocumentForSuccessfulSave` builds and validates the document from submit + mirror inputs; **`waywordRunDocumentRepo.upsertDocument` runs before** `state.history.push` + `persist()`.
+- **Legacy row:** `state.history` / `wayword-history` receive **`legacyHistoryRowFromCanonicalDocument`** (legacy shape uses `text`, not `body`); fallback to `{ ...run }` if assembly/projection throws (logged).
+- **`src/ui/render-history.js`:** Draft display uses `text` or `body` (`body || text` style) for compatibility.
+- **`waywordDevResetCalibrationForTesting`:** Calls `waywordRunDocumentRepo.clearAllDocuments()` after clearing legacy persistence so stores stay aligned.
+
+**Files added** (under `src/data/runs/`)
+
+- `schemaVersion.js`, `runDocumentUtils.js`, `runDocumentModel.js`, `runDocumentMarkdown.js`, `runDocumentRepository.js`, `migrateLegacyRunDocuments.js`, `runDocumentInit.js`, `savedRunsCanonicalRead.js`
+
+**Files modified** (for this architecture)
+
+- `index.html` — script tags for the `src/data/runs/*` chain before `run-controller.js`
+- `script.js` — canonical read helpers; consumers above; `makeRunId` delegates to `waywordRunDocumentUtils.generateRunId` when present; dev reset clears canonical store
+- `src/features/writing/run-controller.js` — submit persistence order (canonical upsert, then legacy sync)
+- `src/ui/render-history.js` — `body` / `text` fallback for saved draft display
+- `src/data/runs/runDocumentModel.js`, `src/data/runs/runDocumentRepository.js` — evolve with validation, assembly, `clearAllDocuments`, guarded migration upserts
+
+**New storage key**
+
+- `wayword-run-documents-v1` (`WAYWORD_RUN_DOCUMENTS_STORAGE_KEY`) — JSON envelope `{ storeEnvelopeVersion: 1, items: string[] }` of markdown documents.
+
+**Legacy keys still in use**
+
+- `wayword-history`, `wayword-runids` — still read/written via `src/data/storage.js` and `state.history` / `persist()`; not removed.
+
+**Major consumers now reading from the canonical repo**
+
+- `renderHistory`, `collectMirrorSessionDigestsFromHistory`, `collectRecentMirrorFamilyKeys`, `aggregateProfile`, `completedRuns`, `getRecentEntries`, `recomputeProgressionLevel` (all through `readSavedRunsChronological` / `readSavedRunsNewestFirst` in `script.js`).
+
+**Legacy compatibility that remains**
+
+- In-memory `state.history` and `waywordStorage.saveHistoryAndRunIds` unchanged as the compatibility/dual-write path.
+- `savedRunIds` / calibration dedupe behavior unchanged.
+- `waywordRunModel.createSubmittedRun` still builds the pre-mirror `run` object for pipeline/digest attachment before canonical assembly.
+
+**Follow-up / risks**
+
+- **Dual-store drift:** If `upsertDocument` throws (e.g. quota), legacy history may still update while the console warns — repo can lag until repaired.
+- **Persistence unification:** Eventually a single write path (e.g. derive `wayword-history` from repo or drop duplicate state) and tighter failure policy.
+- **Remove fallbacks:** `readSavedRuns*` fallback to `state.history` when `waywordSavedRunsRead` is missing; assembly fallback to raw `{ ...run }` — can be removed once load order and error handling are guaranteed.
+
 
 ## What Appears Merged on Main
 

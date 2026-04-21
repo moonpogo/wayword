@@ -18,6 +18,59 @@ export const MIRROR_LOW_SIGNAL_STRUCTURE_MIN_WORDS = 24;
 /** Minimum tokenizer words before any reflection category is considered. */
 export const MIRROR_GEN_MIN_WORDS_FOR_ANY = 32;
 
+/**
+ * Repetition-only short override: still below `MIRROR_GEN_MIN_WORDS_FOR_ANY`, but enough
+ * sentences + surface area that a strong named recurrence is unlikely to be noise.
+ * 20 words: MIX-01-style tight pages that sit just under the old 22-word band.
+ */
+export const MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_WORDS = 20;
+export const MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_SENTENCES = 3;
+/** Minimum share of tokenizer words taken by the chosen lemma count (e.g. 4/27 ≈ 0.15). */
+export const MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_SHARE = 0.11;
+
+/**
+ * Short override only: minimum lemma count for a **named** headline when the lemma is
+ * length-gated “low signal” but not in the dull bucket (MIX-01 triple “fine”).
+ * Non–low-signal lemmas still use `MIRROR_GEN_REPETITION_TOP_MIN_COUNT` in `tryRepetition`.
+ */
+export const MIRROR_GEN_REPETITION_SHORT_OVERRIDE_NAMED_MIN_COUNT = 3;
+
+/**
+ * Hesitation-only short override: phrase-level hedges (not full lexicon) can qualify when the
+ * global 32-word floor would block an otherwise clear qualification pattern.
+ */
+export const MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_WORDS = 22;
+export const MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_SENTENCES = 2;
+export const MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_PHRASE_HITS = 2;
+export const MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_TOTAL = 5;
+export const MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_PER100 = 2;
+
+/**
+ * Long-text hesitation: allow sparse lex totals to be augmented by high-precision revision
+ * phrases only when total lexicon hits stay at or below this ceiling (avoids double-counting
+ * when hesitation is already lexicon-strong).
+ */
+export const MIRROR_GEN_HESITATION_PHRASE_AUGMENT_MAX_TOTAL_LEX = 3;
+export const MIRROR_GEN_HESITATION_PHRASE_AUGMENT_MIN_PHRASE_HITS = 2;
+
+/**
+ * Cadence: when exactly four sentences, half-over-half mean length ratio is used only if
+ * sentence-length variance already shows real structure (blocks flat four-liners).
+ */
+export const MIRROR_GEN_CADENCE_FOUR_SENTENCE_MIN_VARIANCE = 32;
+
+/**
+ * Sparse concrete-image bridge: when lexicon totals stay below `MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL`
+ * but at least one sentence co-locates multiple concrete lemmas and abstraction stays empty.
+ * Tight word band avoids long passages where two stray hits would overclaim; min words keeps
+ * list-like / one-token-per-line dumps out.
+ */
+export const MIRROR_GEN_CONCRETE_SCENE_MIN_WORDS = 30;
+export const MIRROR_GEN_CONCRETE_SCENE_MAX_WORDS = 42;
+export const MIRROR_GEN_CONCRETE_SCENE_MIN_SENTENCES = 3;
+export const MIRROR_GEN_CONCRETE_SCENE_MIN_LEX = 2;
+export const MIRROR_GEN_CONCRETE_SCENE_MIN_PER_SENTENCE = 2;
+
 /** Minimum count for the top repeated word to emit repetition (non-dull, length above short cap). */
 export const MIRROR_GEN_REPETITION_TOP_MIN_COUNT = 4;
 
@@ -35,6 +88,8 @@ export const MIRROR_GEN_REPETITION_DULL_WORDS: ReadonlySet<string> = new Set([
   "thing",
   "things",
   "stuff",
+  /** Filler / discourse marker; avoid named-repetition wins on casual “like” stacks (EDGE-04). */
+  "like",
   "something",
   "anything",
   "nothing",
@@ -108,6 +163,15 @@ export const MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT = 6;
  * before a directional half-session shift headline may emit.
  */
 export const MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT = 5;
+
+/**
+ * Sole abstract half-shift with lex signal but abstract lemma count below `MIN_SIDE_FOR_SHIFT`:
+ * still emit BACK_HALF when ratio is not concrete-dominated (MIX-02: scene → theory with thin
+ * abstract lexicon counts).
+ */
+export const MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_LEX = 4;
+export const MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_ABSTRACT = 2;
+export const MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_RATIO = 0.85;
 
 /** Ratio floor for calling the balance “mostly ideas” in the headline (density branch). */
 export const MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO = 1.35;

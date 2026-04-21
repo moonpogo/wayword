@@ -21,7 +21,8 @@ import {
   MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS,
   MIRROR_HEADLINE_LOW_SIGNAL,
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
-  MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
+  isMirrorHesitationQualifiedAfterStatement,
+  isMirrorHesitationRevisedFamilyStatement,
   MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER,
   normMirrorReflectionHeadline
 } from "../constants/mirrorSessionHeadlines.js";
@@ -83,8 +84,9 @@ export function mirrorStatementSpecificity(statement: string): number {
     return 82;
   }
 
-  if (n === norm(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER)) return 58;
+  if (isMirrorHesitationQualifiedAfterStatement(statement)) return 58;
   if (n === norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)) return 56;
+  if (isMirrorHesitationRevisedFamilyStatement(statement)) return 40;
 
   return 40;
 }

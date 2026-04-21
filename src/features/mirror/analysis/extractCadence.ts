@@ -56,6 +56,16 @@ export function extractCadence(input: MirrorSessionInput): MirrorCadenceExtracti
       endCompression = ratio <= MIRROR_END_COMPRESSION_RATIO;
       endExpansion = ratio >= MIRROR_END_EXPANSION_RATIO;
     }
+  } else if (sentenceCount === 4) {
+    const firstPairMean = mean(lengths.slice(0, 2));
+    const lastPairMean = mean(lengths.slice(2, 4));
+    meanSentenceLengthFirstQuarterWords = firstPairMean;
+    meanSentenceLengthLastQuarterWords = lastPairMean;
+    if (firstPairMean > 0) {
+      const ratio = lastPairMean / firstPairMean;
+      endCompression = ratio <= MIRROR_END_COMPRESSION_RATIO;
+      endExpansion = ratio >= MIRROR_END_EXPANSION_RATIO;
+    }
   }
 
   return {

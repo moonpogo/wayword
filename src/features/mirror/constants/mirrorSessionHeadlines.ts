@@ -15,17 +15,39 @@ export const MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times
 /**
  * When no category clears selection floors: one soft, observational line (not diagnostic).
  * Variants share one reflection family (`fallback:steady_line`) and are chosen by session id.
+ *
+ * Single-sentence drafts (including one long sentence above the low-signal structure floor) use
+ * structure-true lines. Multi-sentence drafts use pattern-absence lines so we do not imply a
+ * measured cadence read when nothing qualified.
  */
-export const MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS = [
+export const MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS = [
   "It stays on one line the whole way through.",
+  "One sentence carries the whole span here."
+] as const;
+
+export const MIRROR_HEADLINE_FALLBACK_SOFT_MULTI_SENTENCE_VARIANTS = [
+  "No single pattern reads clearly enough to name here yet.",
+  "Nothing here grabs the mirror as one decisive habit yet.",
+  "The piece doesn't narrow to one obvious angle yet."
+] as const;
+
+/** Retired cadence-shaped fallbacks — still recognized for `isMirrorFallbackSoftStatement`. */
+const MIRROR_HEADLINE_FALLBACK_SOFT_LEGACY_VARIANTS = [
   "The shape stays steady from start to finish.",
   "Line length stays even the whole way through.",
   "It holds a single, even line across the piece.",
   "Sentence length barely shifts from line to line."
 ] as const;
 
+/** Union of active + legacy strings (for dedupe / nudge routing compatibility). */
+export const MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS = [
+  ...MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS,
+  ...MIRROR_HEADLINE_FALLBACK_SOFT_MULTI_SENTENCE_VARIANTS,
+  ...MIRROR_HEADLINE_FALLBACK_SOFT_LEGACY_VARIANTS
+] as const;
+
 /** Back-compat alias; prefer `pickMirrorFallbackSoftStatement` at selection time. */
-export const MIRROR_HEADLINE_FALLBACK_SOFT = MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS[0];
+export const MIRROR_HEADLINE_FALLBACK_SOFT = MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS[0];
 
 function hashSessionSalt(sessionId: string, salt: string): number {
   const s = `${sessionId}|${salt}`;
@@ -37,10 +59,21 @@ function hashSessionSalt(sessionId: string, salt: string): number {
   return h >>> 0;
 }
 
-/** Deterministic variant pick so repeat sessions do not always show the same fallback sentence. */
-export function pickMirrorFallbackSoftStatement(sessionId: string): string {
-  const idx = hashSessionSalt(sessionId, "mirrorFallbackSoft") % MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS.length;
-  return MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS[idx]!;
+/**
+ * Deterministic variant pick so repeat sessions do not always show the same fallback sentence.
+ * Pass `sentenceCount` from `MirrorFeatures` so one-sentence spans do not get multi-sentence
+ * cadence-shaped fallbacks.
+ */
+export function pickMirrorFallbackSoftStatement(sessionId: string, sentenceCount?: number | null): string {
+  const sc = typeof sentenceCount === "number" && Number.isFinite(sentenceCount) ? sentenceCount : 2;
+  if (sc <= 1) {
+    const pool = MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS;
+    const idx = hashSessionSalt(sessionId, "mirrorFallbackSoft|single") % pool.length;
+    return pool[idx]!;
+  }
+  const pool = MIRROR_HEADLINE_FALLBACK_SOFT_MULTI_SENTENCE_VARIANTS;
+  const idx = hashSessionSalt(sessionId, "mirrorFallbackSoft|multi") % pool.length;
+  return pool[idx]!;
 }
 
 const FALLBACK_SOFT_NORM_SET = new Set(
@@ -124,15 +157,73 @@ export const MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER = "Concrete detail carri
 export const MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "It leans more on ideas than on what can be seen.";
 export const MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Concrete detail carries more than the ideas here.";
 
-/** Hesitation / qualification */
+/** Hesitation / qualification — qualified-after family (session-picked for copy variety). */
+export const MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS = [
+  "A statement appears, then softens right after.",
+  "Something is stated, then almost immediately hedged.",
+  "The sentence makes its move, then tempers the landing."
+] as const;
+
 export const MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER =
-  "A statement appears, then softens right after.";
+  MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS[0];
+
+export function pickMirrorHesitationQualifiedAfterStatement(
+  sessionId: string,
+  fingerprint = ""
+): string {
+  const pool = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS;
+  const key = fingerprint ? `${sessionId}|${fingerprint}` : sessionId;
+  const idx = hashSessionSalt(key, "hesitationQualifiedAfter") % pool.length;
+  return pool[idx]!;
+}
+
+const HESITATION_QUALIFIED_AFTER_NORM_SET = new Set(
+  MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS.map((line) => normMirrorReflectionHeadline(line))
+);
+
+export function isMirrorHesitationQualifiedAfterStatement(statement: string): boolean {
+  return HESITATION_QUALIFIED_AFTER_NORM_SET.has(normMirrorReflectionHeadline(statement));
+}
+
 export const MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertions are often followed by softening.";
-export const MIRROR_HEADLINE_HESITATION_REVISED = "Statements are often revised or softened.";
+
+/** General / revised-softening family (session-picked). */
+export const MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS = [
+  "Statements are often revised or softened.",
+  "What lands on the page keeps revising its own emphasis.",
+  "The voice circles back to adjust what it just said."
+] as const;
+
+export const MIRROR_HEADLINE_HESITATION_REVISED = MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS[0];
+
+export function pickMirrorHesitationRevisedGeneralStatement(sessionId: string, fingerprint = ""): string {
+  const pool = MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS;
+  const key = fingerprint ? `${sessionId}|${fingerprint}` : sessionId;
+  const idx = hashSessionSalt(key, "hesitationRevisedGeneral") % pool.length;
+  return pool[idx]!;
+}
+
+const HESITATION_REVISED_FAMILY_NORM_SET = new Set(
+  MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS.map((line) => normMirrorReflectionHeadline(line))
+);
+
+export function isMirrorHesitationRevisedFamilyStatement(statement: string): boolean {
+  return HESITATION_REVISED_FAMILY_NORM_SET.has(normMirrorReflectionHeadline(statement));
+}
+
+/** Hesitation headlines that use the standard hesitation nudge pool in `nextPassInstruction`. */
+export function isMirrorHesitationStandardNudgeStatement(statement: string): boolean {
+  const n = normMirrorReflectionHeadline(statement);
+  return (
+    HESITATION_QUALIFIED_AFTER_NORM_SET.has(n) ||
+    HESITATION_REVISED_FAMILY_NORM_SET.has(n) ||
+    n === normMirrorReflectionHeadline(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)
+  );
+}
 
 /** Headlines treated as generic fallbacks for specificity tie-breaks (subset of session headlines). */
 export const MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS = [
   ...MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS,
   ...MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS,
-  MIRROR_HEADLINE_HESITATION_REVISED
+  ...MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS
 ] as const;

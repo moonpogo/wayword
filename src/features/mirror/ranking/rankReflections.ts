@@ -16,8 +16,8 @@ import {
   MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
   MIRROR_HEADLINE_SHIFT_TURNS,
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
-  MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
-  MIRROR_HEADLINE_HESITATION_REVISED,
+  isMirrorHesitationQualifiedAfterStatement,
+  isMirrorHesitationRevisedFamilyStatement,
   MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER,
   normMirrorReflectionHeadline
 } from "../constants/mirrorSessionHeadlines.js";
@@ -84,9 +84,9 @@ function rankingWeight(candidate: MirrorReflectionCandidate): number {
 
   // Medium-priority hesitation / qualification patterns.
   if (
-    s === norm(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) ||
+    isMirrorHesitationQualifiedAfterStatement(candidate.statement) ||
     s === norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) ||
-    s === norm(MIRROR_HEADLINE_HESITATION_REVISED)
+    isMirrorHesitationRevisedFamilyStatement(candidate.statement)
   ) {
     return 10;
   }

@@ -132,11 +132,11 @@ function buildCompareInterpretivePrimaryOrder(
   };
 }
 
-function buildFallbackCandidate(sessionId: string): MirrorReflectionCandidate {
+function buildFallbackCandidate(sessionId: string, sentenceCount?: number | null): MirrorReflectionCandidate {
   return {
     id: `fallback:${sessionId}`,
     category: "fallback",
-    statement: pickMirrorFallbackSoftStatement(sessionId),
+    statement: pickMirrorFallbackSoftStatement(sessionId, sentenceCount),
     evidence: [],
     rankScore: 0
   };
@@ -149,10 +149,14 @@ function buildFallbackCandidate(sessionId: string): MirrorReflectionCandidate {
 export function selectFinalReflections(
   rankedDeduped: MirrorReflectionCandidate[],
   sessionId: string,
-  options?: { recentReflectionFamilyKeys?: string[] }
+  options?: { recentReflectionFamilyKeys?: string[]; sentenceCountForFallback?: number | null }
 ): MirrorPipelineResult {
+  const sentenceCountForFallback = options?.sentenceCountForFallback;
   if (rankedDeduped.length === 0) {
-    return { main: asSelected(buildFallbackCandidate(sessionId), "main"), supporting: [] };
+    return {
+      main: asSelected(buildFallbackCandidate(sessionId, sentenceCountForFallback), "main"),
+      supporting: []
+    };
   }
 
   const recentKeys = options?.recentReflectionFamilyKeys;
@@ -165,7 +169,7 @@ export function selectFinalReflections(
         effectivePrimaryRank(c, recentKeys, pool) >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT
     ) ?? null;
 
-  const chosen = primary ?? buildFallbackCandidate(sessionId);
+  const chosen = primary ?? buildFallbackCandidate(sessionId, sentenceCountForFallback);
   const main = asSelected(chosen, "main");
   const supporting: MirrorSelectedReflection[] = [];
   const used = new Set<MirrorCategoryV1>([chosen.category]);

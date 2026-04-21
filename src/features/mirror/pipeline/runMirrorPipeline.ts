@@ -19,6 +19,7 @@ export function runMirrorPipeline(input: MirrorSessionInput): MirrorPipelineResu
   const ranked = rankReflections(raw);
   const deduped = dedupeReflections(ranked);
   return selectFinalReflections(deduped, features.sessionId, {
-    recentReflectionFamilyKeys: input.recentReflectionFamilyKeys
+    recentReflectionFamilyKeys: input.recentReflectionFamilyKeys,
+    sentenceCountForFallback: features.sentenceCount
   });
 }

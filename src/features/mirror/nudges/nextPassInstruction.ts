@@ -15,9 +15,7 @@ import {
   MIRROR_HEADLINE_SHIFT_HOLDS,
   MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
   MIRROR_HEADLINE_SHIFT_TURNS,
-  MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
-  MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER,
-  MIRROR_HEADLINE_HESITATION_REVISED,
+  isMirrorHesitationStandardNudgeStatement,
   normMirrorReflectionHeadline
 } from "../constants/mirrorSessionHeadlines.js";
 import type { MirrorPipelineResult, MirrorSelectedReflection } from "../types/mirrorTypes.js";
@@ -48,6 +46,12 @@ export type MirrorAttentionalNudgeOpts = {
   lowSignal?: boolean;
   /** Stable id (e.g. runId) so variant choice does not flicker on re-render. */
   seed?: string | null;
+  /**
+   * Tokenizer word count for the submitted draft (same as mirror `analyzeText` / `tokenizeText`).
+   * When the primary is soft fallback and this is at or above the ambiguous threshold, nudges
+   * avoid “strong mirror” framing (e.g. chasing detail) while staying modest.
+   */
+  submissionWordCount?: number | null;
 };
 
 function normStatement(s: string): string {
@@ -78,6 +82,9 @@ function seedWithFamily(base: string, family: string | null): string {
   return family ? `${base}|fam:${family}` : `${base}|fam:na`;
 }
 
+/** Below this, keep generic fallback nudges (thin / fragment drafts). */
+const MIRROR_NUDGE_AMBIGUOUS_MIN_WORDS = 28;
+
 function pickDriverReflection(result: MirrorPipelineResult): MirrorSelectedReflection | null {
   const main = result.main;
   if (main && String(main.statement || "").trim()) {
@@ -100,6 +107,13 @@ const NUDGE_GENERIC: readonly string[] = [
   "Where does the thread invite another glance?",
   "What detail keeps catching your attention?",
   "What remains unattended in what you wrote?"
+];
+
+/** When the mirror is soft fallback but the draft has real length—honest, low-claim prompts. */
+const NUDGE_FALLBACK_AMBIGUOUS: readonly string[] = [
+  "What still feels open—not wrong, just unsettled—in what you wrote?",
+  "Where would you trust your own read more than a slick echo?",
+  "If the mirror stays this quiet, what one thread do you still want to follow?"
 ];
 
 const NUDGE_REPETITION: readonly string[] = [
@@ -192,6 +206,12 @@ export function nextPassInstructionFromMirrorPipelineResult(
   }
 
   if (cat === "fallback" || isMirrorFallbackSoftStatement(driver.statement)) {
+    const wcRaw = opts?.submissionWordCount;
+    const wc =
+      typeof wcRaw === "number" && Number.isFinite(wcRaw) && wcRaw >= 0 ? Math.floor(wcRaw) : 0;
+    if (wc >= MIRROR_NUDGE_AMBIGUOUS_MIN_WORDS) {
+      return pickLine(seedWithFamily(`${seed}|fallback-ambiguous`, family), NUDGE_FALLBACK_AMBIGUOUS);
+    }
     return pickLine(seedWithFamily(`${seed}|fallback-soft`, family), NUDGE_GENERIC);
   }
 
@@ -223,11 +243,7 @@ export function nextPassInstructionFromMirrorPipelineResult(
       line = pickLine(seedWithFamily(`${seed}|shape-unknown`, family), NUDGE_GENERIC);
     }
   } else if (cat === "hesitation_qualification") {
-    if (
-      n === normStatement(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) ||
-      n === normStatement(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) ||
-      n === normStatement(MIRROR_HEADLINE_HESITATION_REVISED)
-    ) {
+    if (isMirrorHesitationStandardNudgeStatement(driver.statement)) {
       line = pickLine(seedWithFamily(`${seed}|hesitation`, family), NUDGE_HESITATION);
     } else {
       line = pickLine(seedWithFamily(`${seed}|hesitation-unknown`, family), NUDGE_GENERIC);

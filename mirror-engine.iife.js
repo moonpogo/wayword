@@ -29,7 +29,8 @@ var WaywordMirror = (() => {
     mirrorReflectionFamilyKey: () => mirrorReflectionFamilyKey,
     nextPassInstructionFromMirrorPipelineResult: () => nextPassInstructionFromMirrorPipelineResult,
     runMirrorPipeline: () => runMirrorPipeline,
-    runMirrorRecentTrendsPipeline: () => runMirrorRecentTrendsPipeline
+    runMirrorRecentTrendsPipeline: () => runMirrorRecentTrendsPipeline,
+    tokenizeText: () => tokenizeText
   });
 
   // src/features/mirror/utils/normalizeText.ts
@@ -239,6 +240,16 @@ var WaywordMirror = (() => {
       meanSentenceLengthLastQuarterWords = mean(lastLens);
       if (meanSentenceLengthFirstQuarterWords > 0) {
         const ratio = meanSentenceLengthLastQuarterWords / meanSentenceLengthFirstQuarterWords;
+        endCompression = ratio <= MIRROR_END_COMPRESSION_RATIO;
+        endExpansion = ratio >= MIRROR_END_EXPANSION_RATIO;
+      }
+    } else if (sentenceCount === 4) {
+      const firstPairMean = mean(lengths.slice(0, 2));
+      const lastPairMean = mean(lengths.slice(2, 4));
+      meanSentenceLengthFirstQuarterWords = firstPairMean;
+      meanSentenceLengthLastQuarterWords = lastPairMean;
+      if (firstPairMean > 0) {
+        const ratio = lastPairMean / firstPairMean;
         endCompression = ratio <= MIRROR_END_COMPRESSION_RATIO;
         endExpansion = ratio >= MIRROR_END_EXPANSION_RATIO;
       }
@@ -522,10 +533,32 @@ var WaywordMirror = (() => {
     };
   }
 
+  // src/features/mirror/constants/selectionThresholds.ts
+  var MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT = 34;
+  var MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA = 5;
+  var MIRROR_SELECTION_MAX_SUPPORTING = 4;
+
   // src/features/mirror/constants/generationThresholds.ts
   var MIRROR_LOW_SIGNAL_MAX_WORDS_EXCLUSIVE = 8;
   var MIRROR_LOW_SIGNAL_STRUCTURE_MIN_WORDS = 24;
   var MIRROR_GEN_MIN_WORDS_FOR_ANY = 32;
+  var MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_WORDS = 20;
+  var MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_SENTENCES = 3;
+  var MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_SHARE = 0.11;
+  var MIRROR_GEN_REPETITION_SHORT_OVERRIDE_NAMED_MIN_COUNT = 3;
+  var MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_WORDS = 22;
+  var MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_SENTENCES = 2;
+  var MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_PHRASE_HITS = 2;
+  var MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_TOTAL = 5;
+  var MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_PER100 = 2;
+  var MIRROR_GEN_HESITATION_PHRASE_AUGMENT_MAX_TOTAL_LEX = 3;
+  var MIRROR_GEN_HESITATION_PHRASE_AUGMENT_MIN_PHRASE_HITS = 2;
+  var MIRROR_GEN_CADENCE_FOUR_SENTENCE_MIN_VARIANCE = 32;
+  var MIRROR_GEN_CONCRETE_SCENE_MIN_WORDS = 30;
+  var MIRROR_GEN_CONCRETE_SCENE_MAX_WORDS = 42;
+  var MIRROR_GEN_CONCRETE_SCENE_MIN_SENTENCES = 3;
+  var MIRROR_GEN_CONCRETE_SCENE_MIN_LEX = 2;
+  var MIRROR_GEN_CONCRETE_SCENE_MIN_PER_SENTENCE = 2;
   var MIRROR_GEN_REPETITION_TOP_MIN_COUNT = 4;
   var MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN = 4;
   var MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT = 6;
@@ -533,6 +566,8 @@ var WaywordMirror = (() => {
     "thing",
     "things",
     "stuff",
+    /** Filler / discourse marker; avoid named-repetition wins on casual “like” stacks (EDGE-04). */
+    "like",
     "something",
     "anything",
     "nothing",
@@ -574,6 +609,9 @@ var WaywordMirror = (() => {
   var MIRROR_GEN_ABSTRACTION_SHORTFORM_MAX_CONCRETE = 1;
   var MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT = 6;
   var MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT = 5;
+  var MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_LEX = 4;
+  var MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_ABSTRACT = 2;
+  var MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_RATIO = 0.85;
   var MIRROR_GEN_ABSTRACTION_IDEA_LEAN_RATIO = 1.35;
   var MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO = 1.35;
   var MIRROR_GEN_ABSTRACTION_SOFT_IDEA_LEAN_RATIO = 1.12;
@@ -585,14 +623,27 @@ var WaywordMirror = (() => {
     return s.trim().toLowerCase().replace(/\s+/g, " ");
   }
   var MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times on the page";
-  var MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS = [
+  var MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS = [
     "It stays on one line the whole way through.",
+    "One sentence carries the whole span here."
+  ];
+  var MIRROR_HEADLINE_FALLBACK_SOFT_MULTI_SENTENCE_VARIANTS = [
+    "No single pattern reads clearly enough to name here yet.",
+    "Nothing here grabs the mirror as one decisive habit yet.",
+    "The piece doesn't narrow to one obvious angle yet."
+  ];
+  var MIRROR_HEADLINE_FALLBACK_SOFT_LEGACY_VARIANTS = [
     "The shape stays steady from start to finish.",
     "Line length stays even the whole way through.",
     "It holds a single, even line across the piece.",
     "Sentence length barely shifts from line to line."
   ];
-  var MIRROR_HEADLINE_FALLBACK_SOFT = MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS[0];
+  var MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS = [
+    ...MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS,
+    ...MIRROR_HEADLINE_FALLBACK_SOFT_MULTI_SENTENCE_VARIANTS,
+    ...MIRROR_HEADLINE_FALLBACK_SOFT_LEGACY_VARIANTS
+  ];
+  var MIRROR_HEADLINE_FALLBACK_SOFT = MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS[0];
   function hashSessionSalt(sessionId, salt) {
     const s = `${sessionId}|${salt}`;
     let h = 2166136261 >>> 0;
@@ -602,9 +653,16 @@ var WaywordMirror = (() => {
     }
     return h >>> 0;
   }
-  function pickMirrorFallbackSoftStatement(sessionId) {
-    const idx = hashSessionSalt(sessionId, "mirrorFallbackSoft") % MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS.length;
-    return MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS[idx];
+  function pickMirrorFallbackSoftStatement(sessionId, sentenceCount) {
+    const sc = typeof sentenceCount === "number" && Number.isFinite(sentenceCount) ? sentenceCount : 2;
+    if (sc <= 1) {
+      const pool2 = MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS;
+      const idx2 = hashSessionSalt(sessionId, "mirrorFallbackSoft|single") % pool2.length;
+      return pool2[idx2];
+    }
+    const pool = MIRROR_HEADLINE_FALLBACK_SOFT_MULTI_SENTENCE_VARIANTS;
+    const idx = hashSessionSalt(sessionId, "mirrorFallbackSoft|multi") % pool.length;
+    return pool[idx];
   }
   var FALLBACK_SOFT_NORM_SET = new Set(
     MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS.map((line) => normMirrorReflectionHeadline(line))
@@ -659,16 +717,55 @@ var WaywordMirror = (() => {
   var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER = "Concrete detail carries more of the later passages.";
   var MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "It leans more on ideas than on what can be seen.";
   var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Concrete detail carries more than the ideas here.";
-  var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER = "A statement appears, then softens right after.";
+  var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS = [
+    "A statement appears, then softens right after.",
+    "Something is stated, then almost immediately hedged.",
+    "The sentence makes its move, then tempers the landing."
+  ];
+  var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS[0];
+  function pickMirrorHesitationQualifiedAfterStatement(sessionId, fingerprint = "") {
+    const pool = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS;
+    const key = fingerprint ? `${sessionId}|${fingerprint}` : sessionId;
+    const idx = hashSessionSalt(key, "hesitationQualifiedAfter") % pool.length;
+    return pool[idx];
+  }
+  var HESITATION_QUALIFIED_AFTER_NORM_SET = new Set(
+    MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS.map((line) => normMirrorReflectionHeadline(line))
+  );
+  function isMirrorHesitationQualifiedAfterStatement(statement) {
+    return HESITATION_QUALIFIED_AFTER_NORM_SET.has(normMirrorReflectionHeadline(statement));
+  }
   var MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertions are often followed by softening.";
-  var MIRROR_HEADLINE_HESITATION_REVISED = "Statements are often revised or softened.";
+  var MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS = [
+    "Statements are often revised or softened.",
+    "What lands on the page keeps revising its own emphasis.",
+    "The voice circles back to adjust what it just said."
+  ];
+  var MIRROR_HEADLINE_HESITATION_REVISED = MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS[0];
+  function pickMirrorHesitationRevisedGeneralStatement(sessionId, fingerprint = "") {
+    const pool = MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS;
+    const key = fingerprint ? `${sessionId}|${fingerprint}` : sessionId;
+    const idx = hashSessionSalt(key, "hesitationRevisedGeneral") % pool.length;
+    return pool[idx];
+  }
+  var HESITATION_REVISED_FAMILY_NORM_SET = new Set(
+    MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS.map((line) => normMirrorReflectionHeadline(line))
+  );
+  function isMirrorHesitationRevisedFamilyStatement(statement) {
+    return HESITATION_REVISED_FAMILY_NORM_SET.has(normMirrorReflectionHeadline(statement));
+  }
+  function isMirrorHesitationStandardNudgeStatement(statement) {
+    const n = normMirrorReflectionHeadline(statement);
+    return HESITATION_QUALIFIED_AFTER_NORM_SET.has(n) || HESITATION_REVISED_FAMILY_NORM_SET.has(n) || n === normMirrorReflectionHeadline(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING);
+  }
   var MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS = [
     ...MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS,
     ...MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS,
-    MIRROR_HEADLINE_HESITATION_REVISED
+    ...MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS
   ];
 
   // src/features/mirror/generation/buildReflectionCandidates.ts
+  var CONCRETE_LEX_SET = new Set(MIRROR_CONCRETE_WORDS.map((w) => w.toLowerCase()));
   function candidate(category, sessionId, statement, evidence, rankScore, supportsPrimary = false) {
     const base = {
       id: `${category}:${sessionId}`,
@@ -700,6 +797,67 @@ var WaywordMirror = (() => {
     if (repetitionWordIsLowSignal(word)) return count >= MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT;
     return count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
   }
+  function repetitionShortTextOverrideEligible(features) {
+    if (features.wordCount >= MIRROR_GEN_MIN_WORDS_FOR_ANY) return false;
+    if (features.wordCount < MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_WORDS) return false;
+    if (features.sentenceCount < MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_SENTENCES) return false;
+    return true;
+  }
+  function repetitionShortBeatPageStrong(list, wordCount) {
+    const floor = MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_SHARE;
+    const eligibleShort = list.filter((e) => {
+      const w = e.word.toLowerCase();
+      if (MIRROR_GEN_REPETITION_DULL_WORDS.has(w)) return false;
+      if (e.word.length > MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN) return false;
+      if (e.count < MIRROR_GEN_REPETITION_SHORT_OVERRIDE_NAMED_MIN_COUNT) return false;
+      return e.count / Math.max(wordCount, 1) >= floor;
+    });
+    if (eligibleShort.length >= 2) return true;
+    if (eligibleShort.some((h) => h.count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT)) return true;
+    return false;
+  }
+  function repetitionLemmaEligibleForNamedHeadline(word, count, features, shortOverride, list) {
+    const w = word.toLowerCase();
+    if (MIRROR_GEN_REPETITION_DULL_WORDS.has(w)) return false;
+    if (shortOverride && repetitionShortBeatPageStrong(list, features.wordCount) && word.length <= MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN && count >= MIRROR_GEN_REPETITION_SHORT_OVERRIDE_NAMED_MIN_COUNT && count / Math.max(features.wordCount, 1) >= MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_SHARE) {
+      return true;
+    }
+    return repetitionMeetsCountGate(word, count) && !repetitionWordIsLowSignal(word);
+  }
+  function maxConcreteLexHitsInOneSentence(normalizedText) {
+    let maxH = 0;
+    for (const sent of splitSentences(normalizedText)) {
+      let h = 0;
+      for (const raw of tokenizeText(sent)) {
+        if (CONCRETE_LEX_SET.has(raw.toLowerCase())) h += 1;
+      }
+      maxH = Math.max(maxH, h);
+    }
+    return maxH;
+  }
+  function hesitationPhraseSoftHitCount(normalizedText) {
+    const t = normalizedText.toLowerCase();
+    const patterns = [
+      /\bi think\b/g,
+      /\bi guess\b/g,
+      /\bi suppose\b/g,
+      /\bmore or less\b/g,
+      /\bnot exactly\b/g,
+      /\b(?:or\s+)?at least\b/g,
+      /\bwhich is maybe\b/g,
+      /\bwondering whether\b/g,
+      /\bmore than i expected\b/g,
+      // REAL-02-style evaluative softening; phrase augment still requires sparse lex + min phrase hits.
+      /\bseems to\b/g,
+      /\bmore than it should\b/g
+    ];
+    let n = 0;
+    for (const re of patterns) {
+      const m = t.match(re);
+      if (m) n += m.length;
+    }
+    return n;
+  }
   function pickVariantIndex(sessionId, salt) {
     const s = `${sessionId}|${salt}`;
     let h = 2166136261 >>> 0;
@@ -714,15 +872,22 @@ var WaywordMirror = (() => {
     return features.sentenceCount >= MIRROR_GEN_CADENCE_MIN_SENTENCES && c.shortSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_SHORT && c.longSentenceCount >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_LONG && c.varianceSentenceLength >= MIRROR_GEN_CADENCE_ALTERNATION_MIN_VARIANCE;
   }
   function tryRepetition(features) {
-    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
+    const shortOverride = repetitionShortTextOverrideEligible(features);
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && !shortOverride) return null;
     const list = features.topRepeatedWords;
     const picked = list.find(
-      (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
+      (e) => repetitionLemmaEligibleForNamedHeadline(e.word, e.count, features, shortOverride, list)
     );
     if (!picked) return null;
+    if (shortOverride) {
+      const share = picked.count / Math.max(features.wordCount, 1);
+      if (share < MIRROR_GEN_REPETITION_SHORT_OVERRIDE_MIN_SHARE) return null;
+      const minNamedHits = repetitionWordIsLowSignal(picked.word) ? MIRROR_GEN_REPETITION_SHORT_OVERRIDE_NAMED_MIN_COUNT : MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
+      if (picked.count < minNamedHits) return null;
+    }
     const statement = mirrorHeadlineRepetitionNamed(picked.word);
     const multiNamed = list.filter(
-      (e) => repetitionMeetsCountGate(e.word, e.count) && !repetitionWordIsLowSignal(e.word)
+      (e) => repetitionLemmaEligibleForNamedHeadline(e.word, e.count, features, shortOverride, list)
     ).length;
     const rankScore = Math.min(100, picked.count * 14 + (multiNamed > 1 ? 5 : 0));
     return candidate("repetition", features.sessionId, statement, [], rankScore);
@@ -730,18 +895,23 @@ var WaywordMirror = (() => {
   function tryCadence(features) {
     const c = features.cadenceProfile;
     if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
-    if (features.sentenceCount < MIRROR_GEN_CADENCE_MIN_SENTENCES) return null;
+    const fourSentenceEndShape = features.sentenceCount === 4 && c.varianceSentenceLength >= MIRROR_GEN_CADENCE_FOUR_SENTENCE_MIN_VARIANCE;
+    if (features.sentenceCount < MIRROR_GEN_CADENCE_MIN_SENTENCES) {
+      if (!fourSentenceEndShape) return null;
+    }
     const firstQ = c.meanSentenceLengthFirstQuarterWords;
     const lastQ = c.meanSentenceLengthLastQuarterWords;
     const quarterRatio = firstQ != null && lastQ != null && firstQ > 0 ? lastQ / firstQ : null;
     if (c.endCompression && quarterRatio != null && firstQ != null && lastQ != null) {
       const statement = MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS;
-      const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
+      let rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
+      if (fourSentenceEndShape) rankScore -= 4;
       return candidate("cadence", features.sessionId, statement, [], rankScore);
     }
     if (c.endExpansion && quarterRatio != null && firstQ != null && lastQ != null) {
       const statement = MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN;
-      const rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
+      let rankScore = 54 + Math.min(18, c.varianceSentenceLength * 0.55);
+      if (fourSentenceEndShape) rankScore -= 4;
       return candidate("cadence", features.sessionId, statement, [], rankScore);
     }
     if (cadenceStrongAlternation(features)) {
@@ -796,11 +966,12 @@ var WaywordMirror = (() => {
     const rankScore = 44 + Math.min(12, lex * 1.2);
     return candidate("shift", features.sessionId, statement, [], rankScore);
   }
-  function tryAbstraction(features) {
+  function tryAbstraction(features, sourceNorm) {
     const a = features.abstractionProfile;
     const lex = a.abstractCount + a.concreteCount;
     const shortFormAbstractionEligible = features.wordCount >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_WORDS && a.abstractCount >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_ABSTRACT && a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_SHORTFORM_MIN_RATIO && a.concreteCount <= MIRROR_GEN_ABSTRACTION_SHORTFORM_MAX_CONCRETE;
-    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && !shortFormAbstractionEligible) {
+    const concreteSceneBandEligible = Boolean(sourceNorm) && features.wordCount >= MIRROR_GEN_CONCRETE_SCENE_MIN_WORDS && features.wordCount <= MIRROR_GEN_CONCRETE_SCENE_MAX_WORDS && features.sentenceCount >= MIRROR_GEN_CONCRETE_SCENE_MIN_SENTENCES;
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && !shortFormAbstractionEligible && !concreteSceneBandEligible) {
       return null;
     }
     if (a.shiftsTowardAbstract && a.shiftsTowardConcrete) {
@@ -812,6 +983,11 @@ var WaywordMirror = (() => {
     if (a.shiftsTowardAbstract && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT && a.abstractCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT) {
       const statement = MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL;
       const rankScore = 80 + Math.min(20, a.abstractCount * 2.4);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
+    }
+    if (a.shiftsTowardAbstract && !a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_LEX && a.abstractCount >= MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_ABSTRACT && a.abstractCount < MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT && a.abstractConcreteRatio >= MIRROR_GEN_ABSTRACTION_BACK_HALF_WEAKSHIFT_MIN_RATIO) {
+      const statement = MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL;
+      const rankScore = 74 + Math.min(14, lex * 2.2);
       return abstractionCandidate(features.sessionId, statement, rankScore);
     }
     if (a.shiftsTowardConcrete && lex >= MIRROR_GEN_ABSTRACTION_MIN_FOR_SHIFT && a.concreteCount >= MIRROR_GEN_ABSTRACTION_MIN_SIDE_FOR_SHIFT) {
@@ -842,41 +1018,68 @@ var WaywordMirror = (() => {
       const rankScore = 34 + Math.min(14, lex * 1.5);
       return abstractionCandidate(features.sessionId, statement, rankScore);
     }
+    if (sourceNorm && concreteSceneBandEligible && a.abstractCount === 0 && a.concreteCount >= MIRROR_GEN_CONCRETE_SCENE_MIN_LEX && lex >= MIRROR_GEN_CONCRETE_SCENE_MIN_LEX && lex < MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL && !(a.shiftsTowardAbstract && a.shiftsTowardConcrete) && maxConcreteLexHitsInOneSentence(sourceNorm) >= MIRROR_GEN_CONCRETE_SCENE_MIN_PER_SENTENCE) {
+      const statement = MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS;
+      const rankScore = 56 + Math.min(12, lex * 3);
+      return abstractionCandidate(features.sessionId, statement, rankScore);
+    }
     return null;
   }
-  function tryHesitation(features) {
+  function tryHesitation(features, sourceNorm) {
     const h = features.hesitationProfile;
-    const total = h.qualifierCount + h.pivotCount + h.contradictionMarkers + h.uncertaintyMarkers;
+    const phraseHits = sourceNorm ? hesitationPhraseSoftHitCount(sourceNorm) : 0;
+    const shortOverride = features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && features.wordCount >= MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_WORDS && features.sentenceCount >= MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_SENTENCES && Boolean(sourceNorm) && phraseHits >= MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_PHRASE_HITS;
+    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY && !shortOverride) return null;
+    const totalLex = h.qualifierCount + h.pivotCount + h.contradictionMarkers + h.uncertaintyMarkers;
+    const softLex = h.qualifierCount + h.uncertaintyMarkers;
+    const turnLex = h.pivotCount + h.contradictionMarkers;
+    const phraseAugmentLong = !shortOverride && features.wordCount >= MIRROR_GEN_MIN_WORDS_FOR_ANY && Boolean(sourceNorm) && totalLex <= MIRROR_GEN_HESITATION_PHRASE_AUGMENT_MAX_TOTAL_LEX && phraseHits >= MIRROR_GEN_HESITATION_PHRASE_AUGMENT_MIN_PHRASE_HITS;
+    const phraseAugment = shortOverride || phraseAugmentLong;
+    const soft = phraseAugment ? softLex + phraseHits : softLex;
+    const turn = turnLex;
+    const total = phraseAugment ? totalLex + phraseHits : totalLex;
     const per100 = total / Math.max(features.wordCount, 1) * 100;
-    if (features.wordCount < MIRROR_GEN_MIN_WORDS_FOR_ANY) return null;
-    const soft = h.qualifierCount + h.uncertaintyMarkers;
-    const turn = h.pivotCount + h.contradictionMarkers;
+    const softFloorNoTurn = shortOverride ? 3 : phraseAugmentLong ? 3 : 4;
     if (turn === 0) {
-      if (soft < 4) return null;
+      if (soft < softFloorNoTurn) return null;
     } else {
       if (soft < 2 && (total < 10 || turn < 4)) return null;
       if (soft < 3 && turn > soft && total < 8) return null;
     }
-    if (total < MIRROR_GEN_HESITATION_MIN_TOTAL && per100 < MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS) {
+    const minTotal = shortOverride ? MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_TOTAL : MIRROR_GEN_HESITATION_MIN_TOTAL;
+    const minPer100 = shortOverride ? MIRROR_GEN_HESITATION_SHORT_OVERRIDE_MIN_PER100 : MIRROR_GEN_HESITATION_MIN_HITS_PER_100_WORDS;
+    if (total < minTotal && per100 < minPer100) {
       return null;
     }
+    const qualifiedAfter = soft >= turn && (h.qualifierCount >= 2 || phraseAugment && phraseHits >= 1 && h.qualifierCount >= 1 || phraseAugmentLong && phraseHits >= 2 && turn >= 1 && soft >= 2);
+    const headlineFingerprint = `${turn}|${phraseHits}|${h.qualifierCount}|${softLex}|${totalLex}`;
     let statement;
-    if (soft >= turn && h.qualifierCount >= 2) {
-      statement = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER;
+    if (qualifiedAfter) {
+      statement = pickMirrorHesitationQualifiedAfterStatement(features.sessionId, headlineFingerprint);
     } else if (turn >= soft && turn >= 2 && soft >= 2) {
       statement = MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING;
     } else {
-      statement = MIRROR_HEADLINE_HESITATION_REVISED;
+      statement = pickMirrorHesitationRevisedGeneralStatement(features.sessionId, headlineFingerprint);
     }
     let rankScore = Math.min(54, 24 + total * 2.2 + per100 * 0.7);
-    if (soft < 3 && turn >= 2) rankScore -= 10;
-    return candidate("hesitation_qualification", features.sessionId, statement, [], rankScore);
+    if (soft < 3 && turn >= 2 && !phraseAugmentLong) rankScore -= 10;
+    if (shortOverride) rankScore = Math.min(54, rankScore + 4);
+    if (phraseAugmentLong) rankScore = Math.min(54, rankScore + 6);
+    const eligibleAsSupporting = rankScore >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT;
+    return candidate(
+      "hesitation_qualification",
+      features.sessionId,
+      statement,
+      [],
+      rankScore,
+      eligibleAsSupporting
+    );
   }
   function buildReflectionCandidates(features, _sourceText) {
     const out = [];
     const rep = tryRepetition(features);
     if (rep) out.push(rep);
-    const abs = tryAbstraction(features);
+    const abs = tryAbstraction(features, _sourceText);
     if (abs) out.push(abs);
     const cad = tryCadence(features);
     if (cad) out.push(cad);
@@ -884,15 +1087,10 @@ var WaywordMirror = (() => {
     if (opn) out.push(opn);
     const shf = tryShift(features);
     if (shf) out.push(shf);
-    const hes = tryHesitation(features);
+    const hes = tryHesitation(features, _sourceText);
     if (hes) out.push(hes);
     return out;
   }
-
-  // src/features/mirror/constants/selectionThresholds.ts
-  var MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT = 34;
-  var MIRROR_SELECTION_RANK_SCORE_NEAR_DELTA = 5;
-  var MIRROR_SELECTION_MAX_SUPPORTING = 4;
 
   // src/features/mirror/ranking/statementSpecificity.ts
   var GENERIC_FALLBACK_STATEMENTS = new Set(
@@ -923,8 +1121,9 @@ var WaywordMirror = (() => {
     if (n === norm(MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE) || n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS)) {
       return 82;
     }
-    if (n === norm(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER)) return 58;
+    if (isMirrorHesitationQualifiedAfterStatement(statement)) return 58;
     if (n === norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)) return 56;
+    if (isMirrorHesitationRevisedFamilyStatement(statement)) return 40;
     return 40;
   }
 
@@ -949,7 +1148,7 @@ var WaywordMirror = (() => {
     if (s === norm2(MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS) || s === norm2(MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN) || s === norm2(MIRROR_HEADLINE_CADENCE_ALTERNATION) || s === norm2(MIRROR_HEADLINE_OPENING_DIRECT) || s === norm2(MIRROR_HEADLINE_OPENING_MOMENT) || s === norm2(MIRROR_HEADLINE_OPENING_LOOSE) || s === norm2(MIRROR_HEADLINE_SHIFT_TURNS) || s === norm2(MIRROR_HEADLINE_SHIFT_HOLDS) || s === norm2(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)) {
       return 18;
     }
-    if (s === norm2(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) || s === norm2(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) || s === norm2(MIRROR_HEADLINE_HESITATION_REVISED)) {
+    if (isMirrorHesitationQualifiedAfterStatement(candidate2.statement) || s === norm2(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) || isMirrorHesitationRevisedFamilyStatement(candidate2.statement)) {
       return 10;
     }
     return 0;
@@ -1018,10 +1217,14 @@ var WaywordMirror = (() => {
     [norm3(MIRROR_HEADLINE_SHIFT_TURNS)]: "shift:turns",
     [norm3(MIRROR_HEADLINE_SHIFT_HOLDS)]: "shift:holds",
     [norm3(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)]: "shift:leans_another",
-    [norm3(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER)]: "hesitation:qualified_after",
-    [norm3(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)]: "hesitation:assertions_softening",
-    [norm3(MIRROR_HEADLINE_HESITATION_REVISED)]: "hesitation:revised"
+    [norm3(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)]: "hesitation:assertions_softening"
   };
+  for (const line of MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS) {
+    NORM_TO_FAMILY[norm3(line)] = "hesitation:qualified_after";
+  }
+  for (const line of MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS) {
+    NORM_TO_FAMILY[norm3(line)] = "hesitation:revised";
+  }
   for (const line of MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS) {
     NORM_TO_FAMILY[norm3(line)] = "abstraction:balance";
   }
@@ -1129,18 +1332,22 @@ var WaywordMirror = (() => {
       return categoryTieOrder(a.category) - categoryTieOrder(b.category);
     };
   }
-  function buildFallbackCandidate(sessionId) {
+  function buildFallbackCandidate(sessionId, sentenceCount) {
     return {
       id: `fallback:${sessionId}`,
       category: "fallback",
-      statement: pickMirrorFallbackSoftStatement(sessionId),
+      statement: pickMirrorFallbackSoftStatement(sessionId, sentenceCount),
       evidence: [],
       rankScore: 0
     };
   }
   function selectFinalReflections(rankedDeduped, sessionId, options) {
+    const sentenceCountForFallback = options?.sentenceCountForFallback;
     if (rankedDeduped.length === 0) {
-      return { main: asSelected(buildFallbackCandidate(sessionId), "main"), supporting: [] };
+      return {
+        main: asSelected(buildFallbackCandidate(sessionId, sentenceCountForFallback), "main"),
+        supporting: []
+      };
     }
     const recentKeys = options?.recentReflectionFamilyKeys;
     const pool = rankedDeduped;
@@ -1148,7 +1355,7 @@ var WaywordMirror = (() => {
     const primary = ordered.find(
       (c) => effectivePrimaryRank(c, recentKeys, pool) >= MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT
     ) ?? null;
-    const chosen = primary ?? buildFallbackCandidate(sessionId);
+    const chosen = primary ?? buildFallbackCandidate(sessionId, sentenceCountForFallback);
     const main = asSelected(chosen, "main");
     const supporting = [];
     const used = /* @__PURE__ */ new Set([chosen.category]);
@@ -1194,7 +1401,8 @@ var WaywordMirror = (() => {
     const ranked = rankReflections(raw);
     const deduped = dedupeReflections(ranked);
     return selectFinalReflections(deduped, features.sessionId, {
-      recentReflectionFamilyKeys: input.recentReflectionFamilyKeys
+      recentReflectionFamilyKeys: input.recentReflectionFamilyKeys,
+      sentenceCountForFallback: features.sentenceCount
     });
   }
 
@@ -1713,6 +1921,7 @@ var WaywordMirror = (() => {
   function seedWithFamily(base, family) {
     return family ? `${base}|fam:${family}` : `${base}|fam:na`;
   }
+  var MIRROR_NUDGE_AMBIGUOUS_MIN_WORDS = 28;
   function pickDriverReflection(result) {
     const main = result.main;
     if (main && String(main.statement || "").trim()) {
@@ -1733,6 +1942,11 @@ var WaywordMirror = (() => {
     "Where does the thread invite another glance?",
     "What detail keeps catching your attention?",
     "What remains unattended in what you wrote?"
+  ];
+  var NUDGE_FALLBACK_AMBIGUOUS = [
+    "What still feels open\u2014not wrong, just unsettled\u2014in what you wrote?",
+    "Where would you trust your own read more than a slick echo?",
+    "If the mirror stays this quiet, what one thread do you still want to follow?"
   ];
   var NUDGE_REPETITION = [
     "What shifts if the same pressure shows up somewhere else?",
@@ -1801,6 +2015,11 @@ var WaywordMirror = (() => {
       return pickLine(seedWithFamily(`${seed}|mirror-low-signal`, family), NUDGE_LOW_SIGNAL);
     }
     if (cat === "fallback" || isMirrorFallbackSoftStatement(driver.statement)) {
+      const wcRaw = opts?.submissionWordCount;
+      const wc = typeof wcRaw === "number" && Number.isFinite(wcRaw) && wcRaw >= 0 ? Math.floor(wcRaw) : 0;
+      if (wc >= MIRROR_NUDGE_AMBIGUOUS_MIN_WORDS) {
+        return pickLine(seedWithFamily(`${seed}|fallback-ambiguous`, family), NUDGE_FALLBACK_AMBIGUOUS);
+      }
       return pickLine(seedWithFamily(`${seed}|fallback-soft`, family), NUDGE_GENERIC);
     }
     let line = "";
@@ -1823,7 +2042,7 @@ var WaywordMirror = (() => {
         line = pickLine(seedWithFamily(`${seed}|shape-unknown`, family), NUDGE_GENERIC);
       }
     } else if (cat === "hesitation_qualification") {
-      if (n === normStatement(MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER) || n === normStatement(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) || n === normStatement(MIRROR_HEADLINE_HESITATION_REVISED)) {
+      if (isMirrorHesitationStandardNudgeStatement(driver.statement)) {
         line = pickLine(seedWithFamily(`${seed}|hesitation`, family), NUDGE_HESITATION);
       } else {
         line = pickLine(seedWithFamily(`${seed}|hesitation-unknown`, family), NUDGE_GENERIC);
