@@ -1990,109 +1990,6 @@ function countPunctuation(text) {
   return result;
 }
 
-function pickRandomFromArray(arr) {
-  if (!arr.length) return null;
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function nearDuplicateGroupsFromRecentTail() {
-  const tail = state.recentPromptIds.slice(-PROMPT_NEAR_DUPLICATE_WINDOW);
-  const groups = new Set();
-  for (const id of tail) {
-    const row = promptEntryById.get(id);
-    if (row) groups.add(row.nearDuplicateGroup);
-  }
-  return groups;
-}
-
-function getEligiblePromptsInFamily(familyKey, skipNearDuplicate) {
-  const list = promptLibrary[familyKey] || [];
-  const recentIdSet = new Set(state.recentPromptIds.slice(-PROMPT_RECENT_ID_WINDOW));
-  const blockedGroups = skipNearDuplicate ? nearDuplicateGroupsFromRecentTail() : new Set();
-  return list.filter((e) => {
-    if (!e.active) return false;
-    if (recentIdSet.has(e.id)) return false;
-    if (skipNearDuplicate && blockedGroups.has(e.nearDuplicateGroup)) return false;
-    return true;
-  });
-}
-
-function countFamilyInRecentWindow(familyKey) {
-  const tail = state.recentFamilyKeys.slice(-PROMPT_RECENT_FAMILY_WINDOW);
-  let n = 0;
-  for (const f of tail) {
-    if (f === familyKey) n += 1;
-  }
-  return n;
-}
-
-function pickFamilyKeyForNewPrompt() {
-  let candidates = PROMPT_FAMILIES_ORDER.filter(
-    (f) => getEligiblePromptsInFamily(f, true).length > 0
-  );
-  if (!candidates.length) {
-    candidates = PROMPT_FAMILIES_ORDER.filter((f) => getEligiblePromptsInFamily(f, false).length > 0);
-  }
-  if (!candidates.length) return null;
-  const weights = candidates.map((f) => 1 / (1 + countFamilyInRecentWindow(f)));
-  const sum = weights.reduce((a, b) => a + b, 0);
-  let r = Math.random() * sum;
-  for (let i = 0; i < candidates.length; i++) {
-    r -= weights[i];
-    if (r <= 0) return candidates[i];
-  }
-  return candidates[candidates.length - 1];
-}
-
-function tryPickInFamily(familyKey, preferNearDuplicateFilter) {
-  let eligible = getEligiblePromptsInFamily(familyKey, preferNearDuplicateFilter);
-  if (eligible.length) {
-    return { family: familyKey, entry: pickRandomFromArray(eligible) };
-  }
-  if (preferNearDuplicateFilter) {
-    eligible = getEligiblePromptsInFamily(familyKey, false);
-    if (eligible.length) {
-      return { family: familyKey, entry: pickRandomFromArray(eligible) };
-    }
-  }
-  return null;
-}
-
-function pickAcrossFamiliesSkipping(skipFamilyKey) {
-  for (const fam of PROMPT_FAMILIES_ORDER) {
-    if (skipFamilyKey && fam === skipFamilyKey) continue;
-    const strict = getEligiblePromptsInFamily(fam, true);
-    if (strict.length) return { family: fam, entry: pickRandomFromArray(strict) };
-  }
-  for (const fam of PROMPT_FAMILIES_ORDER) {
-    if (skipFamilyKey && fam === skipFamilyKey) continue;
-    const relaxed = getEligiblePromptsInFamily(fam, false);
-    if (relaxed.length) return { family: fam, entry: pickRandomFromArray(relaxed) };
-  }
-  return null;
-}
-
-function pickPromptEntryBruteFallback() {
-  const all = PROMPT_FAMILIES_ORDER.flatMap((f) => (promptLibrary[f] || []).filter((e) => e.active));
-  const entry = pickRandomFromArray(all);
-  if (!entry) {
-    return {
-      family: "Observation",
-      entry: {
-        id: "fallback_write_stretch",
-        text: "Write for one uninterrupted stretch.",
-        nearDuplicateGroup: "fallback",
-        intensity: 1,
-        structure: "describe_scene",
-        active: true
-      }
-    };
-  }
-  const fam =
-    PROMPT_FAMILIES_ORDER.find((f) => (promptLibrary[f] || []).some((e) => e.id === entry.id)) || "Observation";
-  return { family: fam, entry };
-}
-
 /**
  * @param {{ familyKey?: string }} [options]
  * @returns {string} prompt text (also sets state.promptId, promptFamily, lastPromptKey, history).
@@ -2101,25 +1998,22 @@ function generatePrompt(options) {
   if (!Array.isArray(state.recentPromptIds)) state.recentPromptIds = [];
   if (!Array.isArray(state.recentFamilyKeys)) state.recentFamilyKeys = [];
   const opts = options && typeof options === "object" ? options : {};
-  const forced = typeof opts.familyKey === "string" && PROMPT_FAMILIES_ORDER.includes(opts.familyKey) ? opts.familyKey : null;
+  const forced =
+    typeof opts.familyKey === "string" && PROMPT_FAMILIES_ORDER.includes(opts.familyKey)
+      ? opts.familyKey
+      : null;
 
-  let chosen = null;
-  if (forced) {
-    chosen = tryPickInFamily(forced, true) || tryPickInFamily(forced, false) || pickAcrossFamiliesSkipping(forced);
-  } else {
-    const fam = pickFamilyKeyForNewPrompt();
-    if (fam) {
-      chosen = tryPickInFamily(fam, true) || tryPickInFamily(fam, false);
-    }
-    if (!chosen) {
-      chosen = pickAcrossFamiliesSkipping(null);
-    }
-  }
-  if (!chosen) {
-    chosen = pickPromptEntryBruteFallback();
-  }
-
-  const { family, entry } = chosen;
+  const { family, entry } = window.waywordPromptSelection.choosePromptFamilyAndEntry({
+    forcedFamilyKey: forced,
+    recentPromptIds: state.recentPromptIds,
+    recentFamilyKeys: state.recentFamilyKeys,
+    promptFamiliesOrder: PROMPT_FAMILIES_ORDER,
+    promptLibrary,
+    promptEntryById,
+    recentIdWindow: PROMPT_RECENT_ID_WINDOW,
+    nearDuplicateWindow: PROMPT_NEAR_DUPLICATE_WINDOW,
+    recentFamilyWindow: PROMPT_RECENT_FAMILY_WINDOW,
+  });
   state.promptId = entry.id;
   state.prompt = entry.text;
   state.promptFamily = family;
@@ -2148,12 +2042,13 @@ function updateEnterButtonVisibility() {
 }
 
 function canRerollPrompt() {
-  return (
-    state.active &&
-    !state.submitted &&
-    !getEditorText().trim() &&
-    state.promptRerollsUsed < PROMPT_REROLL_LIMIT
-  );
+  return window.waywordPromptSelection.canRerollPromptCore({
+    active: state.active,
+    submitted: state.submitted,
+    editorTextEmpty: !getEditorText().trim(),
+    promptRerollsUsed: state.promptRerollsUsed,
+    rerollLimit: PROMPT_REROLL_LIMIT,
+  });
 }
 
 function rerollPrompt() {
