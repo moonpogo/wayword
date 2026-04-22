@@ -1674,176 +1674,17 @@ function normalizeWord(word) {
     .replace(/^[^a-z0-9']+|[^a-z0-9']+$/gi, "");
 }
 
-/** Glue / stop / placeholder tokens: never surface in Patterns repeated-word UI or challenges. */
-const WAYWORD_PATTERNS_REPEAT_BLOCKLIST = new Set([
-  "test",
-  "tests",
-  "testing",
-  "the",
-  "a",
-  "an",
-  "and",
-  "or",
-  "but",
-  "nor",
-  "yet",
-  "so",
-  "if",
-  "to",
-  "of",
-  "in",
-  "on",
-  "at",
-  "by",
-  "for",
-  "from",
-  "as",
-  "with",
-  "into",
-  "onto",
-  "upon",
-  "about",
-  "under",
-  "over",
-  "after",
-  "before",
-  "between",
-  "through",
-  "during",
-  "than",
-  "within",
-  "without",
-  "against",
-  "among",
-  "across",
-  "despite",
-  "except",
-  "via",
-  "per",
-  "i",
-  "me",
-  "my",
-  "we",
-  "us",
-  "our",
-  "you",
-  "your",
-  "he",
-  "him",
-  "his",
-  "she",
-  "her",
-  "they",
-  "them",
-  "their",
-  "it",
-  "its",
-  "this",
-  "that",
-  "these",
-  "those",
-  "who",
-  "whom",
-  "whose",
-  "what",
-  "which",
-  "is",
-  "am",
-  "are",
-  "was",
-  "were",
-  "be",
-  "been",
-  "being",
-  "have",
-  "has",
-  "had",
-  "do",
-  "does",
-  "did",
-  "done",
-  "doing",
-  "would",
-  "could",
-  "should",
-  "might",
-  "must",
-  "may",
-  "can",
-  "will",
-  "shall",
-  "not",
-  "no",
-  "only",
-  "own",
-  "same",
-  "just",
-  "also",
-  "too",
-  "very",
-  "here",
-  "there",
-  "then",
-  "once",
-  "even",
-  "ever",
-  "never",
-  "always",
-  "sometimes",
-  "often",
-  "already",
-  "still",
-  "such",
-  "both",
-  "each",
-  "few",
-  "more",
-  "most",
-  "other",
-  "some",
-  "many",
-  "much",
-  "less",
-  "lot",
-  "lots",
-  "like",
-  "again",
-  "now",
-  "however",
-  "though",
-  "although",
-  "because",
-  "since",
-  "until",
-  "unless",
-  "whether",
-  "while",
-  "either",
-  "neither",
-  "why",
-  "how",
-  "all",
-  "any",
-  "every",
-  "off",
-  "out",
-  "up",
-  "down"
-]);
-
+/** Patterns repeated-word chips: delegated to `patterns-repeat-lexical-gate.js` (single source of truth). */
 function waywordPatternsRepeatLexemeOk(word) {
-  const w = normalizeWord(word);
-  if (!w || w.length <= 2) return false;
-  if (/^\d+$/.test(w)) return false;
-  if (WAYWORD_PATTERNS_REPEAT_BLOCKLIST.has(w)) return false;
-  return true;
+  const g = window.waywordPatternsLexicalGate;
+  if (!g || typeof g.lexemeOk !== "function") return false;
+  return g.lexemeOk(word);
 }
 
-/** Challenge prompts only when the word is strong enough to be avoidable on purpose. */
 function waywordPatternsRepeatLexemeChallengeworthy(word, count) {
-  if (!waywordPatternsRepeatLexemeOk(word)) return false;
-  const n = Number(count) || 0;
-  return n >= 5;
+  const g = window.waywordPatternsLexicalGate;
+  if (!g || typeof g.lexemeChallengeworthy !== "function") return false;
+  return g.lexemeChallengeworthy(word, count);
 }
 
 function tokenize(text) {
@@ -4370,6 +4211,10 @@ function renderProfile() {
         waywordPatternsRepeatLexemeChallengeworthy(w, countByShownWord.get(w) ?? 0)
       )
     : suggestedChallengeWords;
+  /** Must match `render-patterns` challenge sanitization so Begin never runs junk tokens. */
+  const patternsExerciseWords = draftChallengeWords.filter((w) =>
+    waywordPatternsRepeatLexemeChallengeworthy(w, countByShownWord.get(w) ?? 0)
+  );
 
   const patternsUtilityRoot = $("patternsRepeatedChallengeRoot");
   if (patternsUtilityRoot) {
@@ -4391,7 +4236,7 @@ function renderProfile() {
       });
     });
     const startBtn = $("startExerciseBtn");
-    if (startBtn) startBtn.addEventListener("click", () => startExerciseRun(draftChallengeWords));
+    if (startBtn) startBtn.addEventListener("click", () => startExerciseRun(patternsExerciseWords));
   }
 
   if ($("patternCallouts")) {

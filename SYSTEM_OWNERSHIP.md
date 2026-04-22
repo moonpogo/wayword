@@ -77,6 +77,7 @@ Plain map of where behavior lives today. No code changes implied.
 
 - **Two languages / two trees:** pipeline **logic** is TypeScript under `src/features/mirror/`; **product wiring and UI** for mirror output is `script.js`. The IIFE is the seam.
 - **Artifact vs source:** behavior can drift if `mirror-engine.iife.js` is not rebuilt after TS edits.
+- **Patterns cache:** `index.html` appends `?v=` to `mirror-engine.iife.js`, `render-patterns.js`, `patterns-repeat-lexical-gate.js`, and `script.js`; bump the token when any of those change so browsers do not keep stale Patterns copy or lexical filters. `npm run verify:patterns-surface` rejects retired internal pattern strings in the committed bundle.
 
 ---
 

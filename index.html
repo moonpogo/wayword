@@ -536,7 +536,7 @@
       <section id="profileView" class="hidden">
         <div class="profile-stack">
           <section class="profile-hero">
-            <div class="section-title card-section-title">Across saved runs</div>
+            <div class="section-title card-section-title">Cross-run patterns</div>
             <div id="patternCallouts" class="profile-hero-copy"></div>
             <div id="profileHeroSummary" class="run-stats-inline profile-hero-strip"></div>
           </section>
@@ -549,7 +549,8 @@
     </div>
   </div>
 
-  <script src="/mirror-engine.iife.js"></script>
+  <!-- Bump ?v= when changing mirror-engine.iife.js, script.js, or Patterns UI scripts (cache safety). -->
+  <script src="/mirror-engine.iife.js?v=20260422-patterns-sot"></script>
   <script src="/mirror-dom.js"></script>
   <script src="/src/features/mirror/mirror-controller.js"></script>
   <script src="/src/dom/elements.js"></script>
@@ -567,9 +568,10 @@
   <script src="/src/data/runs/savedRunsCanonicalRead.js"></script>
   <script src="/src/features/writing/run-controller.js"></script>
   <script src="/src/ui/render-history.js"></script>
-  <script src="/src/ui/render-patterns.js"></script>
+  <script src="/src/ui/render-patterns.js?v=20260422-patterns-sot"></script>
+  <script src="/src/ui/patterns-repeat-lexical-gate.js?v=20260422-patterns-sot"></script>
   <script src="/src/ui/render-post-run.js"></script>
   <script src="/src/ui/view-controller.js"></script>
-  <script src="/script.js"></script>
+  <script src="/script.js?v=20260422-patterns-sot"></script>
 </body>
 </html>

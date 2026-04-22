@@ -154,10 +154,30 @@
     `;
   }
 
+  function patternsSanitizeWordPairs(topWords) {
+    const g = window.waywordPatternsLexicalGate;
+    if (!g || typeof g.lexemeOk !== "function") return [];
+    return topWords.filter((pair) => g.lexemeOk(pair[0]));
+  }
+
+  function patternsSanitizeChallengeWords(draftChallengeWords, wordPairs) {
+    const g = window.waywordPatternsLexicalGate;
+    if (!g || typeof g.lexemeChallengeworthy !== "function") return [];
+    const countBy = new Map(wordPairs.map((p) => [p[0], p[1]]));
+    return draftChallengeWords.filter((w) => g.lexemeChallengeworthy(w, countBy.get(w) ?? 0));
+  }
+
   function buildPatternsRepeatedChallengeRootInnerHtml({ topWords, selectedChallengeSet, draftChallengeWords }) {
-    const wordsHtml = topWords.length
+    const gatedPairs = patternsSanitizeWordPairs(Array.isArray(topWords) ? topWords : []);
+    const countBy = new Map(gatedPairs.map((p) => [p[0], p[1]]));
+    const safeDraft = patternsSanitizeChallengeWords(
+      Array.isArray(draftChallengeWords) ? draftChallengeWords : [],
+      gatedPairs
+    );
+
+    const wordsHtml = gatedPairs.length
       ? `<div class="patterns-word-map">
-          ${topWords
+          ${gatedPairs
             .map(([w, c]) => {
               const sel = selectedChallengeSet.has(w);
               const fs = (12.25 + Math.min(c * 0.42, 3.25)).toFixed(2);
@@ -174,16 +194,16 @@
          </div>`
       : `<p class="patterns-repeated-empty">No strong repeat targets across saved runs yet.</p>`;
 
-    const challengeHtml = draftChallengeWords.length
+    const challengeHtml = safeDraft.length
       ? `<div class="patterns-challenge-block">
           <div class="patterns-challenge-label">Challenge from your repeats</div>
-          <div class="challenge-copy">${buildChallengeCopy(draftChallengeWords)}</div>
+          <div class="challenge-copy">${buildChallengeCopy(safeDraft)}</div>
           <button id="startExerciseBtn" class="exercise-btn" type="button">
             <span class="exercise-dot"></span>
             Begin challenge
           </button>
         </div>`
-      : topWords.length
+      : gatedPairs.length
         ? `<p class="patterns-challenge-hint">Tap a word above to try leaving it out for one run.</p>`
         : "";
 
