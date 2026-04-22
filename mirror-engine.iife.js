@@ -2289,7 +2289,13 @@ var WaywordMirror = (() => {
   }
 
   // src/features/mirror/nudges/nextPassInstruction.ts
-  var PROMPT_FAMILIES = /* @__PURE__ */ new Set(["Observation", "Indirection", "Social", "Object", "Tension"]);
+  var PROMPT_FAMILIES = /* @__PURE__ */ new Set([
+    "Observation",
+    "Relation",
+    "Tension",
+    "Possibility",
+    "Constraint"
+  ]);
   var MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK = "With a little more language on the page, patterns get easier to notice.";
   var MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION = "What stands out in the draft you just wrote?";
   function normStatement(s) {

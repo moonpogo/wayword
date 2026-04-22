@@ -20,7 +20,13 @@ import {
 } from "../constants/mirrorSessionHeadlines.js";
 import type { MirrorPipelineResult, MirrorSelectedReflection } from "../types/mirrorTypes.js";
 
-const PROMPT_FAMILIES = new Set(["Observation", "Indirection", "Social", "Object", "Tension"]);
+const PROMPT_FAMILIES = new Set([
+  "Observation",
+  "Relation",
+  "Tension",
+  "Possibility",
+  "Constraint"
+]);
 
 /**
  * Restrained copy when the mirror cannot lean on strong surface text / cards.

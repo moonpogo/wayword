@@ -1,45 +1,286 @@
-const promptFamilies = {
+/** v1.1 prompt families (fixed set). See `docs/PROMPT_SYSTEM_V1_1.md`. */
+const PROMPT_FAMILIES_ORDER = ["Observation", "Relation", "Tension", "Possibility", "Constraint"];
+
+/**
+ * @typedef {{ id: string, text: string, nearDuplicateGroup: string, intensity: number, structure: string, active: boolean }} PromptEntryV11
+ */
+
+/** @type {Record<string, PromptEntryV11[]>} */
+const promptLibrary = {
   Observation: [
-    "Describe a room without mentioning doors or windows.",
-    "Describe a city rooftop at dusk without using cliché language.",
-    "Describe a kitchen after everyone has left.",
-    "Describe a cheap object with absolute seriousness.",
-    "Describe a neighborhood corner as if it had a private life.",
-    "Describe an empty bus as if it were full."
+    {
+      id: "observation_kitchen_left",
+      text: "Describe a kitchen after everyone has left.",
+      nearDuplicateGroup: "empty_after",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_cheap_object_serious",
+      text: "Describe a cheap object with absolute seriousness.",
+      nearDuplicateGroup: "object_focus",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_corner_private_life",
+      text: "Describe a neighborhood corner as if it had a private life.",
+      nearDuplicateGroup: "place_animacy",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_bus_empty_full",
+      text: "Describe an empty bus as if it were full.",
+      nearDuplicateGroup: "empty_container",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_room_residue",
+      text: "Describe a room using only what stays in it when you cannot name doors or windows.",
+      nearDuplicateGroup: "room_rule",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_rooftop_surface",
+      text: "Describe a rooftop at the hour the light goes thin: underfoot, rim, heat—not the postcard skyline.",
+      nearDuplicateGroup: "rooftop",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_bench_witness",
+      text: "Describe a public park bench as if it were a witness.",
+      nearDuplicateGroup: "witness_object",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_hallway_memory",
+      text: "Describe a hallway as if it remembers everyone who passed through it.",
+      nearDuplicateGroup: "corridor_memory",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_waiting_room_plain",
+      text: "Describe a waiting room: light, vinyl, posture, and the clock—without turning the room into metaphor.",
+      nearDuplicateGroup: "waiting_room",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_cup_crack",
+      text: "Write about a cup with a crack in it. Do not use the word broken or any clear synonym for broken.",
+      nearDuplicateGroup: "withhold_word",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "observation_stairwell_gravity",
+      text: "Describe a stairwell as if gravity there were personal.",
+      nearDuplicateGroup: "vertical_place",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    }
   ],
-  Indirection: [
-    "Write about hunger without naming food.",
-    "Write about shame without naming any emotion.",
-    "Write about a body indirectly, through strain, weight, and gesture.",
-    "Write about a person through the things they leave behind.",
-    "Write about a meal that felt heavier than the food itself.",
-    "Write about relief that arrives too late."
-  ],
-  Social: [
-    "Write a scene where someone lies kindly and the other person knows it.",
-    "Write about a conversation that never quite happened.",
-    "Write about a phone call that changed nothing and everything.",
-    "Write about a friend you have already started losing.",
-    "Write a scene in which someone is kind for the wrong reason.",
-    "Write a note to someone you avoid, but never send it."
-  ],
-  Object: [
-    "Write about a cracked cup without using the word broken.",
-    "Describe an old phone as if it were an organ.",
-    "Describe a storm drain as if it were a mouth.",
-    "Describe a public park bench as if it were a witness.",
-    "Describe a hallway as if it remembers everyone who passed through it.",
-    "Describe a waiting room as if it were sacred."
+  Relation: [
+    {
+      id: "relation_kind_lie_known",
+      text: "Write a scene where someone lies kindly and the other person knows it.",
+      nearDuplicateGroup: "kind_deception",
+      intensity: 3,
+      structure: "scene_dialogue",
+      active: true
+    },
+    {
+      id: "relation_conversation_unhappened",
+      text: "Write about a conversation that never quite happened.",
+      nearDuplicateGroup: "unsaid",
+      intensity: 2,
+      structure: "scene_dialogue",
+      active: true
+    },
+    {
+      id: "relation_kind_wrong_reason",
+      text: "Write a scene in which someone is kind for the wrong reason.",
+      nearDuplicateGroup: "wrong_kindness",
+      intensity: 3,
+      structure: "scene_dialogue",
+      active: true
+    },
+    {
+      id: "relation_call_after_silence",
+      text: "Two people finish a call. Neither names what changed. Write only the silence after the line goes dead.",
+      nearDuplicateGroup: "call_gap",
+      intensity: 3,
+      structure: "interpersonal_gap",
+      active: true
+    },
+    {
+      id: "relation_being_let_go",
+      text: "Write a scene where someone realizes they are already being let go—without accusation or summary.",
+      nearDuplicateGroup: "loss_edge",
+      intensity: 3,
+      structure: "scene_dialogue",
+      active: true
+    },
+    {
+      id: "relation_unsent_surface",
+      text: "Someone writes a message they will not send. Show only the writing surface and the hand.",
+      nearDuplicateGroup: "unsent",
+      intensity: 2,
+      structure: "scene_dialogue",
+      active: true
+    },
+    {
+      id: "relation_person_through_leavings",
+      text: "Write about a person through the things they leave behind.",
+      nearDuplicateGroup: "trace",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    }
   ],
   Tension: [
-    "Write a confession that avoids the actual wrongdoing.",
-    "Write a small story where the only violence is in the tone.",
-    "Write about envy without admitting it.",
-    "Write about forgiveness as if it were a household chore.",
-    "Describe grief using only physical details.",
-    "Write about love as if it were civic infrastructure."
+    {
+      id: "tension_confession_avoids_wrong",
+      text: "Write a confession that avoids the actual wrongdoing.",
+      nearDuplicateGroup: "withhold_act",
+      intensity: 3,
+      structure: "withhold_category",
+      active: true
+    },
+    {
+      id: "tension_violence_in_tone",
+      text: "Write a small story where the only violence is in the tone.",
+      nearDuplicateGroup: "tone_violence",
+      intensity: 3,
+      structure: "scene_dialogue",
+      active: true
+    },
+    {
+      id: "tension_envy_unadmitted",
+      text: "Write about envy without admitting it.",
+      nearDuplicateGroup: "withhold_emotion",
+      intensity: 3,
+      structure: "withhold_category",
+      active: true
+    },
+    {
+      id: "tension_grief_physical_only",
+      text: "Describe grief using only physical details.",
+      nearDuplicateGroup: "grief_body",
+      intensity: 3,
+      structure: "physical_channel",
+      active: true
+    },
+    {
+      id: "tension_relief_too_late",
+      text: "Write about relief that arrives too late.",
+      nearDuplicateGroup: "aftermath",
+      intensity: 3,
+      structure: "fork_aftermath",
+      active: true
+    },
+    {
+      id: "tension_forgiveness_movement",
+      text: "Write about forgiveness as movement through a house: doors, hands, small tasks—not a verdict on anyone.",
+      nearDuplicateGroup: "forgiveness",
+      intensity: 2,
+      structure: "physical_channel",
+      active: true
+    },
+    {
+      id: "tension_care_as_upkeep",
+      text: "Write about care that looks like upkeep—what gets checked, tightened, or left quietly running.",
+      nearDuplicateGroup: "care_work",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    }
+  ],
+  Possibility: [
+    {
+      id: "possibility_day_almost",
+      text: "Write about a day that almost went differently—only near misses; do not use the phrase what if.",
+      nearDuplicateGroup: "near_miss",
+      intensity: 2,
+      structure: "fork_aftermath",
+      active: true
+    },
+    {
+      id: "possibility_choice_in_space",
+      text: "Write about a decision that still takes up space in a room—something that keeps getting moved, avoided, or walked around.",
+      nearDuplicateGroup: "unmade_choice",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "possibility_after_refusal",
+      text: "Write a scene that opens the moment after the better offer was refused.",
+      nearDuplicateGroup: "refusal_after",
+      intensity: 3,
+      structure: "fork_aftermath",
+      active: true
+    }
+  ],
+  Constraint: [
+    {
+      id: "constraint_hunger_channels",
+      text: "Write about hunger using only smell, temperature, and motion—never name food or eating.",
+      nearDuplicateGroup: "withhold_food",
+      intensity: 2,
+      structure: "withhold_category",
+      active: true
+    },
+    {
+      id: "constraint_shame_posture",
+      text: "Write about shame using only posture and distance—no emotion words.",
+      nearDuplicateGroup: "withhold_emotion",
+      intensity: 3,
+      structure: "withhold_category",
+      active: true
+    },
+    {
+      id: "constraint_body_channels",
+      text: "Write about a body using only weight, torque, and where the hands go—no anatomy labels.",
+      nearDuplicateGroup: "body_channel",
+      intensity: 2,
+      structure: "physical_channel",
+      active: true
+    },
+    {
+      id: "constraint_meal_non_food",
+      text: "Write about a meal as weight, warmth, and silence between people—not what is on the plate.",
+      nearDuplicateGroup: "meal_non_food",
+      intensity: 2,
+      structure: "physical_channel",
+      active: true
+    }
   ]
 };
+
+const promptEntryById = new Map();
+for (const fam of PROMPT_FAMILIES_ORDER) {
+  for (const e of promptLibrary[fam] || []) {
+    promptEntryById.set(e.id, { ...e, family: fam });
+  }
+}
 
 /** Ritual Loop V1 — internal family tags only (not shown in UI). */
 function biasTagsForPromptFamily(familyKey) {
@@ -64,29 +305,29 @@ const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
     "Use only what can be seen.",
     "Pick one detail and stay with it."
   ],
-  Indirection: [
-    "Don't name the feeling yet.",
-    "Show what happened. Don't name the feeling.",
-    "Leave the obvious label out.",
-    "Leave the main feeling unnamed."
-  ],
-  Social: [
+  Relation: [
     "Use only spoken lines.",
     "Two people. One exchange.",
     "No summary of how they feel.",
     "Keep it to one room and one moment."
-  ],
-  Object: [
-    "One object. Come back to it once.",
-    "Start with what a hand is touching.",
-    "Keep one ordinary thing in view.",
-    "Describe one thing as simply as you can."
   ],
   Tension: [
     "Stop before it blows up.",
     "Keep one worry present. Don't solve it.",
     "Let someone almost say the hard thing.",
     "Stop before anyone wins."
+  ],
+  Possibility: [
+    "Hold one fork in view.",
+    "Stay with the near-miss.",
+    "Keep the refusal felt, not explained.",
+    "One path not taken—keep it concrete."
+  ],
+  Constraint: [
+    "Don't name the feeling yet.",
+    "Show what happened. Don't name the feeling.",
+    "Leave the obvious label out.",
+    "Leave the main feeling unnamed."
   ]
 });
 
@@ -196,6 +437,9 @@ const {
   CALIBRATION_INSUFFICIENT_COPY,
   ZEN_GARDEN_OPENABLE,
   PROMPT_REROLL_LIMIT,
+  PROMPT_RECENT_ID_WINDOW,
+  PROMPT_NEAR_DUPLICATE_WINDOW,
+  PROMPT_RECENT_FAMILY_WINDOW,
   PROGRESSION_LEVELS,
   PROGRESSION_LEVEL_KEY,
   INACTIVITY_EASE_RUN_KEY,
@@ -1546,6 +1790,9 @@ function waywordDevResetCalibrationForTesting() {
   state.pendingRecentDrawerExpand = false;
   state.pendingNudgeLine = "";
   state.promptBiasTags = [];
+  state.recentPromptIds = [];
+  state.recentFamilyKeys = [];
+  state.promptId = "";
   state.mirrorEmptyFallbackSeed = "";
   window.waywordStorage.removeInactivityEaseRun(INACTIVITY_EASE_RUN_KEY);
 
@@ -1743,24 +1990,144 @@ function countPunctuation(text) {
   return result;
 }
 
-function generatePrompt() {
-  const families = Object.keys(promptFamilies);
-  let family = families[Math.floor(Math.random() * families.length)];
-  let options = promptFamilies[family];
-  let prompt = options[Math.floor(Math.random() * options.length)];
-  let key = `${family}::${prompt}`;
+function pickRandomFromArray(arr) {
+  if (!arr.length) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
-  while (key === state.lastPromptKey && families.length > 1) {
-    family = families[Math.floor(Math.random() * families.length)];
-    options = promptFamilies[family];
-    prompt = options[Math.floor(Math.random() * options.length)];
-    key = `${family}::${prompt}`;
+function nearDuplicateGroupsFromRecentTail() {
+  const tail = state.recentPromptIds.slice(-PROMPT_NEAR_DUPLICATE_WINDOW);
+  const groups = new Set();
+  for (const id of tail) {
+    const row = promptEntryById.get(id);
+    if (row) groups.add(row.nearDuplicateGroup);
+  }
+  return groups;
+}
+
+function getEligiblePromptsInFamily(familyKey, skipNearDuplicate) {
+  const list = promptLibrary[familyKey] || [];
+  const recentIdSet = new Set(state.recentPromptIds.slice(-PROMPT_RECENT_ID_WINDOW));
+  const blockedGroups = skipNearDuplicate ? nearDuplicateGroupsFromRecentTail() : new Set();
+  return list.filter((e) => {
+    if (!e.active) return false;
+    if (recentIdSet.has(e.id)) return false;
+    if (skipNearDuplicate && blockedGroups.has(e.nearDuplicateGroup)) return false;
+    return true;
+  });
+}
+
+function countFamilyInRecentWindow(familyKey) {
+  const tail = state.recentFamilyKeys.slice(-PROMPT_RECENT_FAMILY_WINDOW);
+  let n = 0;
+  for (const f of tail) {
+    if (f === familyKey) n += 1;
+  }
+  return n;
+}
+
+function pickFamilyKeyForNewPrompt() {
+  let candidates = PROMPT_FAMILIES_ORDER.filter(
+    (f) => getEligiblePromptsInFamily(f, true).length > 0
+  );
+  if (!candidates.length) {
+    candidates = PROMPT_FAMILIES_ORDER.filter((f) => getEligiblePromptsInFamily(f, false).length > 0);
+  }
+  if (!candidates.length) return null;
+  const weights = candidates.map((f) => 1 / (1 + countFamilyInRecentWindow(f)));
+  const sum = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * sum;
+  for (let i = 0; i < candidates.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return candidates[i];
+  }
+  return candidates[candidates.length - 1];
+}
+
+function tryPickInFamily(familyKey, preferNearDuplicateFilter) {
+  let eligible = getEligiblePromptsInFamily(familyKey, preferNearDuplicateFilter);
+  if (eligible.length) {
+    return { family: familyKey, entry: pickRandomFromArray(eligible) };
+  }
+  if (preferNearDuplicateFilter) {
+    eligible = getEligiblePromptsInFamily(familyKey, false);
+    if (eligible.length) {
+      return { family: familyKey, entry: pickRandomFromArray(eligible) };
+    }
+  }
+  return null;
+}
+
+function pickAcrossFamiliesSkipping(skipFamilyKey) {
+  for (const fam of PROMPT_FAMILIES_ORDER) {
+    if (skipFamilyKey && fam === skipFamilyKey) continue;
+    const strict = getEligiblePromptsInFamily(fam, true);
+    if (strict.length) return { family: fam, entry: pickRandomFromArray(strict) };
+  }
+  for (const fam of PROMPT_FAMILIES_ORDER) {
+    if (skipFamilyKey && fam === skipFamilyKey) continue;
+    const relaxed = getEligiblePromptsInFamily(fam, false);
+    if (relaxed.length) return { family: fam, entry: pickRandomFromArray(relaxed) };
+  }
+  return null;
+}
+
+function pickPromptEntryBruteFallback() {
+  const all = PROMPT_FAMILIES_ORDER.flatMap((f) => (promptLibrary[f] || []).filter((e) => e.active));
+  const entry = pickRandomFromArray(all);
+  if (!entry) {
+    return {
+      family: "Observation",
+      entry: {
+        id: "fallback_write_stretch",
+        text: "Write for one uninterrupted stretch.",
+        nearDuplicateGroup: "fallback",
+        intensity: 1,
+        structure: "describe_scene",
+        active: true
+      }
+    };
+  }
+  const fam =
+    PROMPT_FAMILIES_ORDER.find((f) => (promptLibrary[f] || []).some((e) => e.id === entry.id)) || "Observation";
+  return { family: fam, entry };
+}
+
+/**
+ * @param {{ familyKey?: string }} [options]
+ * @returns {string} prompt text (also sets state.promptId, promptFamily, lastPromptKey, history).
+ */
+function generatePrompt(options) {
+  if (!Array.isArray(state.recentPromptIds)) state.recentPromptIds = [];
+  if (!Array.isArray(state.recentFamilyKeys)) state.recentFamilyKeys = [];
+  const opts = options && typeof options === "object" ? options : {};
+  const forced = typeof opts.familyKey === "string" && PROMPT_FAMILIES_ORDER.includes(opts.familyKey) ? opts.familyKey : null;
+
+  let chosen = null;
+  if (forced) {
+    chosen = tryPickInFamily(forced, true) || tryPickInFamily(forced, false) || pickAcrossFamiliesSkipping(forced);
+  } else {
+    const fam = pickFamilyKeyForNewPrompt();
+    if (fam) {
+      chosen = tryPickInFamily(fam, true) || tryPickInFamily(fam, false);
+    }
+    if (!chosen) {
+      chosen = pickAcrossFamiliesSkipping(null);
+    }
+  }
+  if (!chosen) {
+    chosen = pickPromptEntryBruteFallback();
   }
 
-  state.lastPromptKey = key;
+  const { family, entry } = chosen;
+  state.promptId = entry.id;
+  state.prompt = entry.text;
   state.promptFamily = family;
+  state.lastPromptKey = `${family}::${entry.id}`;
   state.promptBiasTags = biasTagsForPromptFamily(family);
-  return prompt;
+  state.recentPromptIds = [...state.recentPromptIds, entry.id].slice(-PROMPT_RECENT_ID_WINDOW);
+  state.recentFamilyKeys = [...state.recentFamilyKeys, family].slice(-PROMPT_RECENT_FAMILY_WINDOW);
+  return entry.text;
 }
 
 function makeRunId() {
@@ -1792,7 +2159,10 @@ function canRerollPrompt() {
 function rerollPrompt() {
   if (!canRerollPrompt()) return;
 
-  state.prompt = generatePrompt();
+  const fam = String(state.promptFamily || "").trim();
+  state.prompt = generatePrompt(
+    PROMPT_FAMILIES_ORDER.includes(fam) ? { familyKey: fam } : {}
+  );
   state.promptRerollsUsed += 1;
 
   renderMeta();

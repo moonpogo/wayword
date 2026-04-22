@@ -19,8 +19,11 @@
       progressionLevel: 1,
       banned: [...bannedSource],
       prompt: "",
+      promptId: "",
       promptFamily: "",
       lastPromptKey: "",
+      recentPromptIds: [],
+      recentFamilyKeys: [],
       /** Shown under the prompt for the full next active run; replaced only after the next saved run. */
       pendingNudgeLine: "",
       /** Family-level bias only; set in `generatePrompt`. */
