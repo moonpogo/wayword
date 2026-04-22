@@ -4178,9 +4178,18 @@ function renderHistory() {
   }
 
   const runsNewestFirst = readSavedRunsNewestFirst();
-  if (!runsNewestFirst.length) {
-    state.recentRunsHistoryExpanded = false;
-    document.body.classList.remove("recent-drawer-runs-expanded");
+  const recentVm = window.waywordRecentRunsViewPrep.prepareRecentRunsViewModel({
+    runsNewestFirst,
+    historyExpanded: state.recentRunsHistoryExpanded,
+    capDrawer: recentRunsPreviewCapDrawer(),
+    capRail: recentRunsPreviewCapRail(),
+  });
+
+  if (recentVm.isEmpty) {
+    if (recentVm.clearExpandedHistory) {
+      state.recentRunsHistoryExpanded = false;
+      document.body.classList.remove("recent-drawer-runs-expanded");
+    }
     const drawerOpen = isRecentDrawerOpen();
     allLists.forEach((list) => {
       const isDrawer = list.id === "recentDrawerList";
@@ -4199,38 +4208,28 @@ function renderHistory() {
     return;
   }
 
-  const reversed = runsNewestFirst;
-  const totalCount = reversed.length;
-  const expanded = Boolean(state.recentRunsHistoryExpanded);
-  const drawerCap = expanded ? totalCount : recentRunsPreviewCapDrawer();
-  const railCap = expanded ? totalCount : recentRunsPreviewCapRail();
+  const { totalCount, expanded, drawerRunsExpandedBody, drawerSlice, railSlice, capDrawer, capRail } =
+    recentVm;
 
   if (drawerList) {
-    const slice = reversed.slice(0, drawerCap);
-    drawerList.innerHTML = window.waywordHistoryRenderer.buildRecentEntriesHtml(slice, "draw");
+    drawerList.innerHTML = window.waywordHistoryRenderer.buildRecentEntriesHtml(drawerSlice, "draw");
     drawerList.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
       wireMirrorEvidenceToggles(el);
       collapseMirrorEvidenceInRoot(el);
     });
-    setRecentRunsOverflowFooter(
-      drawerFooter,
-      totalCount,
-      recentRunsPreviewCapDrawer(),
-      expanded
-    );
+    setRecentRunsOverflowFooter(drawerFooter, totalCount, capDrawer, expanded);
   }
 
   if (railList) {
-    const slice = reversed.slice(0, railCap);
-    railList.innerHTML = window.waywordHistoryRenderer.buildRecentEntriesHtml(slice, "rail");
+    railList.innerHTML = window.waywordHistoryRenderer.buildRecentEntriesHtml(railSlice, "rail");
     railList.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
       wireMirrorEvidenceToggles(el);
       collapseMirrorEvidenceInRoot(el);
     });
-    setRecentRunsOverflowFooter(railFooter, totalCount, recentRunsPreviewCapRail(), expanded);
+    setRecentRunsOverflowFooter(railFooter, totalCount, capRail, expanded);
   }
 
-  document.body.classList.toggle("recent-drawer-runs-expanded", expanded && totalCount > 0);
+  document.body.classList.toggle("recent-drawer-runs-expanded", drawerRunsExpandedBody);
 
   syncRecentRunsMoreButtonLabels(expanded);
 
