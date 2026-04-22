@@ -117,6 +117,7 @@ export type {
   MirrorRecentTrendsResult,
   MirrorSessionDigest,
   MirrorSessionDigestVersion,
+  PatternsProfileFromDigestsEmptyState,
   PatternsProfileFromDigestsResult
 } from "./recent/types.js";
 export {
@@ -132,3 +133,5 @@ export {
   sliceLastQualifyingMirrorDigests
 } from "./recent/getPatternsProfileFromDigests.js";
 export { runMirrorRecentTrendsPipeline } from "./recent/runMirrorRecentTrendsPipeline.js";
+
+export { runPatternsFromDigests } from "./patterns/runPatternsFromDigests.js";

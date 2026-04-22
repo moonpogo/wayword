@@ -1,6 +1,6 @@
 import { aggregateRecentDigests } from "./aggregateRecentDigests.js";
 import { buildRecentTrendCandidates } from "./buildRecentTrendCandidates.js";
-import { sliceLastQualifyingMirrorDigests } from "./getPatternsProfileFromDigests.js";
+import { sliceLastQualifyingMirrorDigests } from "../patterns/analysis/qualifyingDigests.js";
 import { selectRecentTrends } from "./selectRecentTrends.js";
 import type { MirrorRecentTrendsResult, MirrorSessionDigest } from "./types.js";
 

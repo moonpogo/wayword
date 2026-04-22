@@ -28,10 +28,15 @@ export interface MirrorSessionDigest {
    * Tokenizer-normalized repeated words (not stemmed/lemmatized).
    */
   readonly topRepeatedWords: ReadonlyArray<{ readonly word: string; readonly count: number }>;
+  /**
+   * Optional on older stored digests: half-session abstraction density flags from `analyzeText`.
+   */
   readonly abstraction: {
     readonly abstractCount: number;
     readonly concreteCount: number;
     readonly abstractConcreteRatio: number;
+    readonly shiftsTowardConcrete?: boolean;
+    readonly shiftsTowardAbstract?: boolean;
   };
   readonly hesitation: {
     readonly qualifierCount: number;
@@ -39,12 +44,34 @@ export interface MirrorSessionDigest {
     readonly contradictionMarkers: number;
     readonly uncertaintyMarkers: number;
   };
+  /**
+   * Optional on older stored digests: sentence-shape snapshot for cross-run cadence.
+   */
+  readonly cadence?: {
+    readonly sentenceCount: number;
+    readonly avgSentenceLength: number;
+    readonly varianceSentenceLength: number;
+    readonly shortSentenceCount: number;
+    readonly longSentenceCount: number;
+    readonly endCompression: boolean;
+    readonly endExpansion: boolean;
+  };
+  /**
+   * Optional on older stored digests: eligible-token repetition surface (distinct vs repeated pool).
+   */
+  readonly repetition?: {
+    readonly eligibleTokenCount: number;
+    readonly distinctEligibleTokenCount: number;
+  };
 }
 
 export type MirrorRecentTrendCategory =
   | "recent_lexical_anchor"
   | "recent_abstraction_lean"
-  | "recent_hesitation_qualification";
+  | "recent_hesitation_qualification"
+  | "pattern_recurring_signal"
+  | "pattern_shift_over_time"
+  | "pattern_consistency_vs_variation";
 
 export interface MirrorRecentTrendEvidence {
   readonly text: string;
@@ -73,4 +100,13 @@ export interface MirrorRecentTrendsResult {
 export interface PatternsProfileFromDigestsResult {
   readonly promotedPatterns: ReadonlyArray<MirrorRecentTrend>;
   readonly profile: string | null;
+  /** Qualifying runs (`v === 1`, `qualifiesForRecent`) feeding Patterns V1. */
+  readonly qualifyingRunCount: number;
+  /**
+   * When no cards render: distinguish low history vs enough history but no passable signal.
+   * `null` when cards exist or mirror bundle does not support patterns V1.
+   */
+  readonly patternsEmptyState: PatternsProfileFromDigestsEmptyState | null;
 }
+
+export type PatternsProfileFromDigestsEmptyState = "insufficient_runs" | "no_strong_pattern";

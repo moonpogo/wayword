@@ -15,6 +15,12 @@ function lowerFirst(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
+function headlineClauseBody(pattern: MirrorRecentTrend): string | null {
+  const s = String(pattern.statement || "").trim();
+  if (!s) return null;
+  return s.endsWith(".") ? s.slice(0, -1) : s;
+}
+
 /** Clause body without a closing sentence period (for joining). */
 function clauseFor(pattern: MirrorRecentTrend): string | null {
   switch (pattern.category) {
@@ -27,6 +33,10 @@ function clauseFor(pattern: MirrorRecentTrend): string | null {
       return "Language leans toward ideas over scenes";
     case "recent_hesitation_qualification":
       return "Statements are often qualified just after they’re made";
+    case "pattern_recurring_signal":
+    case "pattern_shift_over_time":
+    case "pattern_consistency_vs_variation":
+      return headlineClauseBody(pattern);
     default:
       return null;
   }
@@ -44,6 +54,12 @@ function standaloneSentence(pattern: MirrorRecentTrend): string | null {
       return "Language leans toward ideas over scenes.";
     case "recent_hesitation_qualification":
       return "Statements are often qualified just after they’re made.";
+    case "pattern_recurring_signal":
+    case "pattern_shift_over_time":
+    case "pattern_consistency_vs_variation": {
+      const body = headlineClauseBody(pattern);
+      return body ? `${body}.` : null;
+    }
     default:
       return null;
   }

@@ -55,6 +55,12 @@ export type MirrorFeatures = {
 
   topRepeatedWords: Array<{ word: string; count: number }>;
 
+  /** Eligible-token pool for repetition (same basis as `topRepeatedWords`). */
+  repetitionStats: {
+    eligibleTokenCount: number;
+    distinctEligibleTokenCount: number;
+  };
+
   cadenceProfile: {
     avgSentenceLength: number;
     varianceSentenceLength: number;

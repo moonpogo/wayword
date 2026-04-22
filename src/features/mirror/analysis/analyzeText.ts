@@ -16,6 +16,10 @@ export function analyzeText(input: MirrorSessionInput): MirrorFeatures {
     wordCount: repetition.totalTokenCount,
     sentenceCount: cadence.sentenceCount,
     topRepeatedWords: [...repetition.topRepeatedWords],
+    repetitionStats: {
+      eligibleTokenCount: repetition.eligibleTokenCount,
+      distinctEligibleTokenCount: repetition.distinctEligibleTokenCount
+    },
     cadenceProfile: {
       avgSentenceLength: cadence.averageSentenceLengthWords,
       varianceSentenceLength: cadence.sentenceLengthVariance,

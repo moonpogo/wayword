@@ -36,13 +36,28 @@ export function buildMirrorSessionDigest(input: MirrorSessionInput): MirrorSessi
     abstraction: {
       abstractCount: features.abstractionProfile.abstractCount,
       concreteCount: features.abstractionProfile.concreteCount,
-      abstractConcreteRatio: features.abstractionProfile.abstractConcreteRatio
+      abstractConcreteRatio: features.abstractionProfile.abstractConcreteRatio,
+      shiftsTowardConcrete: features.abstractionProfile.shiftsTowardConcrete,
+      shiftsTowardAbstract: features.abstractionProfile.shiftsTowardAbstract
     },
     hesitation: {
       qualifierCount: features.hesitationProfile.qualifierCount,
       pivotCount: features.hesitationProfile.pivotCount,
       contradictionMarkers: features.hesitationProfile.contradictionMarkers,
       uncertaintyMarkers: features.hesitationProfile.uncertaintyMarkers
+    },
+    cadence: {
+      sentenceCount: features.sentenceCount,
+      avgSentenceLength: features.cadenceProfile.avgSentenceLength,
+      varianceSentenceLength: features.cadenceProfile.varianceSentenceLength,
+      shortSentenceCount: features.cadenceProfile.shortSentenceCount,
+      longSentenceCount: features.cadenceProfile.longSentenceCount,
+      endCompression: features.cadenceProfile.endCompression,
+      endExpansion: features.cadenceProfile.endExpansion
+    },
+    repetition: {
+      eligibleTokenCount: features.repetitionStats.eligibleTokenCount,
+      distinctEligibleTokenCount: features.repetitionStats.distinctEligibleTokenCount
     }
   };
 }
