@@ -208,8 +208,8 @@ var WaywordMirror = (() => {
   function populationVariance(values) {
     const n = values.length;
     if (n === 0) return 0;
-    const mean2 = values.reduce((a, b) => a + b, 0) / n;
-    return values.reduce((acc, v) => acc + (v - mean2) ** 2, 0) / n;
+    const mean3 = values.reduce((a, b) => a + b, 0) / n;
+    return values.reduce((acc, v) => acc + (v - mean3) ** 2, 0) / n;
   }
   function mean(values) {
     const n = values.length;
@@ -507,6 +507,10 @@ var WaywordMirror = (() => {
       wordCount: repetition.totalTokenCount,
       sentenceCount: cadence.sentenceCount,
       topRepeatedWords: [...repetition.topRepeatedWords],
+      repetitionStats: {
+        eligibleTokenCount: repetition.eligibleTokenCount,
+        distinctEligibleTokenCount: repetition.distinctEligibleTokenCount
+      },
       cadenceProfile: {
         avgSentenceLength: cadence.averageSentenceLengthWords,
         varianceSentenceLength: cadence.sentenceLengthVariance,
@@ -1433,13 +1437,28 @@ var WaywordMirror = (() => {
       abstraction: {
         abstractCount: features.abstractionProfile.abstractCount,
         concreteCount: features.abstractionProfile.concreteCount,
-        abstractConcreteRatio: features.abstractionProfile.abstractConcreteRatio
+        abstractConcreteRatio: features.abstractionProfile.abstractConcreteRatio,
+        shiftsTowardConcrete: features.abstractionProfile.shiftsTowardConcrete,
+        shiftsTowardAbstract: features.abstractionProfile.shiftsTowardAbstract
       },
       hesitation: {
         qualifierCount: features.hesitationProfile.qualifierCount,
         pivotCount: features.hesitationProfile.pivotCount,
         contradictionMarkers: features.hesitationProfile.contradictionMarkers,
         uncertaintyMarkers: features.hesitationProfile.uncertaintyMarkers
+      },
+      cadence: {
+        sentenceCount: features.sentenceCount,
+        avgSentenceLength: features.cadenceProfile.avgSentenceLength,
+        varianceSentenceLength: features.cadenceProfile.varianceSentenceLength,
+        shortSentenceCount: features.cadenceProfile.shortSentenceCount,
+        longSentenceCount: features.cadenceProfile.longSentenceCount,
+        endCompression: features.cadenceProfile.endCompression,
+        endExpansion: features.cadenceProfile.endExpansion
+      },
+      repetition: {
+        eligibleTokenCount: features.repetitionStats.eligibleTokenCount,
+        distinctEligibleTokenCount: features.repetitionStats.distinctEligibleTokenCount
       }
     };
   }
@@ -1457,6 +1476,11 @@ var WaywordMirror = (() => {
     if (!s) return s;
     return s.charAt(0).toLowerCase() + s.slice(1);
   }
+  function headlineClauseBody(pattern) {
+    const s = String(pattern.statement || "").trim();
+    if (!s) return null;
+    return s.endsWith(".") ? s.slice(0, -1) : s;
+  }
   function clauseFor(pattern) {
     switch (pattern.category) {
       case "recent_lexical_anchor": {
@@ -1468,6 +1492,10 @@ var WaywordMirror = (() => {
         return "Language leans toward ideas over scenes";
       case "recent_hesitation_qualification":
         return "Statements are often qualified just after they\u2019re made";
+      case "pattern_recurring_signal":
+      case "pattern_shift_over_time":
+      case "pattern_consistency_vs_variation":
+        return headlineClauseBody(pattern);
       default:
         return null;
     }
@@ -1483,6 +1511,12 @@ var WaywordMirror = (() => {
         return "Language leans toward ideas over scenes.";
       case "recent_hesitation_qualification":
         return "Statements are often qualified just after they\u2019re made.";
+      case "pattern_recurring_signal":
+      case "pattern_shift_over_time":
+      case "pattern_consistency_vs_variation": {
+        const body = headlineClauseBody(pattern);
+        return body ? `${body}.` : null;
+      }
       default:
         return null;
     }
@@ -1510,22 +1544,146 @@ var WaywordMirror = (() => {
     return `${s1} ${c2}, and ${lowerFirst(c3)}.`;
   }
 
-  // src/features/mirror/recent/getPatternsProfileFromDigests.ts
-  var MIRROR_PROMOTION_WINDOW_QUALIFYING = 8;
-  var MIRROR_PROMOTION_THRESHOLD_HITS = 5;
-  function repetitionWordIsLowSignal2(word) {
-    const w = word.toLowerCase();
-    if (MIRROR_GEN_REPETITION_DULL_WORDS.has(w)) return true;
-    if (w.length <= MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN) return true;
-    return false;
+  // src/features/mirror/patterns/analysis/consistencyVariation.ts
+  function populationStd(values) {
+    const n = values.length;
+    if (n < 2) return 0;
+    const mean3 = values.reduce((a, b) => a + b, 0) / n;
+    const v = values.reduce((acc, x) => acc + (x - mean3) ** 2, 0) / n;
+    return Math.sqrt(v);
   }
-  function repetitionMeetsCountGate2(word, count) {
-    if (repetitionWordIsLowSignal2(word)) return count >= MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT;
-    return count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
+  function minMax(values) {
+    if (values.length === 0) return null;
+    let min = values[0];
+    let max = values[0];
+    for (const x of values) {
+      if (x < min) min = x;
+      if (x > max) max = x;
+    }
+    return { min, max };
   }
-  function lexicalWordCountsForSession(word, count) {
-    return repetitionMeetsCountGate2(word, count) && !repetitionWordIsLowSignal2(word);
+  function detectConsistencyVariationCandidates(sorted) {
+    const n = sorted.length;
+    if (n < 3) return [];
+    const out = [];
+    const cadMeans = sorted.filter((d) => d.cadence.sentenceCount >= 4).map((d) => d.cadence.avgSentenceLength);
+    const mm = minMax(cadMeans);
+    if (mm && cadMeans.length >= 3) {
+      const span = mm.max - mm.min;
+      if (span >= 0.45 && span <= 2.4) {
+        out.push({
+          family: "consistency_vs_variation",
+          id: "pattern_consistency_vs_variation:sentence_length_tight",
+          dedupeKey: "consistency:sentence_length_band",
+          rankScore: Math.round(200 - span * 40) + cadMeans.length * 5,
+          statement: "Average sentence length sits in a narrow band across cadence-qualified saved drafts.",
+          evidence: [
+            {
+              text: `Across ${cadMeans.length} runs with four or more sentences, per-run averages stayed between ${mm.min.toFixed(
+                1
+              )} and ${mm.max.toFixed(1)} words per sentence.`
+            }
+          ]
+        });
+      } else if (span >= 7.5 && cadMeans.length >= 3) {
+        out.push({
+          family: "consistency_vs_variation",
+          id: "pattern_consistency_vs_variation:sentence_length_wide",
+          dedupeKey: "variation:sentence_length_band",
+          rankScore: Math.round(span * 25) + cadMeans.length * 4,
+          statement: "Average sentence length swings across cadence-qualified saved drafts.",
+          evidence: [
+            {
+              text: `Across ${cadMeans.length} runs with four or more sentences, per-run averages ranged from ${mm.min.toFixed(
+                1
+              )} to ${mm.max.toFixed(1)} words per sentence.`
+            }
+          ]
+        });
+      }
+    }
+    const ratios = sorted.filter((d) => d.abstraction.abstractCount + d.abstraction.concreteCount >= MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL).map((d) => d.abstraction.abstractConcreteRatio);
+    if (ratios.length >= 3) {
+      const std = populationStd(ratios);
+      if (std <= 0.17 && std >= 1e-6) {
+        out.push({
+          family: "consistency_vs_variation",
+          id: "pattern_consistency_vs_variation:abstraction_ratio_tight",
+          dedupeKey: "consistency:abstraction_ratio_std",
+          rankScore: Math.round(160 - std * 500) + ratios.length * 6,
+          statement: "The abstract-to-concrete label ratio stays close run to run when lexicon totals clear the floor.",
+          evidence: [
+            {
+              text: `Across ${ratios.length} lexicon-qualified runs, the standard deviation of the ratio was ${std.toFixed(3)}.`
+            }
+          ]
+        });
+      } else if (std >= 1.22) {
+        out.push({
+          family: "consistency_vs_variation",
+          id: "pattern_consistency_vs_variation:abstraction_ratio_loose",
+          dedupeKey: "variation:abstraction_ratio_std",
+          rankScore: Math.round(std * 420) + ratios.length * 5,
+          statement: "The abstract-to-concrete label ratio drifts run to run when lexicon totals clear the floor.",
+          evidence: [
+            {
+              text: `Across ${ratios.length} lexicon-qualified runs, the standard deviation of the ratio was ${std.toFixed(3)}.`
+            }
+          ]
+        });
+      }
+    }
+    return out;
   }
+
+  // src/features/mirror/patterns/analysis/normalizeDigest.ts
+  function normalizeMirrorSessionDigest(d) {
+    const cadence = d.cadence ?? {
+      sentenceCount: 0,
+      avgSentenceLength: 0,
+      varianceSentenceLength: 0,
+      shortSentenceCount: 0,
+      longSentenceCount: 0,
+      endCompression: false,
+      endExpansion: false
+    };
+    const repetition = d.repetition ?? {
+      eligibleTokenCount: 0,
+      distinctEligibleTokenCount: 0
+    };
+    const abstractionBase = d.abstraction;
+    const abstraction = {
+      abstractCount: abstractionBase.abstractCount,
+      concreteCount: abstractionBase.concreteCount,
+      abstractConcreteRatio: abstractionBase.abstractConcreteRatio,
+      shiftsTowardConcrete: abstractionBase.shiftsTowardConcrete ?? false,
+      shiftsTowardAbstract: abstractionBase.shiftsTowardAbstract ?? false
+    };
+    return {
+      ...d,
+      cadence,
+      repetition,
+      abstraction
+    };
+  }
+
+  // src/features/mirror/patterns/generation/templates.ts
+  function recurringLexicalEvidence(displayWord, hitSessions, qualifyingRuns) {
+    return [
+      {
+        text: `\u201C${displayWord}\u201D met the repetition gate in ${hitSessions} of ${qualifyingRuns} qualifying runs.`
+      }
+    ];
+  }
+  function recurringQualificationEvidence(hitSessions, qualifyingRuns) {
+    return [
+      {
+        text: `Qualifier-density snapshots fired in ${hitSessions} of ${qualifyingRuns} qualifying runs.`
+      }
+    ];
+  }
+
+  // src/features/mirror/patterns/analysis/sessionFlags.ts
   function sessionAbstractIdeaLean(d) {
     const a = d.abstraction;
     const lex = a.abstractCount + a.concreteCount;
@@ -1544,7 +1702,7 @@ var WaywordMirror = (() => {
     if (ideaLean) return false;
     return a.concreteCount >= MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO * Math.max(a.abstractCount, 1);
   }
-  function sessionQualifierPattern(d) {
+  function sessionQualifierDensityPattern(d) {
     const q = d.hesitation.qualifierCount;
     const w = Math.max(d.wordCount, 1);
     const per100 = q / w * 100;
@@ -1552,14 +1710,25 @@ var WaywordMirror = (() => {
     if (q >= 3 && per100 >= 1) return true;
     return q >= 2 && per100 >= 1.5;
   }
-  function sliceLastQualifyingMirrorDigests(digests) {
-    const qualifying = digests.filter((d) => d.v === 1 && d.qualifiesForRecent).sort((a, b) => a.timestamp - b.timestamp);
-    if (qualifying.length === 0) return [];
-    const n = qualifying.length;
-    const start = Math.max(0, n - MIRROR_PROMOTION_WINDOW_QUALIFYING);
-    return qualifying.slice(start);
+
+  // src/features/mirror/patterns/analysis/recurringSignal.ts
+  function repetitionWordIsLowSignal2(word) {
+    const w = word.toLowerCase();
+    if (MIRROR_GEN_REPETITION_DULL_WORDS.has(w)) return true;
+    if (w.length <= MIRROR_GEN_REPETITION_SHORT_WORD_MAX_LEN) return true;
+    return false;
   }
-  function promoteLexicalFromWindow(window) {
+  function repetitionMeetsCountGate2(word, count) {
+    if (repetitionWordIsLowSignal2(word)) return count >= MIRROR_GEN_REPETITION_SHORT_WORD_MIN_COUNT;
+    return count >= MIRROR_GEN_REPETITION_TOP_MIN_COUNT;
+  }
+  function lexicalWordCountsForSession(word, count) {
+    return repetitionMeetsCountGate2(word, count) && !repetitionWordIsLowSignal2(word);
+  }
+  function minSessionsRecurring(n) {
+    return Math.max(2, Math.ceil(0.55 * n));
+  }
+  function aggregateLexical(window) {
     const byKey = /* @__PURE__ */ new Map();
     for (const d of window) {
       const seenInDigest = /* @__PURE__ */ new Set();
@@ -1577,65 +1746,290 @@ var WaywordMirror = (() => {
         g.totalCount += row.count;
       }
     }
+    return byKey;
+  }
+  function pickBestLexical(byKey, minSessions) {
     let best = null;
     for (const g of byKey.values()) {
-      if (g.sessions < MIRROR_PROMOTION_THRESHOLD_HITS) continue;
+      if (g.sessions < minSessions) continue;
       if (!best || g.sessions > best.sessions || g.sessions === best.sessions && g.totalCount > best.totalCount || g.sessions === best.sessions && g.totalCount === best.totalCount && g.displayWord.localeCompare(best.displayWord) < 0) {
         best = g;
       }
     }
-    if (!best) return null;
-    const w = best.displayWord;
-    return {
-      id: `recent_lexical_anchor:${w}`,
-      category: "recent_lexical_anchor",
-      statement: `\u201C${w}\u201D recurs across recent drafts.`,
-      evidence: []
-    };
+    return best;
   }
-  function promoteAbstractionFromWindow(window) {
+  function detectRecurringSignalCandidates(window) {
+    const n = window.length;
+    if (n < 2) return [];
+    const minSessions = minSessionsRecurring(n);
+    const out = [];
+    const lexicalMap = aggregateLexical(window);
+    const bestLex = pickBestLexical(lexicalMap, minSessions);
+    if (bestLex) {
+      const w = bestLex.displayWord;
+      const score = bestLex.sessions * 1e3 + bestLex.totalCount;
+      out.push({
+        family: "recurring_signal",
+        id: `pattern_recurring_signal:lexical:${w.toLowerCase()}`,
+        dedupeKey: "recurring:lexical",
+        rankScore: score,
+        statement: "The same surface word keeps landing in the repetition snapshot across qualifying saved drafts.",
+        evidence: recurringLexicalEvidence(w, bestLex.sessions, n)
+      });
+    }
     let idea = 0;
     let concrete = 0;
     for (const d of window) {
       if (sessionAbstractIdeaLean(d)) idea += 1;
       else if (sessionAbstractConcreteLean(d)) concrete += 1;
     }
-    if (idea < MIRROR_PROMOTION_THRESHOLD_HITS || idea <= concrete) return null;
-    return {
-      id: "recent_abstraction_lean:promoted",
-      category: "recent_abstraction_lean",
-      statement: "Across recent drafts, language leans toward ideas over scenes.",
-      evidence: []
-    };
-  }
-  function promoteHesitationFromWindow(window) {
-    let n = 0;
-    for (const d of window) {
-      if (sessionQualifierPattern(d)) n += 1;
+    if (idea >= minSessions && idea > concrete) {
+      out.push({
+        family: "recurring_signal",
+        id: "pattern_recurring_signal:abstraction:idea_lean",
+        dedupeKey: "recurring:abstraction_idea",
+        rankScore: idea * 100 + (idea - concrete) * 10,
+        statement: "Abstract-lean snapshots outnumber concrete-lean snapshots across saved drafts.",
+        evidence: [
+          {
+            text: `Abstract-lean snapshots appeared in ${idea} of ${n} qualifying runs (concrete-lean in ${concrete}).`
+          }
+        ]
+      });
+    } else if (concrete >= minSessions && concrete > idea) {
+      out.push({
+        family: "recurring_signal",
+        id: "pattern_recurring_signal:abstraction:concrete_lean",
+        dedupeKey: "recurring:abstraction_concrete",
+        rankScore: concrete * 100 + (concrete - idea) * 10,
+        statement: "Concrete-lean snapshots outnumber abstract-lean snapshots across saved drafts.",
+        evidence: [
+          {
+            text: `Concrete-lean snapshots appeared in ${concrete} of ${n} qualifying runs (abstract-lean in ${idea}).`
+          }
+        ]
+      });
     }
-    if (n < MIRROR_PROMOTION_THRESHOLD_HITS) return null;
-    return {
-      id: "recent_hesitation_qualification:promoted",
-      category: "recent_hesitation_qualification",
-      statement: "Across recent drafts, statements are often qualified just after they appear.",
-      evidence: []
-    };
-  }
-  function promoteRecentTrendsToPatternsFromWindow(window) {
-    const out = [];
-    const lex = promoteLexicalFromWindow(window);
-    if (lex) out.push(lex);
-    const abs = promoteAbstractionFromWindow(window);
-    if (abs) out.push(abs);
-    const hes = promoteHesitationFromWindow(window);
-    if (hes) out.push(hes);
+    let qual = 0;
+    for (const d of window) {
+      if (sessionQualifierDensityPattern(d)) qual += 1;
+    }
+    if (qual >= minSessions) {
+      out.push({
+        family: "recurring_signal",
+        id: "pattern_recurring_signal:hesitation:density",
+        dedupeKey: "recurring:qualification_density",
+        rankScore: qual * 95,
+        statement: "Qualifier-density snapshots recur in the hesitation channel across saved drafts.",
+        evidence: recurringQualificationEvidence(qual, n)
+      });
+    }
     return out;
   }
+
+  // src/features/mirror/patterns/analysis/qualifyingDigests.ts
+  var MIRROR_PROMOTION_WINDOW_QUALIFYING = 8;
+  function sortQualifyingMirrorDigestsChronological(digests) {
+    return digests.filter((d) => d.v === 1 && d.qualifiesForRecent).sort((a, b) => a.timestamp - b.timestamp);
+  }
+  function sliceLastQualifyingMirrorDigests(digests) {
+    const qualifying = sortQualifyingMirrorDigestsChronological(digests);
+    if (qualifying.length === 0) return [];
+    const n = qualifying.length;
+    const start = Math.max(0, n - MIRROR_PROMOTION_WINDOW_QUALIFYING);
+    return qualifying.slice(start);
+  }
+
+  // src/features/mirror/patterns/analysis/shiftOverTime.ts
+  function mean2(values) {
+    if (values.length === 0) return 0;
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  }
+  function earlyLateSplit(sorted) {
+    const n = sorted.length;
+    if (n < 4) return null;
+    const span = Math.max(2, Math.ceil(n * 0.4));
+    const early = [...sorted.slice(0, span)];
+    const late = [...sorted.slice(n - span)];
+    if (early.length < 2 || late.length < 2) return null;
+    return { early, late };
+  }
+  function qualifiersPer100(d) {
+    const w = Math.max(d.wordCount, 1);
+    return d.hesitation.qualifierCount / w * 100;
+  }
+  function detectShiftOverTimeCandidates(sorted) {
+    const split = earlyLateSplit(sorted);
+    if (!split) return [];
+    const { early, late } = split;
+    const out = [];
+    const earlyAbsRatios = early.filter((d) => d.abstraction.abstractCount + d.abstraction.concreteCount >= MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL).map((d) => d.abstraction.abstractConcreteRatio);
+    const lateAbsRatios = late.filter((d) => d.abstraction.abstractCount + d.abstraction.concreteCount >= MIRROR_GEN_ABSTRACTION_MIN_LEXICON_TOTAL).map((d) => d.abstraction.abstractConcreteRatio);
+    if (earlyAbsRatios.length >= 2 && lateAbsRatios.length >= 2) {
+      const e = mean2(earlyAbsRatios);
+      const l = mean2(lateAbsRatios);
+      const delta = l - e;
+      if (Math.abs(delta) >= 0.48) {
+        const toward = delta > 0 ? "recent" : "earlier";
+        out.push({
+          family: "shift_over_time",
+          id: `pattern_shift_over_time:abstraction_ratio:${toward}`,
+          dedupeKey: "shift:abstraction_ratio",
+          rankScore: Math.round(Math.abs(delta) * 200) + earlyAbsRatios.length + lateAbsRatios.length,
+          statement: "The abstract-to-concrete label ratio shifts between earlier and more recent saved drafts.",
+          evidence: [
+            {
+              text: `Mean abstract-to-concrete ratio was ${e.toFixed(2)} in the earlier segment (${earlyAbsRatios.length} runs) and ${l.toFixed(
+                2
+              )} in the more recent segment (${lateAbsRatios.length} runs).`
+            }
+          ]
+        });
+      }
+    }
+    const earlyCad = early.filter((d) => d.cadence.sentenceCount >= 4).map((d) => d.cadence.avgSentenceLength);
+    const lateCad = late.filter((d) => d.cadence.sentenceCount >= 4).map((d) => d.cadence.avgSentenceLength);
+    if (earlyCad.length >= 2 && lateCad.length >= 2) {
+      const e = mean2(earlyCad);
+      const l = mean2(lateCad);
+      const delta = l - e;
+      if (Math.abs(delta) >= 2.35) {
+        const toward = delta > 0 ? "recent" : "earlier";
+        out.push({
+          family: "shift_over_time",
+          id: `pattern_shift_over_time:sentence_length:${toward}`,
+          dedupeKey: "shift:sentence_length_mean",
+          rankScore: Math.round(Math.abs(delta) * 40) + earlyCad.length + lateCad.length,
+          statement: "Average sentence length shifts between earlier and more recent saved drafts.",
+          evidence: [
+            {
+              text: `Mean words-per-sentence moved from ${e.toFixed(1)} to ${l.toFixed(1)} comparing the two time segments (${earlyCad.length}+${lateCad.length} cadence-qualified runs).`
+            }
+          ]
+        });
+      }
+    }
+    const earlyQ = early.map((d) => qualifiersPer100(d));
+    const lateQ = late.map((d) => qualifiersPer100(d));
+    if (earlyQ.length >= 2 && lateQ.length >= 2) {
+      const e = mean2(earlyQ);
+      const l = mean2(lateQ);
+      const delta = l - e;
+      if (Math.abs(delta) >= 0.95) {
+        const toward = delta > 0 ? "recent" : "earlier";
+        out.push({
+          family: "shift_over_time",
+          id: `pattern_shift_over_time:qualifier_rate:${toward}`,
+          dedupeKey: "shift:qualifier_per100",
+          rankScore: Math.round(Math.abs(delta) * 80) + earlyQ.length + lateQ.length,
+          statement: "Qualifier rate shifts between earlier and more recent saved drafts.",
+          evidence: [
+            {
+              text: `Mean qualifiers per 100 words moved from ${e.toFixed(2)} to ${l.toFixed(2)} (${toward} segment higher).`
+            }
+          ]
+        });
+      }
+    }
+    return out;
+  }
+
+  // src/features/mirror/patterns/ranking/rankAndSelect.ts
+  function maxCardsForRunCount(n) {
+    if (n <= 2) return 0;
+    if (n <= 4) return 1;
+    if (n <= 7) return 2;
+    return 3;
+  }
+  function rankFloor(n) {
+    if (n <= 4) return 118;
+    if (n <= 7) return 92;
+    return 72;
+  }
+  function dedupeByKey(candidates) {
+    const best = /* @__PURE__ */ new Map();
+    for (const c of candidates) {
+      const prev = best.get(c.dedupeKey);
+      if (!prev || c.rankScore > prev.rankScore || c.rankScore === prev.rankScore && c.id.localeCompare(prev.id) < 0) {
+        best.set(c.dedupeKey, c);
+      }
+    }
+    return [...best.values()];
+  }
+  function sortCandidates(a, b) {
+    if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
+    return a.id.localeCompare(b.id);
+  }
+  function rankAndSelectPatternCards(qualifyingRunCount, candidates) {
+    if (qualifyingRunCount <= 2) {
+      return {
+        qualifyingRunCount,
+        cards: [],
+        emptyState: "insufficient_runs"
+      };
+    }
+    const cap = maxCardsForRunCount(qualifyingRunCount);
+    const floor = rankFloor(qualifyingRunCount);
+    const filtered = dedupeByKey(candidates).filter((c) => c.rankScore >= floor).sort(sortCandidates);
+    const picked = [];
+    const usedFamilies = /* @__PURE__ */ new Set();
+    for (const c of filtered) {
+      if (picked.length >= cap) break;
+      if (usedFamilies.has(c.family)) continue;
+      if (picked.length > 0 && c.rankScore < 0.38 * picked[0].rankScore) {
+        break;
+      }
+      usedFamilies.add(c.family);
+      picked.push(c);
+    }
+    if (picked.length === 0) {
+      return {
+        qualifyingRunCount,
+        cards: [],
+        emptyState: "no_strong_pattern"
+      };
+    }
+    return {
+      qualifyingRunCount,
+      cards: picked,
+      emptyState: null
+    };
+  }
+
+  // src/features/mirror/patterns/runPatternsFromDigests.ts
+  function runPatternsFromDigests(digests) {
+    const qualifying = sortQualifyingMirrorDigestsChronological(digests).map(normalizeMirrorSessionDigest);
+    const n = qualifying.length;
+    if (n <= 2) {
+      return rankAndSelectPatternCards(n, []);
+    }
+    const recurring = detectRecurringSignalCandidates(qualifying);
+    const shift = detectShiftOverTimeCandidates(qualifying);
+    const consistency = detectConsistencyVariationCandidates(qualifying);
+    const merged = [...recurring, ...shift, ...consistency];
+    return rankAndSelectPatternCards(n, merged);
+  }
+
+  // src/features/mirror/recent/getPatternsProfileFromDigests.ts
+  function candidateToMirrorRecentTrend(c) {
+    const category = c.family === "recurring_signal" ? "pattern_recurring_signal" : c.family === "shift_over_time" ? "pattern_shift_over_time" : "pattern_consistency_vs_variation";
+    return {
+      id: c.id,
+      category,
+      statement: c.statement,
+      evidence: [...c.evidence]
+    };
+  }
   function getPatternsProfileFromDigests(digests) {
-    const window = sliceLastQualifyingMirrorDigests(digests);
-    const promotedPatterns = promoteRecentTrendsToPatternsFromWindow(window);
+    const selection = runPatternsFromDigests(digests);
+    const promotedPatterns = selection.cards.map(candidateToMirrorRecentTrend);
     const profile = promotedPatterns.length > 0 ? buildReflectiveProfile([...promotedPatterns]) : null;
-    return { promotedPatterns, profile };
+    return {
+      promotedPatterns,
+      profile,
+      qualifyingRunCount: selection.qualifyingRunCount,
+      patternsEmptyState: selection.emptyState
+    };
   }
 
   // src/features/mirror/recent/aggregateRecentDigests.ts
@@ -1746,7 +2140,7 @@ var WaywordMirror = (() => {
     if (ideaLean) return false;
     return a.concreteCount >= MIRROR_GEN_ABSTRACTION_CONCRETE_LEAN_RATIO * Math.max(a.abstractCount, 1);
   }
-  function sessionQualifierPattern2(h) {
+  function sessionQualifierPattern(h) {
     const q = h.qualifierCount;
     const per100 = h.qualifiersPer100Words;
     if (q < 2) return false;
@@ -1810,7 +2204,7 @@ var WaywordMirror = (() => {
     const sessions = aggregate.hesitationSessions;
     let qualPattern = 0;
     for (const s of sessions) {
-      if (sessionQualifierPattern2(s)) qualPattern += 1;
+      if (sessionQualifierPattern(s)) qualPattern += 1;
     }
     if (qualPattern < MIN_SESSIONS_FOR_CROSS_SESSION_PATTERN) return null;
     const rankScore = 46 + qualPattern * 10;

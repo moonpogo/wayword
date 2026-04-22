@@ -2,7 +2,23 @@
   function patternsMirrorHeroEmptyHtml() {
     return (
       '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
-      '<p class="patterns-mirror-empty">Nothing across your saved runs stood out enough to echo back yet.</p>' +
+      '<p class="patterns-mirror-empty">Nothing across saved runs stood out enough to echo back yet.</p>' +
+      "</div>"
+    );
+  }
+
+  function patternsMirrorHeroInsufficientRunsHtml() {
+    return (
+      '<div class="patterns-mirror-hero patterns-mirror-hero--empty patterns-mirror-hero--empty-insufficient">' +
+      '<p class="patterns-mirror-empty">Cross-run patterns need at least three qualifying saved drafts before they can surface here.</p>' +
+      "</div>"
+    );
+  }
+
+  function patternsMirrorHeroNoStrongPatternHtml() {
+    return (
+      '<div class="patterns-mirror-hero patterns-mirror-hero--empty patterns-mirror-hero--empty-no-strong">' +
+      '<p class="patterns-mirror-empty">Enough qualifying drafts are saved, but nothing repeats clearly enough yet for a cross-run card.</p>' +
       "</div>"
     );
   }
@@ -27,6 +43,7 @@
 
     const promoted = Array.isArray(result.promotedPatterns) ? result.promotedPatterns : [];
     const profile = result.profile != null ? String(result.profile).trim() : "";
+    const emptyState = result.patternsEmptyState != null ? String(result.patternsEmptyState) : "";
 
     if (promoted.length > 0) {
       const parts = ['<div class="patterns-mirror-hero">'];
@@ -49,6 +66,13 @@
       });
       parts.push("</div></div>");
       return parts.join("");
+    }
+
+    if (emptyState === "insufficient_runs") {
+      return patternsMirrorHeroInsufficientRunsHtml();
+    }
+    if (emptyState === "no_strong_pattern") {
+      return patternsMirrorHeroNoStrongPatternHtml();
     }
 
     return patternsMirrorHeroEmptyHtml();
@@ -173,6 +197,8 @@
 
   window.waywordPatternsRenderer = {
     patternsMirrorHeroEmptyHtml,
+    patternsMirrorHeroInsufficientRunsHtml,
+    patternsMirrorHeroNoStrongPatternHtml,
     buildPatternsMirrorHeroHtml,
     buildChallengeCopy,
     buildPatternCallouts,

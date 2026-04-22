@@ -10,6 +10,7 @@
     "build:mirror": "esbuild src/features/mirror/entry-iife.ts --bundle --format=iife --platform=browser --target=es2020 --global-name=WaywordMirror --outfile=mirror-engine.iife.js",
     "verify:mirror-bundle": "node scripts/verify-mirror-bundle.js",
     "eval:mirror": "node scripts/run-wayword-evaluation.js",
+    "eval:patterns": "node scripts/run-patterns-evaluation.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

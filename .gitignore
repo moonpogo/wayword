@@ -1,2 +1,3 @@
 node_modules/
 scripts/.wayword-eval.cjs
+scripts/.patterns-eval.cjs
