@@ -30,7 +30,7 @@ const PROMPT_FAMILIES = new Set([
 
 /**
  * Restrained copy when the mirror cannot lean on strong surface text / cards.
- * Stays modest — does not imply a prescribed follow-up run on the same prompt.
+ * Stays modest, and does not imply a prescribed follow-up run on the same prompt.
  */
 export const MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK =
   "With a little more language on the page, patterns get easier to notice.";
@@ -115,9 +115,9 @@ const NUDGE_GENERIC: readonly string[] = [
   "What remains unattended in what you wrote?"
 ];
 
-/** When the mirror is soft fallback but the draft has real length—honest, low-claim prompts. */
+/** When the mirror is soft fallback but the draft has real length: honest, low-claim prompts. */
 const NUDGE_FALLBACK_AMBIGUOUS: readonly string[] = [
-  "What still feels open—not wrong, just unsettled—in what you wrote?",
+  "What still feels open (not wrong, just unsettled) in what you wrote?",
   "Where would you trust your own read more than a slick echo?",
   "If the mirror stays this quiet, what one thread do you still want to follow?"
 ];
@@ -161,7 +161,7 @@ const NUDGE_ABSTRACT_LEANS: readonly string[] = [
 
 const NUDGE_CONCRETE_LEANS: readonly string[] = [
   "Where does the idea begin to surface behind the detail?",
-  "What shifts if the objects fall away for a breath—not erased, just quieter?",
+  "What shifts if the objects fall away for a breath (not erased, just quieter)?",
   "What remains if the scene quiets further and something else hums?"
 ];
 
@@ -172,7 +172,7 @@ const NUDGE_ABSTRACTION_BALANCED: readonly string[] = [
 ];
 
 const NUDGE_HESITATION: readonly string[] = [
-  "What changes when the cushioning thins—without forcing a harder voice?",
+  "What changes when the cushioning thins, without forcing a harder voice?",
   "Where does a line want to stand without the immediate softener?",
   "What clarity appears if the qualification arrives a beat later?",
   "What shifts if you let one assertion stay unaccompanied for a line?"

@@ -7,16 +7,16 @@
 | **Observation** | Outward notice: place, residue, concrete scene (includes former **Object** prompts). |
 | **Relation** | Between people: unsaid, kindness, avoidance, trace. |
 | **Tension** | Pressure, withholding, edge, cost. |
-| **Possibility** | Forks and near-misses—kept intentionally small. |
+| **Possibility** | Forks and near-misses, kept intentionally small. |
 | **Constraint** | Explicit rule on the sentence (withholding channels/categories). |
 
 Removed as families: **Indirection**, **Social**, **Object** (material redistributed).
 
 ## History (compact)
 
-- `recentPromptIds` — last `PROMPT_RECENT_ID_WINDOW` picked prompt ids (no repeat while id remains in window).
-- `recentFamilyKeys` — last `PROMPT_RECENT_FAMILY_WINDOW` picks for soft family spacing (not a ranker).
-- `PROMPT_NEAR_DUPLICATE_WINDOW` — suppress picking a prompt whose `nearDuplicateGroup` matches any of the last N picks.
+- `recentPromptIds`: last `PROMPT_RECENT_ID_WINDOW` picked prompt ids (no repeat while id remains in window).
+- `recentFamilyKeys`: last `PROMPT_RECENT_FAMILY_WINDOW` picks for soft family spacing (not a ranker).
+- `PROMPT_NEAR_DUPLICATE_WINDOW`: suppress picking a prompt whose `nearDuplicateGroup` matches any of the last N picks.
 
 ## Selection
 

@@ -17,7 +17,7 @@
       "Add a little more writing so the next save has enough to echo back clearly.",
     ZEN_GARDEN_OPENABLE: false,
     PROMPT_REROLL_LIMIT: 2,
-    /** Last N picked prompt ids — same id cannot repeat while still in this window. */
+    /** Last N picked prompt ids: same id cannot repeat while still in this window. */
     PROMPT_RECENT_ID_WINDOW: 8,
     /** Last N picks’ `nearDuplicateGroup` values block matching groups. */
     PROMPT_NEAR_DUPLICATE_WINDOW: 3,
