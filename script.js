@@ -3016,10 +3016,10 @@ function syncRecentRailExpandedLayoutMetrics(options = {}) {
    * Keep in sync with `style.css` `--review-runs-rail-desktop-viewport-floor` intent (~sticky + buffer + safe).
    * Slightly conservative so we do not reintroduce page-level vertical strain from a too-tall rail.
    */
-  const viewportCapPx = Math.max(0, vh - colRect.top - 92);
+  const viewportCapPx = Math.max(0, vh - colRect.top - 86);
 
   /** Align to the main text surface (`#editorInput`), not the chamfered shell box (corner curve sits below text). */
-  const railAlignToEditorPx = 8;
+  const railAlignToEditorPx = 5;
   const alignmentCapPx = textRect.bottom - colRect.top - railAlignToEditorPx;
 
   const maxH = Math.min(viewportCapPx, alignmentCapPx);

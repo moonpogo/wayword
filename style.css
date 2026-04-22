@@ -2227,7 +2227,7 @@ body.focus-mode #profileSummarySection,
     -webkit-overflow-scrolling:touch;
     overscroll-behavior:contain;
     touch-action:pan-y;
-    padding-top:8px;
+    padding-top:16px;
     padding-bottom:max(10px, env(safe-area-inset-bottom, 0px));
     min-width:0;
   }
@@ -4990,13 +4990,21 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     overflow-y:auto;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior:contain;
-    padding:0 0 0 2px;
+    box-sizing:border-box;
+    /* Left optical align + right gutter so run text does not sit under the scrollbar. */
+    padding:0 8px 0 2px;
     scrollbar-width:thin;
     scrollbar-color:color-mix(in srgb, var(--muted) 38%, transparent) transparent;
   }
 
   body.recent-rail-expanded #writeView .recent-rail-list-clip .recent-rail-list{
     padding-bottom:10px;
+    padding-right:12px;
+  }
+
+  /* Expanded: slightly tighter run stack so first viewport shows a bit more without raising the rail cap much. */
+  body.recent-rail-expanded #writeView .recent-rail-list .recent-run-detail:not(.recent-run-detail--compact){
+    gap:8px;
   }
 
   /* Expanded: fixed “lip” on the clip — list scrolls underneath; shadow sits on the lip, not washing the rows. */
