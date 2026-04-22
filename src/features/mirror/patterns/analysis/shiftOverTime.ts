@@ -51,12 +51,10 @@ export function detectShiftOverTimeCandidates(
         id: `pattern_shift_over_time:abstraction_ratio:${toward}`,
         dedupeKey: "shift:abstraction_ratio",
         rankScore: Math.round(Math.abs(delta) * 200) + earlyAbsRatios.length + lateAbsRatios.length,
-        statement: "The abstract-to-concrete label ratio shifts between earlier and more recent saved drafts.",
+        statement: "The balance between ideas and detail shifts across saved runs.",
         evidence: [
           {
-            text: `Mean abstract-to-concrete ratio was ${e.toFixed(2)} in the earlier segment (${earlyAbsRatios.length} runs) and ${l.toFixed(
-              2
-            )} in the more recent segment (${lateAbsRatios.length} runs).`
+            text: `Earlier saved runs grouped toward one side of that balance; more recent ones grouped toward the other (each window spans ${earlyAbsRatios.length} and ${lateAbsRatios.length} drafts).`
           }
         ]
       });
@@ -76,10 +74,12 @@ export function detectShiftOverTimeCandidates(
         id: `pattern_shift_over_time:sentence_length:${toward}`,
         dedupeKey: "shift:sentence_length_mean",
         rankScore: Math.round(Math.abs(delta) * 40) + earlyCad.length + lateCad.length,
-        statement: "Average sentence length shifts between earlier and more recent saved drafts.",
+        statement: "Sentence length moves between earlier and more recent saved runs.",
         evidence: [
           {
-            text: `Mean words-per-sentence moved from ${e.toFixed(1)} to ${l.toFixed(1)} comparing the two time segments (${earlyCad.length}+${lateCad.length} cadence-qualified runs).`
+            text: `Across comparable stretches of saved work, the average drifted from about ${e.toFixed(1)} to about ${l.toFixed(
+              1
+            )} words per sentence.`
           }
         ]
       });
@@ -99,10 +99,10 @@ export function detectShiftOverTimeCandidates(
         id: `pattern_shift_over_time:qualifier_rate:${toward}`,
         dedupeKey: "shift:qualifier_per100",
         rankScore: Math.round(Math.abs(delta) * 80) + earlyQ.length + lateQ.length,
-        statement: "Qualifier rate shifts between earlier and more recent saved drafts.",
+        statement: "Hedging lands thicker in one stretch of saved runs than in another.",
         evidence: [
           {
-            text: `Mean qualifiers per 100 words moved from ${e.toFixed(2)} to ${l.toFixed(2)} (${toward} segment higher).`
+            text: `One stretch of saved runs carried more softening markers than the other when those windows are compared.`
           }
         ]
       });

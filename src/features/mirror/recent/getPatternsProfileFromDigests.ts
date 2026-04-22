@@ -32,8 +32,9 @@ export function getPatternsProfileFromDigests(
 ): PatternsProfileFromDigestsResult {
   const selection = runPatternsFromDigests(digests);
   const promotedPatterns = selection.cards.map(candidateToMirrorRecentTrend);
+  /** Single-card layout: headline already carries the line; avoid duplicating it as a profile summary. */
   const profile =
-    promotedPatterns.length > 0 ? buildReflectiveProfile([...promotedPatterns]) : null;
+    promotedPatterns.length > 1 ? buildReflectiveProfile([...promotedPatterns]) : null;
   return {
     promotedPatterns,
     profile,

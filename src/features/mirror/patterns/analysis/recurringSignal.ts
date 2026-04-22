@@ -96,7 +96,7 @@ export function detectRecurringSignalCandidates(
       id: `pattern_recurring_signal:lexical:${w.toLowerCase()}`,
       dedupeKey: "recurring:lexical",
       rankScore: score,
-      statement: "The same surface word keeps landing in the repetition snapshot across qualifying saved drafts.",
+      statement: "One surface word keeps returning across saved drafts.",
       evidence: recurringLexicalEvidence(w, bestLex.sessions, n)
     });
   }
@@ -113,10 +113,10 @@ export function detectRecurringSignalCandidates(
       id: "pattern_recurring_signal:abstraction:idea_lean",
       dedupeKey: "recurring:abstraction_idea",
       rankScore: idea * 100 + (idea - concrete) * 10,
-      statement: "Abstract-lean snapshots outnumber concrete-lean snapshots across saved drafts.",
+      statement: "Writing tilts toward ideas more often than concrete detail across saved drafts.",
       evidence: [
         {
-          text: `Abstract-lean snapshots appeared in ${idea} of ${n} qualifying runs (concrete-lean in ${concrete}).`
+          text: `That tilt showed in ${idea} of ${n} saved drafts counted here, compared with ${concrete} drafts leaning the other way.`
         }
       ]
     });
@@ -126,10 +126,10 @@ export function detectRecurringSignalCandidates(
       id: "pattern_recurring_signal:abstraction:concrete_lean",
       dedupeKey: "recurring:abstraction_concrete",
       rankScore: concrete * 100 + (concrete - idea) * 10,
-      statement: "Concrete-lean snapshots outnumber abstract-lean snapshots across saved drafts.",
+      statement: "Writing tilts toward concrete detail more often than abstract wording across saved drafts.",
       evidence: [
         {
-          text: `Concrete-lean snapshots appeared in ${concrete} of ${n} qualifying runs (abstract-lean in ${idea}).`
+          text: `That tilt showed in ${concrete} of ${n} saved drafts counted here, compared with ${idea} drafts leaning the other way.`
         }
       ]
     });
@@ -145,7 +145,7 @@ export function detectRecurringSignalCandidates(
       id: "pattern_recurring_signal:hesitation:density",
       dedupeKey: "recurring:qualification_density",
       rankScore: qual * 95,
-      statement: "Qualifier-density snapshots recur in the hesitation channel across saved drafts.",
+      statement: "Softening markers show up again and again across saved drafts.",
       evidence: recurringQualificationEvidence(qual, n)
     });
   }

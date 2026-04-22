@@ -3,22 +3,22 @@ import type { MirrorRecentTrendEvidence } from "../../recent/types.js";
 export function recurringLexicalEvidence(
   displayWord: string,
   hitSessions: number,
-  qualifyingRuns: number
+  includedDrafts: number
 ): ReadonlyArray<MirrorRecentTrendEvidence> {
   return [
     {
-      text: `“${displayWord}” met the repetition gate in ${hitSessions} of ${qualifyingRuns} qualifying runs.`
+      text: `“${displayWord}” showed up again in ${hitSessions} of ${includedDrafts} saved drafts counted here.`
     }
   ];
 }
 
 export function recurringQualificationEvidence(
   hitSessions: number,
-  qualifyingRuns: number
+  includedDrafts: number
 ): ReadonlyArray<MirrorRecentTrendEvidence> {
   return [
     {
-      text: `Qualifier-density snapshots fired in ${hitSessions} of ${qualifyingRuns} qualifying runs.`
+      text: `Softening markers sat heavier in ${hitSessions} of ${includedDrafts} saved drafts counted here.`
     }
   ];
 }

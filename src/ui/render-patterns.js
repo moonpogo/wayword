@@ -172,7 +172,7 @@
             })
             .join("")}
          </div>`
-      : `<p class="patterns-repeated-empty">No repeated words in your saved runs yet.</p>`;
+      : `<p class="patterns-repeated-empty">No strong repeat targets across saved runs yet.</p>`;
 
     const challengeHtml = draftChallengeWords.length
       ? `<div class="patterns-challenge-block">

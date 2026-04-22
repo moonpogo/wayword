@@ -223,16 +223,14 @@ let profilePanelCloseMotionToken = 0;
 /**
  * DEV-ONLY — search `WAYWORD_DEV_CALIBRATION_RESET` to remove this entire block.
  * When true: `window.waywordDevResetCalibration()` clears run history + calibration state.
- * Also enabled on `*.vercel.app` (previews share browser storage with past opens; use reset below).
+ * Enabled only for local / file URLs (not deployed previews or production).
  * One-shot URL (runs before first paint of calibration UI): append `?resetCalibration=1` (strip self).
  */
 const WAYWORD_DEV_CALIBRATION_RESET_ENABLED =
   typeof location !== "undefined" &&
   ((location.hostname || "") === "localhost" ||
     (location.hostname || "") === "127.0.0.1" ||
-    location.protocol === "file:" ||
-    new URLSearchParams(location.search).get("waywordDev") === "1" ||
-    /\.vercel\.app$/i.test(location.hostname || ""));
+    location.protocol === "file:");
 
 function logPatternsTransitionSnapshot(_label, _extra = {}) {
   /* Intentionally empty: patterns layout snapshots were removed from default builds. */
@@ -1674,6 +1672,178 @@ function normalizeWord(word) {
     .toLowerCase()
     .replace(/[“”‘’]/g, "")
     .replace(/^[^a-z0-9']+|[^a-z0-9']+$/gi, "");
+}
+
+/** Glue / stop / placeholder tokens: never surface in Patterns repeated-word UI or challenges. */
+const WAYWORD_PATTERNS_REPEAT_BLOCKLIST = new Set([
+  "test",
+  "tests",
+  "testing",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "nor",
+  "yet",
+  "so",
+  "if",
+  "to",
+  "of",
+  "in",
+  "on",
+  "at",
+  "by",
+  "for",
+  "from",
+  "as",
+  "with",
+  "into",
+  "onto",
+  "upon",
+  "about",
+  "under",
+  "over",
+  "after",
+  "before",
+  "between",
+  "through",
+  "during",
+  "than",
+  "within",
+  "without",
+  "against",
+  "among",
+  "across",
+  "despite",
+  "except",
+  "via",
+  "per",
+  "i",
+  "me",
+  "my",
+  "we",
+  "us",
+  "our",
+  "you",
+  "your",
+  "he",
+  "him",
+  "his",
+  "she",
+  "her",
+  "they",
+  "them",
+  "their",
+  "it",
+  "its",
+  "this",
+  "that",
+  "these",
+  "those",
+  "who",
+  "whom",
+  "whose",
+  "what",
+  "which",
+  "is",
+  "am",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "done",
+  "doing",
+  "would",
+  "could",
+  "should",
+  "might",
+  "must",
+  "may",
+  "can",
+  "will",
+  "shall",
+  "not",
+  "no",
+  "only",
+  "own",
+  "same",
+  "just",
+  "also",
+  "too",
+  "very",
+  "here",
+  "there",
+  "then",
+  "once",
+  "even",
+  "ever",
+  "never",
+  "always",
+  "sometimes",
+  "often",
+  "already",
+  "still",
+  "such",
+  "both",
+  "each",
+  "few",
+  "more",
+  "most",
+  "other",
+  "some",
+  "many",
+  "much",
+  "less",
+  "lot",
+  "lots",
+  "like",
+  "again",
+  "now",
+  "however",
+  "though",
+  "although",
+  "because",
+  "since",
+  "until",
+  "unless",
+  "whether",
+  "while",
+  "either",
+  "neither",
+  "why",
+  "how",
+  "all",
+  "any",
+  "every",
+  "off",
+  "out",
+  "up",
+  "down"
+]);
+
+function waywordPatternsRepeatLexemeOk(word) {
+  const w = normalizeWord(word);
+  if (!w || w.length <= 2) return false;
+  if (/^\d+$/.test(w)) return false;
+  if (WAYWORD_PATTERNS_REPEAT_BLOCKLIST.has(w)) return false;
+  return true;
+}
+
+/** Challenge prompts only when the word is strong enough to be avoidable on purpose. */
+function waywordPatternsRepeatLexemeChallengeworthy(word, count) {
+  if (!waywordPatternsRepeatLexemeOk(word)) return false;
+  const n = Number(count) || 0;
+  return n >= 5;
 }
 
 function tokenize(text) {
@@ -4107,12 +4277,13 @@ function renderProfileLocked() {
 /** Suggested challenge target from repeated-word tallies only (existing ≥4 + not completed rule). */
 function buildRepeatedWordChallengeSuggestion(topWords) {
   const list = Array.isArray(topWords) ? topWords : [];
+  const first = list[0];
   if (
-    list[0] &&
-    list[0][1] >= 4 &&
-    !state.completedChallenges.has(list[0][0])
+    first &&
+    waywordPatternsRepeatLexemeChallengeworthy(first[0], first[1]) &&
+    !state.completedChallenges.has(first[0])
   ) {
-    return list[0][0];
+    return first[0];
   }
   return "";
 }
@@ -4174,6 +4345,7 @@ function renderProfile() {
   const topWords = Object.entries(agg.wordFreq)
     .filter(([, c]) => c > 1)
     .sort((a, b) => b[1] - a[1])
+    .filter(([w]) => waywordPatternsRepeatLexemeOk(w))
     .slice(0, 8);
 
   const topStarters = Object.entries(agg.starterFreq)
@@ -4192,7 +4364,12 @@ function renderProfile() {
   const suggestedChallengeWords = suggestedChallengeWord && topRepeatedWordsSet.has(suggestedChallengeWord)
     ? [suggestedChallengeWord]
     : [];
-  const draftChallengeWords = selectedChallengeWords.length ? selectedChallengeWords : suggestedChallengeWords;
+  const countByShownWord = new Map(topWords);
+  const draftChallengeWords = selectedChallengeWords.length
+    ? selectedChallengeWords.filter((w) =>
+        waywordPatternsRepeatLexemeChallengeworthy(w, countByShownWord.get(w) ?? 0)
+      )
+    : suggestedChallengeWords;
 
   const patternsUtilityRoot = $("patternsRepeatedChallengeRoot");
   if (patternsUtilityRoot) {

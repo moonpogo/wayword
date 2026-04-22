@@ -1576,10 +1576,10 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:sentence_length_tight",
           dedupeKey: "consistency:sentence_length_band",
           rankScore: Math.round(200 - span * 40) + cadMeans.length * 5,
-          statement: "Average sentence length sits in a narrow band across cadence-qualified saved drafts.",
+          statement: "Sentence length settles into a steady band across saved runs with enough lines to compare.",
           evidence: [
             {
-              text: `Across ${cadMeans.length} runs with four or more sentences, per-run averages stayed between ${mm.min.toFixed(
+              text: `Across ${cadMeans.length} saved drafts with enough sentences to read shape, averages stayed between ${mm.min.toFixed(
                 1
               )} and ${mm.max.toFixed(1)} words per sentence.`
             }
@@ -1591,10 +1591,10 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:sentence_length_wide",
           dedupeKey: "variation:sentence_length_band",
           rankScore: Math.round(span * 25) + cadMeans.length * 4,
-          statement: "Average sentence length swings across cadence-qualified saved drafts.",
+          statement: "Sentence length swings more widely across saved runs with enough lines to compare.",
           evidence: [
             {
-              text: `Across ${cadMeans.length} runs with four or more sentences, per-run averages ranged from ${mm.min.toFixed(
+              text: `Across ${cadMeans.length} saved drafts with enough sentences to read shape, averages ranged from ${mm.min.toFixed(
                 1
               )} to ${mm.max.toFixed(1)} words per sentence.`
             }
@@ -1611,10 +1611,10 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:abstraction_ratio_tight",
           dedupeKey: "consistency:abstraction_ratio_std",
           rankScore: Math.round(160 - std * 500) + ratios.length * 6,
-          statement: "The abstract-to-concrete label ratio stays close run to run when lexicon totals clear the floor.",
+          statement: "Abstract and concrete wording settle into a similar mix run after run.",
           evidence: [
             {
-              text: `Across ${ratios.length} lexicon-qualified runs, the standard deviation of the ratio was ${std.toFixed(3)}.`
+              text: `Across ${ratios.length} saved drafts with enough material on both sides to compare, that mix stayed tight from run to run.`
             }
           ]
         });
@@ -1624,10 +1624,10 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:abstraction_ratio_loose",
           dedupeKey: "variation:abstraction_ratio_std",
           rankScore: Math.round(std * 420) + ratios.length * 5,
-          statement: "The abstract-to-concrete label ratio drifts run to run when lexicon totals clear the floor.",
+          statement: "Saved runs do not settle into one consistent abstraction/detail balance.",
           evidence: [
             {
-              text: `Across ${ratios.length} lexicon-qualified runs, the standard deviation of the ratio was ${std.toFixed(3)}.`
+              text: `Across ${ratios.length} saved drafts with enough material on both sides to compare, that balance still moved meaningfully from run to run.`
             }
           ]
         });
@@ -1668,17 +1668,17 @@ var WaywordMirror = (() => {
   }
 
   // src/features/mirror/patterns/generation/templates.ts
-  function recurringLexicalEvidence(displayWord, hitSessions, qualifyingRuns) {
+  function recurringLexicalEvidence(displayWord, hitSessions, includedDrafts) {
     return [
       {
-        text: `\u201C${displayWord}\u201D met the repetition gate in ${hitSessions} of ${qualifyingRuns} qualifying runs.`
+        text: `\u201C${displayWord}\u201D showed up again in ${hitSessions} of ${includedDrafts} saved drafts counted here.`
       }
     ];
   }
-  function recurringQualificationEvidence(hitSessions, qualifyingRuns) {
+  function recurringQualificationEvidence(hitSessions, includedDrafts) {
     return [
       {
-        text: `Qualifier-density snapshots fired in ${hitSessions} of ${qualifyingRuns} qualifying runs.`
+        text: `Softening markers sat heavier in ${hitSessions} of ${includedDrafts} saved drafts counted here.`
       }
     ];
   }
@@ -1773,7 +1773,7 @@ var WaywordMirror = (() => {
         id: `pattern_recurring_signal:lexical:${w.toLowerCase()}`,
         dedupeKey: "recurring:lexical",
         rankScore: score,
-        statement: "The same surface word keeps landing in the repetition snapshot across qualifying saved drafts.",
+        statement: "One surface word keeps returning across saved drafts.",
         evidence: recurringLexicalEvidence(w, bestLex.sessions, n)
       });
     }
@@ -1789,10 +1789,10 @@ var WaywordMirror = (() => {
         id: "pattern_recurring_signal:abstraction:idea_lean",
         dedupeKey: "recurring:abstraction_idea",
         rankScore: idea * 100 + (idea - concrete) * 10,
-        statement: "Abstract-lean snapshots outnumber concrete-lean snapshots across saved drafts.",
+        statement: "Writing tilts toward ideas more often than concrete detail across saved drafts.",
         evidence: [
           {
-            text: `Abstract-lean snapshots appeared in ${idea} of ${n} qualifying runs (concrete-lean in ${concrete}).`
+            text: `That tilt showed in ${idea} of ${n} saved drafts counted here, compared with ${concrete} drafts leaning the other way.`
           }
         ]
       });
@@ -1802,10 +1802,10 @@ var WaywordMirror = (() => {
         id: "pattern_recurring_signal:abstraction:concrete_lean",
         dedupeKey: "recurring:abstraction_concrete",
         rankScore: concrete * 100 + (concrete - idea) * 10,
-        statement: "Concrete-lean snapshots outnumber abstract-lean snapshots across saved drafts.",
+        statement: "Writing tilts toward concrete detail more often than abstract wording across saved drafts.",
         evidence: [
           {
-            text: `Concrete-lean snapshots appeared in ${concrete} of ${n} qualifying runs (abstract-lean in ${idea}).`
+            text: `That tilt showed in ${concrete} of ${n} saved drafts counted here, compared with ${idea} drafts leaning the other way.`
           }
         ]
       });
@@ -1820,7 +1820,7 @@ var WaywordMirror = (() => {
         id: "pattern_recurring_signal:hesitation:density",
         dedupeKey: "recurring:qualification_density",
         rankScore: qual * 95,
-        statement: "Qualifier-density snapshots recur in the hesitation channel across saved drafts.",
+        statement: "Softening markers show up again and again across saved drafts.",
         evidence: recurringQualificationEvidence(qual, n)
       });
     }
@@ -1876,12 +1876,10 @@ var WaywordMirror = (() => {
           id: `pattern_shift_over_time:abstraction_ratio:${toward}`,
           dedupeKey: "shift:abstraction_ratio",
           rankScore: Math.round(Math.abs(delta) * 200) + earlyAbsRatios.length + lateAbsRatios.length,
-          statement: "The abstract-to-concrete label ratio shifts between earlier and more recent saved drafts.",
+          statement: "The balance between ideas and detail shifts across saved runs.",
           evidence: [
             {
-              text: `Mean abstract-to-concrete ratio was ${e.toFixed(2)} in the earlier segment (${earlyAbsRatios.length} runs) and ${l.toFixed(
-                2
-              )} in the more recent segment (${lateAbsRatios.length} runs).`
+              text: `Earlier saved runs grouped toward one side of that balance; more recent ones grouped toward the other (each window spans ${earlyAbsRatios.length} and ${lateAbsRatios.length} drafts).`
             }
           ]
         });
@@ -1900,10 +1898,12 @@ var WaywordMirror = (() => {
           id: `pattern_shift_over_time:sentence_length:${toward}`,
           dedupeKey: "shift:sentence_length_mean",
           rankScore: Math.round(Math.abs(delta) * 40) + earlyCad.length + lateCad.length,
-          statement: "Average sentence length shifts between earlier and more recent saved drafts.",
+          statement: "Sentence length moves between earlier and more recent saved runs.",
           evidence: [
             {
-              text: `Mean words-per-sentence moved from ${e.toFixed(1)} to ${l.toFixed(1)} comparing the two time segments (${earlyCad.length}+${lateCad.length} cadence-qualified runs).`
+              text: `Across comparable stretches of saved work, the average drifted from about ${e.toFixed(1)} to about ${l.toFixed(
+                1
+              )} words per sentence.`
             }
           ]
         });
@@ -1922,10 +1922,10 @@ var WaywordMirror = (() => {
           id: `pattern_shift_over_time:qualifier_rate:${toward}`,
           dedupeKey: "shift:qualifier_per100",
           rankScore: Math.round(Math.abs(delta) * 80) + earlyQ.length + lateQ.length,
-          statement: "Qualifier rate shifts between earlier and more recent saved drafts.",
+          statement: "Hedging lands thicker in one stretch of saved runs than in another.",
           evidence: [
             {
-              text: `Mean qualifiers per 100 words moved from ${e.toFixed(2)} to ${l.toFixed(2)} (${toward} segment higher).`
+              text: `One stretch of saved runs carried more softening markers than the other when those windows are compared.`
             }
           ]
         });
@@ -2023,7 +2023,7 @@ var WaywordMirror = (() => {
   function getPatternsProfileFromDigests(digests) {
     const selection = runPatternsFromDigests(digests);
     const promotedPatterns = selection.cards.map(candidateToMirrorRecentTrend);
-    const profile = promotedPatterns.length > 0 ? buildReflectiveProfile([...promotedPatterns]) : null;
+    const profile = promotedPatterns.length > 1 ? buildReflectiveProfile([...promotedPatterns]) : null;
     return {
       promotedPatterns,
       profile,
