@@ -161,10 +161,8 @@
   }
 
   function patternsSanitizeChallengeWords(draftChallengeWords, wordPairs) {
-    const g = window.waywordPatternsLexicalGate;
-    if (!g || typeof g.lexemeChallengeworthy !== "function") return [];
-    const countBy = new Map(wordPairs.map((p) => [p[0], p[1]]));
-    return draftChallengeWords.filter((w) => g.lexemeChallengeworthy(w, countBy.get(w) ?? 0));
+    const shownWords = new Set(wordPairs.map((p) => p[0]));
+    return draftChallengeWords.filter((w) => shownWords.has(w));
   }
 
   function buildPatternsRepeatedChallengeRootInnerHtml({ topWords, selectedChallengeSet, draftChallengeWords }) {

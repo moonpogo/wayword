@@ -4458,7 +4458,6 @@ function renderProfile() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
 
-  const suggestedChallengeWord = buildRepeatedWordChallengeSuggestion(topWords);
   const topRepeatedWords = topWords.map(([word]) => word);
   const topRepeatedWordsSet = new Set(topRepeatedWords);
   const selectedChallengeWords = state.patternSelectedWords.filter((word) => topRepeatedWordsSet.has(word));
@@ -4466,19 +4465,8 @@ function renderProfile() {
     setPatternSelectedWords(selectedChallengeWords);
   }
   const selectedChallengeSet = new Set(selectedChallengeWords);
-  const suggestedChallengeWords = suggestedChallengeWord && topRepeatedWordsSet.has(suggestedChallengeWord)
-    ? [suggestedChallengeWord]
-    : [];
-  const countByShownWord = new Map(topWords);
-  const draftChallengeWords = selectedChallengeWords.length
-    ? selectedChallengeWords.filter((w) =>
-        waywordPatternsRepeatLexemeChallengeworthy(w, countByShownWord.get(w) ?? 0)
-      )
-    : suggestedChallengeWords;
-  /** Must match `render-patterns` challenge sanitization so Begin never runs junk tokens. */
-  const patternsExerciseWords = draftChallengeWords.filter((w) =>
-    waywordPatternsRepeatLexemeChallengeworthy(w, countByShownWord.get(w) ?? 0)
-  );
+  const draftChallengeWords = selectedChallengeWords;
+  const patternsExerciseWords = draftChallengeWords;
 
   const patternsUtilityRoot = $("patternsRepeatedChallengeRoot");
   if (patternsUtilityRoot) {
