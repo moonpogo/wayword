@@ -6,8 +6,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <script>
     (function () {
-      var theme = localStorage.getItem("wayword-theme") || "light";
-      document.documentElement.setAttribute("data-theme", theme);
+      try {
+        document.documentElement.dataset.waywordInlineProbe = "1";
+      } catch (_) {}
+      try {
+        var theme = localStorage.getItem("wayword-theme") || "light";
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (_) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
     })();
   </script>
   <link rel="stylesheet" href="/style.css" />

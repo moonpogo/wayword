@@ -7,6 +7,7 @@
     "esbuild": "^0.28.0"
   },
   "scripts": {
+    "preview": "python3 -m http.server 3001 --bind 127.0.0.1",
     "build:mirror": "esbuild src/features/mirror/entry-iife.ts --bundle --format=iife --platform=browser --target=es2020 --global-name=WaywordMirror --outfile=mirror-engine.iife.js",
     "verify:mirror-bundle": "node scripts/verify-mirror-bundle.js",
     "verify:patterns-surface": "node scripts/verify-patterns-surface-strings.js",
