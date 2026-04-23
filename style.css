@@ -5254,6 +5254,17 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     gap:13px;
   }
 
+  body.settings-open .editor-options-backdrop{
+    top:var(--vv-offset-top, 0px);
+    bottom:auto;
+    height:var(--vvh, 100dvh);
+    max-height:var(--vvh, 100dvh);
+  }
+
+  body.settings-open .editor-options-panel{
+    max-height:calc(var(--vvh, 100dvh) - 32px);
+  }
+
   .editor-options-body{
     gap:13px;
   }
@@ -5683,6 +5694,11 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     width:auto;
     max-height:calc(var(--vvh, 100vh) - 16px);
     overflow:hidden;
+  }
+
+  body.focus-mode.settings-open .editor-options-panel{
+    top:0;
+    max-height:calc(var(--vvh, 100dvh) - 32px);
   }
 }
 

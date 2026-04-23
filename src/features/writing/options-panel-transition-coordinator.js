@@ -11,6 +11,9 @@
     if (!panel) return;
 
     input.applyBodySettingsOpenClass(nextOpen);
+    if (typeof input.syncViewportHeightVar === "function") {
+      input.syncViewportHeightVar();
+    }
 
     if (nextOpen) {
       input.setOptionsPanelDismissGuardUntil(Date.now() + input.optionsPanelDismissGuardMs);
@@ -50,6 +53,9 @@
       requestAnimationFrame(function () {
         input.afterOptionsPanelClosed();
       });
+    }
+    if (typeof input.queueViewportSync === "function") {
+      input.queueViewportSync();
     }
   }
 

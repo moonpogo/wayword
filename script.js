@@ -584,7 +584,8 @@ function syncViewportHeightVar() {
   // visualViewport can lag low after keyboard/panel transitions and leave
   // the app in a compressed intermediary state.
   const inFocusMode = document.body.classList.contains("focus-mode");
-  const h = inFocusMode ? getViewportHeight() : Math.round(window.innerHeight);
+  const settingsOpen = document.body.classList.contains("settings-open");
+  const h = inFocusMode || settingsOpen ? getViewportHeight() : Math.round(window.innerHeight);
   document.documentElement.style.setProperty("--vvh", `${h}px`);
   if (window.visualViewport) {
     const vv = window.visualViewport;
@@ -1501,6 +1502,14 @@ function enterLandingState() {
 
 let landingToAppExitTimer = null;
 
+function resetHorizontalScrollOriginForAppEntry() {
+  document.documentElement.scrollLeft = 0;
+  document.body.scrollLeft = 0;
+  if (window.scrollX !== 0) {
+    window.scrollTo({ left: 0, top: window.scrollY, behavior: "auto" });
+  }
+}
+
 function enterAppState(options = {}) {
   const afterEnter = typeof options.afterEnter === "function" ? options.afterEnter : null;
   const dockFocusModeForMobile = Boolean(options.dockFocusModeForMobile);
@@ -1522,9 +1531,12 @@ function enterAppState(options = {}) {
       landingToAppExitTimer = null;
     }
     window.waywordViewController.applyLandingExitToAppDom({ shell, landing, app });
+    resetHorizontalScrollOriginForAppEntry();
+    syncViewportHeightVar();
     showProfile(false);
     setOptionsOpen(false);
     afterEnter?.();
+    queueViewportSync();
   };
 
   if (prefersReducedUiMotion()) {
@@ -1765,6 +1777,8 @@ function setOptionsOpen(open) {
       applyBodySettingsOpenClass: window.waywordViewController.applyBodySettingsOpenClass,
       applyEditorOptionsPanelAriaAndBackdrop:
         window.waywordViewController.applyEditorOptionsPanelAriaAndBackdrop,
+      syncViewportHeightVar,
+      queueViewportSync,
     });
   }
 
