@@ -2138,6 +2138,18 @@ function makeRunId() {
 }
 
 function updateEnterButtonVisibility() {
+  if (
+    window.waywordWritingSubmitSurfaceCoordinator &&
+    typeof window.waywordWritingSubmitSurfaceCoordinator.updateEnterButtonVisibility === "function"
+  ) {
+    return window.waywordWritingSubmitSurfaceCoordinator.updateEnterButtonVisibility({
+      $,
+      state,
+      editorInput,
+      getEditorText
+    });
+  }
+
   const btn = $("enterSubmitBtn");
   if (!btn || !editorInput) return;
 
@@ -3543,6 +3555,18 @@ function renderExerciseBanner() {
 }
 
 function updateSubmitButtonState() {
+  if (
+    window.waywordWritingSubmitSurfaceCoordinator &&
+    typeof window.waywordWritingSubmitSurfaceCoordinator.updateSubmitButtonState === "function"
+  ) {
+    return window.waywordWritingSubmitSurfaceCoordinator.updateSubmitButtonState({
+      $,
+      state,
+      editorInput,
+      getEditorText
+    });
+  }
+
   updateEnterButtonVisibility();
 }
 
