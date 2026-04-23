@@ -4774,6 +4774,24 @@ function cycleRepeatLimit() {
 }
 
 function saveBannedInline() {
+  if (
+    window.waywordInlineBannedEditorSaveCoordinator &&
+    typeof window.waywordInlineBannedEditorSaveCoordinator.saveBannedInline === "function"
+  ) {
+    return window.waywordInlineBannedEditorSaveCoordinator.saveBannedInline({
+      $,
+      state,
+      normalizeWord,
+      setBannedEditorOpen,
+      applyWriteDocSemanticFlagsFromAnalysis,
+      scheduleEditorDotOverlaySync,
+      renderAnnotationRow,
+      renderMeta,
+      renderHighlight,
+      renderSidebar
+    });
+  }
+
   const input = $("bannedInlineInput");
   if (!input) return;
 
