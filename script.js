@@ -3687,6 +3687,16 @@ function updateSubmitButtonState() {
 }
 
 function syncWordTargetLabels() {
+  if (
+    window.waywordWritingTargetLabelPresentation &&
+    typeof window.waywordWritingTargetLabelPresentation.syncWordTargetLabels === "function"
+  ) {
+    return window.waywordWritingTargetLabelPresentation.syncWordTargetLabels({
+      $,
+      state
+    });
+  }
+
   const t = Number(state.targetWords) || 0;
   const text =
     t === 75 ? "Write to 75 words" : t === 90 ? "Write to 90 words" : "Write to 60 words";
