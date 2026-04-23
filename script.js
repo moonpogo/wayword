@@ -4761,6 +4761,21 @@ function renderProfile() {
 ----------------------------- */
 
 function cycleRepeatLimit() {
+  if (
+    window.waywordWritingRepeatLimitCoordinator &&
+    typeof window.waywordWritingRepeatLimitCoordinator.cycleRepeatLimit === "function"
+  ) {
+    return window.waywordWritingRepeatLimitCoordinator.cycleRepeatLimit({
+      state,
+      applyWriteDocSemanticFlagsFromAnalysis,
+      scheduleEditorDotOverlaySync,
+      renderAnnotationRow,
+      renderMeta,
+      renderHighlight,
+      renderSidebar
+    });
+  }
+
   const next = state.repeatLimit >= 4 ? 1 : state.repeatLimit + 1;
   state.repeatLimit = next;
   if (state.active && !state.submitted) {
