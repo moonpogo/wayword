@@ -1739,6 +1739,24 @@ function scheduleBannedPanelPersistFromPanel() {
 }
 
 function applyWordTargetFromPanel(nextWords) {
+  if (
+    window.waywordWritingModeControlsCoordinator &&
+    typeof window.waywordWritingModeControlsCoordinator.applyWordTargetFromPanel === "function"
+  ) {
+    return window.waywordWritingModeControlsCoordinator.applyWordTargetFromPanel(
+      {
+        state,
+        setActiveModeButton,
+        renderMeta,
+        renderHighlight,
+        renderSidebar,
+        updateWordProgress,
+        updateEnterButtonVisibility
+      },
+      nextWords
+    );
+  }
+
   const n = Number(nextWords);
   if (!Number.isFinite(n) || ![60, 75, 90].includes(n)) return;
   state.targetWords = state.targetWords === n ? 0 : n;
@@ -1752,6 +1770,25 @@ function applyWordTargetFromPanel(nextWords) {
 }
 
 function applyTimerFromPanel(nextSeconds) {
+  if (
+    window.waywordWritingModeControlsCoordinator &&
+    typeof window.waywordWritingModeControlsCoordinator.applyTimerFromPanel === "function"
+  ) {
+    return window.waywordWritingModeControlsCoordinator.applyTimerFromPanel(
+      {
+        state,
+        stopTimer,
+        setActiveModeButton,
+        updateTimeFill,
+        renderMeta,
+        renderHighlight,
+        renderSidebar,
+        renderWritingState
+      },
+      nextSeconds
+    );
+  }
+
   const n = Number(nextSeconds);
   if (!Number.isFinite(n) || ![60, 180, 300].includes(n)) return;
   state.timerSeconds = state.timerSeconds === n ? 0 : n;
