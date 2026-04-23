@@ -38,6 +38,24 @@
 
   function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibration = false) {
     const d = D();
+    if (
+      window.waywordCompletionAftermathHelper &&
+      typeof window.waywordCompletionAftermathHelper.handleRunCompleted === "function"
+    ) {
+      window.waywordCompletionAftermathHelper.handleRunCompleted({
+        state: d.state,
+        text,
+        priorEntries,
+        runWasSaved,
+        insufficientCalibration,
+        calibrationThreshold: d.CALIBRATION_THRESHOLD,
+        calibrationInsufficientCopy: d.CALIBRATION_INSUFFICIENT_COPY,
+        selectCalibrationObservation: d.selectCalibrationObservation,
+      });
+      return;
+    }
+
+    console.error("wayword: completion aftermath helper missing; falling back to inline completion aftermath");
     try {
       if (insufficientCalibration) {
         const step = Math.min(priorEntries.length + 1, d.CALIBRATION_THRESHOLD);
@@ -60,9 +78,8 @@
         d.state.lastRunFeedback = observation;
       }
     } catch (e) {
-      const x = D();
-      x.state.lastRunFeedback = "";
-      x.state.calibrationPostRun = null;
+      d.state.lastRunFeedback = "";
+      d.state.calibrationPostRun = null;
     }
   }
 
@@ -181,6 +198,30 @@
     d.queueViewportSync();
   }
 
+  function computeMirrorForSubmit(currentText, run) {
+    const d = D();
+    if (
+      window.waywordSubmitMirrorAnalysis &&
+      typeof window.waywordSubmitMirrorAnalysis.coordinateSubmitMirrorAnalysis === "function"
+    ) {
+      return window.waywordSubmitMirrorAnalysis.coordinateSubmitMirrorAnalysis({
+        state: d.state,
+        currentText,
+        run,
+        computeAndStoreMirrorPipelineResult: d.computeAndStoreMirrorPipelineResult,
+      });
+    }
+
+    console.error("wayword: submit mirror analysis helper missing; falling back to inline submit mirror coordination");
+    d.computeAndStoreMirrorPipelineResult(currentText, run);
+    d.state.mirrorEmptyFallbackSeed = run.runId;
+    return {
+      lastMirrorPipelineResult: d.state.lastMirrorPipelineResult,
+      lastMirrorLoadFailed: d.state.lastMirrorLoadFailed,
+      mirrorEmptyFallbackSeed: d.state.mirrorEmptyFallbackSeed,
+    };
+  }
+
   function submitWriting(fromTimer = false) {
     const d = D();
     if (!d.state.active) return;
@@ -208,213 +249,299 @@
       return;
     }
 
-    const timeRemainingSnapshot =
-      d.state.timerSeconds && d.state.timerWaitingForFirstInput
-        ? d.state.timerSeconds
-        : d.state.timeRemaining;
-    const timerConfigured = Boolean(d.state.timerSeconds);
-    const activeTimerSecondsForRun = timerConfigured ? d.state.timerSeconds : null;
+    let timeRemainingSnapshot;
+    let timerConfigured;
+    let activeTimerSecondsForRun;
+    let challengeWordsSnapshot;
+    let challengeActive;
+    let challengeCompleted;
+    let activeTargetWords;
+    let runScore;
+    let scoreBreakdown;
+    let finishedWithinTime;
+    let wasSuccessful;
+    let run;
 
-    const challengeWordsSnapshot = [...d.state.exerciseWords];
-    const challengeActive = challengeWordsSnapshot.length > 0;
-    d.clearExerciseIfCompleted(currentText);
-    const challengeCompleted = challengeActive && d.state.exerciseWords.length === 0;
+    if (
+      window.waywordSubmitRunPreparation &&
+      typeof window.waywordSubmitRunPreparation.prepareSubmitRun === "function"
+    ) {
+      ({
+        timeRemainingSnapshot,
+        timerConfigured,
+        activeTimerSecondsForRun,
+        challengeWordsSnapshot,
+        challengeActive,
+        challengeCompleted,
+        activeTargetWords,
+        runScore,
+        scoreBreakdown,
+        finishedWithinTime,
+        wasSuccessful,
+        run,
+      } = window.waywordSubmitRunPreparation.prepareSubmitRun({
+        state: d.state,
+        currentText,
+        prompt: d.state.prompt,
+        analysis,
+        fromTimer,
+        makeRunId: d.makeRunId,
+        clearExerciseIfCompleted: d.clearExerciseIfCompleted,
+        applyWriteDocSemanticFlagsFromAnalysisCore: d.applyWriteDocSemanticFlagsFromAnalysisCore,
+        updateEnterButtonVisibility: d.updateEnterButtonVisibility,
+        stopTimer: d.stopTimer,
+        completeWordmark: d.completeWordmark,
+        getActiveTargetWordsForScoring: d.getActiveTargetWordsForScoring,
+        computeRunScoreV1: d.computeRunScoreV1,
+      }));
+    } else {
+      console.error("wayword: submit run preparation helper missing; falling back to inline submit preparation");
+      timeRemainingSnapshot =
+        d.state.timerSeconds && d.state.timerWaitingForFirstInput
+          ? d.state.timerSeconds
+          : d.state.timeRemaining;
+      timerConfigured = Boolean(d.state.timerSeconds);
+      activeTimerSecondsForRun = timerConfigured ? d.state.timerSeconds : null;
 
-    d.state.submitted = true;
-    d.state.completedUiActive = true;
-    d.applyWriteDocSemanticFlagsFromAnalysisCore(analysis);
+      challengeWordsSnapshot = [...d.state.exerciseWords];
+      challengeActive = challengeWordsSnapshot.length > 0;
+      d.clearExerciseIfCompleted(currentText);
+      challengeCompleted = challengeActive && d.state.exerciseWords.length === 0;
 
-    d.updateEnterButtonVisibility();
-    d.stopTimer();
-    d.completeWordmark();
+      d.state.submitted = true;
+      d.state.completedUiActive = true;
+      d.applyWriteDocSemanticFlagsFromAnalysisCore(analysis);
 
-    const activeTargetWords = d.getActiveTargetWordsForScoring();
-    const { runScore, scoreBreakdown } = d.computeRunScoreV1(
-      analysis,
-      d.state.repeatLimit,
-      activeTargetWords
-    );
+      d.updateEnterButtonVisibility();
+      d.stopTimer();
+      d.completeWordmark();
 
-    const finishedWithinTime = !timerConfigured || !fromTimer;
-    const wasSuccessful =
-      analysis.totalWords >= activeTargetWords &&
-      runScore >= 70 &&
-      finishedWithinTime;
+      activeTargetWords = d.getActiveTargetWordsForScoring();
+      ({ runScore, scoreBreakdown } = d.computeRunScoreV1(
+        analysis,
+        d.state.repeatLimit,
+        activeTargetWords
+      ));
 
-    const now = Date.now();
-    const run = window.waywordRunModel.createSubmittedRun({
-      makeRunId: d.makeRunId,
-      now,
-      currentText,
-      prompt: d.state.prompt,
-      analysis,
-      runScore,
-      scoreBreakdown,
-      challengeActive,
-      challengeCompleted,
-      challengeWordsSnapshot,
-      wasSuccessful,
-      activeTargetWords,
-      activeTimerSecondsForRun,
-      finishedWithinTime,
-      timeRemainingSnapshot,
-      timerConfigured,
-      repeatLimitAtRun: d.state.repeatLimit,
-    });
+      finishedWithinTime = !timerConfigured || !fromTimer;
+      wasSuccessful =
+        analysis.totalWords >= activeTargetWords &&
+        runScore >= 70 &&
+        finishedWithinTime;
 
-    const priorEntries = d.getRecentEntries();
-    const nextCalibrationStep = priorEntries.length + 1;
-    const inCalibrationWindow = nextCalibrationStep <= d.CALIBRATION_THRESHOLD;
-    const signalOkForCalibration =
-      !inCalibrationWindow || d.calibrationSubmissionHasMinimumSignal(currentText, analysis);
-
-    let runWasSaved = false;
-    let insufficientCalibration = false;
-
-    if (!d.state.savedRunIds.has(run.runId)) {
-      if (inCalibrationWindow && !signalOkForCalibration) {
-        insufficientCalibration = true;
-      } else {
-        runWasSaved = true;
-      }
+      run = window.waywordRunModel.createSubmittedRun({
+        makeRunId: d.makeRunId,
+        now: Date.now(),
+        currentText,
+        prompt: d.state.prompt,
+        analysis,
+        runScore,
+        scoreBreakdown,
+        challengeActive,
+        challengeCompleted,
+        challengeWordsSnapshot,
+        wasSuccessful,
+        activeTargetWords,
+        activeTimerSecondsForRun,
+        finishedWithinTime,
+        timeRemainingSnapshot,
+        timerConfigured,
+        repeatLimitAtRun: d.state.repeatLimit,
+      });
     }
 
-    handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
-
-    d.computeAndStoreMirrorPipelineResult(currentText, run);
-    d.state.mirrorEmptyFallbackSeed = run.runId;
-
-    if (runWasSaved) {
-      const mirror = globalThis.WaywordMirror;
-      const nudgeLowSig =
-        typeof window.waywordPostRunRenderer?.computeMirrorAttentionalNudgeLowSignal === "function"
-          ? window.waywordPostRunRenderer.computeMirrorAttentionalNudgeLowSignal(
-              String(currentText || ""),
+    if (
+      window.waywordCompletionDecisionCoordinator &&
+      typeof window.waywordCompletionDecisionCoordinator.coordinateSubmitCompletion === "function"
+    ) {
+      window.waywordCompletionDecisionCoordinator.coordinateSubmitCompletion({
+        getRecentEntries: d.getRecentEntries,
+        calibrationThreshold: d.CALIBRATION_THRESHOLD,
+        calibrationSubmissionHasMinimumSignal: d.calibrationSubmissionHasMinimumSignal,
+        savedRunIds: d.state.savedRunIds,
+        runId: run.runId,
+        currentText: currentText,
+        analysis: analysis,
+        handleRunCompleted: handleRunCompleted,
+        computeMirrorForSubmit() {
+          computeMirrorForSubmit(currentText, run);
+        },
+        routeSuccessfulSavedRun() {
+          if (
+            window.waywordSuccessfulSubmitCoordinator &&
+            typeof window.waywordSuccessfulSubmitCoordinator.coordinateSuccessfulSavedRunSubmit === "function"
+          ) {
+            window.waywordSuccessfulSubmitCoordinator.coordinateSuccessfulSavedRunSubmit({
+              state: d.state,
+              run: run,
+              currentText: currentText,
+              canonicalSaveInput: {
+                runId: run.runId,
+                savedAt: run.savedAt,
+                timestamp: run.timestamp,
+                body: currentText,
+                prompt: d.state.prompt,
+                analysis: analysis,
+                runScore: runScore,
+                scoreBreakdown: scoreBreakdown,
+                challengeActive: challengeActive,
+                challengeCompleted: challengeCompleted,
+                challengeWordsSnapshot: challengeWordsSnapshot,
+                wasSuccessful: wasSuccessful,
+                activeTargetWords: activeTargetWords,
+                activeTimerSecondsForRun: activeTimerSecondsForRun,
+                finishedWithinTime: finishedWithinTime,
+                timeRemainingSnapshot: timeRemainingSnapshot,
+                timerConfigured: timerConfigured,
+                repeatLimitAtRun: d.state.repeatLimit,
+                mirrorLoadFailed: Boolean(run.mirrorLoadFailed),
+                mirrorPipelineResult: run.mirrorPipelineResult,
+                mirrorSessionDigest: run.mirrorSessionDigest,
+              },
+              inactivityEaseRunKey: d.INACTIVITY_EASE_RUN_KEY,
+              persist: d.persist,
+              renderHistory: d.renderHistory,
+              renderProfileSummaryStrip: d.renderProfileSummaryStrip,
+              recomputeProgressionLevel: d.recomputeProgressionLevel,
+              applyProgressionToState: d.applyProgressionToState,
+              renderProfile: d.renderProfile,
+            });
+          } else {
+            console.error("wayword: successful submit coordinator missing; falling back to inline submit success flow");
+            d.state.pendingNudgeLine = "What stands out in the draft you just wrote?";
+            window.waywordRunModel.attachMirrorSnapshotToRun(
+              run,
               d.state.lastMirrorPipelineResult,
               d.state.lastMirrorLoadFailed
-            )
-          : false;
-      const fallbackLine =
-        mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
-          ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
-          : "What stands out in the draft you just wrote?";
-      const submissionWordCount =
-        mirror && typeof mirror.tokenizeText === "function"
-          ? mirror.tokenizeText(String(currentText || "")).length
-          : String(currentText || "")
-              .trim()
-              .split(/\s+/)
-              .filter(Boolean).length;
-      const line =
-        mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function"
-          ? mirror.nextPassInstructionFromMirrorPipelineResult(
-              d.state.lastMirrorPipelineResult,
-              d.state.lastMirrorLoadFailed,
-              {
-                promptFamily: d.state.promptFamily,
-                lowSignal: nudgeLowSig,
-                seed: run.runId,
-                submissionWordCount
-              }
-            )
-          : fallbackLine;
-      d.state.pendingNudgeLine = String(line || "").trim() || fallbackLine;
-      window.waywordRunModel.attachMirrorSnapshotToRun(
-        run,
-        d.state.lastMirrorPipelineResult,
-        d.state.lastMirrorLoadFailed
-      );
-      window.waywordMirrorController.assignMirrorSessionDigestToRunIfAvailable(run, {
-        text: String(currentText || ""),
-        sessionId: String(run.runId),
-        startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
-        endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
+            );
+            window.waywordMirrorController.assignMirrorSessionDigestToRunIfAvailable(run, {
+              text: String(currentText || ""),
+              sessionId: String(run.runId),
+              startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
+              endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
+            });
+            d.state.history.push({ ...run });
+            d.state.savedRunIds.add(run.runId);
+            window.waywordStorage.removeInactivityEaseRun(d.INACTIVITY_EASE_RUN_KEY);
+            d.persist();
+            d.state.pendingRecentDrawerExpand = true;
+            d.renderHistory();
+            d.renderProfileSummaryStrip();
+            d.recomputeProgressionLevel({ afterRun: true });
+            d.applyProgressionToState();
+            d.renderProfile();
+          }
+        },
       });
+    } else {
+      console.error("wayword: completion decision coordinator missing; falling back to inline completion routing");
+      const priorEntries = d.getRecentEntries();
+      const nextCalibrationStep = priorEntries.length + 1;
+      const inCalibrationWindow = nextCalibrationStep <= d.CALIBRATION_THRESHOLD;
+      const signalOkForCalibration =
+        !inCalibrationWindow || d.calibrationSubmissionHasMinimumSignal(currentText, analysis);
 
-      var canonicalDoc = null;
-      var legacyRowForHistory = null;
-      if (
-        window.waywordRunDocumentsModel &&
-        typeof window.waywordRunDocumentsModel.assembleRunDocumentForSuccessfulSave === "function"
-      ) {
-        try {
-          canonicalDoc = window.waywordRunDocumentsModel.assembleRunDocumentForSuccessfulSave({
-            runId: run.runId,
-            savedAt: run.savedAt,
-            timestamp: run.timestamp,
-            body: currentText,
-            prompt: d.state.prompt,
-            analysis: analysis,
-            runScore: runScore,
-            scoreBreakdown: scoreBreakdown,
-            challengeActive: challengeActive,
-            challengeCompleted: challengeCompleted,
-            challengeWordsSnapshot: challengeWordsSnapshot,
-            wasSuccessful: wasSuccessful,
-            activeTargetWords: activeTargetWords,
-            activeTimerSecondsForRun: activeTimerSecondsForRun,
-            finishedWithinTime: finishedWithinTime,
-            timeRemainingSnapshot: timeRemainingSnapshot,
-            timerConfigured: timerConfigured,
-            repeatLimitAtRun: d.state.repeatLimit,
-            mirrorLoadFailed: Boolean(run.mirrorLoadFailed),
-            mirrorPipelineResult: run.mirrorPipelineResult,
-            mirrorSessionDigest: run.mirrorSessionDigest,
+      let runWasSaved = false;
+      let insufficientCalibration = false;
+
+      if (!d.state.savedRunIds.has(run.runId)) {
+        if (inCalibrationWindow && !signalOkForCalibration) {
+          insufficientCalibration = true;
+        } else {
+          runWasSaved = true;
+        }
+      }
+
+      handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
+      computeMirrorForSubmit(currentText, run);
+
+      if (runWasSaved) {
+        if (
+          window.waywordSuccessfulSubmitCoordinator &&
+          typeof window.waywordSuccessfulSubmitCoordinator.coordinateSuccessfulSavedRunSubmit === "function"
+        ) {
+          window.waywordSuccessfulSubmitCoordinator.coordinateSuccessfulSavedRunSubmit({
+            state: d.state,
+            run: run,
+            currentText: currentText,
+            canonicalSaveInput: {
+              runId: run.runId,
+              savedAt: run.savedAt,
+              timestamp: run.timestamp,
+              body: currentText,
+              prompt: d.state.prompt,
+              analysis: analysis,
+              runScore: runScore,
+              scoreBreakdown: scoreBreakdown,
+              challengeActive: challengeActive,
+              challengeCompleted: challengeCompleted,
+              challengeWordsSnapshot: challengeWordsSnapshot,
+              wasSuccessful: wasSuccessful,
+              activeTargetWords: activeTargetWords,
+              activeTimerSecondsForRun: activeTimerSecondsForRun,
+              finishedWithinTime: finishedWithinTime,
+              timeRemainingSnapshot: timeRemainingSnapshot,
+              timerConfigured: timerConfigured,
+              repeatLimitAtRun: d.state.repeatLimit,
+              mirrorLoadFailed: Boolean(run.mirrorLoadFailed),
+              mirrorPipelineResult: run.mirrorPipelineResult,
+              mirrorSessionDigest: run.mirrorSessionDigest,
+            },
+            inactivityEaseRunKey: d.INACTIVITY_EASE_RUN_KEY,
+            persist: d.persist,
+            renderHistory: d.renderHistory,
+            renderProfileSummaryStrip: d.renderProfileSummaryStrip,
+            recomputeProgressionLevel: d.recomputeProgressionLevel,
+            applyProgressionToState: d.applyProgressionToState,
+            renderProfile: d.renderProfile,
           });
-        } catch (assembleErr) {
-          console.error("wayword: assembleRunDocumentForSuccessfulSave failed; using legacy run row for session only", assembleErr);
-        }
-      }
-      if (
-        canonicalDoc &&
-        window.waywordRunDocumentsModel &&
-        typeof window.waywordRunDocumentsModel.legacyHistoryRowFromCanonicalDocument === "function"
-      ) {
-        try {
-          legacyRowForHistory = window.waywordRunDocumentsModel.legacyHistoryRowFromCanonicalDocument(canonicalDoc);
-        } catch (projErr) {
-          console.error("wayword: legacyHistoryRowFromCanonicalDocument failed; using legacy run row", projErr);
-        }
-      }
-      if (!legacyRowForHistory) {
-        legacyRowForHistory = { ...run };
-      }
-
-      if (
-        canonicalDoc &&
-        window.waywordRunDocumentRepo &&
-        typeof window.waywordRunDocumentRepo.upsertDocument === "function"
-      ) {
-        try {
-          window.waywordRunDocumentRepo.upsertDocument(canonicalDoc);
-        } catch (persistErr) {
-          console.error("wayword: canonical repository upsert failed", persistErr);
-          console.warn(
-            "wayword: legacy history/localStorage will still be updated; canonical store may be out of sync until repaired"
+        } else {
+          console.error("wayword: successful submit coordinator missing; falling back to inline submit success flow");
+          d.state.pendingNudgeLine = "What stands out in the draft you just wrote?";
+          window.waywordRunModel.attachMirrorSnapshotToRun(
+            run,
+            d.state.lastMirrorPipelineResult,
+            d.state.lastMirrorLoadFailed
           );
+          window.waywordMirrorController.assignMirrorSessionDigestToRunIfAvailable(run, {
+            text: String(currentText || ""),
+            sessionId: String(run.runId),
+            startedAt: typeof run.timestamp === "number" ? run.timestamp : undefined,
+            endedAt: typeof run.savedAt === "number" ? run.savedAt : undefined
+          });
+          d.state.history.push({ ...run });
+          d.state.savedRunIds.add(run.runId);
+          window.waywordStorage.removeInactivityEaseRun(d.INACTIVITY_EASE_RUN_KEY);
+          d.persist();
+          d.state.pendingRecentDrawerExpand = true;
+          d.renderHistory();
+          d.renderProfileSummaryStrip();
+          d.recomputeProgressionLevel({ afterRun: true });
+          d.applyProgressionToState();
+          d.renderProfile();
         }
       }
-
-      d.state.history.push({ ...legacyRowForHistory });
-      d.state.savedRunIds.add(run.runId);
-      d.state.pendingRecentDrawerExpand = true;
-      window.waywordStorage.removeInactivityEaseRun(d.INACTIVITY_EASE_RUN_KEY);
-      d.persist();
-      d.renderHistory();
-      d.renderProfileSummaryStrip();
-
-      d.recomputeProgressionLevel({ afterRun: true });
-      d.applyProgressionToState();
-      d.renderProfile();
     }
 
-    d.renderWritingState({ deferPostRunOverlaySync: false });
-    d.renderMeta();
-    d.renderSidebar();
-
-    d.queueViewportSync();
-
-    pulseEditorShellAfterSubmit();
+    if (
+      window.waywordPostSubmitUiReconciler &&
+      typeof window.waywordPostSubmitUiReconciler.reconcilePostSubmitUi === "function"
+    ) {
+      window.waywordPostSubmitUiReconciler.reconcilePostSubmitUi({
+        renderWritingState: d.renderWritingState,
+        renderMeta: d.renderMeta,
+        renderSidebar: d.renderSidebar,
+        queueViewportSync: d.queueViewportSync,
+        pulseEditorShellAfterSubmit: pulseEditorShellAfterSubmit,
+      });
+    } else {
+      console.error("wayword: post-submit UI reconciler missing; falling back to inline post-submit UI updates");
+      d.renderWritingState({ deferPostRunOverlaySync: false });
+      d.renderMeta();
+      d.renderSidebar();
+      d.queueViewportSync();
+      pulseEditorShellAfterSubmit();
+    }
   }
 
   window.waywordRunController = {

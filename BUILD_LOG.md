@@ -22,6 +22,49 @@
 - Extracted pure recent-trends mirror HTML assembly from `script.js` into `mirror-dom.js`, keeping history access, pipeline invocation, and empty/error handling in `script.js`.
 - Added a mirror bundle verification so step so changes in'src/features/mirror**' cannot drift silently from the committed 'mirror-engine.iife.js' artifact. 
 - Extracted Review Runs row HTML into a single helper inside `script.js`, keeping `renderHistory` as the orchestrator for drawer/rail differences and empty-state rules.
+- Extracted saved-run persistence coordination from the submit write path into `src/data/runs/savedRunPersistence.js`, keeping canonical-write-before-legacy-sync ordering explicit.
+- Extracted submit-path orchestration seams from `src/features/writing/run-controller.js` into narrow helpers:
+  - `submit-run-preparation.js`
+  - `submit-mirror-analysis.js`
+  - `completion-aftermath-helper.js`
+  - `completion-decision-coordinator.js`
+  - `successful-submit-coordinator.js`
+  - `post-submit-ui-reconciler.js`
+- Extracted Review Runs surface coordination outside the submit path into:
+  - `recent-runs-render-coordinator.js` for drawer/rail render application
+  - `recent-runs-interaction.js` for row expand/collapse and shared surface interaction wiring
+- Extracted writing-shell runtime coordinators from `script.js` into narrow feature helpers:
+  - `patterns-transition-coordinator.js`
+  - `options-panel-transition-coordinator.js`
+  - `options-panel-interactions.js`
+  - `prompt-interactions.js`
+  - `focus-mode-transition-coordinator.js`
+  - `viewport-sync-coordinator.js`
+  - `mobile-editor-focus-guard.js`
+  - `semantic-picker-interactions.js`
+  - `completed-ui-restart-interactions.js`
+  - `editor-shell-interactions.js`
+
+## Decomposition Checkpoint
+
+This extraction phase is complete for now. The writing shell/runtime has been carved down along the highest-confidence orchestration seams without intentionally redesigning behavior.
+
+**Major seams now extracted**
+
+- **Saved-run persistence:** canonical-write / legacy-sync coordination lives in `src/data/runs/savedRunPersistence.js`.
+- **Submit path:** `src/features/writing/run-controller.js` now delegates major success-path orchestration to focused submit helpers instead of carrying the full completed-run flow inline.
+- **Review Runs:** drawer/rail render application and row interaction wiring now live outside `script.js`.
+- **Patterns transition:** `showProfile(...)` transition orchestration now lives in `patterns-transition-coordinator.js`.
+- **Settings / options:** panel transition behavior and trigger/backdrop/close-button interaction wiring now live outside `script.js`.
+- **Prompts:** prompt reroll / prompt-control interaction binding now lives outside `script.js`.
+- **Viewport + mobile shell:** focus-mode transitions, viewport-sync sequencing, and mobile focus-exit guarding now have narrow coordinators.
+- **Editor interactions:** semantic-picker / annotation interaction wiring, completed-UI restart interaction wiring, and editor-shell surface interaction wiring now live outside the main runtime file.
+
+**What still remains intentionally inline**
+
+- Leaf rendering and analysis helpers still live close to the runtime state that owns them.
+- Fallback inline behavior remains in many `script.js` entry points so the app does not take on a hard script-load dependency while these helpers are still plain browser globals.
+- The large `script.js` file still owns substantial state, rendering, and leaf helper logic even though most of the high-risk orchestration seams have been extracted.
 
 ## Recent Changes (Last 72 Hours)
 
@@ -96,6 +139,26 @@ Newest first (sample):
 - **Persistence unification:** Eventually a single write path (e.g. derive `wayword-history` from repo or drop duplicate state) and tighter failure policy.
 - **Remove fallbacks:** `readSavedRuns*` fallback to `state.history` when `waywordSavedRunsRead` is missing; assembly fallback to raw `{ ...run }` — can be removed once load order and error handling are guaranteed.
 
+## Remaining Risks After Extraction Phase
+
+- **Intentional fallback duplication still exists:** many extracted helpers are called through `window.*` guards with inline fallback logic still present in `script.js`. This is deliberate load-order insurance, but it means some behavior is still duplicated until a later deliberate cleanup pass is justified.
+- **Human-smoke validation was the main runtime proof for UI seams:** the extracted submit path, Review Runs seams, Patterns transition seam, Settings/options seams, Prompts interaction seam, viewport-sync seam, mobile focus-exit seam, semantic-picker seam, completed-UI restart seam, and editor-shell interaction seam were validated by targeted human/manual smoke passes rather than automated browser coverage.
+- **Real-device mobile caveats remain:** true phone keyboard-overlay / visual-viewport edge cases were not fully verified on physical devices even after the focus-mode and viewport-sync extractions. Browser-visible behavior passed smoke testing, but real-phone `keyboard-open` / touch/focus quirks still deserve caution.
+- **Large runtime file still exists:** `script.js` is less fragile at the orchestration layer now, but it still remains the owner of broad state and many leaf behaviors. “Smaller than before” does not mean “small.”
+
+## When To Reopen Extraction
+
+- Reopen extraction only if a new concrete orchestration knot is identified during maintenance, review, or bug fixing.
+- Reopen extraction when a remaining inline path is causing real confusion, regressions, or duplicated edits across more than one caller.
+- Reopen extraction when fallback duplication itself becomes the primary maintenance risk and there is enough confidence to replace it with a stricter load-order contract.
+
+## When Not To Reopen Extraction
+
+- Do not reopen extraction just because `script.js` is still large.
+- Do not extract wrappers around already-extracted helpers simply to keep momentum.
+- Do not continue carving when the remaining logic is mostly leaf behavior, rendering detail, or tightly state-coupled code without a clear seam.
+- Prefer stabilization, bug fixing, and documentation over more structural change unless a concrete seam or bug shows up.
+
 
 ## What Appears Merged on Main
 
@@ -111,6 +174,7 @@ Newest first (sample):
 ## Implemented Systems
 
 - **Writing shell:** `index.html`, `style.css`, `category-colors.css`, large monolith **`script.js`** (prompts, timer/word targets, calibration, focus mode, patterns view, post-run UI, settings).
+- **Writing shell note:** `script.js` still owns broad runtime state and many leaf behaviors, but major orchestration seams now delegate into `src/features/writing/*.js` helper modules loaded before it.
 - **Review runs UI:** drawer + desktop rail, list rendering and caps in **`script.js`** + matching markup in **`index.html`**.
 - **Mirror engine (TypeScript):** `src/features/mirror/` — analysis, candidate generation, ranking/dedupe/selection, session digests, recent trends / patterns-from-digests.
 - **Browser bundle:** `npm run build:mirror` → **`mirror-engine.iife.js`**; **`index.html`** loads it; **`script.js`** calls `globalThis.WaywordMirror` (`runMirrorPipeline`, digests, trends, patterns helpers).

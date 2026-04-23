@@ -681,6 +681,19 @@ function armPostFocusExitKeyboardLayoutSettle() {
 
 /** Mobile: leave focus mode in one layout pass (caller should end with `queueViewportSync()` to clear snap). */
 function exitFocusModeForLayoutIfNeeded() {
+  if (
+    window.waywordFocusModeTransitionCoordinator &&
+    typeof window.waywordFocusModeTransitionCoordinator.exitFocusModeForLayoutIfNeeded === "function"
+  ) {
+    return window.waywordFocusModeTransitionCoordinator.exitFocusModeForLayoutIfNeeded({
+      isMobileViewport,
+      syncViewportHeightVar,
+      syncKeyboardOpenClass,
+      state,
+      armPostFocusExitKeyboardLayoutSettle,
+      resetWordmarkChromeMotionState
+    });
+  }
   if (!isMobileViewport()) return false;
   if (!document.body.classList.contains("focus-mode")) return false;
   document.documentElement.classList.add("focus-mode-layout-snap");
@@ -725,6 +738,30 @@ function setExpandedField(expanded) {
 }
 
 function setFocusMode(enabled) {
+  if (
+    window.waywordFocusModeTransitionCoordinator &&
+    typeof window.waywordFocusModeTransitionCoordinator.setFocusMode === "function"
+  ) {
+    return window.waywordFocusModeTransitionCoordinator.setFocusMode(enabled, {
+      isMobileViewport,
+      state,
+      logPatternsTransitionSnapshot,
+      setSuppressKeyboardOpenTruthUntil(value) {
+        suppressKeyboardOpenTruthUntil = value;
+      },
+      resetWordmarkChromeMotionState,
+      setRecentDrawerOpen,
+      renderProfileSummaryStrip,
+      syncExpandedFieldClass,
+      renderPostRunReflectionLine() {
+        window.waywordPostRunRenderer.renderReflectionLine(getPostRunReflectionLineText());
+      },
+      queueViewportSync,
+      syncViewportHeightVar,
+      syncKeyboardOpenClass,
+      armPostFocusExitKeyboardLayoutSettle
+    });
+  }
   logPatternsTransitionSnapshot("setFocusMode:before", { enabled });
   const shouldEnable = Boolean(enabled) && isMobileViewport();
   if (shouldEnable) {
@@ -931,6 +968,26 @@ function scheduleCalibrationOverlayGeometrySync() {
 }
 
 function queueViewportSync() {
+  if (
+    window.waywordViewportSyncCoordinator &&
+    typeof window.waywordViewportSyncCoordinator.queueViewportSync === "function"
+  ) {
+    return window.waywordViewportSyncCoordinator.queueViewportSync({
+      logPatternsTransitionSnapshot,
+      syncViewportHeightVar,
+      syncKeyboardOpenClass,
+      syncEditorShellChamferEdge,
+      syncEditorCalibrationOverlayClip,
+      isMobileViewport,
+      setFocusMode,
+      syncPatternsLayoutMode: window.waywordViewController.syncPatternsLayoutMode,
+      renderHistory,
+      syncRecentRailExpandedLayoutMetrics,
+      syncSubmittedAnnotatedEditorSurfaces,
+      scheduleEditorDotOverlaySync,
+      renderProfileSummaryStrip
+    });
+  }
   logPatternsTransitionSnapshot("queueViewportSync:requested", {
     alreadyQueued: viewportSyncRaf !== null
   });
@@ -939,8 +996,8 @@ function queueViewportSync() {
     return;
   }
   viewportSyncRaf = requestAnimationFrame(() => {
-    logPatternsTransitionSnapshot("queueViewportSync:raf-start");
     viewportSyncRaf = null;
+    logPatternsTransitionSnapshot("queueViewportSync:raf-start");
     try {
       syncViewportHeightVar();
       syncKeyboardOpenClass();
@@ -954,7 +1011,8 @@ function queueViewportSync() {
       scheduleEditorDotOverlaySync();
       renderProfileSummaryStrip();
       logPatternsTransitionSnapshot("queueViewportSync:raf-after-sync");
-    } finally {
+    }
+    finally {
       if (viewportSyncCoalescePending) {
         viewportSyncCoalescePending = false;
         queueViewportSync();
@@ -1676,6 +1734,40 @@ function afterOptionsPanelClosed() {
 }
 
 function setOptionsOpen(open) {
+  if (
+    window.waywordOptionsPanelTransitionCoordinator &&
+    typeof window.waywordOptionsPanelTransitionCoordinator.setOptionsOpen === "function"
+  ) {
+    return window.waywordOptionsPanelTransitionCoordinator.setOptionsOpen(open, {
+      $,
+      state,
+      optionsPanelDismissGuardMs: OPTIONS_PANEL_DISMISS_GUARD_MS,
+      setOptionsPanelDismissGuardUntil(value) {
+        optionsPanelDismissGuardUntil = value;
+      },
+      clearBannedPanelPersistTimer() {
+        if (bannedPanelPersistTimer != null) {
+          clearTimeout(bannedPanelPersistTimer);
+          bannedPanelPersistTimer = null;
+        }
+      },
+      syncWordModesPanel() {
+        setActiveModeButton("wordModesPanel", "words", state.targetWords);
+      },
+      syncTimeModesPanel() {
+        setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
+      },
+      getBannedPanelValue() {
+        return state.banned.join(", ");
+      },
+      flushBannedPanelPersistFromPanel,
+      afterOptionsPanelClosed,
+      applyBodySettingsOpenClass: window.waywordViewController.applyBodySettingsOpenClass,
+      applyEditorOptionsPanelAriaAndBackdrop:
+        window.waywordViewController.applyEditorOptionsPanelAriaAndBackdrop,
+    });
+  }
+
   const wasOpen = state.optionsOpen;
   state.optionsOpen = open;
 
@@ -2075,7 +2167,7 @@ function onPromptRerollControlClick(e) {
   rerollPrompt();
 }
 
-function onPromptClusterControlPointerDown(e) {
+function onPromptClusterControlPointerDownFallback(e) {
   e.preventDefault();
   e.stopPropagation();
 }
@@ -2132,18 +2224,29 @@ function onFieldExpandedControlClick(e) {
 }
 
 function bindPromptClusterControlsOnce() {
+  if (
+    window.waywordPromptInteractions &&
+    typeof window.waywordPromptInteractions.bindPromptClusterControls === "function"
+  ) {
+    window.waywordPromptInteractions.bindPromptClusterControls({
+      $,
+      onPromptRerollControlClick,
+      onFieldExpandedControlClick
+    });
+    return;
+  }
+
   const reroll = $("promptRerollBtn");
   if (reroll) {
-    reroll.removeEventListener("pointerdown", onPromptClusterControlPointerDown);
-    reroll.addEventListener("pointerdown", onPromptClusterControlPointerDown);
-    reroll.removeEventListener("click", rerollPrompt);
+    reroll.removeEventListener("pointerdown", onPromptClusterControlPointerDownFallback);
+    reroll.addEventListener("pointerdown", onPromptClusterControlPointerDownFallback);
     reroll.removeEventListener("click", onPromptRerollControlClick);
     reroll.addEventListener("click", onPromptRerollControlClick);
   }
   const field = $("fieldExpandedToggle");
   if (field) {
-    field.removeEventListener("pointerdown", onPromptClusterControlPointerDown);
-    field.addEventListener("pointerdown", onPromptClusterControlPointerDown);
+    field.removeEventListener("pointerdown", onPromptClusterControlPointerDownFallback);
+    field.addEventListener("pointerdown", onPromptClusterControlPointerDownFallback);
     field.removeEventListener("click", onFieldExpandedControlClick);
     field.addEventListener("click", onFieldExpandedControlClick);
   }
@@ -2762,6 +2865,14 @@ function setSemanticFlagsOnToken(lineIndex, tokenIndex, rawFlags) {
 let semanticPickerRaf = null;
 
 function scheduleSemanticPickerFromSelection() {
+  if (
+    window.waywordSemanticPickerInteractions &&
+    typeof window.waywordSemanticPickerInteractions.scheduleSemanticPickerFromSelection === "function"
+  ) {
+    return window.waywordSemanticPickerInteractions.scheduleSemanticPickerFromSelection({
+      updateEditorSemanticPickerFromSelection
+    });
+  }
   if (semanticPickerRaf !== null) return;
   semanticPickerRaf = requestAnimationFrame(() => {
     semanticPickerRaf = null;
@@ -2770,6 +2881,14 @@ function scheduleSemanticPickerFromSelection() {
 }
 
 function hideEditorSemanticPicker() {
+  if (
+    window.waywordSemanticPickerInteractions &&
+    typeof window.waywordSemanticPickerInteractions.hideEditorSemanticPicker === "function"
+  ) {
+    return window.waywordSemanticPickerInteractions.hideEditorSemanticPicker({
+      editorSemanticPicker
+    });
+  }
   editorSemanticPicker?.classList.add("hidden");
 }
 
@@ -2778,6 +2897,22 @@ function hideEditorSemanticPicker() {
  * Geometry from Range only; semantics from writeDoc mapping only.
  */
 function updateEditorSemanticPickerFromSelection() {
+  if (
+    window.waywordSemanticPickerInteractions &&
+    typeof window.waywordSemanticPickerInteractions.updateEditorSemanticPickerFromSelection === "function"
+  ) {
+    return window.waywordSemanticPickerInteractions.updateEditorSemanticPickerFromSelection({
+      editorSemanticPicker,
+      editorInput,
+      state,
+      getEditorSurfaceComposing() {
+        return editorSurfaceComposing;
+      },
+      serializeWriteDoc,
+      getSelectionOffsetsForEditorRoot,
+      findExactSingleTokenForCanonicalRange
+    });
+  }
   const picker = editorSemanticPicker;
   if (!picker || !editorInput) return;
 
@@ -2861,6 +2996,23 @@ function updateEditorSemanticPickerFromSelection() {
 }
 
 function bindEditorSemanticPicker() {
+  if (
+    window.waywordSemanticPickerInteractions &&
+    typeof window.waywordSemanticPickerInteractions.bindEditorSemanticPicker === "function"
+  ) {
+    return window.waywordSemanticPickerInteractions.bindEditorSemanticPicker({
+      editorSemanticPicker,
+      state,
+      semanticFlagIds: SEMANTIC_FLAG_IDS,
+      setSemanticFlagsOnToken,
+      getOrderedSemanticFlagsForToken,
+      scheduleEditorDotOverlaySync,
+      renderAnnotationRow,
+      renderSidebar,
+      $,
+      updateEditorSemanticPickerFromSelection
+    });
+  }
   const picker = editorSemanticPicker;
   if (!picker || picker.dataset.semanticPickerBound === "1") return;
   picker.dataset.semanticPickerBound = "1";
@@ -3039,6 +3191,32 @@ function renderAnnotationRow() {
 }
 
 function bindAnnotationRowFlagInteraction() {
+  if (
+    window.waywordSemanticPickerInteractions &&
+    typeof window.waywordSemanticPickerInteractions.bindAnnotationRowFlagInteraction === "function"
+  ) {
+    return window.waywordSemanticPickerInteractions.bindAnnotationRowFlagInteraction({
+      $,
+      state,
+      editorInput,
+      getEditorSurfaceComposing() {
+        return editorSurfaceComposing;
+      },
+      getSelectionOffsetsForEditorRoot,
+      getAnnotationRowPendingEditorSel() {
+        return annotationRowPendingEditorSel;
+      },
+      setAnnotationRowPendingEditorSel(value) {
+        annotationRowPendingEditorSel = value;
+      },
+      cycleAnnotationSemanticFlag,
+      renderAnnotationRow,
+      setSelectionOffsetsForEditorRoot,
+      scheduleEditorDotOverlaySync,
+      renderSidebar,
+      scheduleSemanticPickerFromSelection
+    });
+  }
   const row = $("annotationRow");
   if (!row || row.dataset.flagInteractionBound === "1") return;
   row.dataset.flagInteractionBound = "1";
@@ -3222,39 +3400,36 @@ function prefersReducedUiMotion() {
   }
 }
 
+function recentRunsTransitionDeps() {
+  return {
+    $,
+    state,
+    editorInput,
+    isMobileViewport,
+    isDesktopPatternsViewport,
+    RECENT_DRAWER_DISMISS_GUARD_MS,
+    setRecentDrawerDismissGuardUntil(n) {
+      recentDrawerDismissGuardUntil = n;
+    },
+    setSuppressFocusExitUntil(n) {
+      suppressFocusExitUntil = n;
+    },
+    setFocusMode,
+    renderHistory,
+    hideMetricExplainer,
+    queueViewportSync,
+    applyRecentDrawerDomState: window.waywordViewController.applyRecentDrawerDomState.bind(
+      window.waywordViewController
+    ),
+  };
+}
+
 function isRecentDrawerOpen() {
-  return Boolean(document.body?.classList.contains("recent-drawer-open"));
+  return window.waywordRecentRunsTransition.isRecentDrawerOpen();
 }
 
 function syncRecentRailExpandedChrome() {
-  const expanded = Boolean(state.recentRunsHistoryExpanded);
-  const desktop = isDesktopPatternsViewport();
-  const drawerOpen = isRecentDrawerOpen();
-  const show = expanded && desktop && !drawerOpen;
-  const writeView = $("writeView");
-  const backdrop = $("recentRailExpandedBackdrop");
-  const closeBtn = $("recentRailExpandedCloseBtn");
-  if (backdrop) {
-    backdrop.classList.toggle("hidden", !show);
-    backdrop.setAttribute("aria-hidden", show ? "false" : "true");
-  }
-  if (closeBtn) {
-    closeBtn.classList.toggle("hidden", !show);
-  }
-
-  /* Clear the bounded-height custom property before dropping the body class so we never paint a stale cap. */
-  if (!show) {
-    writeView?.style.removeProperty("--review-runs-rail-expanded-max-h");
-  } else {
-    /* Measure + set `--review-runs-rail-expanded-max-h` before `recent-rail-expanded` so the first frame is already capped. */
-    syncRecentRailExpandedLayoutMetrics({ forceExpanded: true });
-  }
-
-  document.body.classList.toggle("recent-rail-expanded", show);
-
-  if (show) {
-    requestAnimationFrame(() => syncRecentRailExpandedLayoutMetrics());
-  }
+  window.waywordRecentRunsTransition.syncRecentRailExpandedChrome(recentRunsTransitionDeps());
 }
 
 /**
@@ -3263,48 +3438,10 @@ function syncRecentRailExpandedChrome() {
  * on `#writeView` for `body.recent-rail-expanded #writeView .side-column`.
  */
 function syncRecentRailExpandedLayoutMetrics(options = {}) {
-  const writeView = $("writeView");
-  if (!writeView) return;
-  const forceExpanded = Boolean(options.forceExpanded);
-  const railExpanded = document.body.classList.contains("recent-rail-expanded");
-  if (!isDesktopPatternsViewport()) {
-    writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
-    return;
-  }
-  if (!railExpanded && !forceExpanded) {
-    writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
-    return;
-  }
-
-  const col = writeView.querySelector(".side-column");
-  const textBox = editorInput || writeView.querySelector(".editor-input");
-  if (!col || !textBox) {
-    writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
-    return;
-  }
-
-  const colRect = col.getBoundingClientRect();
-  const textRect = textBox.getBoundingClientRect();
-  const vv = window.visualViewport;
-  const vh = vv && Number.isFinite(vv.height) ? vv.height : window.innerHeight;
-
-  /**
-   * Keep in sync with `style.css` `--review-runs-rail-desktop-viewport-floor` intent (~sticky + buffer + safe).
-   * Slightly conservative so we do not reintroduce page-level vertical strain from a too-tall rail.
-   */
-  const viewportCapPx = Math.max(0, vh - colRect.top - 86);
-
-  /** Align to the main text surface (`#editorInput`), not the chamfered shell box (corner curve sits below text). */
-  const railAlignToEditorPx = 5;
-  const alignmentCapPx = textRect.bottom - colRect.top - railAlignToEditorPx;
-
-  const maxH = Math.min(viewportCapPx, alignmentCapPx);
-  if (!Number.isFinite(maxH) || maxH < 160) {
-    writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
-    return;
-  }
-
-  writeView.style.setProperty("--review-runs-rail-expanded-max-h", `${Math.round(maxH)}px`);
+  window.waywordRecentRunsTransition.syncRecentRailExpandedLayoutMetrics(
+    options,
+    recentRunsTransitionDeps()
+  );
 }
 
 function initEditorCompletedFlow() {
@@ -4149,33 +4286,7 @@ function renderHistory() {
   const railFooter = $("recentRailFooter");
   const trigger = $("recentWritingTrigger");
   const allLists = [drawerList, railList].filter(Boolean);
-  allLists.forEach((list) => wireRecentEntryRowKeynav(list));
-
-  function setRecentRunsOverflowFooter(footer, totalCount, cap, hideOverflowLink) {
-    if (!footer) return;
-    const show = !hideOverflowLink && totalCount > cap;
-    footer.classList.toggle("hidden", !show);
-    footer.setAttribute("aria-hidden", show ? "false" : "true");
-  }
-
-  function syncRecentRunsMoreButtonLabels(expanded) {
-    const drawerBtn = $("recentDrawerMoreBtn");
-    if (drawerBtn) {
-      drawerBtn.textContent = expanded ? "Show fewer" : "View older runs";
-    }
-    const railBtn = $("recentRailMoreBtn");
-    if (railBtn) {
-      railBtn.textContent = expanded ? "Show fewer" : "View older runs";
-    }
-  }
-
-  function hideRecentRunsOverflowFooters() {
-    [drawerFooter, railFooter].forEach((footer) => {
-      if (!footer) return;
-      footer.classList.add("hidden");
-      footer.setAttribute("aria-hidden", "true");
-    });
-  }
+  allLists.forEach((list) => bindRecentRunsSurfaceInteractions(list));
 
   const runsNewestFirst = readSavedRunsNewestFirst();
   const recentVm = window.waywordRecentRunsViewPrep.prepareRecentRunsViewModel({
@@ -4185,10 +4296,38 @@ function renderHistory() {
     capRail: recentRunsPreviewCapRail(),
   });
 
+  if (
+    window.waywordRecentRunsRenderCoordinator &&
+    typeof window.waywordRecentRunsRenderCoordinator.renderRecentRunsSurfaces === "function"
+  ) {
+    window.waywordRecentRunsRenderCoordinator.renderRecentRunsSurfaces({
+      recentVm,
+      state,
+      allLists,
+      drawerList,
+      railList,
+      drawerFooter,
+      railFooter,
+      drawerMoreBtn: $("recentDrawerMoreBtn"),
+      railMoreBtn: $("recentRailMoreBtn"),
+      trigger,
+      isRecentDrawerOpen,
+      isDesktopPatternsViewport,
+      getRecentListEmptyInnerHtml: window.waywordHistoryRenderer.getRecentListEmptyInnerHtml,
+      buildRecentEntriesHtml: window.waywordHistoryRenderer.buildRecentEntriesHtml,
+      wireMirrorEvidenceToggles,
+      collapseMirrorEvidenceInRoot,
+      syncRecentDrawerRunsExpandedBodyClass:
+        window.waywordRecentRunsTransition.syncRecentDrawerRunsExpandedBodyClass,
+      syncRecentRailExpandedChrome,
+    });
+    return;
+  }
+
   if (recentVm.isEmpty) {
     if (recentVm.clearExpandedHistory) {
       state.recentRunsHistoryExpanded = false;
-      document.body.classList.remove("recent-drawer-runs-expanded");
+      window.waywordRecentRunsTransition.syncRecentDrawerRunsExpandedBodyClass(false);
     }
     const drawerOpen = isRecentDrawerOpen();
     allLists.forEach((list) => {
@@ -4199,7 +4338,11 @@ function renderHistory() {
         isDesktopPatternsViewport()
       );
     });
-    hideRecentRunsOverflowFooters();
+    [drawerFooter, railFooter].forEach((footer) => {
+      if (!footer) return;
+      footer.classList.add("hidden");
+      footer.setAttribute("aria-hidden", "true");
+    });
     if (trigger) {
       trigger.disabled = false;
       trigger.setAttribute("aria-disabled", "false");
@@ -4210,29 +4353,31 @@ function renderHistory() {
 
   const { totalCount, expanded, drawerRunsExpandedBody, drawerSlice, railSlice, capDrawer, capRail } =
     recentVm;
-
   if (drawerList) {
     drawerList.innerHTML = window.waywordHistoryRenderer.buildRecentEntriesHtml(drawerSlice, "draw");
     drawerList.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
       wireMirrorEvidenceToggles(el);
       collapseMirrorEvidenceInRoot(el);
     });
-    setRecentRunsOverflowFooter(drawerFooter, totalCount, capDrawer, expanded);
+    const showDrawerFooter = !expanded && totalCount > capDrawer;
+    drawerFooter?.classList.toggle("hidden", !showDrawerFooter);
+    drawerFooter?.setAttribute("aria-hidden", showDrawerFooter ? "false" : "true");
   }
-
   if (railList) {
     railList.innerHTML = window.waywordHistoryRenderer.buildRecentEntriesHtml(railSlice, "rail");
     railList.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
       wireMirrorEvidenceToggles(el);
       collapseMirrorEvidenceInRoot(el);
     });
-    setRecentRunsOverflowFooter(railFooter, totalCount, capRail, expanded);
+    const showRailFooter = !expanded && totalCount > capRail;
+    railFooter?.classList.toggle("hidden", !showRailFooter);
+    railFooter?.setAttribute("aria-hidden", showRailFooter ? "false" : "true");
   }
-
-  document.body.classList.toggle("recent-drawer-runs-expanded", drawerRunsExpandedBody);
-
-  syncRecentRunsMoreButtonLabels(expanded);
-
+  window.waywordRecentRunsTransition.syncRecentDrawerRunsExpandedBodyClass(drawerRunsExpandedBody);
+  const drawerBtn = $("recentDrawerMoreBtn");
+  if (drawerBtn) drawerBtn.textContent = expanded ? "Show fewer" : "View older runs";
+  const railBtn = $("recentRailMoreBtn");
+  if (railBtn) railBtn.textContent = expanded ? "Show fewer" : "View older runs";
   if (trigger) {
     trigger.disabled = false;
     trigger.setAttribute("aria-disabled", "false");
@@ -4241,72 +4386,38 @@ function renderHistory() {
 }
 
 function setRecentDrawerOpen(open, options = {}) {
-  const backdrop = $("recentDrawerBackdrop");
-  const drawer = $("recentDrawer");
-  const trigger = $("recentWritingTrigger");
-
-  const shouldOpen = Boolean(open);
-  const skipHistory = Boolean(options.skipHistory);
-  const skipFocus = Boolean(options.skipFocus);
-  const afterOpen = typeof options.afterOpen === "function" ? options.afterOpen : null;
-
-  window.waywordViewController.applyRecentDrawerDomState({
-    shouldOpen,
-    backdrop,
-    drawer,
-    trigger
-  });
-
-  if (shouldOpen) {
-    recentDrawerDismissGuardUntil = Date.now() + RECENT_DRAWER_DISMISS_GUARD_MS;
-    if (isMobileViewport()) {
-      suppressFocusExitUntil = performance.now() + 380;
-      if (document.body.classList.contains("focus-mode")) {
-        setFocusMode(false);
-      }
-    }
-    if (document.activeElement === editorInput) {
-      editorInput.blur();
-    }
-  }
-
-  queueViewportSync();
-
-  if (shouldOpen) {
-    if (!skipHistory) renderHistory();
-    const shouldAutoExpand = Boolean(state.pendingRecentDrawerExpand);
-    if (!skipFocus && !shouldAutoExpand) $("recentDrawerCloseBtn")?.focus();
-    requestAnimationFrame(() => {
-      afterOpen?.();
-      if (shouldAutoExpand) {
-        state.pendingRecentDrawerExpand = false;
-        if (!skipFocus) $("recentDrawerCloseBtn")?.focus();
-      }
-      queueViewportSync();
-    });
-  } else {
-    recentDrawerDismissGuardUntil = 0;
-    state.pendingRecentDrawerExpand = false;
-    state.recentRunsHistoryExpanded = false;
-    hideMetricExplainer();
-    renderHistory();
-    if (!skipFocus) trigger?.focus();
-    requestAnimationFrame(() => {
-      queueViewportSync();
-    });
-  }
-  syncRecentRailExpandedChrome();
+  window.waywordRecentRunsTransition.setRecentDrawerOpen(open, options, recentRunsTransitionDeps());
 }
 
-function wireRecentEntryRowKeynav(list) {
-  if (!list || list.dataset.recentEntryKeynav === "1") return;
-  list.dataset.recentEntryKeynav = "1";
+function bindRecentRunsSurfaceInteractions(list) {
+  if (
+    window.waywordRecentRunsInteraction &&
+    typeof window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions === "function"
+  ) {
+    window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions({
+      list,
+      domEventTargetElement,
+      collapseMirrorEvidenceInRoot,
+    });
+    return;
+  }
+
+  if (!list || list.dataset.recentEntryInteractionsBound === "1") return;
+  list.dataset.recentEntryInteractionsBound = "1";
   list.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     const ae = document.activeElement;
     if (!ae || !ae.classList.contains("recent-entry") || !list.contains(ae)) return;
     e.preventDefault();
     window.waywordViewController.toggleRecentEntry(ae, collapseMirrorEvidenceInRoot);
+  });
+  list.addEventListener("click", (e) => {
+    const origin = domEventTargetElement(e);
+    if (!origin) return;
+    const entry = origin.closest(".recent-entry");
+    if (!entry) return;
+    if (origin.closest("button, a")) return;
+    window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
   });
 }
 
@@ -4673,6 +4784,28 @@ window.waywordRunController.registerDeps({
 });
 
 function showProfile(show = true) {
+  if (
+    window.waywordPatternsTransitionCoordinator &&
+    typeof window.waywordPatternsTransitionCoordinator.showProfile === "function"
+  ) {
+    return window.waywordPatternsTransitionCoordinator.showProfile(show, {
+      $,
+      state,
+      editorInput,
+      isMobileViewport,
+      isDesktopPatternsViewport,
+      prefersReducedUiMotion,
+      setFocusMode,
+      syncExpandedFieldClass,
+      syncViewportHeightVar,
+      syncKeyboardOpenClass,
+      queueViewportSync,
+      renderProfile,
+      syncPatternsLayoutMode: window.waywordViewController.syncPatternsLayoutMode,
+      logPatternsTransitionSnapshot
+    });
+  }
+
   const profileView = $("profileView");
   if (!profileView) return;
   const wasVisible = !profileView.classList.contains("hidden");
@@ -4839,6 +4972,26 @@ if (editorInput) {
   });
 
   editorInput.addEventListener("blur", (e) => {
+    if (
+      window.waywordMobileEditorFocusGuard &&
+      typeof window.waywordMobileEditorFocusGuard.handleEditorBlur === "function"
+    ) {
+      return window.waywordMobileEditorFocusGuard.handleEditorBlur(
+        {
+          state,
+          hideEditorSemanticPicker,
+          queueViewportSync,
+          getSuppressFocusExitUntil() {
+            return suppressFocusExitUntil;
+          },
+          isMobilePatternsVisible,
+          syncViewportHeightVar,
+          syncKeyboardOpenClass,
+          setFocusMode
+        },
+        e
+      );
+    }
     if (state.submitted && state.completedUiActive) {
       hideEditorSemanticPicker();
       return;
@@ -4955,25 +5108,18 @@ if (editorInput) {
 
   editorInput.addEventListener("keydown", (e) => {
     if (
-      !state.optionsOpen &&
-      state.submitted &&
-      state.completedUiActive
+      window.waywordCompletedUiRestartInteractions &&
+      typeof window.waywordCompletedUiRestartInteractions.handleEditorCompletedRestartKeydown ===
+        "function" &&
+      window.waywordCompletedUiRestartInteractions.handleEditorCompletedRestartKeydown(
+        {
+          state,
+          runPostSubmitAutoNewRunNow
+        },
+        e
+      )
     ) {
-      const enterBegin = e.key === "Enter" && !e.shiftKey;
-      const typingKey =
-        (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) ||
-        e.key === "Backspace" ||
-        e.key === "Delete" ||
-        e.key === " ";
-      if (enterBegin) {
-        e.preventDefault();
-        runPostSubmitAutoNewRunNow();
-        return;
-      }
-      if (typingKey) {
-        e.preventDefault();
-        return;
-      }
+      return;
     }
 
     if (e.key === "Enter" && !e.shiftKey) {
@@ -4992,44 +5138,75 @@ if (editorInput) {
 
 const { editorShell } = window.waywordDomElements.resolveEditorShell();
 
-editorShell?.addEventListener("pointerdown", (e) => {
-  if (e.target.closest("#editorInput")) {
-    annotationRowPendingEditorSel = null;
-  }
-
-  const blocked =
-    e.target.closest("#optionsTrigger") ||
-    e.target.closest(".editor-progress") ||
-    e.target.closest("#editorOptionsPanel") ||
-    e.target.closest("#editorOptionsBackdrop") ||
-    e.target.closest("#enterSubmitBtn") ||
-    e.target.closest("#editorOverlay") ||
-    e.target.closest("#editorSemanticPicker") ||
-    e.target.closest("#recentWritingTrigger") ||
-    e.target.closest("#recentDrawer") ||
-    e.target.closest("#recentDrawerBackdrop");
-
-  if (blocked) return;
-  /* Post-run overlay is hidden after calibration; desktop uses Enter / overlay click to begin the next run.
-     Mobile must get the same `runPostSubmitAutoNewRunNow` path when the user taps the writing surface. */
-  if (
-    state.active &&
-    state.submitted &&
-    state.completedUiActive &&
-    !state.optionsOpen &&
-    e.target.closest("#editorInput")
-  ) {
-    runPostSubmitAutoNewRunNow();
-    return;
-  }
-  if (!state.active || state.submitted) return;
-  /* Clicks on the editable surface must use native caret/selection; only chrome hits focus the end. */
-  if (e.target.closest("#editorInput")) return;
-
-  requestAnimationFrame(() => {
-    focusEditorToEnd();
+if (
+  window.waywordEditorShellInteractions &&
+  typeof window.waywordEditorShellInteractions.bindEditorShellInteractions === "function"
+) {
+  window.waywordEditorShellInteractions.bindEditorShellInteractions({
+    editorShell,
+    resetAnnotationRowPendingEditorSel() {
+      annotationRowPendingEditorSel = null;
+    },
+    handleEditorSurfaceCompletedRestart(e) {
+      return Boolean(
+        window.waywordCompletedUiRestartInteractions &&
+          typeof window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart ===
+            "function" &&
+          window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart(
+            {
+              state,
+              runPostSubmitAutoNewRunNow
+            },
+            e
+          )
+      );
+    },
+    isActiveAndEditable() {
+      return state.active && !state.submitted;
+    },
+    focusEditorToEnd
   });
-});
+} else {
+  editorShell?.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("#editorInput")) {
+      annotationRowPendingEditorSel = null;
+    }
+
+    const blocked =
+      e.target.closest("#optionsTrigger") ||
+      e.target.closest(".editor-progress") ||
+      e.target.closest("#editorOptionsPanel") ||
+      e.target.closest("#editorOptionsBackdrop") ||
+      e.target.closest("#enterSubmitBtn") ||
+      e.target.closest("#editorOverlay") ||
+      e.target.closest("#editorSemanticPicker") ||
+      e.target.closest("#recentWritingTrigger") ||
+      e.target.closest("#recentDrawer") ||
+      e.target.closest("#recentDrawerBackdrop");
+
+    if (blocked) return;
+    if (
+      window.waywordCompletedUiRestartInteractions &&
+      typeof window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart ===
+        "function" &&
+      window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart(
+        {
+          state,
+          runPostSubmitAutoNewRunNow
+        },
+        e
+      )
+    ) {
+      return;
+    }
+    if (!state.active || state.submitted) return;
+    if (e.target.closest("#editorInput")) return;
+
+    requestAnimationFrame(() => {
+      focusEditorToEnd();
+    });
+  });
+}
 
 let suppressRecentTriggerClickOpen = false;
 $("promptCard")?.addEventListener("click", (e) => {
@@ -5070,49 +5247,20 @@ $("recentDrawerBackdrop")?.addEventListener("click", () => {
   setRecentDrawerOpen(false);
 });
 
-$("recentDrawerList")?.addEventListener("click", (e) => {
-  const origin = domEventTargetElement(e);
-  if (!origin) return;
-  const entry = origin.closest(".recent-entry");
-  if (!entry) return;
-  if (origin.closest("button, a")) return;
-  window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
-});
-$("recentRailList")?.addEventListener("click", (e) => {
-  const origin = domEventTargetElement(e);
-  if (!origin) return;
-  const entry = origin.closest(".recent-entry");
-  if (!entry) return;
-  if (origin.closest("button, a")) return;
-  window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
-});
-
 document.addEventListener("keydown", (e) => {
   if (
-    e.key === "Enter" &&
-    state.submitted &&
-    state.completedUiActive &&
-    !e.shiftKey &&
-    !e.metaKey &&
-    !e.ctrlKey &&
-    !e.altKey
+    window.waywordCompletedUiRestartInteractions &&
+    typeof window.waywordCompletedUiRestartInteractions.handleDocumentCompletedRestartKeydown ===
+      "function" &&
+    window.waywordCompletedUiRestartInteractions.handleDocumentCompletedRestartKeydown(
+      {
+        state,
+        runPostSubmitAutoNewRunNow
+      },
+      e
+    )
   ) {
-    if (state.optionsOpen) return;
-    if (e.target && e.target.closest && e.target.closest("#editorInput")) {
-      return;
-    }
-    const target = e.target;
-    const editable =
-      target &&
-      (target.closest("input,textarea,select,[contenteditable='true']") ||
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.tagName === "SELECT");
-    if (!editable) {
-      e.preventDefault();
-      runPostSubmitAutoNewRunNow();
-      return;
-    }
+    return;
   }
 
   if (e.key !== "Escape") return;
@@ -5121,15 +5269,9 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   }
-  if (document.body.classList.contains("recent-rail-expanded")) {
-    state.recentRunsHistoryExpanded = false;
-    renderHistory();
+  if (window.waywordRecentRunsTransition.tryHandleEscapeForRecentRunsSurfaces(recentRunsTransitionDeps())) {
     e.preventDefault();
     return;
-  }
-  if (isRecentDrawerOpen()) {
-    setRecentDrawerOpen(false);
-    e.preventDefault();
   }
 });
 
@@ -5199,35 +5341,6 @@ $("bannedInlineInput")?.addEventListener("keydown", (e) => {
   }
 });
 
-$("editorOptionsBackdrop")?.addEventListener("click", e => {
-  if (Date.now() < optionsPanelDismissGuardUntil) return;
-  const panel = $("editorOptionsPanel");
-  if (panel?.contains(e.target)) return;
-  setOptionsOpen(false);
-});
-
-let suppressGearClickToggle = false;
-$("optionsTrigger")?.addEventListener(
-  "pointerdown",
-  (e) => {
-    suppressGearClickToggle = false;
-    if (!state.optionsOpen) {
-      setOptionsOpen(true);
-      suppressGearClickToggle = true;
-    }
-  },
-  true
-);
-
-$("optionsTrigger")?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  if (suppressGearClickToggle) {
-    suppressGearClickToggle = false;
-    return;
-  }
-  setOptionsOpen(!state.optionsOpen);
-});
-
 $("editorOptionsPanel")?.addEventListener("pointerdown", e => {
   e.stopPropagation();
 });
@@ -5236,11 +5349,56 @@ $("editorOptionsPanel")?.addEventListener("click", e => {
   e.stopPropagation();
 });
 
-$("editorOptionsCloseBtn")?.addEventListener("click", e => {
-  e.stopPropagation();
-  if (Date.now() < optionsPanelDismissGuardUntil) return;
-  setOptionsOpen(false);
-});
+if (
+  window.waywordOptionsPanelInteractions &&
+  typeof window.waywordOptionsPanelInteractions.bindOptionsPanelInteractions === "function"
+) {
+  window.waywordOptionsPanelInteractions.bindOptionsPanelInteractions({
+    $,
+    getOptionsOpen() {
+      return state.optionsOpen;
+    },
+    getOptionsPanelDismissGuardUntil() {
+      return optionsPanelDismissGuardUntil;
+    },
+    setOptionsOpen
+  });
+} else {
+  $("editorOptionsBackdrop")?.addEventListener("click", e => {
+    if (Date.now() < optionsPanelDismissGuardUntil) return;
+    const panel = $("editorOptionsPanel");
+    if (panel?.contains(e.target)) return;
+    setOptionsOpen(false);
+  });
+
+  let suppressGearClickToggle = false;
+  $("optionsTrigger")?.addEventListener(
+    "pointerdown",
+    () => {
+      suppressGearClickToggle = false;
+      if (!state.optionsOpen) {
+        setOptionsOpen(true);
+        suppressGearClickToggle = true;
+      }
+    },
+    true
+  );
+
+  $("optionsTrigger")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (suppressGearClickToggle) {
+      suppressGearClickToggle = false;
+      return;
+    }
+    setOptionsOpen(!state.optionsOpen);
+  });
+
+  $("editorOptionsCloseBtn")?.addEventListener("click", e => {
+    e.stopPropagation();
+    if (Date.now() < optionsPanelDismissGuardUntil) return;
+    setOptionsOpen(false);
+  });
+}
 
 document.addEventListener("click", e => {
   const editor = $("metaEditorRow");
@@ -5257,6 +5415,18 @@ document.addEventListener("click", e => {
 });
 
 document.addEventListener("pointerdown", (e) => {
+  if (
+    window.waywordMobileEditorFocusGuard &&
+    typeof window.waywordMobileEditorFocusGuard.handleDocumentPointerDown === "function"
+  ) {
+    return window.waywordMobileEditorFocusGuard.handleDocumentPointerDown(
+      {
+        editorInput,
+        isMobileViewport
+      },
+      e
+    );
+  }
   if (!editorInput) return;
   if (!isMobileViewport()) return;
   if (!document.body.classList.contains("focus-mode")) return;
@@ -5397,43 +5567,10 @@ bindEditorSemanticPicker();
 bindMetricExplainerDelegation("recentDrawerList");
 bindMetricExplainerDelegation("recentRailList");
 
-(function wireRecentRunsExpandToggle() {
-  const drawerBtn = $("recentDrawerMoreBtn");
-  if (drawerBtn && drawerBtn.dataset.recentRunsExpandBound !== "1") {
-    drawerBtn.dataset.recentRunsExpandBound = "1";
-    drawerBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      state.recentRunsHistoryExpanded = !state.recentRunsHistoryExpanded;
-      renderHistory();
-    });
-  }
-  const railBtn = $("recentRailMoreBtn");
-  if (railBtn && railBtn.dataset.recentRunsExpandBound !== "1") {
-    railBtn.dataset.recentRunsExpandBound = "1";
-    railBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      state.recentRunsHistoryExpanded = !state.recentRunsHistoryExpanded;
-      renderHistory();
-    });
-  }
-  const railBackdrop = $("recentRailExpandedBackdrop");
-  if (railBackdrop && railBackdrop.dataset.recentRailDismissBound !== "1") {
-    railBackdrop.dataset.recentRailDismissBound = "1";
-    railBackdrop.addEventListener("click", () => {
-      if (!document.body.classList.contains("recent-rail-expanded")) return;
-      state.recentRunsHistoryExpanded = false;
-      renderHistory();
-    });
-  }
-  const railClose = $("recentRailExpandedCloseBtn");
-  if (railClose && railClose.dataset.recentRailDismissBound !== "1") {
-    railClose.dataset.recentRailDismissBound = "1";
-    railClose.addEventListener("click", () => {
-      if (!document.body.classList.contains("recent-rail-expanded")) return;
-      state.recentRunsHistoryExpanded = false;
-      renderHistory();
-    });
-  }
-})();
+window.waywordRecentRunsTransition.bindRecentRunsExpandDismissUi({
+  $,
+  state,
+  renderHistory
+});
 
 queueViewportSync();

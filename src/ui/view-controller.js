@@ -84,6 +84,16 @@
    * @param {(root: HTMLElement | null) => void} collapseMirrorEvidenceInRoot
    */
   function toggleRecentEntry(entry, collapseMirrorEvidenceInRoot) {
+    if (
+      window.waywordRecentRunsInteraction &&
+      typeof window.waywordRecentRunsInteraction.toggleRecentEntry === "function"
+    ) {
+      return window.waywordRecentRunsInteraction.toggleRecentEntry(
+        entry,
+        collapseMirrorEvidenceInRoot
+      );
+    }
+
     const expanded = entry.querySelector(".recent-entry-expanded");
     if (!expanded) return;
 
