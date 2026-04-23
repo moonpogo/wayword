@@ -5046,6 +5046,23 @@ function triggerShuffle() {
 }
 
 function startExerciseRun(wordsOrWord) {
+  if (
+    window.waywordWritingExerciseStartCoordinator &&
+    typeof window.waywordWritingExerciseStartCoordinator.startExerciseRun === "function"
+  ) {
+    return window.waywordWritingExerciseStartCoordinator.startExerciseRun(
+      {
+        normalizeExerciseWords,
+        setExerciseWords,
+        startWriting,
+        renderMeta,
+        renderHighlight,
+        renderSidebar
+      },
+      wordsOrWord
+    );
+  }
+
   const words = Array.isArray(wordsOrWord)
     ? wordsOrWord
     : [wordsOrWord];
