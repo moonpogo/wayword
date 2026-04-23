@@ -3774,9 +3774,6 @@ function syncWordTargetLabels() {
 }
 
 function renderMeta() {
-  const bannedPill = $("bannedPill");
-  const bannedInlineInputPanel = $("bannedInlineInputPanel");
-
   if (
     window.waywordWritingPromptCardPresentation &&
     typeof window.waywordWritingPromptCardPresentation.renderPromptCard === "function"
@@ -3809,13 +3806,26 @@ function renderMeta() {
     }
   }
 
-  if (bannedPill) {
-    const bannedText = state.banned.length ? state.banned.join(", ") : "none";
-    bannedPill.textContent = `avoid: ${bannedText}`;
-  }
+  if (
+    window.waywordWritingBannedPanelPresentation &&
+    typeof window.waywordWritingBannedPanelPresentation.syncBannedPanelPresentation === "function"
+  ) {
+    window.waywordWritingBannedPanelPresentation.syncBannedPanelPresentation({
+      $,
+      document,
+      state
+    });
+  } else {
+    const bannedPill = $("bannedPill");
+    if (bannedPill) {
+      const bannedText = state.banned.length ? state.banned.join(", ") : "none";
+      bannedPill.textContent = `avoid: ${bannedText}`;
+    }
 
-  if (bannedInlineInputPanel && document.activeElement !== bannedInlineInputPanel) {
-    bannedInlineInputPanel.value = state.banned.join(", ");
+    const bannedInlineInputPanel = $("bannedInlineInputPanel");
+    if (bannedInlineInputPanel && document.activeElement !== bannedInlineInputPanel) {
+      bannedInlineInputPanel.value = state.banned.join(", ");
+    }
   }
 
   renderExerciseBanner();
