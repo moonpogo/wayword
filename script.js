@@ -3586,6 +3586,18 @@ function initEditorCompletedFlow() {
 }
 
 function setActiveModeButton(containerId, attribute, value) {
+  if (
+    window.waywordWritingModeButtonPresentation &&
+    typeof window.waywordWritingModeButtonPresentation.setActiveModeButton === "function"
+  ) {
+    return window.waywordWritingModeButtonPresentation.setActiveModeButton(
+      { $ },
+      containerId,
+      attribute,
+      value
+    );
+  }
+
   const container = $(containerId);
   if (!container) return;
   const sel = attribute === "words" ? "button[data-words]" : "button[data-time]";
