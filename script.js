@@ -4827,6 +4827,26 @@ function saveBannedInline() {
 }
 
 function triggerShuffle() {
+  if (
+    window.waywordWritingShuffleCoordinator &&
+    typeof window.waywordWritingShuffleCoordinator.triggerShuffle === "function"
+  ) {
+    return window.waywordWritingShuffleCoordinator.triggerShuffle({
+      $,
+      document,
+      state,
+      shuffleTargetWords: SHUFFLE_TARGET_WORDS,
+      shuffleTimerSeconds: SHUFFLE_TIMER_SECONDS,
+      bannedSets,
+      stopTimer,
+      setActiveModeButton,
+      renderMeta,
+      renderHighlight,
+      renderSidebar,
+      renderWritingState
+    });
+  }
+
   state.targetWords =
     SHUFFLE_TARGET_WORDS[Math.floor(Math.random() * SHUFFLE_TARGET_WORDS.length)];
   state.timerSeconds =
