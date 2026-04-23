@@ -533,6 +533,20 @@ function normalizeExerciseWords(words) {
 }
 
 function setExerciseWords(words) {
+  if (
+    window.waywordWritingExerciseWordsCoordinator &&
+    typeof window.waywordWritingExerciseWordsCoordinator.setExerciseWords === "function"
+  ) {
+    return window.waywordWritingExerciseWordsCoordinator.setExerciseWords(
+      {
+        state,
+        normalizeExerciseWords,
+        storage: window.waywordStorage
+      },
+      words
+    );
+  }
+
   state.exerciseWords = normalizeExerciseWords(words);
   if (state.exerciseWords.length) {
     window.waywordStorage.saveExerciseWords(state.exerciseWords);
