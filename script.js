@@ -5059,6 +5059,21 @@ function startExerciseRun(wordsOrWord) {
 }
 
 function clearExerciseIfCompleted(text) {
+  if (
+    window.waywordWritingExerciseCompletionCoordinator &&
+    typeof window.waywordWritingExerciseCompletionCoordinator.clearExerciseIfCompleted === "function"
+  ) {
+    return window.waywordWritingExerciseCompletionCoordinator.clearExerciseIfCompleted(
+      {
+        state,
+        tokenize,
+        storage: window.waywordStorage,
+        setExerciseWords
+      },
+      text
+    );
+  }
+
   if (!state.exerciseWords.length) return;
 
   const tokens = tokenize(text);
