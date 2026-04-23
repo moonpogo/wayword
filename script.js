@@ -1461,6 +1461,13 @@ function setEditorText(text) {
 }
 
 function focusEditorToEnd() {
+  if (
+    window.waywordEditorFocusPresentation &&
+    typeof window.waywordEditorFocusPresentation.focusEditorToEnd === "function"
+  ) {
+    return window.waywordEditorFocusPresentation.focusEditorToEnd(editorInput);
+  }
+
   if (!editorInput) return;
 
   editorInput.focus({ preventScroll: true });
@@ -1477,6 +1484,13 @@ function focusEditorToEnd() {
 }
 
 function focusEditorToStart() {
+  if (
+    window.waywordEditorFocusPresentation &&
+    typeof window.waywordEditorFocusPresentation.focusEditorToStart === "function"
+  ) {
+    return window.waywordEditorFocusPresentation.focusEditorToStart(editorInput);
+  }
+
   if (!editorInput) return;
 
   editorInput.focus({ preventScroll: true });
@@ -1494,6 +1508,16 @@ function focusEditorToStart() {
 
 /** Shared delayed focus timing for run start flows. */
 function scheduleDeferredEditorFocus(focusCaret = "end") {
+  if (
+    window.waywordEditorFocusPresentation &&
+    typeof window.waywordEditorFocusPresentation.scheduleDeferredEditorFocus === "function"
+  ) {
+    return window.waywordEditorFocusPresentation.scheduleDeferredEditorFocus({
+      editorInput,
+      focusCaret
+    });
+  }
+
   setTimeout(() => {
     if (focusCaret === "start") {
       focusEditorToStart();
