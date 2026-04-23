@@ -5453,21 +5453,7 @@ $("enterSubmitBtn")?.addEventListener("click", () => {
   if (!editorInput || getEditorText().trim().length === 0) return;
   submitWriting(false);
 });
-$("bannedPill")?.addEventListener("click", () => {
-  setBannedEditorOpen(!state.bannedEditorOpen);
-});
-
 $("saveBannedBtn")?.addEventListener("click", saveBannedInline);
-
-$("bannedInlineInput")?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    saveBannedInline();
-  }
-  if (e.key === "Escape") {
-    setBannedEditorOpen(false);
-  }
-});
 
 $("editorOptionsPanel")?.addEventListener("pointerdown", e => {
   e.stopPropagation();
@@ -5528,19 +5514,47 @@ if (
   });
 }
 
-document.addEventListener("click", e => {
-  const editor = $("metaEditorRow");
-  const pill = $("bannedPill");
+if (
+  window.waywordInlineBannedEditorInteractions &&
+  typeof window.waywordInlineBannedEditorInteractions.bindInlineBannedEditorInteractions === "function"
+) {
+  window.waywordInlineBannedEditorInteractions.bindInlineBannedEditorInteractions({
+    $,
+    getBannedEditorOpen() {
+      return state.bannedEditorOpen;
+    },
+    setBannedEditorOpen,
+    saveBannedInline
+  });
+} else {
+  $("bannedPill")?.addEventListener("click", () => {
+    setBannedEditorOpen(!state.bannedEditorOpen);
+  });
 
-  if (!editor || !pill) return;
+  $("bannedInlineInput")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveBannedInline();
+    }
+    if (e.key === "Escape") {
+      setBannedEditorOpen(false);
+    }
+  });
 
-  const clickedInside = editor.contains(e.target);
-  const clickedPill = pill.contains(e.target);
+  document.addEventListener("click", e => {
+    const editor = $("metaEditorRow");
+    const pill = $("bannedPill");
 
-  if (!clickedInside && !clickedPill) {
-    setBannedEditorOpen(false);
-  }
-});
+    if (!editor || !pill) return;
+
+    const clickedInside = editor.contains(e.target);
+    const clickedPill = pill.contains(e.target);
+
+    if (!clickedInside && !clickedPill) {
+      setBannedEditorOpen(false);
+    }
+  });
+}
 
 document.addEventListener("pointerdown", (e) => {
   if (
