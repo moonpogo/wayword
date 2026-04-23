@@ -3764,26 +3764,39 @@ function renderMeta() {
   updateTimeFill();
   updateEnterButtonVisibility();
 
-  let rerollBtn = $("promptRerollBtn");
-  if (rerollBtn) {
-    normalizePromptRerollButtonIfNeeded();
-    rerollBtn = $("promptRerollBtn");
-  }
+  if (
+    window.waywordWritingPromptRerollPresentation &&
+    typeof window.waywordWritingPromptRerollPresentation.renderPromptRerollButton === "function"
+  ) {
+    window.waywordWritingPromptRerollPresentation.renderPromptRerollButton({
+      $,
+      state,
+      rerollLimit: PROMPT_REROLL_LIMIT,
+      canRerollPrompt,
+      normalizePromptRerollButtonIfNeeded
+    });
+  } else {
+    let rerollBtn = $("promptRerollBtn");
+    if (rerollBtn) {
+      normalizePromptRerollButtonIfNeeded();
+      rerollBtn = $("promptRerollBtn");
+    }
 
-  if (rerollBtn) {
-    const remaining = Math.max(0, PROMPT_REROLL_LIMIT - state.promptRerollsUsed);
-    const locked = !canRerollPrompt();
+    if (rerollBtn) {
+      const remaining = Math.max(0, PROMPT_REROLL_LIMIT - state.promptRerollsUsed);
+      const locked = !canRerollPrompt();
 
-    rerollBtn.disabled = locked;
-    rerollBtn.classList.toggle("locked", locked);
-    rerollBtn.classList.toggle("hidden", remaining === 0);
-    rerollBtn.dataset.rerolls = String(remaining);
-    rerollBtn.setAttribute(
-      "aria-label",
-      remaining === 0
-        ? "No prompt rerolls left"
-        : `Get a different prompt (${remaining} reroll${remaining === 1 ? "" : "s"} left)`
-    );
+      rerollBtn.disabled = locked;
+      rerollBtn.classList.toggle("locked", locked);
+      rerollBtn.classList.toggle("hidden", remaining === 0);
+      rerollBtn.dataset.rerolls = String(remaining);
+      rerollBtn.setAttribute(
+        "aria-label",
+        remaining === 0
+          ? "No prompt rerolls left"
+          : `Get a different prompt (${remaining} reroll${remaining === 1 ? "" : "s"} left)`
+      );
+    }
   }
 }
 
