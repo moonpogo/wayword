@@ -2323,6 +2323,18 @@ function ensurePromptRerollButton() {
 ----------------------------- */
 
 function updateWordProgress() {
+  if (
+    window.waywordWritingProgressCoordinator &&
+    typeof window.waywordWritingProgressCoordinator.updateWordProgress === "function"
+  ) {
+    return window.waywordWritingProgressCoordinator.updateWordProgress({
+      $,
+      state,
+      tokenize,
+      getEditorText
+    });
+  }
+
   const fill = $("editorProgressFill");
   const progressRoot = fill?.closest(".editor-progress");
   const track = fill?.closest(".editor-progress-track");
@@ -2371,6 +2383,16 @@ function updateWordProgress() {
 }
 
 function updateTimeFill() {
+  if (
+    window.waywordWritingProgressCoordinator &&
+    typeof window.waywordWritingProgressCoordinator.updateTimeFill === "function"
+  ) {
+    return window.waywordWritingProgressCoordinator.updateTimeFill({
+      $,
+      state
+    });
+  }
+
   const fill = $("editorTimeFill");
   if (!fill) return;
 
