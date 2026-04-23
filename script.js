@@ -1711,6 +1711,32 @@ function bannedListsShallowEqual(a, b) {
 }
 
 function flushBannedPanelPersistFromPanel() {
+  if (
+    window.waywordBannedPanelPersistCoordinator &&
+    typeof window.waywordBannedPanelPersistCoordinator.flushBannedPanelPersistFromPanel === "function"
+  ) {
+    return window.waywordBannedPanelPersistCoordinator.flushBannedPanelPersistFromPanel({
+      $,
+      state,
+      bannedPanelPersistTimerRef: {
+        get value() {
+          return bannedPanelPersistTimer;
+        },
+        set value(next) {
+          bannedPanelPersistTimer = next;
+        }
+      },
+      bannedWordsListFromPanelFieldValue,
+      bannedListsShallowEqual,
+      applyWriteDocSemanticFlagsFromAnalysis,
+      scheduleEditorDotOverlaySync,
+      renderAnnotationRow,
+      renderMeta,
+      renderHighlight,
+      renderSidebar
+    });
+  }
+
   if (bannedPanelPersistTimer != null) {
     clearTimeout(bannedPanelPersistTimer);
     bannedPanelPersistTimer = null;
@@ -1731,6 +1757,33 @@ function flushBannedPanelPersistFromPanel() {
 }
 
 function scheduleBannedPanelPersistFromPanel() {
+  if (
+    window.waywordBannedPanelPersistCoordinator &&
+    typeof window.waywordBannedPanelPersistCoordinator.scheduleBannedPanelPersistFromPanel === "function"
+  ) {
+    return window.waywordBannedPanelPersistCoordinator.scheduleBannedPanelPersistFromPanel({
+      bannedPanelPersistTimerRef: {
+        get value() {
+          return bannedPanelPersistTimer;
+        },
+        set value(next) {
+          bannedPanelPersistTimer = next;
+        }
+      },
+      debounceMs: BANNED_PANEL_DEBOUNCE_MS,
+      $,
+      state,
+      bannedWordsListFromPanelFieldValue,
+      bannedListsShallowEqual,
+      applyWriteDocSemanticFlagsFromAnalysis,
+      scheduleEditorDotOverlaySync,
+      renderAnnotationRow,
+      renderMeta,
+      renderHighlight,
+      renderSidebar
+    });
+  }
+
   if (bannedPanelPersistTimer != null) clearTimeout(bannedPanelPersistTimer);
   bannedPanelPersistTimer = window.setTimeout(() => {
     bannedPanelPersistTimer = null;
