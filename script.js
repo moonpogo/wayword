@@ -3707,27 +3707,39 @@ function syncWordTargetLabels() {
 }
 
 function renderMeta() {
-  const promptCard = $("promptCard");
-  const promptText = $("promptText");
-  const promptFamily = $("promptFamilyLabel");
   const bannedPill = $("bannedPill");
   const bannedInlineInputPanel = $("bannedInlineInputPanel");
 
-  if (promptCard) promptCard.classList.toggle("hidden", !state.active);
-  if (promptText) promptText.textContent = state.prompt || "";
-  if (promptFamily) promptFamily.textContent = state.promptFamily || "Prompt";
+  if (
+    window.waywordWritingPromptCardPresentation &&
+    typeof window.waywordWritingPromptCardPresentation.renderPromptCard === "function"
+  ) {
+    window.waywordWritingPromptCardPresentation.renderPromptCard({
+      $,
+      state,
+      getActivePromptNudgeLineForRender
+    });
+  } else {
+    const promptCard = $("promptCard");
+    const promptText = $("promptText");
+    const promptFamily = $("promptFamilyLabel");
 
-  const promptNudge = $("promptNudge");
-  const promptMain = promptCard?.querySelector(".prompt-main") ?? null;
-  const nudgeRowVisible = Boolean(state.active && !state.submitted);
-  if (promptNudge) {
-    const nudge = nudgeRowVisible ? getActivePromptNudgeLineForRender() : "";
-    promptNudge.textContent = nudge;
-    promptNudge.classList.toggle("hidden", !nudgeRowVisible);
-    promptNudge.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
-  }
-  if (promptMain) {
-    promptMain.classList.toggle("prompt-main--with-nudge", nudgeRowVisible);
+    if (promptCard) promptCard.classList.toggle("hidden", !state.active);
+    if (promptText) promptText.textContent = state.prompt || "";
+    if (promptFamily) promptFamily.textContent = state.promptFamily || "Prompt";
+
+    const promptNudge = $("promptNudge");
+    const promptMain = promptCard?.querySelector(".prompt-main") ?? null;
+    const nudgeRowVisible = Boolean(state.active && !state.submitted);
+    if (promptNudge) {
+      const nudge = nudgeRowVisible ? getActivePromptNudgeLineForRender() : "";
+      promptNudge.textContent = nudge;
+      promptNudge.classList.toggle("hidden", !nudgeRowVisible);
+      promptNudge.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
+    }
+    if (promptMain) {
+      promptMain.classList.toggle("prompt-main--with-nudge", nudgeRowVisible);
+    }
   }
 
   if (bannedPill) {
