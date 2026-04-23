@@ -3561,6 +3561,20 @@ function setActiveModeButton(containerId, attribute, value) {
 }
 
 function setBannedEditorOpen(open) {
+  if (
+    window.waywordInlineBannedEditorPresentation &&
+    typeof window.waywordInlineBannedEditorPresentation.setBannedEditorOpen === "function"
+  ) {
+    return window.waywordInlineBannedEditorPresentation.setBannedEditorOpen({
+      $,
+      state,
+      open,
+      getBannedValue() {
+        return state.banned.join(", ");
+      }
+    });
+  }
+
   state.bannedEditorOpen = open;
   $("metaEditorRow")?.classList.toggle("hidden", !open);
   if (open) {
