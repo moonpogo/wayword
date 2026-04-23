@@ -1417,7 +1417,14 @@ function projectWriteDocToEditorFromState(anchor, focus, backward) {
   if (typeof anchor === "number" && typeof focus === "number") {
     setSelectionOffsetsForEditorRoot(editorInput, anchor, focus, Boolean(backward));
   }
-  editorInput.classList.toggle("is-empty", !canonical.trim());
+  if (
+    window.waywordEditorStatePresentation &&
+    typeof window.waywordEditorStatePresentation.syncEditorEmptyState === "function"
+  ) {
+    window.waywordEditorStatePresentation.syncEditorEmptyState(editorInput, canonical);
+  } else {
+    editorInput.classList.toggle("is-empty", !canonical.trim());
+  }
 }
 
 function flushEditorSurfaceIntoWriteDocOnce() {
@@ -3668,11 +3675,22 @@ function renderWritingState(options = {}) {
 
   const deferPostRunOverlaySync = Boolean(options.deferPostRunOverlaySync);
 
-  const isLocked = !state.active || state.submitted;
+  if (
+    window.waywordEditorStatePresentation &&
+    typeof window.waywordEditorStatePresentation.applyEditorWritingState === "function"
+  ) {
+    window.waywordEditorStatePresentation.applyEditorWritingState({
+      state,
+      editorInput,
+      getEditorText
+    });
+  } else {
+    const isLocked = !state.active || state.submitted;
 
-  editorInput.setAttribute("contenteditable", isLocked ? "false" : "true");
-  editorInput.setAttribute("data-placeholder", "");
-  editorInput.classList.toggle("is-empty", !getEditorText().trim());
+    editorInput.setAttribute("contenteditable", isLocked ? "false" : "true");
+    editorInput.setAttribute("data-placeholder", "");
+    editorInput.classList.toggle("is-empty", !getEditorText().trim());
+  }
 
   updateSubmitButtonState();
   updateWordProgress();
