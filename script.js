@@ -1768,6 +1768,18 @@ function applyTimerFromPanel(nextSeconds) {
 }
 
 function afterOptionsPanelClosed() {
+  if (
+    window.waywordEditorFocusRecovery &&
+    typeof window.waywordEditorFocusRecovery.afterOptionsPanelClosed === "function"
+  ) {
+    return window.waywordEditorFocusRecovery.afterOptionsPanelClosed({
+      isMobileViewport,
+      state,
+      editorInput,
+      focusEditorToEnd
+    });
+  }
+
   if (!isMobileViewport()) return;
   if (!document.body.classList.contains("focus-mode")) return;
   if (!state.active || state.submitted || !editorInput) return;
