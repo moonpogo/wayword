@@ -3753,16 +3753,30 @@ function renderMeta() {
 
   renderExerciseBanner();
 
-  setActiveModeButton("wordModes", "words", state.targetWords);
-  setActiveModeButton("timeModes", "time", state.timerSeconds);
-  setActiveModeButton("wordModesPanel", "words", state.targetWords);
-  setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
+  if (
+    window.waywordWritingMetaSurfaceCoordinator &&
+    typeof window.waywordWritingMetaSurfaceCoordinator.syncMetaSurface === "function"
+  ) {
+    window.waywordWritingMetaSurfaceCoordinator.syncMetaSurface({
+      state,
+      setActiveModeButton,
+      syncWordTargetLabels,
+      updateWordProgress,
+      updateTimeFill,
+      updateEnterButtonVisibility
+    });
+  } else {
+    setActiveModeButton("wordModes", "words", state.targetWords);
+    setActiveModeButton("timeModes", "time", state.timerSeconds);
+    setActiveModeButton("wordModesPanel", "words", state.targetWords);
+    setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
 
-  syncWordTargetLabels();
+    syncWordTargetLabels();
 
-  updateWordProgress();
-  updateTimeFill();
-  updateEnterButtonVisibility();
+    updateWordProgress();
+    updateTimeFill();
+    updateEnterButtonVisibility();
+  }
 
   if (
     window.waywordWritingPromptRerollPresentation &&
