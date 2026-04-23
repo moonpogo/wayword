@@ -3643,6 +3643,16 @@ function setBannedEditorOpen(open) {
 ----------------------------- */
 
 function renderExerciseBanner() {
+  if (
+    window.waywordWritingExerciseBannerPresentation &&
+    typeof window.waywordWritingExerciseBannerPresentation.renderExerciseBanner === "function"
+  ) {
+    return window.waywordWritingExerciseBannerPresentation.renderExerciseBanner({
+      $,
+      state
+    });
+  }
+
   const bannedPill = $("bannedPill");
   const exercisePill = $("exerciseLegendPill");
   if (!bannedPill) return;
