@@ -1984,8 +1984,10 @@ function toggleTheme() {
 }
 
 /**
- * Saved runs for UI/analysis: canonical document repo (`waywordSavedRunsRead`), oldest → newest.
- * Matches legacy `state.history` index order. Falls back to `state.history` if the read module is absent.
+ * Saved runs for UI/analysis (progression, Patterns digests, chronological walks).
+ * Uses canonical documents via `waywordSavedRunsRead` when present; else copies `state.history`
+ * (oldest → newest, same index order as legacy push). Does not merge legacy when the read module
+ * exists but the canonical store is empty—see `docs/SAVED_RUNS_PERSISTENCE.md`.
  */
 function readSavedRunsChronological() {
   if (window.waywordSavedRunsRead && typeof window.waywordSavedRunsRead.listSavedRunsChronological === "function") {
@@ -1995,7 +1997,8 @@ function readSavedRunsChronological() {
 }
 
 /**
- * Saved runs newest → oldest (same iteration order as `state.history.slice().reverse()`).
+ * Saved runs newest → oldest (Recent Runs drawer/rail). Same precedence as
+ * `readSavedRunsChronological`; see `docs/SAVED_RUNS_PERSISTENCE.md`.
  */
 function readSavedRunsNewestFirst() {
   if (window.waywordSavedRunsRead && typeof window.waywordSavedRunsRead.listSavedRunsNewestFirst === "function") {

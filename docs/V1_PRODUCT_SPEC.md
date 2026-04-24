@@ -90,7 +90,7 @@ Mirror V1 does not:
 
 Wayword V1 is local-first and browser-local only.
 
-- Saved runs persist in browser `localStorage`.
+- Saved runs persist in browser `localStorage` (canonical run-document envelope plus legacy history; see `docs/SAVED_RUNS_PERSISTENCE.md`).
 - Theme, progression state, selected pattern words, and related local settings also persist in `localStorage`.
 - V1 does not include accounts, cloud sync, or remote storage.
 

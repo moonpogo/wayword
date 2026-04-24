@@ -1,5 +1,14 @@
 # Build Log
 
+## Current Pass: Saved-run persistence contract
+
+- Added **`docs/SAVED_RUNS_PERSISTENCE.md`**: single normative description of dual stores (canonical `wayword-run-documents-v1` vs legacy `wayword-history`), fixed write order in `waywordSavedRunPersistence`, read precedence via `waywordSavedRunsRead` vs `script.js` fallback when the read module is absent, boot migration (`mergeLegacyHistoryMissingIntoCanonicalStore`), corrupt envelope handling, and the explicit same-session gap when canonical upsert fails but legacy sync succeeds.
+- **`docs/STATE_FLOW.md`** and **`docs/V1_PRODUCT_SPEC.md`**: cross-linked / clarified read fallback semantics (module missing ≠ “canonical list empty”).
+- **`script.js`**: `readSavedRunsChronological` / `readSavedRunsNewestFirst` comments now point at the contract doc and state that an empty canonical list does not merge legacy rows when the read module is present.
+- **`savedRunPersistence.js`**, **`savedRunsCanonicalRead.js`**: contract pointers in module headers.
+- **`successful-submit-coordinator.js`**: when `persistSuccessfulSavedRun` is missing but `syncLegacySavedRunState` exists, delegate to the same legacy sync helper instead of duplicating push/id/persist ordering.
+- **`tests/app-logic.test.cjs`**: strengthened canonical-failure test (full stack + inner repo length + read length); added corrupt JSON / unknown envelope-version tests; added legacy migration idempotency test; added `loadRunMigrationContext` helper.
+
 ## Current Pass: Patterns / mobile transition ownership seam
 
 - **`showProfile`:** `script.js` no longer carries a second copy of open/close, mobile resolver, reduced-motion, and desktop `profile-view--recede` token logic. Single owner remains `window.waywordPatternsTransitionCoordinator` (`patterns-transition-coordinator.js`); close motion token stays module-private there.

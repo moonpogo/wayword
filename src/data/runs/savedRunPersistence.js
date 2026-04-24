@@ -83,7 +83,7 @@
   }
 
   /**
-   * Canonical-first saved-run persistence seam.
+   * Canonical-first saved-run persistence seam. Normative contract: `docs/SAVED_RUNS_PERSISTENCE.md`.
    * Order is intentionally explicit:
    * 1. Assemble canonical document.
    * 2. Project canonical document to the legacy history row when possible.

@@ -108,6 +108,24 @@ function loadSavedRunsContext(overrides = {}) {
   );
 }
 
+function loadRunMigrationContext(overrides = {}) {
+  return loadBrowserScripts(
+    [
+      "src/data/runs/schemaVersion.js",
+      "src/data/runs/runDocumentUtils.js",
+      "src/data/runs/runDocumentMarkdown.js",
+      "src/data/runs/runDocumentModel.js",
+      "src/data/runs/runDocumentRepository.js",
+      "src/data/runs/migrateLegacyRunDocuments.js",
+    ],
+    {
+      console: silentConsole(),
+      localStorage: createMemoryStorage(),
+      ...overrides,
+    }
+  );
+}
+
 function makeCanonicalSaveInput(overrides = {}) {
   return {
     runId: "run-default",
@@ -387,20 +405,22 @@ test("saved-run persistence writes canonical documents and reads them back in bo
 
 test("saved-run persistence keeps legacy sync alive when canonical upsert fails", () => {
   const removedMarkers = [];
-  const context = loadBrowserScripts(["src/data/runs/savedRunPersistence.js"], {
-    console: silentConsole(),
+  const context = loadSavedRunsContext();
+  const innerRepo = context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+    storage: context.localStorage,
   });
-  context.waywordRunDocumentsModel = {
-    assembleRunDocumentForSuccessfulSave() {
-      return { runId: "run-fail" };
-    },
-    legacyHistoryRowFromCanonicalDocument() {
-      return { runId: "run-fail", text: "projected row" };
-    },
-  };
   context.waywordRunDocumentRepo = {
     upsertDocument() {
       throw new Error("quota");
+    },
+    listDocumentsParsed() {
+      return innerRepo.listDocumentsParsed();
+    },
+    getDocumentByRunId(id) {
+      return innerRepo.getDocumentByRunId(id);
+    },
+    clearAllDocuments() {
+      return innerRepo.clearAllDocuments();
     },
   };
   context.waywordStorage = {
@@ -415,7 +435,12 @@ test("saved-run persistence keeps legacy sync alive when canonical upsert fails"
 
   const result = context.waywordSavedRunPersistence.persistSuccessfulSavedRun({
     run: { runId: "run-fail" },
-    canonicalSaveInput: { runId: "run-fail" },
+    canonicalSaveInput: makeCanonicalSaveInput({
+      runId: "run-fail",
+      savedAt: 100,
+      timestamp: 100,
+      body: "projected row body text",
+    }),
     history,
     savedRunIds,
     inactivityEaseRunKey: "ease-key",
@@ -428,8 +453,92 @@ test("saved-run persistence keeps legacy sync alive when canonical upsert fails"
   assert.equal(result.legacyPersisted, true);
   assert.equal(history.length, 1);
   assert.equal(history[0].runId, "run-fail");
-  assert.equal(history[0].text, "projected row");
+  assert.equal(String(history[0].text || "").trim(), "projected row body text");
   assert.ok(savedRunIds.has("run-fail"));
   assert.equal(persistCalls, 1);
   assert.deepEqual(removedMarkers, ["ease-key"]);
+  assert.equal(innerRepo.listDocumentsParsed().length, 0, "canonical store must stay empty when upsert throws");
+  assert.equal(
+    context.waywordSavedRunsRead.listSavedRunsChronological().length,
+    0,
+    "savedRunsRead lists repo only; legacy row lives in memory until reload/migration"
+  );
+});
+
+test("run document repository treats corrupt envelope JSON as empty", () => {
+  const storage = createMemoryStorage();
+  storage.setItem("wayword-run-documents-v1", "not-json{");
+  const context = loadBrowserScripts(
+    ["src/data/runs/schemaVersion.js", "src/data/runs/runDocumentRepository.js"],
+    { console: silentConsole(), localStorage: storage }
+  );
+  const repo = context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+    storage,
+  });
+  assert.equal(repo.listDocumentsParsed().length, 0);
+});
+
+test("run document repository ignores unknown store envelope versions", () => {
+  const storage = createMemoryStorage();
+  storage.setItem(
+    "wayword-run-documents-v1",
+    JSON.stringify({ storeEnvelopeVersion: 99999, items: ["should-be-ignored"] })
+  );
+  const context = loadBrowserScripts(
+    ["src/data/runs/schemaVersion.js", "src/data/runs/runDocumentRepository.js"],
+    { console: silentConsole(), localStorage: storage }
+  );
+  const repo = context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+    storage,
+  });
+  assert.equal(repo.listDocumentsParsed().length, 0);
+});
+
+test("legacy migration merges rows missing from canonical store only once", () => {
+  const storage = createMemoryStorage();
+  const legacyRow = {
+    runId: "mig-1",
+    text: "one two three four",
+    prompt: "Prompt",
+    savedAt: 50,
+    timestamp: 50,
+    repeatedWords: [],
+    bannedHits: [],
+    repeatedStarters: [],
+    wordCount: 4,
+    words: 4,
+    runScore: 1,
+    scoreBreakdown: {},
+    challengeActive: false,
+    challengeCompleted: false,
+    challengeWords: [],
+    wasSuccessful: true,
+    activeTargetWords: 60,
+    finishedWithinTime: true,
+    timeRemaining: null,
+    activeTimerSeconds: null,
+    timerConfigured: false,
+    repeatLimitAtRun: 2,
+  };
+  const context = loadRunMigrationContext({
+    localStorage: storage,
+    waywordStorage: {
+      loadHistory() {
+        return [legacyRow];
+      },
+    },
+  });
+  const repo = context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+    storage,
+  });
+  const first = context.waywordRunMigration.mergeLegacyHistoryMissingIntoCanonicalStore(repo);
+  assert.equal(first.merged, 1);
+  assert.equal(first.skipped, 0);
+  const listed = repo.listDocumentsParsed();
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].runId, "mig-1");
+
+  const second = context.waywordRunMigration.mergeLegacyHistoryMissingIntoCanonicalStore(repo);
+  assert.equal(second.merged, 0);
+  assert.equal(second.skipped, 1);
 });

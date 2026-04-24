@@ -1,6 +1,7 @@
 (function () {
   /**
    * Single read path for saved runs from `waywordRunDocumentRepo` for UI and analysis.
+   * Normative contract: `docs/SAVED_RUNS_PERSISTENCE.md`.
    *
    * Ordering (equivalent to legacy `state.history` usage):
    * - **Chronological** = oldest → newest, same as array index order in `state.history` (push order,

@@ -46,7 +46,7 @@ This document maps Wayword's visible app surfaces and major state transitions so
   - completed challenges set
   - pattern-selected words
   - progression level
-- Canonical saved-run reads are used when available (`waywordSavedRunsRead`), with fallback to in-memory `state.history`.
+- Canonical saved-run reads use `waywordSavedRunsRead` when that module loaded; `script.js` falls back to in-memory `state.history` only if the read module is absent (not when the canonical list is merely empty). See `docs/SAVED_RUNS_PERSISTENCE.md`.
 - Should not happen: auto-start writing, auto-submit, or skipping landing without user action.
 
 ### Begin

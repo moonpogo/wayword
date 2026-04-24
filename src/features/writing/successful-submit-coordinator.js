@@ -69,10 +69,24 @@
     }
 
     console.error("wayword: saved run persistence helper missing; falling back to legacy-only sync");
-    input.state.history.push({ ...input.run });
-    input.state.savedRunIds.add(input.run.runId);
-    window.waywordStorage.removeInactivityEaseRun(input.inactivityEaseRunKey);
-    input.persist();
+    if (
+      window.waywordSavedRunPersistence &&
+      typeof window.waywordSavedRunPersistence.syncLegacySavedRunState === "function"
+    ) {
+      window.waywordSavedRunPersistence.syncLegacySavedRunState({
+        history: input.state.history,
+        savedRunIds: input.state.savedRunIds,
+        runId: String(input.run.runId || ""),
+        legacyRow: { ...input.run },
+        inactivityEaseRunKey: input.inactivityEaseRunKey,
+        persist: input.persist,
+      });
+    } else {
+      input.state.history.push({ ...input.run });
+      input.state.savedRunIds.add(input.run.runId);
+      window.waywordStorage.removeInactivityEaseRun(input.inactivityEaseRunKey);
+      input.persist();
+    }
     return {
       canonicalDoc: null,
       legacyRow: { ...input.run },

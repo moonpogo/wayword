@@ -12,6 +12,7 @@
    * @param {Storage} storage
    * @returns {RunDocumentStoreEnvelope}
    */
+  /** Invalid JSON / wrong version / non-array `items` → empty envelope (see `docs/SAVED_RUNS_PERSISTENCE.md`). */
   function readEnvelope(storage) {
     var key = window.WAYWORD_RUN_DOCUMENTS_STORAGE_KEY;
     var raw = storage.getItem(key);
