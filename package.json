@@ -4,7 +4,8 @@
   "description": "Write. See what emerges.",
   "main": "mirror-engine.iife.js",
   "devDependencies": {
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.0",
+    "playwright": "^1.52.0"
   },
   "scripts": {
     "preview": "python3 -m http.server 3001 --bind 127.0.0.1",
@@ -13,6 +14,7 @@
     "verify:patterns-surface": "node scripts/verify-patterns-surface-strings.js",
     "eval:mirror": "node scripts/run-wayword-evaluation.js",
     "eval:patterns": "node scripts/run-patterns-evaluation.js",
+    "postinstall": "playwright install chromium",
     "test:smoke": "node --test tests/browser-smoke.test.cjs",
     "test:logic": "node --test tests/app-logic.test.cjs tests/mirror-pipeline.test.cjs tests/patterns-aggregation.test.cjs",
     "test": "npm run test:logic"

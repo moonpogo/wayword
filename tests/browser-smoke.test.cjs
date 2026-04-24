@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { ROOT } = require("./helpers/bundle-require.cjs");
 const { startStaticServer } = require("./helpers/static-server.cjs");
-const { startSafariWebDriver } = require("./helpers/webdriver.cjs");
+const { startPlaywrightChromium } = require("./helpers/playwright-browser.cjs");
 
 const SMOKE_RUN_TEXTS = [
   "I kept returning to the window and the same streetlight, trying to explain why the room felt narrower after I spoke. I started with a careful sentence, backed away from it, then softened it again. The draft keeps circling the safer words before it reaches the sharper one.",
@@ -16,7 +16,7 @@ let smokeHarness = null;
 
 test.before(async () => {
   const server = await startStaticServer({ rootDir: ROOT });
-  const driver = await startSafariWebDriver();
+  const driver = await startPlaywrightChromium({ headless: true });
   smokeHarness = { driver, server };
 });
 
@@ -26,25 +26,15 @@ test.after(async () => {
   await smokeHarness.server.close();
 });
 
-async function withSmokeSession(t, callback) {
+async function withSmokeSession(_t, callback) {
   if (!smokeHarness) {
     throw new Error("Browser smoke harness was not initialized");
   }
 
-  if (smokeHarness.driver.skipReason) {
-    t.skip(smokeHarness.driver.skipReason);
-    return;
-  }
-
   const sessionState = await smokeHarness.driver.newSession();
-  if (sessionState.skipReason) {
-    t.skip(sessionState.skipReason);
-    return;
-  }
-
   const { session, close } = sessionState;
   try {
-    await session.setWindowRect({ height: 900, width: 1280, x: 0, y: 0 });
+    await session.setWindowRect({ height: 900, width: 960, x: 0, y: 0 });
     await callback(session);
   } finally {
     await close();
@@ -123,9 +113,10 @@ async function beginRun(session) {
       await session.execute(`
         var appView = document.getElementById("appView");
         var editor = document.getElementById("editorInput");
+        var appHidden = appView && appView.getAttribute("aria-hidden") === "true";
         return Boolean(
           appView &&
-          appView.getAttribute("aria-hidden") === "false" &&
+          !appHidden &&
           editor &&
           editor.getAttribute("contenteditable") === "true"
         );
@@ -140,7 +131,7 @@ async function fillEditor(session, text) {
       var editor = document.getElementById("editorInput");
       if (!editor) return 0;
       editor.focus();
-      editor.textContent = arguments[0];
+      editor.textContent = __p0;
       editor.dispatchEvent(new Event("input", { bubbles: true }));
       return String(editor.textContent || "").trim().length;
     `,
