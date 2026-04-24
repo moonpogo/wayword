@@ -829,6 +829,7 @@ function settleNonFocusBaselineAfterPatternsClose() {
 
 let viewportSyncRaf = null;
 let viewportSyncCoalescePending = false;
+let lastDesktopPatternsViewport = null;
 /** After leaving focus mode, ignore transient visualViewport reads so `keyboard-open` does not flicker back on while the shell reflows. */
 let suppressKeyboardOpenTruthUntil = 0;
 /** Ignore blur-driven focus exits during mobile Patterns toggles. */
@@ -991,6 +992,12 @@ function queueViewportSync() {
       syncEditorShellChamferEdge,
       syncEditorCalibrationOverlayClip,
       isMobileViewport,
+      isDesktopPatternsViewport,
+      isProfileVisible() {
+        const profileView = $("profileView");
+        return Boolean(profileView && !profileView.classList.contains("hidden"));
+      },
+      showProfile,
       setFocusMode,
       syncPatternsLayoutMode: window.waywordViewController.syncPatternsLayoutMode,
       renderHistory,
@@ -1011,11 +1018,25 @@ function queueViewportSync() {
     viewportSyncRaf = null;
     logPatternsTransitionSnapshot("queueViewportSync:raf-start");
     try {
+      const desktopPatternsViewport = isDesktopPatternsViewport();
       syncViewportHeightVar();
       syncKeyboardOpenClass();
       syncEditorShellChamferEdge();
       syncEditorCalibrationOverlayClip();
       if (!isMobileViewport()) setFocusMode(false);
+      if (lastDesktopPatternsViewport === null) {
+        lastDesktopPatternsViewport = desktopPatternsViewport;
+      } else {
+        const crossedIntoNarrowPatternsViewport =
+          lastDesktopPatternsViewport && !desktopPatternsViewport;
+        lastDesktopPatternsViewport = desktopPatternsViewport;
+        if (crossedIntoNarrowPatternsViewport) {
+          const profileView = $("profileView");
+          if (profileView && !profileView.classList.contains("hidden")) {
+            showProfile(false);
+          }
+        }
+      }
       window.waywordViewController.syncPatternsLayoutMode();
       renderHistory();
       requestAnimationFrame(() => syncRecentRailExpandedLayoutMetrics());

@@ -1,6 +1,26 @@
 (function () {
   var viewportSyncRaf = null;
   var viewportSyncCoalescePending = false;
+  var lastDesktopPatternsViewport = null;
+
+  function handlePatternsViewportCrossing(input) {
+    var isDesktopPatternsViewport = Boolean(input.isDesktopPatternsViewport());
+
+    if (lastDesktopPatternsViewport === null) {
+      lastDesktopPatternsViewport = isDesktopPatternsViewport;
+      return;
+    }
+
+    var crossedIntoNarrowPatternsViewport =
+      lastDesktopPatternsViewport && !isDesktopPatternsViewport;
+    lastDesktopPatternsViewport = isDesktopPatternsViewport;
+
+    if (!crossedIntoNarrowPatternsViewport) return;
+    if (typeof input.isProfileVisible !== "function" || !input.isProfileVisible()) return;
+    if (typeof input.showProfile !== "function") return;
+
+    input.showProfile(false);
+  }
 
   function queueViewportSync(input) {
     input.logPatternsTransitionSnapshot("queueViewportSync:requested", {
@@ -23,6 +43,7 @@
         if (!input.isMobileViewport()) {
           input.setFocusMode(false);
         }
+        handlePatternsViewportCrossing(input);
         input.syncPatternsLayoutMode();
         input.renderHistory();
         requestAnimationFrame(function () {

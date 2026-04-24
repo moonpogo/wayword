@@ -2338,6 +2338,11 @@ body.focus-mode #profileSummarySection,
     grid-column:1 / -1;
     grid-row:4;
   }
+
+  /* Tighten only the lane below pills/meta when Reflection is present (default 10px is mobile-ish air). */
+  .below-editor-stack > .below-editor-reflection-stack:has(#mirrorReflectionSection:not(.hidden)){
+    margin-top:4px;
+  }
 }
 
 /* Phase 2: read-only token slots (writeDoc only; no contenteditable; not a text source) */
@@ -6099,9 +6104,91 @@ html[data-theme="dark"] .metric-explainer{
 
 @media (min-width:981px){
   .mirror-reflection-section:not(.hidden){
-    margin-top:1.65rem;
-    padding-top:1.15rem;
-    padding-bottom:0.85rem;
+    /* Desktop: sit closer to pill/meta row; avoid mobile-scale top air above the panel. */
+    margin-top:0.42rem;
+    padding-top:0.58rem;
+    padding-bottom:0.58rem;
+    min-width:0;
+  }
+
+  #mirrorReflectionSection:not(.hidden) .mirror-reflection-root{
+    max-width:100%;
+    box-sizing:border-box;
+    padding:0.22rem 0.35rem 0.36rem 0.5rem;
+  }
+
+  #mirrorReflectionSection:not(.hidden) .mirror-reflection-eyebrow{
+    margin-bottom:0.48rem;
+  }
+
+  #mirrorReflectionSection:not(.hidden) .mirror-stack{
+    gap:0.58rem;
+  }
+
+  #mirrorReflectionSection:not(.hidden) .mirror-card{
+    padding:0.42rem 0.5rem 0.48rem;
+  }
+
+  #mirrorReflectionSection:not(.hidden) .mirror-card--main{
+    padding:0.55rem 0.62rem 0.62rem;
+    max-height:min(34vh, 260px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+
+  #mirrorReflectionSection:not(.hidden) .mirror-card--support{
+    max-height:min(28vh, 220px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+
+  #mirrorReflectionSection:not(.hidden) .mirror-card__statement{
+    max-width:100%;
+    text-wrap:wrap;
+  }
+
+  #mirrorReflectionSection:not(.hidden) .mirror-card--main .mirror-card__statement{
+    font-size:1.02rem;
+    line-height:1.52;
+    letter-spacing:0;
+  }
+
+  /*
+   * Collapsed #reflection-line still participates in flex gap — the default 12px reads as dead air
+   * between the pill/meta lane and Reflection on desktop. Pull the stack together without touching
+   * the pill band’s own layout above this stack.
+   */
+  .below-editor-reflection-stack:has(#mirrorReflectionSection:not(.hidden)){
+    gap:3px;
+  }
+
+  /* Semantic legend row present: it grows the pill band; tighten grid + stack + Reflection only. */
+  .below-editor-stack:has(#mirrorReflectionSection:not(.hidden)):has(#editorSemanticStatusBar:not(.hidden)){
+    row-gap:2px;
+  }
+
+  .below-editor-stack:has(#mirrorReflectionSection:not(.hidden)):has(#editorSemanticStatusBar:not(.hidden)) > .below-editor-reflection-stack{
+    margin-top:2px;
+    gap:2px;
+  }
+
+  .below-editor-stack:has(#mirrorReflectionSection:not(.hidden)):has(#editorSemanticStatusBar:not(.hidden)) .mirror-reflection-section:not(.hidden){
+    margin-top:0.08rem;
+    padding-top:0.32rem;
+    padding-bottom:0.42rem;
+  }
+
+  .below-editor-stack:has(#mirrorReflectionSection:not(.hidden)):has(#editorSemanticStatusBar:not(.hidden)) #mirrorReflectionSection:not(.hidden) .mirror-card--main{
+    max-height:min(26vh, 200px);
+  }
+
+  .below-editor-stack:has(#mirrorReflectionSection:not(.hidden)):has(#editorSemanticStatusBar:not(.hidden)) #mirrorReflectionSection:not(.hidden) .mirror-card--support{
+    max-height:min(22vh, 170px);
+  }
+
+  .below-editor-stack:has(#mirrorReflectionSection:not(.hidden)) #editorSemanticStatusBar:not(.hidden) .legend-pill{
+    padding-top:5px;
+    padding-bottom:5px;
   }
 }
 

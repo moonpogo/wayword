@@ -12,6 +12,13 @@ const SMOKE_RUN_TEXTS = [
   "I kept returning to the lamp and the same pale outline on the wall, trying to explain why the exchange felt narrower once it was over. I opened with a mild sentence, revised it, then buffered it again. The draft repeats its approach and tests the same idea from a safer distance.",
 ];
 
+const DESKTOP_REFLECTION_STRESS_TEXT =
+  "I kept returning to the hallway and the same square of light on the floor, trying to explain why the conversation felt smaller after it ended. I started with a careful sentence, then revised it in place, then backed away from it again. The draft keeps circling the safer words before it reaches the sharper one, and every time it gets close it adds another softer phrase. Maybe that is why the paragraph keeps widening and narrowing in the same breath. I keep saying maybe, almost, still, just, as if the sentence needs another layer before it can hold. In the first half I stay abstract and polite, talking about pressure, distance, pattern, change, feeling, and shape. Later the language gets more concrete: hallway, glass, sleeve, throat, table, light, window, hand. The sentences start longer, then shorten, then tighten again near the end. I return to the same opening several times. I keep beginning with I kept, I started, I keep, as though the draft needs to announce its hesitation before it says anything clear. By the end the wording is more direct, but it still circles the same point and repeats the same narrow image.";
+
+/** Diverse vocabulary / cadence so post-submit semantic legend pills stay hidden (no banned hits, no 4+ char repeats, no opening streak). */
+const DESKTOP_REFLECTION_NO_SEM_PILL_TEXT =
+  "Cedar boughs brushed frost from jade ledges before dawn. Vapor loosened along each cliff trace until ridgelines cleared. Mica glinted under pale ice by the creek bend. Fox trails crossed frozen gravel toward pine shade without doubling back.";
+
 let smokeHarness = null;
 
 test.before(async () => {
@@ -241,6 +248,247 @@ async function readSmokeErrors(session) {
   `);
 }
 
+async function readDesktopWritingColumnLayoutSnapshot(session) {
+  return await session.execute(`
+    var header = document.querySelector(".app-write-surface > .header");
+    var writeView = document.getElementById("writeView");
+    var main = document.querySelector(".main-column");
+    var rail = document.querySelector("#writeView .side-column");
+    var editor = document.querySelector(".editor-shell");
+    var pc = document.getElementById("promptCard");
+    var pt = document.getElementById("promptText");
+    var topline = document.getElementById("promptFamilyLabel");
+    var nudge = document.getElementById("promptNudge");
+    function top(el) {
+      return el ? Math.round(el.getBoundingClientRect().top) : null;
+    }
+    function bottom(el) {
+      return el ? Math.round(el.getBoundingClientRect().bottom) : null;
+    }
+    var band = document.querySelector(".editor-pill-band");
+    var hb = header ? Math.round(header.getBoundingClientRect().bottom) : null;
+    var pct = top(pc);
+    return {
+      mainColumnScrollTop: main != null ? Math.round(main.scrollTop) : null,
+      headerBottom: hb,
+      writeViewTop: writeView ? Math.round(writeView.getBoundingClientRect().top) : null,
+      railTop: rail ? Math.round(rail.getBoundingClientRect().top) : null,
+      editorPillBandBottom: bottom(band),
+      editorShellTop: top(editor),
+      promptCardTop: pct,
+      promptTextTop: top(pt),
+      promptFamilyTop: top(topline),
+      promptNudgeTop: nudge && !nudge.classList.contains("hidden") ? top(nudge) : null,
+      gapPromptCardBelowHeader: hb != null && pct != null ? Math.round(pct - hb) : null,
+      gapPromptFamilyBelowHeader:
+        hb != null && topline ? Math.round(top(topline) - hb) : null
+    };
+  `);
+}
+
+async function readReflectionGapBelowPillMetaRow(session) {
+  return await session.execute(`
+    var band = document.querySelector(".editor-pill-band");
+    var profile = document.getElementById("profileSummarySection");
+    var section = document.getElementById("mirrorReflectionSection");
+    if (!band || !section || section.classList.contains("hidden")) return null;
+    var bandB = band.getBoundingClientRect().bottom;
+    var profB =
+      profile && !profile.classList.contains("hidden")
+        ? profile.getBoundingClientRect().bottom
+        : bandB;
+    var metaBottom = Math.max(bandB, profB);
+    var secT = section.getBoundingClientRect().top;
+    return {
+      gapPx: Math.round(secT - metaBottom),
+      metaBottom: Math.round(metaBottom),
+      sectionTop: Math.round(secT),
+      pillBandBottom: Math.round(bandB)
+    };
+  `);
+}
+
+function assertLayoutTopDidNotShiftUp(label, beforeTop, afterTop, tolerancePx) {
+  if (beforeTop == null || afterTop == null) return;
+  assert.ok(
+    afterTop >= beforeTop - tolerancePx,
+    "expected " +
+      label +
+      " not to move upward vs pre-submit (before=" +
+      beforeTop +
+      ", after=" +
+      afterTop +
+      ")"
+  );
+}
+
+async function verifyDesktopReflectionPostSubmit(session, layoutBefore, expectSemanticPillsVisible) {
+  const barState = await session.execute(`
+    var bar = document.getElementById("editorSemanticStatusBar");
+    if (!bar) return { missing: true };
+    return {
+      semanticBarHidden: bar.classList.contains("hidden"),
+      visiblePillCount: document.querySelectorAll("#editorSemanticStatusBar .legend-pill:not(.hidden)").length
+    };
+  `);
+  assert.ok(!barState.missing, "expected #editorSemanticStatusBar");
+  assert.equal(
+    barState.semanticBarHidden,
+    !expectSemanticPillsVisible,
+    expectSemanticPillsVisible
+      ? `expected semantic pill row visible (hidden=${barState.semanticBarHidden}, pills=${barState.visiblePillCount})`
+      : `expected semantic pill row hidden (hidden=${barState.semanticBarHidden}, pills=${barState.visiblePillCount})`
+  );
+
+  await session.waitFor(
+    "desktop Reflection card comfortably visible in viewport",
+    async () =>
+      await session.execute(`
+        var card = document.querySelector("#mirrorReflectionRoot .mirror-card");
+        if (!card) return false;
+        var cardRect = card.getBoundingClientRect();
+        var viewportHeight = window.innerHeight;
+        return Boolean(
+          cardRect.height > 0 &&
+          cardRect.top >= 0 &&
+          cardRect.bottom <= viewportHeight - 72
+        );
+      `),
+    { timeoutMs: 15000 }
+  );
+
+  const cardViewportBox = await readElementViewportBox(session, "#mirrorReflectionRoot .mirror-card", {
+    topMargin: 0,
+    bottomMargin: 72
+  });
+
+  const reflectionSnapshot = await session.execute(`
+    var section = document.getElementById("mirrorReflectionSection");
+    var mainColumn = document.querySelector(".main-column");
+    var card = document.querySelector("#mirrorReflectionRoot .mirror-card");
+    var sectionRect = section ? section.getBoundingClientRect() : null;
+    var containerRect = mainColumn ? mainColumn.getBoundingClientRect() : null;
+    var cardRect = card ? card.getBoundingClientRect() : null;
+    var visibleTop = 0;
+    var visibleBottom = window.innerHeight - 72;
+    var cardVisibleHeight =
+      cardRect
+        ? Math.min(cardRect.bottom, visibleBottom) -
+          Math.max(cardRect.top, visibleTop)
+        : 0;
+    return {
+      sectionHidden: section?.classList.contains("hidden"),
+      mainColumnScrollTop: mainColumn?.scrollTop || 0,
+      cardCount: document.querySelectorAll("#mirrorReflectionRoot .mirror-card").length,
+      cardVisibleHeight: Math.max(0, Math.round(cardVisibleHeight)),
+      cardHeight: cardRect ? Math.round(cardRect.height) : 0,
+      sectionTop: sectionRect ? Math.round(sectionRect.top) : -1,
+      sectionBottom: sectionRect ? Math.round(sectionRect.bottom) : -1,
+      cardTop: cardRect ? Math.round(cardRect.top) : -1,
+      cardBottom: cardRect ? Math.round(cardRect.bottom) : -1,
+      containerTop: containerRect ? Math.round(containerRect.top) : -1,
+      containerBottom: containerRect ? Math.round(containerRect.bottom) : -1,
+      cardVisible: Boolean(
+        cardRect &&
+          cardRect.top < visibleBottom &&
+          cardRect.bottom > visibleTop
+      ),
+      viewportHeight: Math.round(window.innerHeight)
+    };
+  `);
+
+  assert.equal(reflectionSnapshot.sectionHidden, false, "expected Reflection section to stay visible");
+  assert.ok(reflectionSnapshot.cardCount >= 1, "expected at least one Reflection card");
+  assert.equal(reflectionSnapshot.cardVisible, true, "expected a Reflection card to be visible in the desktop write column");
+  assert.ok(cardViewportBox, "expected viewport box for the Reflection card");
+  assert.equal(
+    cardViewportBox.comfortablyVisible,
+    true,
+    `expected Reflection card to sit comfortably in viewport, received top=${cardViewportBox?.top} bottom=${cardViewportBox?.bottom} vh=${cardViewportBox?.viewportHeight}`
+  );
+  assert.ok(
+    reflectionSnapshot.cardVisibleHeight >= Math.min(reflectionSnapshot.cardHeight, 120),
+    `expected the Reflection card body to be meaningfully visible, received ${reflectionSnapshot.cardVisibleHeight} of ${reflectionSnapshot.cardHeight}`
+  );
+
+  const layoutAfter = await readDesktopWritingColumnLayoutSnapshot(session);
+  assert.ok(layoutAfter, "expected desktop writing-column layout snapshot after submit");
+  assert.ok(
+    layoutAfter.gapPromptCardBelowHeader != null && layoutAfter.gapPromptCardBelowHeader >= 8,
+    `expected prompt card below header chrome after submit, gap=${layoutAfter.gapPromptCardBelowHeader}`
+  );
+  assert.ok(
+    layoutAfter.gapPromptFamilyBelowHeader == null || layoutAfter.gapPromptFamilyBelowHeader >= 8,
+    `expected prompt family label below header chrome after submit, gap=${layoutAfter.gapPromptFamilyBelowHeader}`
+  );
+
+  const tolPx = 2;
+  assertLayoutTopDidNotShiftUp("#writeView top", layoutBefore.writeViewTop, layoutAfter.writeViewTop, tolPx);
+  assertLayoutTopDidNotShiftUp("Recent Runs rail top", layoutBefore.railTop, layoutAfter.railTop, tolPx);
+  assertLayoutTopDidNotShiftUp(".editor-shell top", layoutBefore.editorShellTop, layoutAfter.editorShellTop, tolPx);
+  assertLayoutTopDidNotShiftUp("#promptCard top", layoutBefore.promptCardTop, layoutAfter.promptCardTop, tolPx);
+  assertLayoutTopDidNotShiftUp("#promptText top", layoutBefore.promptTextTop, layoutAfter.promptTextTop, tolPx);
+  assertLayoutTopDidNotShiftUp("#promptFamilyLabel top", layoutBefore.promptFamilyTop, layoutAfter.promptFamilyTop, tolPx);
+  if (layoutBefore.promptNudgeTop != null && layoutAfter.promptNudgeTop != null) {
+    assertLayoutTopDidNotShiftUp("#promptNudge top", layoutBefore.promptNudgeTop, layoutAfter.promptNudgeTop, tolPx);
+  }
+  assertLayoutTopDidNotShiftUp("header bottom rule", layoutBefore.headerBottom, layoutAfter.headerBottom, tolPx);
+  assert.equal(
+    layoutAfter.mainColumnScrollTop,
+    layoutBefore.mainColumnScrollTop,
+    "expected main column scroll position unchanged (Reflection must not scroll the writing stack)"
+  );
+
+  assert.ok(
+    layoutBefore.editorPillBandBottom != null && layoutAfter.editorPillBandBottom != null,
+    "expected editor pill band geometry for invariance checks"
+  );
+  assert.ok(
+    Math.abs(layoutAfter.editorPillBandBottom - layoutBefore.editorPillBandBottom) <= 3,
+    `expected editor pill / annotation band not to shift vertically (before=${layoutBefore.editorPillBandBottom}, after=${layoutAfter.editorPillBandBottom})`
+  );
+
+  const reflectionGap = await readReflectionGapBelowPillMetaRow(session);
+  assert.ok(reflectionGap, "expected Reflection gap below pill/meta row");
+  assert.ok(
+    reflectionGap.gapPx >= 2 && reflectionGap.gapPx <= 48,
+    `expected modest desktop gap between pill/meta row and Reflection top, got gapPx=${reflectionGap.gapPx} (pillBandBottom=${reflectionGap.pillBandBottom}, sectionTop=${reflectionGap.sectionTop})`
+  );
+  if (expectSemanticPillsVisible) {
+    assert.ok(
+      reflectionGap.gapPx <= 30,
+      `expected tight pill/meta → Reflection gap when semantic legend is visible, gapPx=${reflectionGap.gapPx}`
+    );
+  }
+
+  const errors = await readSmokeErrors(session);
+  assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+}
+
+async function readElementViewportBox(session, selector, options = {}) {
+  const topMargin = Number(options.topMargin ?? 0);
+  const bottomMargin = Number(options.bottomMargin ?? 0);
+  return await session.execute(
+    `
+      var el = document.querySelector(__p0);
+      if (!el) return null;
+      var rect = el.getBoundingClientRect();
+      var viewportHeight = window.innerHeight;
+      return {
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+        height: Math.round(rect.height),
+        viewportHeight: Math.round(viewportHeight),
+        comfortablyVisible:
+          rect.height > 0 &&
+          rect.top >= __p1 &&
+          rect.bottom <= viewportHeight - __p2
+      };
+    `,
+    [selector, topMargin, bottomMargin]
+  );
+}
+
 test("browser smoke: begin -> write -> submit renders Mirror without visible evidence controls", async (t) => {
   await withSmokeSession(t, async (session) => {
     await loadFreshApp(session);
@@ -264,6 +512,52 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: desktop Reflection readable when semantic pill row is hidden", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await session.setWindowRect({ height: 900, width: 1600, x: 0, y: 0 });
+    await loadFreshApp(session);
+    await beginRun(session);
+    await fillEditor(session, DESKTOP_REFLECTION_NO_SEM_PILL_TEXT);
+
+    const layoutBefore = await readDesktopWritingColumnLayoutSnapshot(session);
+    assert.ok(layoutBefore, "expected desktop writing-column layout snapshot before submit");
+    assert.ok(
+      layoutBefore.gapPromptCardBelowHeader != null && layoutBefore.gapPromptCardBelowHeader >= 8,
+      `expected prompt card below header chrome before submit, gap=${layoutBefore.gapPromptCardBelowHeader}`
+    );
+    assert.ok(
+      layoutBefore.gapPromptFamilyBelowHeader == null || layoutBefore.gapPromptFamilyBelowHeader >= 8,
+      `expected prompt family label below header chrome before submit, gap=${layoutBefore.gapPromptFamilyBelowHeader}`
+    );
+
+    await submitCurrentRun(session);
+    await verifyDesktopReflectionPostSubmit(session, layoutBefore, false);
+  });
+});
+
+test("browser smoke: desktop Reflection readable when semantic pill row is visible", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await session.setWindowRect({ height: 900, width: 1600, x: 0, y: 0 });
+    await loadFreshApp(session);
+    await beginRun(session);
+    await fillEditor(session, DESKTOP_REFLECTION_STRESS_TEXT);
+
+    const layoutBefore = await readDesktopWritingColumnLayoutSnapshot(session);
+    assert.ok(layoutBefore, "expected desktop writing-column layout snapshot before submit");
+    assert.ok(
+      layoutBefore.gapPromptCardBelowHeader != null && layoutBefore.gapPromptCardBelowHeader >= 8,
+      `expected prompt card below header chrome before submit, gap=${layoutBefore.gapPromptCardBelowHeader}`
+    );
+    assert.ok(
+      layoutBefore.gapPromptFamilyBelowHeader == null || layoutBefore.gapPromptFamilyBelowHeader >= 8,
+      `expected prompt family label below header chrome before submit, gap=${layoutBefore.gapPromptFamilyBelowHeader}`
+    );
+
+    await submitCurrentRun(session);
+    await verifyDesktopReflectionPostSubmit(session, layoutBefore, true);
   });
 });
 
@@ -436,6 +730,76 @@ test("browser smoke: Patterns view opens after five saved runs", async (t) => {
     assert.equal(profileSnapshot.profileHidden, false, "expected Patterns view to be visible");
     assert.ok(profileSnapshot.text.length > 0, "expected Patterns view to render visible copy");
     assert.equal(profileSnapshot.evidenceControlCount, 0, "Patterns view should not render stale evidence controls");
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: desktop Patterns closes on narrow breakpoint resize and returns to writing", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await session.setWindowRect({ height: 900, width: 1280, x: 0, y: 0 });
+    await loadFreshApp(session);
+    await unlockPatternsTab(session);
+    await restartIntoNextRun(session);
+
+    await session.click("#styleTab");
+    await session.waitFor(
+      "desktop Patterns view open before resize",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          var writeView = document.getElementById("writeView");
+          return Boolean(
+            profileView &&
+            !profileView.classList.contains("hidden") &&
+            writeView &&
+            !writeView.classList.contains("hidden")
+          );
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    await session.setWindowRect({ height: 844, width: 390, x: 0, y: 0 });
+
+    await session.waitFor(
+      "desktop Patterns closes after narrow resize",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          var writeView = document.getElementById("writeView");
+          var editor = document.getElementById("editorInput");
+          return Boolean(
+            profileView &&
+            profileView.classList.contains("hidden") &&
+            writeView &&
+            !writeView.classList.contains("hidden") &&
+            editor &&
+            editor.getAttribute("contenteditable") === "true"
+          );
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    const resizeSnapshot = await session.execute(`
+      var editor = document.getElementById("editorInput");
+      var rect = editor ? editor.getBoundingClientRect() : null;
+      return {
+        profileHidden: document.getElementById("profileView")?.classList.contains("hidden"),
+        patternsOpen: document.body.classList.contains("patterns-open"),
+        writeViewHidden: document.getElementById("writeView")?.classList.contains("hidden"),
+        styleExpanded: document.getElementById("styleTab")?.getAttribute("aria-expanded") || "",
+        editorEditable: editor?.getAttribute("contenteditable") || "",
+        editorVisible: Boolean(rect && rect.width > 0 && rect.height > 0)
+      };
+    `);
+
+    assert.equal(resizeSnapshot.profileHidden, true, "expected breakpoint resize to close Patterns");
+    assert.equal(resizeSnapshot.patternsOpen, false, "expected no stranded mobile Patterns body state");
+    assert.equal(resizeSnapshot.writeViewHidden, false, "expected writing surface to remain visible");
+    assert.equal(resizeSnapshot.styleExpanded, "false");
+    assert.equal(resizeSnapshot.editorEditable, "true");
+    assert.equal(resizeSnapshot.editorVisible, true, "expected editor to stay visible after resize");
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
