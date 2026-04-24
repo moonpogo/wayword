@@ -3594,36 +3594,14 @@ function prefersReducedUiMotion() {
   }
 }
 
-function recentRunsTransitionDeps() {
-  return {
-    $,
-    state,
-    editorInput,
-    isMobileViewport,
-    isDesktopPatternsViewport,
-    RECENT_DRAWER_DISMISS_GUARD_MS,
-    setRecentDrawerDismissGuardUntil(n) {
-      recentDrawerDismissGuardUntil = n;
-    },
-    setSuppressFocusExitUntil(n) {
-      suppressFocusExitUntil = n;
-    },
-    setFocusMode,
-    renderHistory,
-    hideMetricExplainer,
-    queueViewportSync,
-    applyRecentDrawerDomState: window.waywordViewController.applyRecentDrawerDomState.bind(
-      window.waywordViewController
-    ),
-  };
-}
+let recentRunsUi = null;
 
 function isRecentDrawerOpen() {
-  return window.waywordRecentRunsTransition.isRecentDrawerOpen();
+  return recentRunsUi.isRecentDrawerOpen();
 }
 
 function syncRecentRailExpandedChrome() {
-  window.waywordRecentRunsTransition.syncRecentRailExpandedChrome(recentRunsTransitionDeps());
+  recentRunsUi.syncRecentRailExpandedChrome();
 }
 
 /**
@@ -3632,11 +3610,36 @@ function syncRecentRailExpandedChrome() {
  * on `#writeView` for `body.recent-rail-expanded #writeView .side-column`.
  */
 function syncRecentRailExpandedLayoutMetrics(options = {}) {
-  window.waywordRecentRunsTransition.syncRecentRailExpandedLayoutMetrics(
-    options,
-    recentRunsTransitionDeps()
-  );
+  recentRunsUi.syncRecentRailExpandedLayoutMetrics(options);
 }
+
+recentRunsUi = window.waywordRecentRunsUiCoordination.createCoordinator({
+  $,
+  state,
+  editorInput,
+  isMobileViewport,
+  isDesktopPatternsViewport,
+  recentDrawerDismissGuardMs: RECENT_DRAWER_DISMISS_GUARD_MS,
+  getRecentDrawerDismissGuardUntil() {
+    return recentDrawerDismissGuardUntil;
+  },
+  setRecentDrawerDismissGuardUntil(n) {
+    recentDrawerDismissGuardUntil = n;
+  },
+  setSuppressFocusExitUntil(n) {
+    suppressFocusExitUntil = n;
+  },
+  setFocusMode,
+  renderHistory,
+  hideMetricExplainer,
+  queueViewportSync,
+  applyRecentDrawerDomState: window.waywordViewController.applyRecentDrawerDomState.bind(
+    window.waywordViewController
+  ),
+  domEventTargetElement,
+  interaction: window.waywordRecentRunsInteraction,
+  transition: window.waywordRecentRunsTransition
+});
 
 function initEditorCompletedFlow() {
   const overlay = $("editorOverlay");
@@ -4545,7 +4548,7 @@ function renderHistory() {
   const railFooter = $("recentRailFooter");
   const trigger = $("recentWritingTrigger");
   const allLists = [drawerList, railList].filter(Boolean);
-  allLists.forEach((list) => bindRecentRunsSurfaceInteractions(list));
+  allLists.forEach((list) => recentRunsUi.bindRecentRunsSurfaceInteractions(list));
 
   const runsNewestFirst = readSavedRunsNewestFirst();
   const recentVm = window.waywordRecentRunsViewPrep.prepareRecentRunsViewModel({
@@ -4635,20 +4638,7 @@ function renderHistory() {
 }
 
 function setRecentDrawerOpen(open, options = {}) {
-  window.waywordRecentRunsTransition.setRecentDrawerOpen(open, options, recentRunsTransitionDeps());
-}
-
-function bindRecentRunsSurfaceInteractions(list) {
-  if (
-    !window.waywordRecentRunsInteraction ||
-    typeof window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions !== "function"
-  ) {
-    return;
-  }
-  window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions({
-    list,
-    domEventTargetElement,
-  });
+  recentRunsUi.setRecentDrawerOpen(open, options);
 }
 
 function aggregateProfile() {
@@ -5320,43 +5310,11 @@ if (
   });
 }
 
-let suppressRecentTriggerClickOpen = false;
 $("promptCard")?.addEventListener("click", (e) => {
   const origin = domEventTargetElement(e);
   if (!origin || !origin.closest("[data-mirror-next-pass]")) return;
   e.preventDefault();
   runPostSubmitAutoNewRunNow();
-});
-
-$("recentWritingTrigger")?.addEventListener(
-  "pointerdown",
-  (e) => {
-    suppressRecentTriggerClickOpen = false;
-    if (isRecentDrawerOpen()) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setRecentDrawerOpen(true);
-    suppressRecentTriggerClickOpen = true;
-  },
-  true
-);
-
-$("recentWritingTrigger")?.addEventListener("click", (e) => {
-  if (suppressRecentTriggerClickOpen) {
-    suppressRecentTriggerClickOpen = false;
-    return;
-  }
-  e.stopPropagation();
-  setRecentDrawerOpen(true);
-});
-
-$("recentDrawerCloseBtn")?.addEventListener("click", () => {
-  setRecentDrawerOpen(false);
-});
-
-$("recentDrawerBackdrop")?.addEventListener("click", () => {
-  if (Date.now() < recentDrawerDismissGuardUntil) return;
-  setRecentDrawerOpen(false);
 });
 
 document.addEventListener("keydown", (e) => {
@@ -5381,7 +5339,7 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   }
-  if (window.waywordRecentRunsTransition.tryHandleEscapeForRecentRunsSurfaces(recentRunsTransitionDeps())) {
+  if (recentRunsUi.tryHandleEscapeForRecentRunsSurfaces()) {
     e.preventDefault();
     return;
   }
@@ -5657,11 +5615,7 @@ bindAnnotationRowFlagInteraction();
 bindEditorSemanticPicker();
 bindMetricExplainerDelegation("recentDrawerList");
 bindMetricExplainerDelegation("recentRailList");
-
-window.waywordRecentRunsTransition.bindRecentRunsExpandDismissUi({
-  $,
-  state,
-  renderHistory
-});
+recentRunsUi.bindRecentRunsOpenCloseControls();
+recentRunsUi.bindRecentRunsExpandDismissUi();
 
 queueViewportSync();
