@@ -1,5 +1,12 @@
 # QA Regression Checklist
 
+## Must run before V1-sensitive merge
+- [ ] Run `npm test`
+- [ ] Run `npm run verify:mirror-bundle`
+- [ ] Run `npm run verify:patterns-surface`
+- [ ] Run `npm run test:smoke` when Playwright/browser prerequisites are available on the machine
+- [ ] Manual sanity where automation is still weaker: landing -> Begin -> write -> submit, reroll while empty only, Recent Runs drawer/rail, Patterns after enough saved runs, refresh persistence on a saved corpus
+
 ## Core entry
 - [ ] Landing page renders correctly (desktop + mobile)
 - [ ] Begin opens the app correctly (desktop + mobile)

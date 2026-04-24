@@ -1,5 +1,12 @@
 # Build Log
 
+## 2026-04-23: V1 architecture snapshot + guardrails
+
+- Added `docs/V1_ARCHITECTURE_SNAPSHOT.md` to document the current V1 architecture as it exists in the repo now: boot/load order, core user flow, Mirror pipeline, prompt/reroll behavior, Recent Runs, Patterns, persistence, current test coverage, known risks, and pre-V1 do-not-touch areas.
+- Added `docs/V1_CHANGE_GUARDRAILS.md` as a concise pre-change checklist for future Codex/Cursor work on V1-sensitive areas.
+- Updated `docs/QA_REGRESSION_CHECKLIST.md` with a `Must run before V1-sensitive merge` section covering the current automated commands plus the remaining manual sanity passes that matter most before V1.
+- No runtime behavior was intentionally changed in this pass.
+
 ## Current Pass: Visual polish — Recent Runs scrollbar + Patterns challenge CTA
 
 - **`style.css`:** Recent Runs scrollbars: tail-of-file `#recentDrawerList` / `#writeView .recent-rail-list-clip #recentRailList` rules (`scrollbar-color` + WebKit + `color-scheme`) so WebKit does not repaint back to the default bright thumb after later overflow/history CSS loads.
