@@ -1,5 +1,11 @@
 # Build Log
 
+## Current Pass: V1 Browser Smoke Layer
+
+- Added a zero-dependency Safari WebDriver smoke harness under `tests/browser-smoke.test.cjs`.
+- Added `npm run test:smoke` for real browser checks of the V1 loop: begin, write, submit, Mirror render, no visible evidence controls, Recent Runs drawer behavior, and Patterns open after five saved runs.
+- The smoke layer is opt-in and skips with an explicit prerequisite message when Safari WebDriver automation is not available on the machine running it.
+
 ## Current Repo State
 
 - **Branch:** `main`
