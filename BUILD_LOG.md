@@ -1,5 +1,26 @@
 # Build Log
 
+## 2026-04-24: Options coordination extraction
+
+- Added new module `src/features/ui/options-coordination.js`.
+- Extracted narrow Options wrapper/choreography from `script.js`:
+  - `setOptionsOpen` wrapper logic
+  - post-close focus recovery
+  - Options panel pointer/click propagation guards
+  - Options open/close control binding
+  - Escape-to-close wrapper
+- The new UI coordinator composes the existing lower-level Options helpers:
+  - `src/features/writing/options-panel-transition-coordinator.js`
+  - `src/features/writing/options-panel-interactions.js`
+- `index.html` gained one required helper include before `script.js` so the extracted Options coordination global is available at boot.
+- `script.js` shrank from 5621 lines to 5502 lines in this pass.
+- Validation passed:
+  - `npm test`
+  - `npm run test:smoke`
+  - `npm run verify:patterns-surface`
+  - `npm run verify:mirror-bundle`
+- Runtime behavior was intended to remain unchanged; this was a structural extraction only.
+
 ## 2026-04-24: Recent Runs coordination extraction
 
 - Added new module `src/features/ui/recent-runs-coordination.js`.
