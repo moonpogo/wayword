@@ -1,5 +1,26 @@
 # Build Log
 
+## 2026-04-24: UI panel coordination extraction
+
+- Added new module `src/features/ui/panel-coordination.js`.
+- Extracted narrow UI coordination helpers:
+  - `closePanelsForAppEntry`
+  - `closePanelsForFreshRun`
+  - `armMobilePatternsToggleGuard`
+  - `togglePatternsPanelFromStyleTab`
+- Files touched by the extraction:
+  - `index.html`
+  - `script.js`
+  - `src/features/writing/run-controller.js`
+  - `src/features/ui/panel-coordination.js`
+- `index.html` received one required helper script include before `script.js` so the extracted coordination global is available at boot.
+- Validation passed:
+  - `npm test`
+  - `npm run verify:mirror-bundle`
+  - `npm run verify:patterns-surface`
+  - `npm run test:smoke`
+- Runtime behavior was intended to remain unchanged; this was a structural extraction only.
+
 ## 2026-04-23: V1 architecture snapshot + guardrails
 
 - Added `docs/V1_ARCHITECTURE_SNAPSHOT.md` to document the current V1 architecture as it exists in the repo now: boot/load order, core user flow, Mirror pipeline, prompt/reroll behavior, Recent Runs, Patterns, persistence, current test coverage, known risks, and pre-V1 do-not-touch areas.
