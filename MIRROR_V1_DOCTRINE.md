@@ -2,7 +2,9 @@
 
 ## 1. Mirror V1 purpose
 
-**Mirror V1** turns the **current session draft** into a **small set of short, evidence-backed observations** about **surface-visible patterns** in the text: how words recur, how abstract vs concrete vocabulary shows up (including whether that balance **shifts** across the draft), how sentence length behaves, and how often qualification-style wording appears.
+**Mirror V1** turns the **current session draft** into a **small set of short, internally evidence-backed observations** about **surface-visible patterns** in the text: how words recur, how abstract vs concrete vocabulary shows up (including whether that balance **shifts** across the draft), how sentence length behaves, and how often qualification-style wording appears.
+
+The V1 UI renders those observations as **statement-only cards**. Internal evidence may exist for scoring, selection, QA, debug, or future modes, but it is not shown to the user in the current product surface.
 
 Mirror is a **mirror**, not a coach: it names **what the draft is doing on the page**, not what the writer should do, think, or become.
 
@@ -14,7 +16,7 @@ Mirror V1 may surface **at most one observation per category** per run. The cate
 
 | Category | What it reflects (product meaning) |
 |----------|-----------------------------------|
-| **Repetition** | A **specific word** the draft returns to often enough to be worth naming, with optional proof snippets. |
+| **Repetition** | A **specific word** the draft returns to often enough to be worth naming. |
 | **Abstraction / concrete** | Whether **idea-leaning** vs **image-leaning** vocabulary dominates, stays mixed, or **shifts** between the first and second half of the draft. |
 | **Cadence** | Whether sentences **shorten or lengthen** toward the end in a clear way, or the draft **alternates** clearly short and long lines. |
 | **Hesitation / qualification** | How often the draft uses **softening and revision-style** wording (qualifiers, pivots, uncertainty, contradiction markers), summarized as a single pattern line. |
@@ -31,7 +33,7 @@ Anything outside these four buckets is **out of scope** for V1 cards.
 - **Max cards:** **up to five** in total: **at most one main** and **up to four supporting**.
 - **At most one card per category** in the final stack (no duplicate categories in the output).
 
-A "card" is a single headline statement paired with optional supporting evidence (counts, ratios, or text snippets).
+A visible V1 card is a single headline statement. Internal evidence may exist in the pipeline result, but the user-facing card does not render it.
 
 ### Main vs supporting
 
@@ -41,10 +43,11 @@ A "card" is a single headline statement paired with optional supporting evidence
 
 A main card represents a clearly dominant observation. Supporting cards represent secondary but still meaningful signals. If no observation is strong enough to qualify as dominant, the system may return supporting cards only.
 
-### Evidence
+### Internal evidence
 
 - The **headline** states one observation in **plain, restrained** language.
-- **Counts, ratios, means, and short text snippets** live in **evidence**, not in the headline.
+- **Counts, ratios, means, and short text snippets** may live in **internal evidence**, not in the visible headline.
+- V1 does **not** require or render a visible evidence accordion, toggle, context button, or evidence panel.
 
 ---
 
@@ -74,7 +77,7 @@ If no category produces a signal that clearly meets the system's internal thresh
 
 ## 5. Language rules
 
-Headlines and evidence must obey all of the following:
+Headlines and internal evidence must obey all of the following:
 
 1. **No diagnosis** — Do not label the writer, their mental state, skill level, or “problem.”
 2. **No personality inference** — Do not imply traits, identity, habits outside the text, or motivation.
@@ -130,15 +133,12 @@ Mirror V1 **does not**:
 
 For the current product surface (V1 UI):
 
-- Reflection cards display only the headline sentence.
+- Reflection cards display only the observational statement.
 - No excerpts, counts, ratios, or internal metrics are shown.
 - No “context” or supporting text is rendered in the card.
+- No `Context` / `Hide` control, accordion, or evidence panel is part of the V1 UX.
 
-Evidence remains part of the internal generation pipeline,
-but is not exposed in the UI.
-
-This override takes precedence over any earlier sections
-that describe visible evidence in cards.
+Evidence remains part of the internal generation pipeline but is not exposed in the UI.
 
 ---
 

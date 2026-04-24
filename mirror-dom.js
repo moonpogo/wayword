@@ -31,18 +31,6 @@
     return lines[h % lines.length];
   }
 
-  function renderMirrorEvidenceLinesHtml(evidence) {
-    if (!Array.isArray(evidence) || !evidence.length) {
-      return '<p class="mirror-card__evidence-line mirror-card__evidence-line--muted">Nothing quoted from this run for this line.</p>';
-    }
-    return evidence
-      .map((ev) => {
-        const t = escapeHtmlMirror(ev && ev.text != null ? ev.text : "");
-        return `<p class="mirror-card__evidence-line">${t}</p>`;
-      })
-      .join("");
-  }
-
   function mirrorReflectionCardHtml(card, opts) {
     const role = opts && opts.role === "main" ? "main" : "support";
     const firstSupport = Boolean(opts && opts.firstSupportInSupportOnlyStack);
@@ -57,7 +45,6 @@
   }
 
   function buildMirrorPanelBodyHtml({ loadFailed, result, idPrefix, emptyHintSeed }) {
-    const pfx = String(idPrefix || "mirror");
     if (loadFailed) {
       return '<p class="mirror-empty">Reflection isn\u2019t available in this build.</p>';
     }
@@ -84,7 +71,6 @@
       parts.push(
         mirrorReflectionCardHtml(main, {
           role: "main",
-          evidencePanelId: `${pfx}-main`
         })
       );
     }
@@ -94,7 +80,6 @@
         mirrorReflectionCardHtml(c, {
           role: "support",
           firstSupportInSupportOnlyStack: !hasMain && i === 0,
-          evidencePanelId: `${pfx}-s-${i}`
         })
       );
     });
@@ -131,7 +116,6 @@
    * plus a non-interactive depth hint when more cards exist. Full stacks stay on post-run / Patterns.
    */
   function buildReviewRunsMirrorGlanceBodyHtml({ result, idPrefix, emptyHintSeed }) {
-    const pfx = String(idPrefix || "mirror");
     const r = result;
     if (!r || typeof r !== "object") {
       const line0 = escapeHtmlMirror(pickMirrorEmptyFallbackLine(emptyHintSeed));
@@ -169,7 +153,6 @@
       mirrorReflectionCardHtml(card, {
         role,
         firstSupportInSupportOnlyStack,
-        evidencePanelId: `${pfx}-glance`
       })
     );
     if (moreCount > 0) {
@@ -185,7 +168,6 @@
    * Post-run “Across recent runs” block: markup for pre-filtered trend rows only (no pipeline/history).
    */
   function buildMirrorRecentTrendsBlockBodyHtml(rows, idPrefix) {
-    const pfx = String(idPrefix || "mirror-recent");
     const parts = [];
     parts.push('<div class="mirror-recent-block">');
     parts.push(
@@ -195,11 +177,10 @@
     rows.forEach((t, i) => {
       parts.push(
         mirrorReflectionCardHtml(
-          { statement: t.statement, evidence: t.evidence },
+          { statement: t.statement },
           {
             role: "support",
             firstSupportInSupportOnlyStack: i === 0,
-            evidencePanelId: `${pfx}-t-${i}`
           }
         )
       );
@@ -210,7 +191,6 @@
 
   globalThis.WaywordMirrorDom = {
     escapeHtmlMirror,
-    renderMirrorEvidenceLinesHtml,
     mirrorReflectionCardHtml,
     buildMirrorPanelBodyHtml,
     mirrorPipelineResultHasEvidenceCards,

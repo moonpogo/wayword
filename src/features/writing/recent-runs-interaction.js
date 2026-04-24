@@ -1,5 +1,5 @@
 (function () {
-  function toggleRecentEntry(entry, collapseMirrorEvidenceInRoot) {
+  function toggleRecentEntry(entry) {
     var expanded = entry.querySelector(".recent-entry-expanded");
     if (!expanded) return;
 
@@ -17,7 +17,6 @@
     entry.classList.toggle("recent-entry--active", !isOpen);
     expanded.hidden = isOpen;
     entry.setAttribute("aria-expanded", String(!isOpen));
-    entry.querySelectorAll(".recent-entry-mirror-root").forEach(collapseMirrorEvidenceInRoot);
   }
 
   function bindRecentRunsSurfaceInteractions(input) {
@@ -31,7 +30,7 @@
       var activeEl = document.activeElement;
       if (!activeEl || !activeEl.classList.contains("recent-entry") || !list.contains(activeEl)) return;
       e.preventDefault();
-      toggleRecentEntry(activeEl, input.collapseMirrorEvidenceInRoot);
+      toggleRecentEntry(activeEl);
     });
 
     list.addEventListener("click", function (e) {
@@ -40,7 +39,7 @@
       var entry = origin.closest(".recent-entry");
       if (!entry) return;
       if (origin.closest("button, a")) return;
-      toggleRecentEntry(entry, input.collapseMirrorEvidenceInRoot);
+      toggleRecentEntry(entry);
     });
   }
 

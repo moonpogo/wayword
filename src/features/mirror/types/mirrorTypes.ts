@@ -27,7 +27,7 @@ export interface MirrorEvidence {
   end?: number;
 }
 
-/** Headline line; `evidence` is always empty in V1 UI (internal scoring only). */
+/** Visible V1 UI renders the statement only; `evidence` remains internal data on the reflection object. */
 export interface MirrorReflection {
   id: string;
   category: MirrorCategoryV1;

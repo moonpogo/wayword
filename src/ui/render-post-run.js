@@ -246,7 +246,7 @@
   }
 
   /**
-   * Post-run Mirror stack: visibility + innerHTML only (evidence toggles wired by script.js).
+   * Post-run Mirror stack: visibility + innerHTML only.
    * @param {{
    *   sectionEl: HTMLElement;
    *   rootEl: HTMLElement;
@@ -255,7 +255,6 @@
    *   v1Body: string;
    *   recentBody: string;
    * }} opts
-   * @returns {{ shouldWireEvidence: boolean }}
    */
   function updateMirrorReflectionSection(opts) {
     const { sectionEl, rootEl, submitted, completedUiActive, v1Body, recentBody } = opts;
@@ -263,18 +262,17 @@
     if (!submitted || !completedUiActive) {
       sectionEl.classList.add("hidden");
       rootEl.innerHTML = "";
-      return { shouldWireEvidence: false };
+      return;
     }
 
     if (!v1Body && !recentBody) {
       sectionEl.classList.add("hidden");
       rootEl.innerHTML = "";
-      return { shouldWireEvidence: false };
+      return;
     }
 
     sectionEl.classList.remove("hidden");
     rootEl.innerHTML = (v1Body || "") + recentBody;
-    return { shouldWireEvidence: true };
   }
 
   /**

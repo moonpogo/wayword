@@ -1,10 +1,12 @@
 # Wayword
 
+Current V1 product contract source of truth: `docs/V1_PRODUCT_SPEC.md`.
+
 A writing tool that shows you how you think.
 
 Write. See what emerges.
 
-Wayword is a minimal writing environment that reflects your language back to you in real time.
+Wayword is a minimal writing environment that lets you write, submit, and see restrained observations about visible patterns in the draft.
 
 It is not a notes app.
 It is not a document editor.
@@ -15,11 +17,11 @@ It is a space for observation.
 
 ## What it does
 
-- Surfaces patterns in your writing as you type
+- Surfaces patterns in a submitted draft
 - Highlights repetition, structure, variation, and drift
-- Tracks tonal and emotional signals in language
-- Shows how your expression shifts across a session
-- Returns simple, directional feedback after each run
+- Shows recurring signals across saved runs
+- Returns simple observational feedback after each run
+- Stores runs locally in the browser
 
 The goal is not to optimize writing.
 
@@ -50,13 +52,12 @@ Everything in the app exists to support the writing loop.
 
 ## Features
 
-- Real-time text analysis
+- Submit-time Mirror reflections
 - Pattern and structure highlighting
-- Tone and emotional signal detection
 - Session feedback (score, variation, sentence shape)
 - Prompt system across multiple modes
 - Keyboard-driven interaction (Enter to restart)
-- Lightweight profile view of writing patterns over time
+- Lightweight recent-runs and patterns views over time
 
 ---
 
@@ -68,8 +69,7 @@ Not something to perfect.
 Something to notice.
 
 Patterns reveal themselves through repetition.
-Emotion reveals itself through language.
-Clarity comes from seeing both.
+Clarity comes from seeing structure and recurrence.
 
 ---
 

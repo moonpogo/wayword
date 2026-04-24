@@ -1,5 +1,7 @@
 # Structural audit (maintainability)
 
+Note: This is a maintainability snapshot and is partially historical. For the current V1 user-facing contract, including the statement-only Mirror surface and no visible evidence controls, use `docs/V1_PRODUCT_SPEC.md` as the source of truth.
+
 Scope: `main` as source of truth. Focus is seams, coupling, and regression risk — not new product ideas. Observations below are tied to files that were opened or searched in this audit (`script.js`, `index.html`, `style.css`, `src/features/mirror/**`, `package.json`).
 
 ---

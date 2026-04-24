@@ -55,11 +55,10 @@
         if (!card || !String(card.statement || "").trim()) return;
         parts.push(
           mirrorReflectionCardHtml(
-            { statement: card.statement, evidence: card.evidence },
+            { statement: card.statement },
             {
               role: "support",
               firstSupportInSupportOnlyStack: i === 0,
-              evidencePanelId: `patterns-promoted-${i}`,
             }
           )
         );

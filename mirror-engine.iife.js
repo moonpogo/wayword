@@ -2344,7 +2344,7 @@ var WaywordMirror = (() => {
     "What remains unattended in what you wrote?"
   ];
   var NUDGE_FALLBACK_AMBIGUOUS = [
-    "What still feels open\u2014not wrong, just unsettled\u2014in what you wrote?",
+    "What still feels open (not wrong, just unsettled) in what you wrote?",
     "Where would you trust your own read more than a slick echo?",
     "If the mirror stays this quiet, what one thread do you still want to follow?"
   ];
@@ -2381,7 +2381,7 @@ var WaywordMirror = (() => {
   ];
   var NUDGE_CONCRETE_LEANS = [
     "Where does the idea begin to surface behind the detail?",
-    "What shifts if the objects fall away for a breath\u2014not erased, just quieter?",
+    "What shifts if the objects fall away for a breath (not erased, just quieter)?",
     "What remains if the scene quiets further and something else hums?"
   ];
   var NUDGE_ABSTRACTION_BALANCED = [
@@ -2390,7 +2390,7 @@ var WaywordMirror = (() => {
     "What would you watch for in the handoff between scene and thought?"
   ];
   var NUDGE_HESITATION = [
-    "What changes when the cushioning thins\u2014without forcing a harder voice?",
+    "What changes when the cushioning thins, without forcing a harder voice?",
     "Where does a line want to stand without the immediate softener?",
     "What clarity appears if the qualification arrives a beat later?",
     "What shifts if you let one assertion stay unaccompanied for a line?"

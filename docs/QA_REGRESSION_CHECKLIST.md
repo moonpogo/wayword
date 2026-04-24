@@ -31,7 +31,9 @@
 - [ ] No blank mirror state
 - [ ] Primary reflection renders
 - [ ] Supporting reflections render when applicable
-- [ ] Evidence toggle/render works
+- [ ] Mirror cards render without visible evidence controls
+- [ ] No stale `Context` / `Hide` buttons or evidence toggles appear
+- [ ] Internal evidence/scoring behavior is not exposed in the UI
 - [ ] Mirror copy is visually contained and not clipped
 
 ## Recent runs

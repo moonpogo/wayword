@@ -49,13 +49,9 @@
     input.syncRecentRailExpandedChrome();
   }
 
-  function renderRecentRunsList(list, runsSlice, idPrefix, buildRecentEntriesHtml, wireMirrorEvidenceToggles, collapseMirrorEvidenceInRoot) {
+  function renderRecentRunsList(list, runsSlice, idPrefix, buildRecentEntriesHtml) {
     if (!list) return;
     list.innerHTML = buildRecentEntriesHtml(runsSlice, idPrefix);
-    list.querySelectorAll(".recent-entry-mirror-root").forEach(function (el) {
-      wireMirrorEvidenceToggles(el);
-      collapseMirrorEvidenceInRoot(el);
-    });
   }
 
   function renderFilledRecentRunsState(input) {
@@ -64,9 +60,7 @@
       input.drawerList,
       recentVm.drawerSlice,
       "draw",
-      input.buildRecentEntriesHtml,
-      input.wireMirrorEvidenceToggles,
-      input.collapseMirrorEvidenceInRoot
+      input.buildRecentEntriesHtml
     );
     setRecentRunsOverflowFooter(input.drawerFooter, recentVm.totalCount, recentVm.capDrawer, recentVm.expanded);
 
@@ -74,9 +68,7 @@
       input.railList,
       recentVm.railSlice,
       "rail",
-      input.buildRecentEntriesHtml,
-      input.wireMirrorEvidenceToggles,
-      input.collapseMirrorEvidenceInRoot
+      input.buildRecentEntriesHtml
     );
     setRecentRunsOverflowFooter(input.railFooter, recentVm.totalCount, recentVm.capRail, recentVm.expanded);
 

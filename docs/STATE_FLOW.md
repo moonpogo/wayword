@@ -101,11 +101,9 @@ This document maps Wayword's visible app surfaces and major state transitions so
 
 ### Mirror interaction
 - Primary/supporting reflections render from post-run mirror parts (`v1Body` + recent trends), or fallback/low-signal copy when applicable.
-- Evidence toggles are per-card:
-  - button flips `aria-expanded`
-  - label swaps `Context`/`Hide`
-  - evidence panel hidden state toggles
-- On row/surface changes, evidence panels are collapsed by default.
+- V1 cards render as statement-only observations.
+- No visible evidence toggles, `Context` / `Hide` controls, or evidence panels are part of the current user-facing flow.
+- Internal evidence may still travel in pipeline results, saved run snapshots, or digests, but it is not exposed in the UI.
 - Mirror state is tied to current submitted run via `lastMirrorPipelineResult`, `lastMirrorLoadFailed`, and current run seed/session IDs; saved runs keep snapshot/digest on persisted run records.
 
 ### Recent runs open/close

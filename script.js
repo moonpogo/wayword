@@ -4252,10 +4252,6 @@ function escapeHtmlMirror(s) {
   return globalThis.WaywordMirrorDom.escapeHtmlMirror(s);
 }
 
-function renderMirrorEvidenceLinesHtml(evidence) {
-  return globalThis.WaywordMirrorDom.renderMirrorEvidenceLinesHtml(evidence);
-}
-
 function mirrorReflectionCardHtml(card, opts) {
   return globalThis.WaywordMirrorDom.mirrorReflectionCardHtml(card, opts);
 }
@@ -4266,52 +4262,6 @@ function buildMirrorPanelBodyHtml(args) {
 
 function countMirrorReflectionCards(result) {
   return globalThis.WaywordMirrorDom.countMirrorReflectionCards(result);
-}
-
-/** Collapse all Mirror evidence panels under `root` (Recent drawer, rail, post-run, Patterns). */
-function collapseMirrorEvidenceInRoot(root) {
-  if (!root) return;
-  root.querySelectorAll(".mirror-card__evidence-toggle").forEach((btn) => {
-    btn.setAttribute("aria-expanded", "false");
-    btn.textContent = "Context";
-    btn.setAttribute(
-      "aria-label",
-      "Show where this line comes from in the run"
-    );
-    const panelId = btn.getAttribute("aria-controls");
-    const panel = panelId ? document.getElementById(panelId) : null;
-    if (panel) panel.setAttribute("hidden", "");
-    const card = btn.closest(".mirror-card");
-    if (card) card.classList.remove("mirror-card--evidence-open");
-  });
-}
-
-function toggleRecentEntry(entry) {
-  return window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
-}
-
-function wireMirrorEvidenceToggles(root) {
-  if (!root) return;
-  root.querySelectorAll(".mirror-card__evidence-toggle").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const open = btn.getAttribute("aria-expanded") === "true";
-      const panelId = btn.getAttribute("aria-controls");
-      const panel = panelId ? document.getElementById(panelId) : null;
-      if (!panel) return;
-      const next = !open;
-      btn.setAttribute("aria-expanded", String(next));
-      btn.textContent = next ? "Hide" : "Context";
-      btn.setAttribute(
-        "aria-label",
-        next ? "Hide grounding from the run" : "Show where this line comes from in the run"
-      );
-      if (next) panel.removeAttribute("hidden");
-      else panel.setAttribute("hidden", "");
-      const card = btn.closest(".mirror-card");
-      if (card) card.classList.toggle("mirror-card--evidence-open", next);
-    });
-  });
 }
 
 /**
@@ -4339,7 +4289,7 @@ function renderMirrorReflectionPanel(precomputedParts) {
   const parts =
     precomputedParts ||
     window.waywordPostRunRenderer.computeMirrorPostRunPanelParts(postRunMirrorPanelInputs());
-  const { shouldWireEvidence } = window.waywordPostRunRenderer.updateMirrorReflectionSection({
+  window.waywordPostRunRenderer.updateMirrorReflectionSection({
     sectionEl: section,
     rootEl: root,
     submitted: state.submitted,
@@ -4352,10 +4302,6 @@ function renderMirrorReflectionPanel(precomputedParts) {
     completedUiActive: state.completedUiActive,
     nextPassHtml: parts.nextPassHtml
   });
-  if (shouldWireEvidence) {
-    wireMirrorEvidenceToggles(root);
-    collapseMirrorEvidenceInRoot(root);
-  }
 }
 
 const METRIC_EXPLAINER_COPY = {
@@ -4628,8 +4574,6 @@ function renderHistory() {
       isDesktopPatternsViewport,
       getRecentListEmptyInnerHtml: window.waywordHistoryRenderer.getRecentListEmptyInnerHtml,
       buildRecentEntriesHtml: window.waywordHistoryRenderer.buildRecentEntriesHtml,
-      wireMirrorEvidenceToggles,
-      collapseMirrorEvidenceInRoot,
       syncRecentDrawerRunsExpandedBodyClass:
         window.waywordRecentRunsTransition.syncRecentDrawerRunsExpandedBodyClass,
       syncRecentRailExpandedChrome,
@@ -4668,20 +4612,12 @@ function renderHistory() {
     recentVm;
   if (drawerList) {
     drawerList.innerHTML = window.waywordHistoryRenderer.buildRecentEntriesHtml(drawerSlice, "draw");
-    drawerList.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
-      wireMirrorEvidenceToggles(el);
-      collapseMirrorEvidenceInRoot(el);
-    });
     const showDrawerFooter = !expanded && totalCount > capDrawer;
     drawerFooter?.classList.toggle("hidden", !showDrawerFooter);
     drawerFooter?.setAttribute("aria-hidden", showDrawerFooter ? "false" : "true");
   }
   if (railList) {
     railList.innerHTML = window.waywordHistoryRenderer.buildRecentEntriesHtml(railSlice, "rail");
-    railList.querySelectorAll(".recent-entry-mirror-root").forEach((el) => {
-      wireMirrorEvidenceToggles(el);
-      collapseMirrorEvidenceInRoot(el);
-    });
     const showRailFooter = !expanded && totalCount > capRail;
     railFooter?.classList.toggle("hidden", !showRailFooter);
     railFooter?.setAttribute("aria-hidden", showRailFooter ? "false" : "true");
@@ -4710,7 +4646,6 @@ function bindRecentRunsSurfaceInteractions(list) {
     window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions({
       list,
       domEventTargetElement,
-      collapseMirrorEvidenceInRoot,
     });
     return;
   }
@@ -4722,7 +4657,7 @@ function bindRecentRunsSurfaceInteractions(list) {
     const ae = document.activeElement;
     if (!ae || !ae.classList.contains("recent-entry") || !list.contains(ae)) return;
     e.preventDefault();
-    window.waywordViewController.toggleRecentEntry(ae, collapseMirrorEvidenceInRoot);
+    window.waywordViewController.toggleRecentEntry(ae);
   });
   list.addEventListener("click", (e) => {
     const origin = domEventTargetElement(e);
@@ -4730,7 +4665,7 @@ function bindRecentRunsSurfaceInteractions(list) {
     const entry = origin.closest(".recent-entry");
     if (!entry) return;
     if (origin.closest("button, a")) return;
-    window.waywordViewController.toggleRecentEntry(entry, collapseMirrorEvidenceInRoot);
+    window.waywordViewController.toggleRecentEntry(entry);
   });
 }
 
@@ -4924,8 +4859,6 @@ function renderProfile() {
         patternsMirrorHero != null
           ? patternsMirrorHero
           : window.waywordPatternsRenderer.patternsMirrorHeroEmptyHtml();
-      wireMirrorEvidenceToggles($("patternCallouts"));
-      collapseMirrorEvidenceInRoot($("patternCallouts"));
     } else {
       const calloutsWithStarters = window.waywordPatternsRenderer.buildPatternCallouts(
         agg,

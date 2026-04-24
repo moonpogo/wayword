@@ -81,17 +81,13 @@
 
   /**
    * @param {HTMLElement} entry
-   * @param {(root: HTMLElement | null) => void} collapseMirrorEvidenceInRoot
    */
-  function toggleRecentEntry(entry, collapseMirrorEvidenceInRoot) {
+  function toggleRecentEntry(entry) {
     if (
       window.waywordRecentRunsInteraction &&
       typeof window.waywordRecentRunsInteraction.toggleRecentEntry === "function"
     ) {
-      return window.waywordRecentRunsInteraction.toggleRecentEntry(
-        entry,
-        collapseMirrorEvidenceInRoot
-      );
+      return window.waywordRecentRunsInteraction.toggleRecentEntry(entry);
     }
 
     const expanded = entry.querySelector(".recent-entry-expanded");
@@ -111,7 +107,6 @@
     entry.classList.toggle("recent-entry--active", !isOpen);
     expanded.hidden = isOpen;
     entry.setAttribute("aria-expanded", String(!isOpen));
-    entry.querySelectorAll(".recent-entry-mirror-root").forEach(collapseMirrorEvidenceInRoot);
   }
 
   window.waywordViewController = {

@@ -1,5 +1,7 @@
 # System ownership map
 
+Note: This is a code-ownership snapshot and is partially historical. For the current V1 user-facing contract, including the statement-only Mirror surface and no visible evidence controls, use `docs/V1_PRODUCT_SPEC.md` as the source of truth.
+
 Plain map of where behavior lives today. No code changes implied.
 
 ---
