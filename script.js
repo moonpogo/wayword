@@ -1867,111 +1867,6 @@ function applyTimerFromPanel(nextSeconds) {
   renderWritingState();
 }
 
-function afterOptionsPanelClosed() {
-  if (
-    window.waywordEditorFocusRecovery &&
-    typeof window.waywordEditorFocusRecovery.afterOptionsPanelClosed === "function"
-  ) {
-    return window.waywordEditorFocusRecovery.afterOptionsPanelClosed({
-      isMobileViewport,
-      state,
-      editorInput,
-      focusEditorToEnd
-    });
-  }
-
-  if (!isMobileViewport()) return;
-  if (!document.body.classList.contains("focus-mode")) return;
-  if (!state.active || state.submitted || !editorInput) return;
-  if (state.optionsOpen) return;
-  if (document.activeElement === editorInput) return;
-  focusEditorToEnd();
-}
-
-function setOptionsOpen(open) {
-  if (
-    window.waywordOptionsPanelTransitionCoordinator &&
-    typeof window.waywordOptionsPanelTransitionCoordinator.setOptionsOpen === "function"
-  ) {
-    return window.waywordOptionsPanelTransitionCoordinator.setOptionsOpen(open, {
-      $,
-      state,
-      optionsPanelDismissGuardMs: OPTIONS_PANEL_DISMISS_GUARD_MS,
-      setOptionsPanelDismissGuardUntil(value) {
-        optionsPanelDismissGuardUntil = value;
-      },
-      clearBannedPanelPersistTimer() {
-        if (bannedPanelPersistTimer != null) {
-          clearTimeout(bannedPanelPersistTimer);
-          bannedPanelPersistTimer = null;
-        }
-      },
-      syncWordModesPanel() {
-        setActiveModeButton("wordModesPanel", "words", state.targetWords);
-      },
-      syncTimeModesPanel() {
-        setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
-      },
-      getBannedPanelValue() {
-        return state.banned.join(", ");
-      },
-      flushBannedPanelPersistFromPanel,
-      afterOptionsPanelClosed,
-      applyBodySettingsOpenClass: window.waywordViewController.applyBodySettingsOpenClass,
-      applyEditorOptionsPanelAriaAndBackdrop:
-        window.waywordViewController.applyEditorOptionsPanelAriaAndBackdrop,
-      syncViewportHeightVar,
-      queueViewportSync,
-    });
-  }
-
-  const wasOpen = state.optionsOpen;
-  state.optionsOpen = open;
-
-  const panel = $("editorOptionsPanel");
-  const backdrop = $("editorOptionsBackdrop");
-  if (!panel) return;
-  window.waywordViewController.applyBodySettingsOpenClass(open);
-
-  if (open) {
-    optionsPanelDismissGuardUntil = Date.now() + OPTIONS_PANEL_DISMISS_GUARD_MS;
-    if (bannedPanelPersistTimer != null) {
-      clearTimeout(bannedPanelPersistTimer);
-      bannedPanelPersistTimer = null;
-    }
-
-    setActiveModeButton("wordModesPanel", "words", state.targetWords);
-    setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
-
-    const input = $("bannedInlineInputPanel");
-    if (input && document.activeElement !== input) {
-      input.value = state.banned.join(", ");
-    }
-    requestAnimationFrame(() => {
-      const livePanel = $("editorOptionsPanel");
-      if (!livePanel || !state.optionsOpen) return;
-      const lockWidth = Math.round(livePanel.getBoundingClientRect().width);
-      if (lockWidth > 0) {
-        livePanel.style.width = `${lockWidth}px`;
-        livePanel.style.maxWidth = `${lockWidth}px`;
-      }
-    });
-  } else {
-    optionsPanelDismissGuardUntil = 0;
-    flushBannedPanelPersistFromPanel();
-    panel.style.removeProperty("width");
-    panel.style.removeProperty("max-width");
-  }
-
-  window.waywordViewController.applyEditorOptionsPanelAriaAndBackdrop({ open, panel, backdrop });
-
-  if (!open && wasOpen) {
-    requestAnimationFrame(() => {
-      afterOptionsPanelClosed();
-    });
-  }
-}
-
 function applyTheme(theme) {
   state.theme = theme;
   document.documentElement.setAttribute("data-theme", theme);
@@ -3595,6 +3490,7 @@ function prefersReducedUiMotion() {
 }
 
 let recentRunsUi = null;
+let optionsUi = null;
 
 function isRecentDrawerOpen() {
   return recentRunsUi.isRecentDrawerOpen();
@@ -3640,6 +3536,49 @@ recentRunsUi = window.waywordRecentRunsUiCoordination.createCoordinator({
   interaction: window.waywordRecentRunsInteraction,
   transition: window.waywordRecentRunsTransition
 });
+
+optionsUi = window.waywordOptionsUiCoordination.createCoordinator({
+  $,
+  state,
+  editorInput,
+  isMobileViewport,
+  focusEditorToEnd,
+  optionsPanelDismissGuardMs: OPTIONS_PANEL_DISMISS_GUARD_MS,
+  getOptionsOpen() {
+    return state.optionsOpen;
+  },
+  getOptionsPanelDismissGuardUntil() {
+    return optionsPanelDismissGuardUntil;
+  },
+  setOptionsPanelDismissGuardUntil(value) {
+    optionsPanelDismissGuardUntil = value;
+  },
+  clearBannedPanelPersistTimer() {
+    if (bannedPanelPersistTimer != null) {
+      clearTimeout(bannedPanelPersistTimer);
+      bannedPanelPersistTimer = null;
+    }
+  },
+  syncWordModesPanel() {
+    setActiveModeButton("wordModesPanel", "words", state.targetWords);
+  },
+  syncTimeModesPanel() {
+    setActiveModeButton("timeModesPanel", "time", state.timerSeconds);
+  },
+  getBannedPanelValue() {
+    return state.banned.join(", ");
+  },
+  flushBannedPanelPersistFromPanel,
+  applyBodySettingsOpenClass: window.waywordViewController.applyBodySettingsOpenClass,
+  applyEditorOptionsPanelAriaAndBackdrop:
+    window.waywordViewController.applyEditorOptionsPanelAriaAndBackdrop,
+  syncViewportHeightVar,
+  queueViewportSync
+});
+
+function setOptionsOpen(open) {
+  return optionsUi.setOptionsOpen(open);
+}
 
 function initEditorCompletedFlow() {
   const overlay = $("editorOverlay");
@@ -5334,8 +5273,7 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (e.key !== "Escape") return;
-  if (state.optionsOpen) {
-    setOptionsOpen(false);
+  if (optionsUi.tryHandleEscapeForOptionsSurface()) {
     e.preventDefault();
     return;
   }
@@ -5390,65 +5328,8 @@ $("enterSubmitBtn")?.addEventListener("click", () => {
   submitWriting(false);
 });
 $("saveBannedBtn")?.addEventListener("click", saveBannedInline);
-
-$("editorOptionsPanel")?.addEventListener("pointerdown", e => {
-  e.stopPropagation();
-});
-
-$("editorOptionsPanel")?.addEventListener("click", e => {
-  e.stopPropagation();
-});
-
-if (
-  window.waywordOptionsPanelInteractions &&
-  typeof window.waywordOptionsPanelInteractions.bindOptionsPanelInteractions === "function"
-) {
-  window.waywordOptionsPanelInteractions.bindOptionsPanelInteractions({
-    $,
-    getOptionsOpen() {
-      return state.optionsOpen;
-    },
-    getOptionsPanelDismissGuardUntil() {
-      return optionsPanelDismissGuardUntil;
-    },
-    setOptionsOpen
-  });
-} else {
-  $("editorOptionsBackdrop")?.addEventListener("click", e => {
-    if (Date.now() < optionsPanelDismissGuardUntil) return;
-    const panel = $("editorOptionsPanel");
-    if (panel?.contains(e.target)) return;
-    setOptionsOpen(false);
-  });
-
-  let suppressGearClickToggle = false;
-  $("optionsTrigger")?.addEventListener(
-    "pointerdown",
-    () => {
-      suppressGearClickToggle = false;
-      if (!state.optionsOpen) {
-        setOptionsOpen(true);
-        suppressGearClickToggle = true;
-      }
-    },
-    true
-  );
-
-  $("optionsTrigger")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (suppressGearClickToggle) {
-      suppressGearClickToggle = false;
-      return;
-    }
-    setOptionsOpen(!state.optionsOpen);
-  });
-
-  $("editorOptionsCloseBtn")?.addEventListener("click", e => {
-    e.stopPropagation();
-    if (Date.now() < optionsPanelDismissGuardUntil) return;
-    setOptionsOpen(false);
-  });
-}
+optionsUi.bindOptionsSurfaceEventGuards();
+optionsUi.bindOptionsOpenCloseControls();
 
 if (
   window.waywordInlineBannedEditorInteractions &&
