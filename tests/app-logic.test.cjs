@@ -45,6 +45,45 @@ function loadRecentRunsInteractionContext(documentStub) {
   });
 }
 
+function loadPatternsTransitionCoordinatorVm() {
+  const profileClass = createClassList();
+  const profileView = {
+    classList: profileClass,
+    removeEventListener() {},
+    addEventListener() {},
+    offsetWidth: 100,
+  };
+  const bodyClass = createClassList(["patterns-open", "keyboard-open"]);
+  const docElClass = createClassList(["focus-mode-layout-snap"]);
+  const state = { isExpandedField: true };
+  const documentStub = {
+    body: { classList: bodyClass },
+    documentElement: { classList: docElClass },
+  };
+  const context = loadBrowserScripts(["src/features/writing/patterns-transition-coordinator.js"], {
+    console: silentConsole(),
+    document: documentStub,
+  });
+  const $ = (id) => (id === "profileView" ? profileView : null);
+  const deps = {
+    $,
+    state,
+    editorInput: { blur() {} },
+    isMobileViewport: () => true,
+    isDesktopPatternsViewport: () => false,
+    prefersReducedUiMotion: () => false,
+    setFocusMode() {},
+    syncExpandedFieldClass() {},
+    syncPatternsLayoutMode() {},
+    renderProfile() {},
+    syncViewportHeightVar() {},
+    syncKeyboardOpenClass() {},
+    queueViewportSync() {},
+    logPatternsTransitionSnapshot() {},
+  };
+  return { context, profileView, profileClass, bodyClass, docElClass, state, deps };
+}
+
 function loadSavedRunsContext(overrides = {}) {
   return loadBrowserScripts(
     [
@@ -261,6 +300,22 @@ test("recent runs row expansion keeps a single open entry and toggles aria-expan
   toggleRecentEntry(entryB);
   assert.equal(entryB.classList.contains("is-open"), false);
   assert.equal(entryB.expanded.hidden, true);
+});
+
+test("patterns transition coordinator closes mobile profile shell state", () => {
+  const { context, profileClass, bodyClass, docElClass, state, deps } = loadPatternsTransitionCoordinatorVm();
+  const { showProfile } = context.waywordPatternsTransitionCoordinator;
+
+  profileClass.remove("hidden");
+  assert.equal(profileClass.contains("hidden"), false);
+
+  showProfile(false, deps);
+
+  assert.equal(profileClass.contains("hidden"), true);
+  assert.equal(bodyClass.contains("patterns-open"), false);
+  assert.equal(bodyClass.contains("keyboard-open"), false);
+  assert.equal(docElClass.contains("focus-mode-layout-snap"), false);
+  assert.equal(state.isExpandedField, false);
 });
 
 test("saved-run persistence writes canonical documents and reads them back in both orders", () => {

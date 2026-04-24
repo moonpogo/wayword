@@ -461,9 +461,6 @@ const {
   SHUFFLE_TIMER_SECONDS,
 } = window.waywordConfig;
 
-/** Bumped when opening Patterns so an in-flight close animation cannot hide the panel after reopen. */
-let profilePanelCloseMotionToken = 0;
-
 /**
  * DEV-ONLY — search `WAYWORD_DEV_CALIBRATION_RESET` to remove this entire block.
  * When true: `window.waywordDevResetCalibration()` clears run history + calibration state.
@@ -5099,153 +5096,27 @@ window.waywordRunController.registerDeps({
 
 function showProfile(show = true) {
   if (
-    window.waywordPatternsTransitionCoordinator &&
-    typeof window.waywordPatternsTransitionCoordinator.showProfile === "function"
+    !window.waywordPatternsTransitionCoordinator ||
+    typeof window.waywordPatternsTransitionCoordinator.showProfile !== "function"
   ) {
-    return window.waywordPatternsTransitionCoordinator.showProfile(show, {
-      $,
-      state,
-      editorInput,
-      isMobileViewport,
-      isDesktopPatternsViewport,
-      prefersReducedUiMotion,
-      setFocusMode,
-      syncExpandedFieldClass,
-      syncViewportHeightVar,
-      syncKeyboardOpenClass,
-      queueViewportSync,
-      renderProfile,
-      syncPatternsLayoutMode: window.waywordViewController.syncPatternsLayoutMode,
-      logPatternsTransitionSnapshot
-    });
+    return;
   }
-
-  const profileView = $("profileView");
-  if (!profileView) return;
-  const wasVisible = !profileView.classList.contains("hidden");
-  const isMobilePatternsContext = isMobileViewport() && !isDesktopPatternsViewport();
-  const isPatternsOpen = document.body.classList.contains("patterns-open");
-  logPatternsTransitionSnapshot("showProfile:enter", {
-    show,
-    wasVisible,
-    isMobilePatternsContext,
-    isPatternsOpen
+  return window.waywordPatternsTransitionCoordinator.showProfile(show, {
+    $,
+    state,
+    editorInput,
+    isMobileViewport,
+    isDesktopPatternsViewport,
+    prefersReducedUiMotion,
+    setFocusMode,
+    syncExpandedFieldClass,
+    syncViewportHeightVar,
+    syncKeyboardOpenClass,
+    queueViewportSync,
+    renderProfile,
+    syncPatternsLayoutMode: window.waywordViewController.syncPatternsLayoutMode,
+    logPatternsTransitionSnapshot
   });
-
-  if (show) {
-    profilePanelCloseMotionToken++;
-  }
-
-  if (isMobilePatternsContext && (show || wasVisible || isPatternsOpen)) {
-    if (show) {
-      editorInput?.blur();
-      if (document.body.classList.contains("focus-mode")) {
-        setFocusMode(false);
-      }
-      profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
-      profileView.classList.remove("hidden");
-    } else {
-      // Canonical destination for mobile Patterns close: explicit non-focus baseline.
-      setFocusMode(false);
-      profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
-      profileView.classList.add("hidden");
-      document.body.classList.remove("patterns-open", "keyboard-open");
-      document.documentElement.classList.remove("focus-mode-layout-snap");
-      state.isExpandedField = false;
-      syncExpandedFieldClass();
-    }
-    window.waywordViewController.syncPatternsLayoutMode();
-    renderProfile();
-    syncViewportHeightVar();
-    syncKeyboardOpenClass();
-    queueViewportSync();
-    logPatternsTransitionSnapshot("showProfile:mobile-resolver-return", { show });
-    requestAnimationFrame(() => {
-      logPatternsTransitionSnapshot("showProfile:mobile-resolver-next-raf", { show });
-    });
-    return;
-  }
-
-  const motion = !prefersReducedUiMotion();
-
-  if (show && !isDesktopPatternsViewport()) {
-    editorInput?.blur();
-    if (isMobileViewport() && document.body.classList.contains("focus-mode")) {
-      setFocusMode(false);
-    }
-  }
-
-  if (!motion) {
-    profileView.classList.toggle("hidden", !show);
-    window.waywordViewController.syncPatternsLayoutMode();
-    renderProfile();
-    queueViewportSync();
-    logPatternsTransitionSnapshot("showProfile:no-motion-return", { show });
-    return;
-  }
-
-  if (show && !wasVisible) {
-    profileView.classList.remove("profile-view--recede");
-    profileView.classList.add("profile-view--enter-from");
-    profileView.classList.remove("hidden");
-    window.waywordViewController.syncPatternsLayoutMode();
-    renderProfile();
-    void profileView.offsetWidth;
-    requestAnimationFrame(() => {
-      profileView.classList.remove("profile-view--enter-from");
-      queueViewportSync();
-      logPatternsTransitionSnapshot("showProfile:open-next-raf");
-    });
-    logPatternsTransitionSnapshot("showProfile:open-return");
-    return;
-  }
-
-  if (!show && wasVisible) {
-    if (isMobileViewport()) {
-      setFocusMode(false);
-      profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
-      profileView.classList.add("hidden");
-      window.waywordViewController.syncPatternsLayoutMode();
-      renderProfile();
-      queueViewportSync();
-      logPatternsTransitionSnapshot("showProfile:close-mobile-return");
-      return;
-    }
-    if (profileView.classList.contains("profile-view--recede")) {
-      return;
-    }
-    const closeToken = profilePanelCloseMotionToken;
-    let settled = false;
-    const settle = () => {
-      profileView.removeEventListener("transitionend", onTransitionEnd);
-      if (settled) return;
-      if (closeToken !== profilePanelCloseMotionToken) return;
-      settled = true;
-      profileView.classList.add("hidden");
-      profileView.classList.remove("profile-view--recede");
-      window.waywordViewController.syncPatternsLayoutMode();
-      renderProfile();
-      queueViewportSync();
-      logPatternsTransitionSnapshot("showProfile:close-desktop-settle");
-    };
-    const onTransitionEnd = (e) => {
-      if (e.target !== profileView) return;
-      if (e.propertyName !== "opacity" && e.propertyName !== "transform") return;
-      settle();
-    };
-    profileView.addEventListener("transitionend", onTransitionEnd);
-    void profileView.offsetWidth;
-    profileView.classList.add("profile-view--recede");
-    window.setTimeout(settle, 260);
-    return;
-  }
-
-  profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
-  profileView.classList.toggle("hidden", !show);
-  window.waywordViewController.syncPatternsLayoutMode();
-  renderProfile();
-  queueViewportSync();
-  logPatternsTransitionSnapshot("showProfile:fallthrough-return", { show });
 }
 
 /* -----------------------------
@@ -5287,101 +5158,26 @@ if (editorInput) {
 
   editorInput.addEventListener("blur", (e) => {
     if (
-      window.waywordMobileEditorFocusGuard &&
-      typeof window.waywordMobileEditorFocusGuard.handleEditorBlur === "function"
+      !window.waywordMobileEditorFocusGuard ||
+      typeof window.waywordMobileEditorFocusGuard.handleEditorBlur !== "function"
     ) {
-      return window.waywordMobileEditorFocusGuard.handleEditorBlur(
-        {
-          state,
-          hideEditorSemanticPicker,
-          queueViewportSync,
-          getSuppressFocusExitUntil() {
-            return suppressFocusExitUntil;
-          },
-          isMobilePatternsVisible,
-          syncViewportHeightVar,
-          syncKeyboardOpenClass,
-          setFocusMode
+      return;
+    }
+    return window.waywordMobileEditorFocusGuard.handleEditorBlur(
+      {
+        state,
+        hideEditorSemanticPicker,
+        queueViewportSync,
+        getSuppressFocusExitUntil() {
+          return suppressFocusExitUntil;
         },
-        e
-      );
-    }
-    if (state.submitted && state.completedUiActive) {
-      hideEditorSemanticPicker();
-      return;
-    }
-    if (state.optionsOpen) {
-      hideEditorSemanticPicker();
-      return;
-    }
-    const rt = e.relatedTarget;
-    if (
-      rt &&
-      typeof rt.closest === "function" &&
-      (rt.closest("#optionsTrigger") ||
-        rt.closest("#editorOptionsPanel") ||
-        rt.closest("#editorOptionsBackdrop") ||
-        rt.closest("#enterSubmitBtn") ||
-        rt.closest("#recentWritingTrigger") ||
-        rt.closest("#recentDrawer") ||
-        rt.closest("#recentDrawerBackdrop") ||
-        rt.closest("#recentRailExpandedBackdrop") ||
-        rt.closest("#recentDrawerCloseBtn") ||
-        rt.closest("#recentRailExpandedCloseBtn") ||
-        rt.closest("#recentDrawerList") ||
-        rt.closest("#styleTab") ||
-        rt.closest("#profileView") ||
-        rt.closest("#fieldExpandedToggle") ||
-        rt.closest("#promptRerollBtn"))
-    ) {
-      queueViewportSync();
-      hideEditorSemanticPicker();
-      return;
-    }
-    window.setTimeout(() => {
-      if (state.optionsOpen) {
-        hideEditorSemanticPicker();
-        return;
-      }
-      const ae = document.activeElement;
-      if (
-        ae &&
-        typeof ae.closest === "function" &&
-        (ae.closest("#optionsTrigger") ||
-          ae.closest("#editorOptionsPanel") ||
-          ae.closest("#editorOptionsBackdrop") ||
-          ae.closest("#enterSubmitBtn") ||
-          ae.closest("#recentWritingTrigger") ||
-          ae.closest("#recentDrawer") ||
-          ae.closest("#recentDrawerBackdrop") ||
-          ae.closest("#recentRailExpandedBackdrop") ||
-          ae.closest("#recentDrawerCloseBtn") ||
-          ae.closest("#recentRailExpandedCloseBtn") ||
-          ae.closest("#recentDrawerList") ||
-          ae.closest("#styleTab") ||
-          ae.closest("#profileView") ||
-          ae.closest("#fieldExpandedToggle") ||
-          ae.closest("#promptRerollBtn"))
-      ) {
-        queueViewportSync();
-        hideEditorSemanticPicker();
-        return;
-      }
-      if (document.body.classList.contains("recent-drawer-open")) {
-        queueViewportSync();
-        hideEditorSemanticPicker();
-        return;
-      }
-      if (performance.now() < suppressFocusExitUntil || isMobilePatternsVisible()) {
-        queueViewportSync();
-        hideEditorSemanticPicker();
-        return;
-      }
-      syncViewportHeightVar();
-      syncKeyboardOpenClass();
-      setFocusMode(false);
-      hideEditorSemanticPicker();
-    }, 0);
+        isMobilePatternsVisible,
+        syncViewportHeightVar,
+        syncKeyboardOpenClass,
+        setFocusMode
+      },
+      e
+    );
   });
 
   editorInput.addEventListener("compositionstart", () => {
@@ -5744,47 +5540,18 @@ if (
 
 document.addEventListener("pointerdown", (e) => {
   if (
-    window.waywordMobileEditorFocusGuard &&
-    typeof window.waywordMobileEditorFocusGuard.handleDocumentPointerDown === "function"
-  ) {
-    return window.waywordMobileEditorFocusGuard.handleDocumentPointerDown(
-      {
-        editorInput,
-        isMobileViewport
-      },
-      e
-    );
-  }
-  if (!editorInput) return;
-  if (!isMobileViewport()) return;
-  if (!document.body.classList.contains("focus-mode")) return;
-  if (document.activeElement !== editorInput) return;
-
-  const interactiveControl = e.target.closest(
-    "button,a,input,textarea,select,[role='button']"
-  );
-  if (interactiveControl) return;
-
-  const insideEditor = e.target.closest(".editor-shell");
-  const insideOptions =
-    e.target.closest("#editorOptionsPanel") ||
-    e.target.closest("#optionsTrigger") ||
-    e.target.closest("#editorOptionsBackdrop");
-  const insideRecent =
-    e.target.closest("#recentDrawer") || e.target.closest("#recentDrawerBackdrop");
-  const insideBelowEditorStack = e.target.closest(".below-editor-stack");
-  if (
-    insideEditor ||
-    insideOptions ||
-    insideRecent ||
-    insideBelowEditorStack ||
-    e.target.closest("#fieldExpandedToggle") ||
-    e.target.closest("#promptRerollBtn")
+    !window.waywordMobileEditorFocusGuard ||
+    typeof window.waywordMobileEditorFocusGuard.handleDocumentPointerDown !== "function"
   ) {
     return;
   }
-
-  editorInput.blur();
+  return window.waywordMobileEditorFocusGuard.handleDocumentPointerDown(
+    {
+      editorInput,
+      isMobileViewport
+    },
+    e
+  );
 });
 
 /* -----------------------------

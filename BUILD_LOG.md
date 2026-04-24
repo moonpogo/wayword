@@ -1,5 +1,12 @@
 # Build Log
 
+## Current Pass: Patterns / mobile transition ownership seam
+
+- **`showProfile`:** `script.js` no longer carries a second copy of open/close, mobile resolver, reduced-motion, and desktop `profile-view--recede` token logic. Single owner remains `window.waywordPatternsTransitionCoordinator` (`patterns-transition-coordinator.js`); close motion token stays module-private there.
+- **Mobile editor focus:** `script.js` no longer duplicates `handleEditorBlur` / `handleDocumentPointerDown` when `waywordMobileEditorFocusGuard` is missing; boot always loads `mobile-editor-focus-guard.js` before `script.js`.
+- **Tests:** added `node:test` coverage for mobile Patterns close via the transition coordinator (profile hidden, `patterns-open` / `keyboard-open` / `focus-mode-layout-snap` cleared, `state.isExpandedField` reset).
+- **Unchanged:** `waywordViewController.syncPatternsLayoutMode` (rail vs app placement + body `patterns-open` for mobile layout mode), `render-patterns.js` / `render-post-run.js` copy and structure, style tab listeners in `script.js`.
+
 ## Current Pass: Recent Runs ownership seam
 
 - **Row expansion + list interactions:** single owner `window.waywordRecentRunsInteraction` (`recent-runs-interaction.js`). Removed duplicate `toggleRecentEntry` implementation and export from `view-controller.js`.
