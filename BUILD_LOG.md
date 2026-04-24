@@ -1,5 +1,19 @@
 # Build Log
 
+## 2026-04-24: Recent Runs coordination extraction
+
+- Added new module `src/features/ui/recent-runs-coordination.js`.
+- `script.js` now delegates Recent Runs coordination wrappers through that helper module instead of owning the wrapper layer inline.
+- `index.html` gained one required helper include before `script.js` so the extracted Recent Runs coordination global is available at boot.
+- Rendering, data shaping, persistence, and row HTML were intentionally not moved in this pass.
+- Validation passed:
+  - `npm test`
+  - `npm run test:smoke`
+  - `npm run verify:patterns-surface`
+  - `npm run verify:mirror-bundle`
+- During extraction, an init-order bug was found: `renderHistory()` could run before the new coordinator existed via the dev reset path. Coordinator initialization was moved earlier to fix that timing issue.
+- Runtime behavior was intended to remain unchanged; this was a structural extraction only.
+
 ## 2026-04-24: UI panel coordination extraction
 
 - Added new module `src/features/ui/panel-coordination.js`.
