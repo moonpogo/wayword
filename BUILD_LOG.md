@@ -1,5 +1,10 @@
 # Build Log
 
+## Current Pass: Visual polish — Recent Runs scrollbar + Patterns challenge CTA
+
+- **`style.css`:** Recent Runs scrollbars: tail-of-file `#recentDrawerList` / `#writeView .recent-rail-list-clip #recentRailList` rules (`scrollbar-color` + WebKit + `color-scheme`) so WebKit does not repaint back to the default bright thumb after later overflow/history CSS loads.
+- **`style.css`:** Patterns “Begin challenge” (`.patterns-challenge-block .exercise-btn`) — compact pill sizing + `margin-top` for spacing above the CTA; `.exercise-dot` scaled to match.
+
 ## Current Pass: Saved-run persistence contract
 
 - Added **`docs/SAVED_RUNS_PERSISTENCE.md`**: single normative description of dual stores (canonical `wayword-run-documents-v1` vs legacy `wayword-history`), fixed write order in `waywordSavedRunPersistence`, read precedence via `waywordSavedRunsRead` vs `script.js` fallback when the read module is absent, boot migration (`mergeLegacyHistoryMissingIntoCanonicalStore`), corrupt envelope handling, and the explicit same-session gap when canonical upsert fails but legacy sync succeeds.

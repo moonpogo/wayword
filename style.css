@@ -4019,6 +4019,24 @@ html[data-theme="dark"] .profile-hero{
   color:var(--muted);
 }
 
+/* Patterns-only: “Begin challenge” reads smaller than the global `.exercise-btn` default (same id/class only in repeated-words card). */
+.patterns-challenge-block .exercise-btn{
+  margin-top:14px;
+  gap:5px;
+  padding:5px 10px;
+  font-size:12px;
+  line-height:1.25;
+  letter-spacing:0.01em;
+  border-radius:10px;
+  min-height:32px;
+}
+
+.patterns-challenge-block .exercise-dot{
+  width:5px;
+  height:5px;
+  flex-shrink:0;
+}
+
 .patterns-repeated-empty{
   margin:0;
   font-size:15px;
@@ -4993,8 +5011,6 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     box-sizing:border-box;
     /* Left optical align + right gutter so run text does not sit under the scrollbar. */
     padding:0 8px 0 2px;
-    scrollbar-width:thin;
-    scrollbar-color:color-mix(in srgb, var(--muted) 38%, transparent) transparent;
   }
 
   body.recent-rail-expanded #writeView .recent-rail-list-clip .recent-rail-list{
@@ -5025,19 +5041,6 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     );
     border-bottom:1px solid color-mix(in srgb, var(--line) 70%, transparent);
     box-shadow:0 2px 5px -3px color-mix(in srgb, var(--ink) 5%, transparent);
-  }
-
-  #writeView .recent-rail-list-clip .recent-rail-list::-webkit-scrollbar{
-    width:5px;
-  }
-
-  #writeView .recent-rail-list-clip .recent-rail-list::-webkit-scrollbar-thumb{
-    background:color-mix(in srgb, var(--muted) 42%, transparent);
-    border-radius:999px;
-  }
-
-  #writeView .recent-rail-list-clip .recent-rail-list::-webkit-scrollbar-track{
-    background:transparent;
   }
 
   #writeView .desktop-rail-panel .recent-runs-more-footer{
@@ -6434,4 +6437,56 @@ html[data-theme="dark"] .metric-explainer{
   letter-spacing:0.02em;
   color:color-mix(in srgb, var(--muted) 82%, var(--ink));
   opacity:0.78;
+}
+
+/*
+ * Recent Runs scrollbars — tail placement + ID anchors.
+ * Rationale: class-only `::-webkit-scrollbar-*` rules lived ~3k lines above the final
+ * `body.recent-drawer-open.recent-drawer-runs-expanded .recent-drawer-list` / rail overflow
+ * stack; WebKit repaints the scroll layer after those apply and the thumb can fall back to
+ * the default bright overlay. These selectors load last and pin the real scroll nodes:
+ * `#recentDrawerList` (drawer), `#recentRailList` inside `#writeView` (desktop rail).
+ */
+#recentDrawerList.recent-drawer-list,
+#writeView .recent-rail-list-clip #recentRailList{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(74, 66, 58, 0.28) transparent;
+  color-scheme:light;
+}
+
+html[data-theme="dark"] #recentDrawerList.recent-drawer-list,
+html[data-theme="dark"] #writeView .recent-rail-list-clip #recentRailList{
+  scrollbar-color:rgba(214, 206, 188, 0.16) transparent;
+  color-scheme:dark;
+}
+
+#recentDrawerList.recent-drawer-list::-webkit-scrollbar,
+#writeView .recent-rail-list-clip #recentRailList::-webkit-scrollbar{
+  width:5px;
+}
+
+#recentDrawerList.recent-drawer-list::-webkit-scrollbar-track,
+#writeView .recent-rail-list-clip #recentRailList::-webkit-scrollbar-track{
+  background:transparent;
+}
+
+#recentDrawerList.recent-drawer-list::-webkit-scrollbar-thumb,
+#writeView .recent-rail-list-clip #recentRailList::-webkit-scrollbar-thumb{
+  background:rgba(74, 66, 58, 0.26);
+  border-radius:999px;
+}
+
+#recentDrawerList.recent-drawer-list::-webkit-scrollbar-thumb:hover,
+#writeView .recent-rail-list-clip #recentRailList::-webkit-scrollbar-thumb:hover{
+  background:rgba(74, 66, 58, 0.4);
+}
+
+html[data-theme="dark"] #recentDrawerList.recent-drawer-list::-webkit-scrollbar-thumb,
+html[data-theme="dark"] #writeView .recent-rail-list-clip #recentRailList::-webkit-scrollbar-thumb{
+  background:rgba(214, 206, 188, 0.14);
+}
+
+html[data-theme="dark"] #recentDrawerList.recent-drawer-list::-webkit-scrollbar-thumb:hover,
+html[data-theme="dark"] #writeView .recent-rail-list-clip #recentRailList::-webkit-scrollbar-thumb:hover{
+  background:rgba(214, 206, 188, 0.24);
 }
