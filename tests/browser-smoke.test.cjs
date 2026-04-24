@@ -245,6 +245,96 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
   });
 });
 
+
+test("browser smoke: desktop rail — expanding a Recent Run does not grow the document", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await session.setWindowRect({ height: 900, width: 1280, x: 0, y: 0 });
+    await loadFreshApp(session);
+    await beginRun(session);
+
+    for (let index = 0; index < SMOKE_RUN_TEXTS.length; index += 1) {
+      await fillEditor(session, SMOKE_RUN_TEXTS[index]);
+      await submitCurrentRun(session);
+      if (index < SMOKE_RUN_TEXTS.length - 1) {
+        await restartIntoNextRun(session);
+      }
+    }
+
+    const before = await session.execute(`
+      var el = document.documentElement;
+      var rail = document.getElementById("recentRailList");
+      return {
+        sh: el.scrollHeight,
+        ih: window.innerHeight,
+        ch: el.clientHeight,
+        rail: rail ? { ch: rail.clientHeight, sh: rail.scrollHeight, oy: window.getComputedStyle(rail).overflowY } : null
+      };
+    `);
+
+    await session.execute(`
+      var e = document.querySelector("#recentRailList .recent-entry");
+      if (e) e.click();
+    `);
+
+    await session.waitFor(
+      "recent rail entry expanded",
+      async () =>
+        await session.execute(`
+          var e = document.querySelector("#recentRailList .recent-entry");
+          return Boolean(e && e.getAttribute("aria-expanded") === "true");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const after = await session.execute(`
+      var el = document.documentElement;
+      var rail = document.getElementById("recentRailList");
+      var expanded = document.querySelector("#recentRailList .recent-entry-expanded");
+      var expandedHeight = 0;
+      if (expanded && !expanded.hidden) {
+        expandedHeight = expanded.getBoundingClientRect().height;
+      }
+      return {
+        sh: el.scrollHeight,
+        ih: window.innerHeight,
+        ch: el.clientHeight,
+        expandedHeight: expandedHeight,
+        rail: rail ? { ch: rail.clientHeight, sh: rail.scrollHeight, oy: window.getComputedStyle(rail).overflowY } : null
+      };
+    `);
+
+    assert.ok(after.expandedHeight > 80, "expected expanded Recent Runs panel to render with meaningful height");
+
+    const band = Math.max(after.ih, after.ch) + 32;
+    assert.ok(
+      after.sh <= band,
+      `document scrollHeight should stay within viewport band after expand (sh=${after.sh} band=${band})`
+    );
+    assert.ok(
+      after.sh <= before.sh + 32,
+      `expand should not materially grow document height (before=${before.sh} after=${after.sh})`
+    );
+
+    if (after.rail && after.rail.sh > after.rail.ch + 2) {
+      assert.ok(
+        after.rail.oy === "auto" || after.rail.oy === "scroll",
+        "when rail list overflows, it should remain scrollable"
+      );
+      const railScrolled = await session.execute(`
+        var rail = document.getElementById("recentRailList");
+        if (!rail) return false;
+        var start = rail.scrollTop;
+        rail.scrollTop = start + 120;
+        return rail.scrollTop > start;
+      `);
+      assert.equal(railScrolled, true, "expected Recent Runs rail list to scroll");
+    }
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
 test("browser smoke: Recent Runs drawer opens and closes around a saved run", async (t) => {
   await withSmokeSession(t, async (session) => {
     await loadFreshApp(session);

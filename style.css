@@ -4824,6 +4824,13 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     min-height:0;
     border-top:2px solid var(--ink);
     padding-top:0;
+    /* Keep the writing deck inside the viewport band so expanded rail rows cannot increase page height. */
+    max-height:min(
+      calc(100svh - 56px - clamp(100px, 15vh, 180px)),
+      calc(100dvh - 56px - clamp(100px, 15vh, 180px)),
+      calc(100vh - 56px - clamp(100px, 15vh, 180px))
+    );
+    overflow:hidden;
   }
 
   #writeView .prompt-card{
@@ -4838,12 +4845,17 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     gap:0;
     align-items:start;
     min-height:0;
+    max-height:100%;
+    overflow:hidden;
   }
 
   .main-column{
     grid-column:1;
     max-width:920px;
     min-height:0;
+    max-height:100%;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
   }
 
   /* Single inset below the write-surface deck line for rail + patterns (matches expanded rail rhythm). */
@@ -4878,6 +4890,11 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
       calc(100vh - var(--review-runs-rail-desktop-viewport-floor))
     );
     transition:none;
+  }
+
+  #writeView .side-column:has(.recent-entry--active),
+  body.recent-rail-expanded #writeView .side-column{
+    align-self:stretch;
   }
 
   #writeView .side-column.rail-mode-patterns{
