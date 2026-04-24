@@ -20,6 +20,7 @@
   - Patterns digest qualification
   - Mirror integration/bundle ownership
   - broad render splitting
+- Future structure work should be bug-driven or post-V1 unless a concrete launch blocker emerges.
 
 ## 2026-04-24: Options coordination extraction
 
