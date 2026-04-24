@@ -1,5 +1,26 @@
 # Build Log
 
+## 2026-04-24: Structural audit refresh + V1 structure freeze
+
+- Structural audit refreshed after three completed coordination extractions:
+  - panel coordination
+  - Recent Runs coordination
+  - Options coordination
+- Audit conclusion:
+  - `script.js` is still large, but acceptable for V1 in its current state
+  - the highest remaining risks are now closer to protected product-contract seams rather than obvious wrapper/choreography duplication
+  - further pre-V1 refactors are now lower-yield and higher-risk
+- Decision:
+  - freeze structure for V1
+  - move to QA/release mode
+- Deferred until after V1 unless a concrete bug forces intervention:
+  - prompt/reroll rules
+  - `startWriting` lifecycle
+  - submit/save/persistence paths
+  - Patterns digest qualification
+  - Mirror integration/bundle ownership
+  - broad render splitting
+
 ## 2026-04-24: Options coordination extraction
 
 - Added new module `src/features/ui/options-coordination.js`.
