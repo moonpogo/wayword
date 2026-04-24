@@ -8,6 +8,12 @@
 - **Tracking:** `origin/main`
 - **Working tree during this pass:** intentionally dirty with uncommitted V1 stabilization edits listed below
 
+## Current Pass: Minimal V1 Regression Safety Net
+
+- Added a zero-dependency `node:test` logic suite wired through `npm test`.
+- New automated coverage now checks Mirror pipeline determinism and guardrails, Patterns aggregation fixtures, prompt selection suppression, Recent Runs view prep, and canonical saved-run seams.
+- Browser smoke was not added in this pass because the repo does not currently include a lightweight browser automation dependency.
+
 ## Current Pass: Mirror Bundle Sync
 
 - Rebuilt `mirror-engine.iife.js` with `npm run build:mirror`.

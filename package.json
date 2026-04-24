@@ -13,7 +13,8 @@
     "verify:patterns-surface": "node scripts/verify-patterns-surface-strings.js",
     "eval:mirror": "node scripts/run-wayword-evaluation.js",
     "eval:patterns": "node scripts/run-patterns-evaluation.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test:logic": "node --test",
+    "test": "npm run test:logic"
   },
   "repository": {
     "type": "git",
