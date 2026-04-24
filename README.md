@@ -81,6 +81,16 @@ This is an evolving system. Features are added carefully to preserve the core ex
 
 ---
 
+## Contributor docs
+
+For any V1-sensitive change, start here before editing code:
+
+- `docs/V1_ARCHITECTURE_SNAPSHOT.md` — current architecture, protected seams, and known risks
+- `docs/V1_CHANGE_GUARDRAILS.md` — pre-change checklist for V1-sensitive work
+- `docs/QA_REGRESSION_CHECKLIST.md` — merge-time verification and manual sanity checks
+
+---
+
 ## Tech
 
 - HTML / CSS / JavaScript
