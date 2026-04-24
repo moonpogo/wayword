@@ -79,43 +79,12 @@
     });
   }
 
-  /**
-   * @param {HTMLElement} entry
-   */
-  function toggleRecentEntry(entry) {
-    if (
-      window.waywordRecentRunsInteraction &&
-      typeof window.waywordRecentRunsInteraction.toggleRecentEntry === "function"
-    ) {
-      return window.waywordRecentRunsInteraction.toggleRecentEntry(entry);
-    }
-
-    const expanded = entry.querySelector(".recent-entry-expanded");
-    if (!expanded) return;
-
-    const isOpen = entry.classList.contains("is-open");
-    document.querySelectorAll(".recent-entry.is-open").forEach((el) => {
-      if (el === entry) return;
-      el.classList.remove("is-open");
-      el.classList.remove("recent-entry--active");
-      el.setAttribute("aria-expanded", "false");
-      const other = el.querySelector(".recent-entry-expanded");
-      if (other) other.hidden = true;
-    });
-
-    entry.classList.toggle("is-open", !isOpen);
-    entry.classList.toggle("recent-entry--active", !isOpen);
-    expanded.hidden = isOpen;
-    entry.setAttribute("aria-expanded", String(!isOpen));
-  }
-
   window.waywordViewController = {
     applyBodySettingsOpenClass,
     applyEditorOptionsPanelAriaAndBackdrop,
     applyRecentDrawerDomState,
     enterLandingState,
     applyLandingExitToAppDom,
-    syncPatternsLayoutMode,
-    toggleRecentEntry
+    syncPatternsLayoutMode
   };
 })();

@@ -1,5 +1,12 @@
 # Build Log
 
+## Current Pass: Recent Runs ownership seam
+
+- **Row expansion + list interactions:** single owner `window.waywordRecentRunsInteraction` (`recent-runs-interaction.js`). Removed duplicate `toggleRecentEntry` implementation and export from `view-controller.js`.
+- **`script.js`:** `bindRecentRunsSurfaceInteractions` no longer carries a second copy of click/key listeners when the interaction module is absent; production boot always loads `recent-runs-interaction.js` before `script.js`.
+- **Tests:** exported `createClassList` from `tests/helpers/browser-context.cjs` for reuse; added `node:test` coverage for `toggleRecentEntry` accordion behavior (one open row, `aria-expanded`, expanded body `hidden`).
+- **Unchanged by design:** `waywordRecentRunsViewPrep` (view-model prep), `waywordRecentRunsRenderCoordinator` (DOM list paint), `waywordRecentRunsTransition` (drawer/rail expanded chrome + Escape), `waywordHistoryRenderer` (row HTML), `applyRecentDrawerDomState` on `waywordViewController`, and the `renderHistory` fallback path when the render coordinator global is missing.
+
 ## Current Pass: V1 Browser Smoke Layer
 
 - Added a zero-dependency Safari WebDriver smoke harness under `tests/browser-smoke.test.cjs`.

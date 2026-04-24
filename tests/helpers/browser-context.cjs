@@ -156,6 +156,7 @@ function loadBrowserScripts(scriptRelativePaths, overrides = {}) {
 }
 
 module.exports = {
+  createClassList,
   createMemoryStorage,
   loadBrowserScript,
   loadBrowserScripts,

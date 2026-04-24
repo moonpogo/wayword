@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
+  createClassList,
   createMemoryStorage,
   loadBrowserScripts,
   silentConsole,
@@ -34,6 +35,13 @@ function loadPromptSelectionContext() {
 function loadRecentRunsPrepContext() {
   return loadBrowserScripts(["src/features/writing/recent-runs-view-prep.js"], {
     console: silentConsole(),
+  });
+}
+
+function loadRecentRunsInteractionContext(documentStub) {
+  return loadBrowserScripts(["src/features/writing/recent-runs-interaction.js"], {
+    console: silentConsole(),
+    document: documentStub,
   });
 }
 
@@ -202,6 +210,57 @@ test("recent runs view prep returns expected empty and expanded states", () => {
   assert.equal(expanded.drawerRunsExpandedBody, true);
   assert.deepEqual(expanded.drawerSlice.map((run) => run.runId), ["run-2", "run-1"]);
   assert.deepEqual(expanded.railSlice.map((run) => run.runId), ["run-2", "run-1"]);
+});
+
+test("recent runs row expansion keeps a single open entry and toggles aria-expanded", () => {
+  function makeRecentEntry() {
+    const expanded = { hidden: true };
+    const classList = createClassList();
+    return {
+      classList,
+      querySelector(sel) {
+        return sel === ".recent-entry-expanded" ? expanded : null;
+      },
+      setAttribute(name, value) {
+        this._attrs = this._attrs || new Map();
+        this._attrs.set(name, value);
+      },
+      getAttribute(name) {
+        return this._attrs?.get(name) ?? null;
+      },
+      expanded,
+    };
+  }
+
+  const entryA = makeRecentEntry();
+  const entryB = makeRecentEntry();
+  const allEntries = [entryA, entryB];
+
+  const documentStub = {
+    querySelectorAll(sel) {
+      if (sel !== ".recent-entry.is-open") return [];
+      return allEntries.filter((el) => el.classList.contains("is-open"));
+    },
+  };
+
+  const context = loadRecentRunsInteractionContext(documentStub);
+  const { toggleRecentEntry } = context.waywordRecentRunsInteraction;
+
+  toggleRecentEntry(entryA);
+  assert.equal(entryA.classList.contains("is-open"), true);
+  assert.equal(entryA.expanded.hidden, false);
+  assert.equal(entryA.getAttribute("aria-expanded"), "true");
+
+  toggleRecentEntry(entryB);
+  assert.equal(entryA.classList.contains("is-open"), false);
+  assert.equal(entryA.expanded.hidden, true);
+  assert.equal(entryA.getAttribute("aria-expanded"), "false");
+  assert.equal(entryB.classList.contains("is-open"), true);
+  assert.equal(entryB.expanded.hidden, false);
+
+  toggleRecentEntry(entryB);
+  assert.equal(entryB.classList.contains("is-open"), false);
+  assert.equal(entryB.expanded.hidden, true);
 });
 
 test("saved-run persistence writes canonical documents and reads them back in both orders", () => {

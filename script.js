@@ -4535,7 +4535,8 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
  * - Preview caps differ: `recentRunsPreviewCapDrawer` vs `recentRunsPreviewCapRail`.
  * - Expanded history (`recentRunsHistoryExpanded`) grows the drawer height (~max 88vh) with a scrolling list.
  * - Empty state rules differ (drawer vs rail visibility).
- * - Some interactions stay surface-specific (drawer open/close, focus) and live outside this renderer.
+ * - Drawer open/close, rail expanded chrome, and focus live in `waywordRecentRunsTransition` + `waywordViewController.applyRecentDrawerDomState`.
+ * - Row expansion and list click/key wiring live in `waywordRecentRunsInteraction` (loaded before `script.js`).
  * - Row data comes from the canonical run document repo via `readSavedRunsNewestFirst()` (newest first).
  */
 function renderHistory() {
@@ -4640,32 +4641,14 @@ function setRecentDrawerOpen(open, options = {}) {
 
 function bindRecentRunsSurfaceInteractions(list) {
   if (
-    window.waywordRecentRunsInteraction &&
-    typeof window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions === "function"
+    !window.waywordRecentRunsInteraction ||
+    typeof window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions !== "function"
   ) {
-    window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions({
-      list,
-      domEventTargetElement,
-    });
     return;
   }
-
-  if (!list || list.dataset.recentEntryInteractionsBound === "1") return;
-  list.dataset.recentEntryInteractionsBound = "1";
-  list.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    const ae = document.activeElement;
-    if (!ae || !ae.classList.contains("recent-entry") || !list.contains(ae)) return;
-    e.preventDefault();
-    window.waywordViewController.toggleRecentEntry(ae);
-  });
-  list.addEventListener("click", (e) => {
-    const origin = domEventTargetElement(e);
-    if (!origin) return;
-    const entry = origin.closest(".recent-entry");
-    if (!entry) return;
-    if (origin.closest("button, a")) return;
-    window.waywordViewController.toggleRecentEntry(entry);
+  window.waywordRecentRunsInteraction.bindRecentRunsSurfaceInteractions({
+    list,
+    domEventTargetElement,
   });
 }
 
