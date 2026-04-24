@@ -1624,7 +1624,7 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:abstraction_ratio_loose",
           dedupeKey: "variation:abstraction_ratio_std",
           rankScore: Math.round(std * 420) + ratios.length * 5,
-          statement: "Saved runs do not settle into one consistent abstraction/detail balance.",
+          statement: "The balance between abstraction and detail shifts across runs.",
           evidence: [
             {
               text: `Across ${ratios.length} saved drafts with enough material on both sides to compare, that balance still moved meaningfully from run to run.`
