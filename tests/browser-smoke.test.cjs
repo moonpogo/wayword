@@ -213,6 +213,28 @@ async function restartIntoNextRun(session) {
   );
 }
 
+async function unlockPatternsTab(session) {
+  await beginRun(session);
+
+  for (let index = 0; index < SMOKE_RUN_TEXTS.length; index += 1) {
+    await fillEditor(session, SMOKE_RUN_TEXTS[index]);
+    await submitCurrentRun(session);
+    if (index < SMOKE_RUN_TEXTS.length - 1) {
+      await restartIntoNextRun(session);
+    }
+  }
+
+  await session.waitFor(
+    "Patterns tab to unlock",
+    async () =>
+      await session.execute(`
+        var tab = document.getElementById("styleTab");
+        return Boolean(tab && !tab.classList.contains("hidden"));
+      `),
+    { timeoutMs: 15000 }
+  );
+}
+
 async function readSmokeErrors(session) {
   return await session.execute(`
     return Array.isArray(window.__waywordSmokeErrors) ? window.__waywordSmokeErrors.slice() : [];
@@ -384,25 +406,7 @@ test("browser smoke: Recent Runs drawer opens and closes around a saved run", as
 test("browser smoke: Patterns view opens after five saved runs", async (t) => {
   await withSmokeSession(t, async (session) => {
     await loadFreshApp(session);
-    await beginRun(session);
-
-    for (let index = 0; index < SMOKE_RUN_TEXTS.length; index += 1) {
-      await fillEditor(session, SMOKE_RUN_TEXTS[index]);
-      await submitCurrentRun(session);
-      if (index < SMOKE_RUN_TEXTS.length - 1) {
-        await restartIntoNextRun(session);
-      }
-    }
-
-    await session.waitFor(
-      "Patterns tab to unlock",
-      async () =>
-        await session.execute(`
-          var tab = document.getElementById("styleTab");
-          return Boolean(tab && !tab.classList.contains("hidden"));
-        `),
-      { timeoutMs: 15000 }
-    );
+    await unlockPatternsTab(session);
 
     await session.click("#styleTab");
     await session.waitFor(
@@ -432,6 +436,235 @@ test("browser smoke: Patterns view opens after five saved runs", async (t) => {
     assert.equal(profileSnapshot.profileHidden, false, "expected Patterns view to be visible");
     assert.ok(profileSnapshot.text.length > 0, "expected Patterns view to render visible copy");
     assert.equal(profileSnapshot.evidenceControlCount, 0, "Patterns view should not render stale evidence controls");
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: Patterns style tab toggles by keyboard after unlock", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await loadFreshApp(session);
+    await unlockPatternsTab(session);
+
+    const keyboardToggleSupported = await session.execute(`
+      return Boolean(
+        document.getElementById("styleTab") &&
+        document.getElementById("styleTab").getAttribute("tabindex") === "0"
+      );
+    `);
+    assert.equal(keyboardToggleSupported, true, "expected style tab keyboard support to remain available");
+
+    await session.execute(`
+      var tab = document.getElementById("styleTab");
+      tab.focus();
+      tab.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      return true;
+    `);
+
+    await session.waitFor(
+      "Patterns view open by keyboard",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          return Boolean(profileView && !profileView.classList.contains("hidden"));
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    await session.execute(`
+      var tab = document.getElementById("styleTab");
+      tab.focus();
+      tab.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      return true;
+    `);
+
+    await session.waitFor(
+      "Patterns view close by keyboard",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          return Boolean(profileView && profileView.classList.contains("hidden"));
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    const snapshot = await session.execute(`
+      return {
+        profileHidden: document.getElementById("profileView")?.classList.contains("hidden"),
+        styleExpanded: document.getElementById("styleTab")?.getAttribute("aria-expanded") || ""
+      };
+    `);
+
+    assert.equal(snapshot.profileHidden, true, "expected Patterns view to close on second keyboard toggle");
+    assert.equal(snapshot.styleExpanded, "false");
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: mobile Patterns toggle guard opens and returns to writing cleanly", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await session.setWindowRect({ height: 844, width: 390, x: 0, y: 0 });
+    await loadFreshApp(session);
+    await unlockPatternsTab(session);
+    await restartIntoNextRun(session);
+
+    await session.click("#editorInput");
+    await session.waitFor(
+      "mobile focus mode active",
+      async () =>
+        await session.execute(`
+          return document.body.classList.contains("focus-mode");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    await session.execute(`
+      var tab = document.getElementById("styleTab");
+      tab.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      tab.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      return true;
+    `);
+
+    await session.waitFor(
+      "mobile Patterns view open",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          return Boolean(
+            profileView &&
+            !profileView.classList.contains("hidden") &&
+            document.body.classList.contains("patterns-open")
+          );
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    const openSnapshot = await session.execute(`
+      return {
+        profileVisible: !document.getElementById("profileView")?.classList.contains("hidden"),
+        patternsOpen: document.body.classList.contains("patterns-open"),
+        focusModeCleared: !document.body.classList.contains("focus-mode")
+      };
+    `);
+
+    assert.equal(openSnapshot.profileVisible, true, "expected mobile Patterns view to become visible");
+    assert.equal(openSnapshot.patternsOpen, true, "expected mobile body patterns-open state");
+    assert.equal(openSnapshot.focusModeCleared, true, "expected focus mode to clear when mobile Patterns opens");
+
+    await session.execute(`
+      var tab = document.getElementById("styleTab");
+      tab.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      return true;
+    `);
+    await session.waitFor(
+      "mobile Patterns view close",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          return Boolean(
+            profileView &&
+            profileView.classList.contains("hidden") &&
+            !document.body.classList.contains("patterns-open")
+          );
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    await session.click("#editorInput");
+    await session.waitFor(
+      "editor usable after mobile Patterns close",
+      async () =>
+        await session.execute(`
+          var editor = document.getElementById("editorInput");
+          return Boolean(
+            editor &&
+            editor.getAttribute("contenteditable") === "true" &&
+            document.body.classList.contains("focus-mode")
+          );
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: fresh run resets Options and Patterns surfaces after unlock", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await loadFreshApp(session);
+    await unlockPatternsTab(session);
+    await restartIntoNextRun(session);
+
+    await session.click("#optionsTrigger");
+    await session.waitFor(
+      "Options open before fresh run reset",
+      async () =>
+        await session.execute(`
+          return document.body.classList.contains("settings-open");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    await session.click("#editorOptionsCloseBtn");
+    await session.waitFor(
+      "Options close before opening Patterns",
+      async () =>
+        await session.execute(`
+          return !document.body.classList.contains("settings-open");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    await session.click("#styleTab");
+    await session.waitFor(
+      "Patterns open before fresh run reset",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          return Boolean(profileView && !profileView.classList.contains("hidden"));
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    await session.execute(`
+      window.waywordRunController.startWriting({ deferEditorFocus: true });
+      return true;
+    `);
+
+    await session.waitFor(
+      "fresh run closes Patterns and leaves Options closed",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          var backdrop = document.getElementById("editorOptionsBackdrop");
+          return Boolean(
+            profileView &&
+            profileView.classList.contains("hidden") &&
+            !document.body.classList.contains("settings-open") &&
+            backdrop &&
+            backdrop.getAttribute("aria-hidden") === "true"
+          );
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const resetSnapshot = await session.execute(`
+      return {
+        profileHidden: document.getElementById("profileView")?.classList.contains("hidden"),
+        settingsClosed: !document.body.classList.contains("settings-open"),
+        backdropHidden: document.getElementById("editorOptionsBackdrop")?.getAttribute("aria-hidden") || "",
+        editorEditable: document.getElementById("editorInput")?.getAttribute("contenteditable") || ""
+      };
+    `);
+
+    assert.equal(resetSnapshot.profileHidden, true, "expected fresh run to hide Patterns");
+    assert.equal(resetSnapshot.settingsClosed, true, "expected fresh run to leave Options closed");
+    assert.equal(resetSnapshot.backdropHidden, "true");
+    assert.equal(resetSnapshot.editorEditable, "true");
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
