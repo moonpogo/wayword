@@ -168,9 +168,11 @@
     d.state.calibrationPostRun = null;
     d.waywordPostRunRenderer.renderReflectionLine("");
 
-    d.setBannedEditorOpen(false);
-    d.setOptionsOpen(false);
-    d.showProfile(false);
+    window.waywordPanelCoordination.closePanelsForFreshRun({
+      setBannedEditorOpen: d.setBannedEditorOpen,
+      setOptionsOpen: d.setOptionsOpen,
+      showProfile: d.showProfile,
+    });
 
     d.renderMeta();
     d.renderWritingState();

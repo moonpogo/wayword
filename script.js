@@ -1575,8 +1575,7 @@ function enterAppState(options = {}) {
     window.waywordViewController.applyLandingExitToAppDom({ shell, landing, app });
     resetHorizontalScrollOriginForAppEntry();
     syncViewportHeightVar();
-    showProfile(false);
-    setOptionsOpen(false);
+    window.waywordPanelCoordination.closePanelsForAppEntry({ showProfile, setOptionsOpen });
     afterEnter?.();
     queueViewportSync();
   };
@@ -5400,36 +5399,30 @@ $("beginBtn")?.addEventListener("click", () => {
 });
 $("themeToggleInPanel")?.addEventListener("click", toggleTheme);
 $("styleTab")?.addEventListener("pointerdown", () => {
-  if (!isMobileViewport()) return;
-  suppressFocusExitUntil = performance.now() + 320;
+  window.waywordPanelCoordination.armMobilePatternsToggleGuard({
+    isMobileViewport,
+    setSuppressFocusExitUntil: (value) => (suppressFocusExitUntil = value),
+    now: () => performance.now(),
+    durationMs: 320
+  });
 });
 $("styleTab")?.addEventListener("click", () => {
-  const profileView = $("profileView");
-  const isShowingProfile = profileView && !profileView.classList.contains("hidden");
-  logPatternsTransitionSnapshot("styleTab:click-before-toggle", { isShowingProfile });
-  showProfile(!isShowingProfile);
-  logPatternsTransitionSnapshot("styleTab:click-after-toggle", { nextShow: !isShowingProfile });
-  requestAnimationFrame(() => {
-    logPatternsTransitionSnapshot("styleTab:click-next-raf", { nextShow: !isShowingProfile });
+  window.waywordPanelCoordination.togglePatternsPanelFromStyleTab({
+    $, showProfile, source: "styleTab:click", logPatternsTransitionSnapshot
   });
-  window.setTimeout(() => {
-    logPatternsTransitionSnapshot("styleTab:click-timeout-200ms", { nextShow: !isShowingProfile });
-  }, 200);
 });
 $("styleTab")?.addEventListener("keydown", (e) => {
   if (e.key !== "Enter" && e.key !== " ") return;
   e.preventDefault();
-  if (isMobileViewport()) suppressFocusExitUntil = performance.now() + 320;
-  const profileView = $("profileView");
-  const isShowingProfile = profileView && !profileView.classList.contains("hidden");
-  logPatternsTransitionSnapshot("styleTab:key-before-toggle", {
-    key: e.key,
-    isShowingProfile
+  window.waywordPanelCoordination.armMobilePatternsToggleGuard({
+    isMobileViewport,
+    setSuppressFocusExitUntil: (value) => (suppressFocusExitUntil = value),
+    now: () => performance.now(),
+    durationMs: 320
   });
-  showProfile(!isShowingProfile);
-  logPatternsTransitionSnapshot("styleTab:key-after-toggle", { nextShow: !isShowingProfile });
-  requestAnimationFrame(() => {
-    logPatternsTransitionSnapshot("styleTab:key-next-raf", { nextShow: !isShowingProfile });
+  window.waywordPanelCoordination.togglePatternsPanelFromStyleTab({
+    $, showProfile, source: "styleTab:key", key: e.key, logPatternsTransitionSnapshot,
+    skipTimeoutLog: true
   });
 });
 $("shuffleBtn")?.addEventListener("click", triggerShuffle);
