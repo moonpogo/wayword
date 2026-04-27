@@ -8,6 +8,7 @@
     "playwright": "^1.52.0"
   },
   "scripts": {
+    "build:favicon": "node scripts/build-bmp-favicon-ico.mjs",
     "preview": "node scripts/preview-server.js",
     "build:mirror": "esbuild src/features/mirror/entry-iife.ts --bundle --format=iife --platform=browser --target=es2020 --global-name=WaywordMirror --outfile=mirror-engine.iife.js",
     "verify:mirror-bundle": "node scripts/verify-mirror-bundle.js",
