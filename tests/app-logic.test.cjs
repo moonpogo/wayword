@@ -32,6 +32,48 @@ function loadPromptSelectionContext() {
   });
 }
 
+function loadRunControllerRuntimeContext(overrides = {}) {
+  return loadBrowserScripts(["src/app/run-controller-runtime.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
+function loadAppBootRuntimeContext(overrides = {}) {
+  return loadBrowserScripts(["src/app/app-boot-runtime.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
+function loadAppEventsRuntimeContext(overrides = {}) {
+  return loadBrowserScripts(["src/app/app-events-runtime.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
+function loadProgressionRuntimeContext(overrides = {}) {
+  return loadBrowserScripts(["src/app/progression-runtime.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
+function loadAnalysisRuntimeContext(overrides = {}) {
+  return loadBrowserScripts(["src/app/analysis-runtime.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
+function loadPromptRuntimeContext(overrides = {}) {
+  return loadBrowserScripts(["src/app/prompt-runtime.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
 function loadRecentRunsPrepContext() {
   return loadBrowserScripts(["src/features/writing/recent-runs-view-prep.js"], {
     console: silentConsole(),
@@ -231,6 +273,897 @@ test("reroll gating stays tied to active, unsubmitted, empty-editor state", () =
     }),
     false
   );
+});
+
+test("run controller runtime registers built deps and keeps input callable surfaces", () => {
+  const context = loadRunControllerRuntimeContext();
+  let registered = null;
+  const controller = {
+    registerDeps(value) {
+      registered = value;
+    },
+  };
+  const input = {
+    state: { active: true },
+    $: () => "node",
+    editorInput: { id: "editor" },
+    getEditorSurfaceComposing() {
+      return true;
+    },
+    flushEditorSurfaceIntoWriteDocOnce() {},
+    getEditorText() {
+      return "draft";
+    },
+    analyze() {
+      return { totalWords: 1 };
+    },
+    getRecentEntries() {
+      return [];
+    },
+    makeRunId() {
+      return "run-1";
+    },
+    persist() {},
+    CALIBRATION_THRESHOLD: 4,
+    CALIBRATION_INSUFFICIENT_COPY: "keep going",
+    INACTIVITY_EASE_RUN_KEY: "ease",
+    selectCalibrationObservation() {
+      return "observe";
+    },
+    calibrationSubmissionHasMinimumSignal() {
+      return true;
+    },
+    clearExerciseIfCompleted() {},
+    applyWriteDocSemanticFlagsFromAnalysisCore() {},
+    updateEnterButtonVisibility() {},
+    stopTimer() {},
+    completeWordmark() {},
+    getActiveTargetWordsForScoring() {
+      return 60;
+    },
+    computeRunScoreV1() {
+      return { runScore: 80, scoreBreakdown: { completion: 25 } };
+    },
+    computeAndStoreMirrorPipelineResult() {},
+    recomputeProgressionLevel() {},
+    applyProgressionToState() {},
+    renderHistory() {},
+    renderProfileSummaryStrip() {},
+    renderProfile() {},
+    renderHighlight() {},
+    renderWritingState() {},
+    renderMeta() {},
+    renderSidebar() {},
+    queueViewportSync() {},
+    setExerciseWords() {},
+    generatePrompt() {
+      return "Prompt";
+    },
+    setEditorText() {},
+    setBannedEditorOpen() {},
+    setOptionsOpen() {},
+    showProfile() {},
+    scheduleDeferredEditorFocus() {},
+    scheduleEditorDotOverlaySync() {},
+    syncEditorBottomChromeForCalibrationOverlay() {},
+    focusEditorToStart() {},
+    updateTimeFill() {},
+    waywordPostRunRenderer: { renderReflectionLine() {} },
+  };
+
+  const deps = context.waywordRunControllerRuntime.registerRunControllerDeps(controller, input);
+
+  assert.equal(registered, deps);
+  assert.equal(deps.state, input.state);
+  assert.equal(deps.getEditorSurfaceComposing(), true);
+  assert.equal(deps.getEditorText(), "draft");
+  assert.equal(deps.CALIBRATION_THRESHOLD, 4);
+});
+
+test("app boot runtime binds viewport listeners and initial render sequence", () => {
+  const context = loadAppBootRuntimeContext();
+  const calls = [];
+  const visualViewport = {
+    addEventListener(eventName, handler) {
+      calls.push(["visualViewport", eventName, typeof handler]);
+    },
+  };
+  const windowStub = {
+    visualViewport,
+    addEventListener(eventName, handler) {
+      calls.push(["window", eventName, typeof handler]);
+    },
+    setTimeout(fn) {
+      calls.push(["timeout"]);
+      fn();
+      return 1;
+    },
+  };
+  const state = { theme: "light", progressionLevel: 0 };
+
+  context.waywordAppBootRuntime.bindViewportObservers({
+    window: windowStub,
+    queueViewportSync() {},
+  });
+
+  context.waywordAppBootRuntime.runInitialRender({
+    state,
+    syncViewportHeightVar() {
+      calls.push("syncViewportHeightVar");
+    },
+    applyTheme(value) {
+      calls.push(["applyTheme", value]);
+    },
+    loadStoredProgressionLevel() {
+      calls.push("loadStoredProgressionLevel");
+      return 2;
+    },
+    recomputeProgressionLevel(options) {
+      calls.push(["recomputeProgressionLevel", options.sessionInit]);
+    },
+    applyProgressionToState() {
+      calls.push("applyProgressionToState");
+    },
+    ensurePromptRerollButton() {
+      calls.push("ensurePromptRerollButton");
+    },
+    bindPromptClusterControlsOnce() {
+      calls.push("bindPromptClusterControlsOnce");
+    },
+    renderMeta() {
+      calls.push("renderMeta");
+    },
+    renderWritingState() {
+      calls.push("renderWritingState");
+    },
+    projectWriteDocToEditorFromState(a, b, c) {
+      calls.push(["projectWriteDocToEditorFromState", a, b, c]);
+    },
+    renderHighlight() {
+      calls.push("renderHighlight");
+    },
+    scheduleEditorDotOverlaySync() {
+      calls.push("scheduleEditorDotOverlaySync");
+    },
+    renderSidebar() {
+      calls.push("renderSidebar");
+    },
+    renderHistory() {
+      calls.push("renderHistory");
+    },
+    renderProfile() {
+      calls.push("renderProfile");
+    },
+    syncPatternsLayoutMode() {
+      calls.push("syncPatternsLayoutMode");
+    },
+    renderCalibration() {
+      calls.push("renderCalibration");
+    },
+    renderProfileSummaryStrip() {
+      calls.push("renderProfileSummaryStrip");
+    },
+    updateEnterButtonVisibility() {
+      calls.push("updateEnterButtonVisibility");
+    },
+  });
+
+  assert.deepEqual(calls.slice(0, 3), [
+    ["window", "resize", "function"],
+    ["visualViewport", "resize", "function"],
+    ["visualViewport", "scroll", "function"],
+  ]);
+  assert.equal(state.progressionLevel, 2);
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "applyTheme" && entry[1] === "light"));
+  assert.ok(calls.includes("renderProfileSummaryStrip"));
+});
+
+test("app boot runtime resize observers stay inert when targets are missing", () => {
+  const context = loadAppBootRuntimeContext({
+    document: {
+      querySelector() {
+        return null;
+      },
+    },
+  });
+
+  class ResizeObserverStub {
+    observe() {
+      throw new Error("observe should not run without targets");
+    }
+  }
+
+  const shellResult = context.waywordAppBootRuntime.bindEditorShellEdgeResizeObserver({
+    window: { setTimeout },
+    document: { querySelector: () => null },
+    ResizeObserver: ResizeObserverStub,
+    queueViewportSync() {},
+  });
+  const overlayResult = context.waywordAppBootRuntime.bindEditorCalibrationOverlayResizeObserver({
+    $() {
+      return null;
+    },
+    ResizeObserver: ResizeObserverStub,
+    syncEditorCalibrationOverlayClip() {},
+  });
+
+  assert.equal(shellResult, null);
+  assert.equal(overlayResult, null);
+});
+
+test("app events runtime binds editor input events once, syncs scroll, and submits on enter", () => {
+  const context = loadAppEventsRuntimeContext();
+  const listeners = new Map();
+  const editorInput = {
+    dataset: {},
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+  };
+  const calls = [];
+  const input = {
+    editorInput,
+    state: { active: true, submitted: false, completedUiActive: false, optionsOpen: false },
+    setFocusMode(value) {
+      calls.push(["setFocusMode", value]);
+    },
+    mobileEditorFocusGuard: null,
+    hideEditorSemanticPicker() {},
+    queueViewportSync() {},
+    getSuppressFocusExitUntil() {
+      return 0;
+    },
+    isMobilePatternsVisible() {
+      return false;
+    },
+    syncViewportHeightVar() {},
+    syncKeyboardOpenClass() {},
+    setEditorSurfaceComposing(value) {
+      calls.push(["setEditorSurfaceComposing", value]);
+    },
+    getEditorSurfaceComposing() {
+      return false;
+    },
+    isActiveAndEditable() {
+      return true;
+    },
+    flushEditorSurfaceIntoWriteDocOnce() {
+      calls.push("flush");
+    },
+    tryStartTimerOnFirstMeaningfulInput() {
+      calls.push("timer");
+    },
+    pulseWordmark() {
+      calls.push("pulse");
+    },
+    renderHighlight() {
+      calls.push("highlight");
+    },
+    renderSidebar() {
+      calls.push("sidebar");
+    },
+    updateWordProgress() {
+      calls.push("progress");
+    },
+    updateEnterButtonVisibility() {
+      calls.push("button");
+    },
+    scheduleSemanticPickerFromSelection() {
+      calls.push("picker");
+    },
+    syncScroll() {
+      calls.push("syncScroll");
+    },
+    scheduleEditorDotOverlaySync() {
+      calls.push("scheduleEditorDotOverlaySync");
+    },
+    completedUiRestartInteractions: null,
+    runPostSubmitAutoNewRunNow() {
+      calls.push("restart");
+    },
+    getEditorText() {
+      return "hello world";
+    },
+    submitWriting(value) {
+      calls.push(["submitWriting", value]);
+    },
+  };
+
+  context.waywordAppEventsRuntime.bindEditorInputEvents(input);
+  context.waywordAppEventsRuntime.bindEditorInputEvents(input);
+
+  assert.equal(editorInput.dataset.appEventsBound, "1");
+  assert.equal(listeners.has("keydown"), true);
+
+  listeners.get("focus")();
+  listeners.get("scroll")();
+  listeners.get("keydown")({
+    key: "Enter",
+    shiftKey: false,
+    preventDefault() {
+      calls.push("preventDefault");
+    },
+  });
+
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "setFocusMode" && entry[1] === true));
+  assert.ok(calls.includes("syncScroll"));
+  assert.ok(calls.includes("scheduleEditorDotOverlaySync"));
+  assert.ok(calls.includes("preventDefault"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
+});
+
+test("app events runtime binds document, primary controls, and panel controls once", () => {
+  const documentListeners = new Map();
+  const rootDataset = {};
+  const wordBtn = {
+    dataset: { words: "60" },
+    addEventListener(name, handler) {
+      this[name] = handler;
+    },
+  };
+  wordBtn.dataset.words = "60";
+  const timeBtn = {
+    dataset: { time: "180" },
+    addEventListener(name, handler) {
+      this[name] = handler;
+    },
+  };
+  timeBtn.dataset.time = "180";
+  const nodes = new Map();
+  function makeNode(id) {
+    return {
+      id,
+      dataset: {},
+      addEventListener(name, handler) {
+        this[name] = handler;
+      },
+    };
+  }
+  nodes.set("beginBtn", makeNode("beginBtn"));
+  nodes.set("themeToggleInPanel", makeNode("themeToggleInPanel"));
+  nodes.set("styleTab", makeNode("styleTab"));
+  nodes.set("shuffleBtn", makeNode("shuffleBtn"));
+  nodes.set("repeatLimitPill", makeNode("repeatLimitPill"));
+  nodes.set("enterSubmitBtn", makeNode("enterSubmitBtn"));
+  nodes.set("saveBannedBtn", makeNode("saveBannedBtn"));
+  nodes.set("shuffleBtnPanel", makeNode("shuffleBtnPanel"));
+  nodes.set("bannedInlineInputPanel", makeNode("bannedInlineInputPanel"));
+  nodes.set("promptCard", makeNode("promptCard"));
+
+  const documentStub = {
+    documentElement: { dataset: rootDataset },
+    addEventListener(name, handler) {
+      documentListeners.set(name, handler);
+    },
+    querySelectorAll(selector) {
+      if (selector === "#wordModesPanel button[data-words]") return [wordBtn];
+      if (selector === "#timeModesPanel button[data-time]") return [timeBtn];
+      return [];
+    },
+  };
+
+  const context = loadAppEventsRuntimeContext({ document: documentStub });
+  const calls = [];
+  const $ = (id) => nodes.get(id) || null;
+  const mobileEditorFocusGuard = {
+    handleDocumentPointerDown(payload, event) {
+      calls.push(["handleDocumentPointerDown", payload.editorInput === nodes.get("enterSubmitBtn"), event.type]);
+    },
+  };
+
+  context.waywordAppEventsRuntime.bindDocumentEvents({
+    document: documentStub,
+    state: {},
+    completedUiRestartInteractions: null,
+    runPostSubmitAutoNewRunNow() {},
+    tryHandleEscapeForOptionsSurface() {
+      calls.push("optionsEscape");
+      return true;
+    },
+    tryHandleEscapeForRecentRunsSurfaces() {
+      calls.push("recentEscape");
+      return false;
+    },
+    mobileEditorFocusGuard,
+    editorInput: nodes.get("enterSubmitBtn"),
+    isMobileViewport() {
+      return false;
+    },
+  });
+  context.waywordAppEventsRuntime.bindDocumentEvents({
+    document: documentStub,
+    state: {},
+    completedUiRestartInteractions: null,
+    runPostSubmitAutoNewRunNow() {},
+    tryHandleEscapeForOptionsSurface() {
+      return false;
+    },
+    tryHandleEscapeForRecentRunsSurfaces() {
+      return false;
+    },
+    mobileEditorFocusGuard,
+    editorInput: nodes.get("enterSubmitBtn"),
+    isMobileViewport() {
+      return false;
+    },
+  });
+
+  context.waywordAppEventsRuntime.bindPrimaryControls({
+    $,
+    enterAppState(options) {
+      calls.push(["enterAppState", options.dockFocusModeForMobile]);
+      options.afterEnter();
+    },
+    scheduleDeferredEditorFocus(position) {
+      calls.push(["scheduleDeferredEditorFocus", position]);
+    },
+    isMobileViewport() {
+      return false;
+    },
+    setFocusMode(value) {
+      calls.push(["setFocusMode", value]);
+    },
+    startWriting(options) {
+      calls.push(["startWriting", options.deferEditorFocus]);
+    },
+    toggleTheme() {
+      calls.push("toggleTheme");
+    },
+    panelCoordination: {
+      armMobilePatternsToggleGuard(payload) {
+        calls.push(["armMobilePatternsToggleGuard", payload.durationMs]);
+      },
+      togglePatternsPanelFromStyleTab(payload) {
+        calls.push(["togglePatternsPanelFromStyleTab", payload.source]);
+      },
+    },
+    setSuppressFocusExitUntil(value) {
+      calls.push(["setSuppressFocusExitUntil", typeof value]);
+    },
+    now() {
+      return 123;
+    },
+    showProfile() {},
+    logPatternsTransitionSnapshot() {},
+    triggerShuffle() {
+      calls.push("triggerShuffle");
+    },
+    cycleRepeatLimit() {
+      calls.push("cycleRepeatLimit");
+    },
+    editorInput: {},
+    getEditorText() {
+      return "text";
+    },
+    submitWriting(value) {
+      calls.push(["submitWriting", value]);
+    },
+    saveBannedInline() {
+      calls.push("saveBannedInline");
+    },
+  });
+  context.waywordAppEventsRuntime.bindPrimaryControls({
+    $,
+    enterAppState() {},
+    scheduleDeferredEditorFocus() {},
+    isMobileViewport() {
+      return false;
+    },
+    setFocusMode() {},
+    startWriting() {},
+    toggleTheme() {},
+    panelCoordination: {
+      armMobilePatternsToggleGuard() {},
+      togglePatternsPanelFromStyleTab() {},
+    },
+    setSuppressFocusExitUntil() {},
+    now() {
+      return 123;
+    },
+    showProfile() {},
+    logPatternsTransitionSnapshot() {},
+    triggerShuffle() {},
+    cycleRepeatLimit() {},
+    editorInput: {},
+    getEditorText() {
+      return "text";
+    },
+    submitWriting() {},
+    saveBannedInline() {},
+  });
+
+  context.waywordAppEventsRuntime.bindPromptCardRestart({
+    $,
+    domEventTargetElement(event) {
+      return event.target;
+    },
+    runPostSubmitAutoNewRunNow() {
+      calls.push("runPostSubmitAutoNewRunNow");
+    },
+  });
+  context.waywordAppEventsRuntime.bindPromptCardRestart({
+    $,
+    domEventTargetElement(event) {
+      return event.target;
+    },
+    runPostSubmitAutoNewRunNow() {},
+  });
+
+  context.waywordAppEventsRuntime.bindPanelControlWiring({
+    document: documentStub,
+    $,
+    applyWordTargetFromPanel(value) {
+      calls.push(["applyWordTargetFromPanel", value]);
+    },
+    applyTimerFromPanel(value) {
+      calls.push(["applyTimerFromPanel", value]);
+    },
+    triggerShuffle() {
+      calls.push("panelShuffle");
+    },
+    scheduleBannedPanelPersistFromPanel() {
+      calls.push("scheduleBannedPanelPersistFromPanel");
+    },
+    flushBannedPanelPersistFromPanel() {
+      calls.push("flushBannedPanelPersistFromPanel");
+    },
+  });
+  context.waywordAppEventsRuntime.bindPanelControlWiring({
+    document: documentStub,
+    $,
+    applyWordTargetFromPanel() {},
+    applyTimerFromPanel() {},
+    triggerShuffle() {},
+    scheduleBannedPanelPersistFromPanel() {},
+    flushBannedPanelPersistFromPanel() {},
+  });
+
+  documentListeners.get("keydown")({
+    key: "Escape",
+    preventDefault() {
+      calls.push("preventEscapeDefault");
+    },
+  });
+  documentListeners.get("pointerdown")({ type: "pointerdown" });
+  nodes.get("promptCard").click({
+    preventDefault() {
+      calls.push("preventPromptDefault");
+    },
+    target: {
+      closest(selector) {
+        return selector === "[data-mirror-next-pass]" ? this : null;
+      },
+    },
+  });
+  nodes.get("beginBtn").click();
+  nodes.get("themeToggleInPanel").click();
+  nodes.get("styleTab").pointerdown();
+  nodes.get("styleTab").click();
+  wordBtn.click();
+  timeBtn.click();
+  nodes.get("shuffleBtnPanel").click();
+  nodes.get("bannedInlineInputPanel").input();
+  nodes.get("bannedInlineInputPanel").blur();
+
+  assert.ok(calls.includes("optionsEscape"));
+  assert.ok(calls.includes("preventEscapeDefault"));
+  assert.ok(calls.includes("preventPromptDefault"));
+  assert.ok(calls.includes("runPostSubmitAutoNewRunNow"));
+  assert.ok(
+    calls.some(
+      (entry) =>
+        Array.isArray(entry) && entry[0] === "handleDocumentPointerDown" && entry[1] === true && entry[2] === "pointerdown"
+    )
+  );
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "startWriting" && entry[1] === true));
+  assert.ok(calls.includes("toggleTheme"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "applyWordTargetFromPanel" && entry[1] === "60"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "applyTimerFromPanel" && entry[1] === "180"));
+  assert.ok(calls.includes("panelShuffle"));
+  assert.ok(calls.includes("flushBannedPanelPersistFromPanel"));
+});
+
+test("progression runtime clamps, loads, applies, and persists levels", () => {
+  const context = loadProgressionRuntimeContext();
+  const writes = [];
+  const state = { progressionLevel: 2, targetWords: 0, timerSeconds: 0 };
+  const input = {
+    state,
+    storage: {
+      readProgressionLevelOrDefault() {
+        return "3.9";
+      },
+      saveProgressionLevel(key, value) {
+        writes.push([key, value]);
+      },
+      getInactivityEaseRunMarker() {
+        return null;
+      },
+      setInactivityEaseRunMarker() {},
+    },
+    progressionLevelKey: "progression-key",
+    progressionLevels: [
+      { level: 1, targetWords: 60, timerSeconds: 0 },
+      { level: 2, targetWords: 75, timerSeconds: 120 },
+      { level: 3, targetWords: 90, timerSeconds: 90 },
+    ],
+    inactivityEaseRunKey: "ease-key",
+    readSavedRunsChronological() {
+      return [];
+    },
+    now() {
+      return 0;
+    },
+  };
+
+  assert.equal(context.waywordProgressionRuntime.clampProgressionLevel("2.8"), 2);
+  assert.equal(context.waywordProgressionRuntime.loadStoredProgressionLevel(input), 3);
+  assert.deepEqual(context.waywordProgressionRuntime.getProgressionConfig(input, 2), {
+    level: 2,
+    targetWords: 75,
+    timerSeconds: 120,
+  });
+
+  context.waywordProgressionRuntime.applyProgressionToState(input);
+  assert.equal(state.targetWords, 75);
+  assert.equal(state.timerSeconds, 120);
+
+  context.waywordProgressionRuntime.persistProgressionLevel(input);
+  assert.deepEqual(writes, [["progression-key", 2]]);
+});
+
+test("progression runtime eases on stale sessions and advances after strong runs", () => {
+  const context = loadProgressionRuntimeContext();
+  const markerWrites = [];
+  const progressionWrites = [];
+  const state = { progressionLevel: 2 };
+  const chronologicalRuns = [
+    { runId: "run-1", savedAt: 10, wasSuccessful: false },
+    { runId: "run-2", savedAt: 20, wasSuccessful: true },
+    { runId: "run-3", savedAt: 30, wasSuccessful: true },
+    { runId: "run-4", savedAt: 40, wasSuccessful: true },
+    { runId: "run-5", savedAt: 50, wasSuccessful: true },
+    { runId: "run-6", savedAt: 60, wasSuccessful: true },
+    { runId: "run-7", savedAt: 70, wasSuccessful: true },
+    { runId: "run-8", savedAt: 80, wasSuccessful: true },
+  ];
+  const input = {
+    state,
+    storage: {
+      readProgressionLevelOrDefault() {
+        return 2;
+      },
+      saveProgressionLevel(key, value) {
+        progressionWrites.push([key, value]);
+      },
+      getInactivityEaseRunMarker() {
+        return null;
+      },
+      setInactivityEaseRunMarker(key, value) {
+        markerWrites.push([key, value]);
+      },
+    },
+    progressionLevelKey: "progression-key",
+    progressionLevels: [
+      { level: 1, targetWords: 60, timerSeconds: 0 },
+      { level: 2, targetWords: 75, timerSeconds: 120 },
+      { level: 3, targetWords: 90, timerSeconds: 90 },
+    ],
+    inactivityEaseRunKey: "ease-key",
+    readSavedRunsChronological() {
+      return chronologicalRuns;
+    },
+    now() {
+      return 8 * 86400000;
+    },
+  };
+
+  const sessionInitResult = context.waywordProgressionRuntime.recomputeProgressionLevel(input, {
+    sessionInit: true,
+  });
+  assert.equal(state.progressionLevel, 1);
+  assert.deepEqual(markerWrites, [["ease-key", "run-8"]]);
+  assert.equal(sessionInitResult.prevLevel, 2);
+
+  state.progressionLevel = 2;
+  const afterRunResult = context.waywordProgressionRuntime.recomputeProgressionLevel(input, {
+    afterRun: true,
+  });
+  assert.equal(state.progressionLevel, 3);
+  assert.equal(afterRunResult.changed, true);
+  assert.ok(progressionWrites.length >= 2);
+});
+
+test("analysis runtime computes run score with repeat and banned penalties", () => {
+  const context = loadAnalysisRuntimeContext();
+  const analysis = {
+    totalWords: 12,
+    bannedHits: [
+      { word: "just", count: 2, isExercise: false },
+      { word: "glass", count: 1, isExercise: true },
+    ],
+    repeated: [["hallway", 4]],
+    repeatedStarters: [["i", 3]],
+  };
+
+  const result = context.waywordAnalysisRuntime.computeRunScoreV1({}, analysis, 2, 12);
+
+  assert.equal(result.runScore, 15);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.scoreBreakdown)), {
+    completion: 25,
+    filler: 19,
+    repetition: 19,
+    openings: 19,
+    completionMultiplier: 1,
+  });
+});
+
+test("analysis runtime analyzes text with repeat, banned, and sentence signals", () => {
+  const context = loadAnalysisRuntimeContext();
+  const input = {
+    repeatLimit: 1,
+    exerciseWords: ["glass"],
+    banned: ["just"],
+    targetWords: 6,
+    exemptWords: new Set(["the"]),
+    tokenize(text) {
+      return String(text || "")
+        .split(/\s+/)
+        .map((word) => word.toLowerCase().replace(/[^a-z']/g, ""))
+        .filter(Boolean);
+    },
+    countWords(tokens) {
+      const counts = {};
+      tokens.forEach((token) => {
+        counts[token] = (counts[token] || 0) + 1;
+      });
+      return counts;
+    },
+    sentenceStarters(text) {
+      return String(text || "")
+        .split(/[.!?]+/)
+        .map((sentence) => sentence.trim())
+        .filter(Boolean)
+        .map((sentence) => sentence.split(/\s+/)[0].toLowerCase().replace(/[^a-z']/g, ""));
+    },
+    sentenceStarterExamples(text) {
+      return String(text || "")
+        .split(/[.!?]+/)
+        .map((sentence) => sentence.trim())
+        .filter(Boolean)
+        .map((sentence) => ({
+          starter: sentence.split(/\s+/)[0].toLowerCase().replace(/[^a-z']/g, ""),
+          excerpt: sentence,
+        }));
+    },
+    countPerspective(tokens) {
+      return {
+        first: tokens.filter((token) => token === "i").length,
+        second: tokens.filter((token) => token === "you").length,
+        third: tokens.filter((token) => token === "they").length,
+      };
+    },
+    countPunctuation(text) {
+      return {
+        commas: (String(text || "").match(/,/g) || []).length,
+      };
+    },
+  };
+
+  const result = context.waywordAnalysisRuntime.analyze(
+    input,
+    "I just saw glass. I just saw hallway hallway."
+  );
+
+  assert.equal(result.totalWords, 9);
+  assert.equal(result.uniqueCount, 5);
+  assert.deepEqual(result.repeated, [["i", 2], ["just", 2], ["saw", 2], ["hallway", 2]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.bannedHits)), [
+    { word: "just", count: 2, isExercise: false },
+    { word: "glass", count: 1, isExercise: true },
+  ]);
+  assert.deepEqual(result.repeatedStarters, [["i", 2]]);
+  assert.equal(result.targetDelta, 3);
+  assert.equal(result.uniqueRatio, 5 / 9);
+  assert.equal(result.avgSentenceLength, 4.5);
+  assert.deepEqual(result.perspective, { first: 2, second: 0, third: 0 });
+  assert.deepEqual(result.punctuation, { commas: 0 });
+});
+
+test("prompt runtime generates prompt and updates prompt history state", () => {
+  const context = loadPromptRuntimeContext();
+  const state = {
+    recentPromptIds: ["obs-0"],
+    recentFamilyKeys: ["Observation"],
+  };
+  const input = {
+    state,
+    promptSelection: {
+      choosePromptFamilyAndEntry() {
+        return {
+          family: "Relation",
+          entry: { id: "rel-2", text: "Prompt 2" },
+        };
+      },
+    },
+    promptFamiliesOrder: ["Observation", "Relation"],
+    promptLibrary: {},
+    promptEntryById: new Map(),
+    promptRecentIdWindow: 3,
+    promptNearDuplicateWindow: 2,
+    promptRecentFamilyWindow: 2,
+    promptRerollLimit: 2,
+    biasTagsForPromptFamily(family) {
+      return [family.toLowerCase()];
+    },
+    getEditorText() {
+      return "";
+    },
+    renderMeta() {},
+  };
+
+  const text = context.waywordPromptRuntime.generatePrompt(input, {});
+
+  assert.equal(text, "Prompt 2");
+  assert.equal(state.promptId, "rel-2");
+  assert.equal(state.prompt, "Prompt 2");
+  assert.equal(state.promptFamily, "Relation");
+  assert.equal(state.lastPromptKey, "Relation::rel-2");
+  assert.deepEqual(state.promptBiasTags, ["relation"]);
+  assert.deepEqual(state.recentPromptIds, ["obs-0", "rel-2"]);
+  assert.deepEqual(state.recentFamilyKeys, ["Observation", "Relation"]);
+});
+
+test("prompt runtime reroll respects eligibility and rerenders meta", () => {
+  const context = loadPromptRuntimeContext();
+  const calls = [];
+  const state = {
+    active: true,
+    submitted: false,
+    promptRerollsUsed: 0,
+    promptFamily: "Observation",
+    recentPromptIds: [],
+    recentFamilyKeys: [],
+  };
+  const input = {
+    state,
+    promptSelection: {
+      canRerollPromptCore() {
+        return true;
+      },
+      choosePromptFamilyAndEntry(args) {
+        calls.push(["choosePromptFamilyAndEntry", args.forcedFamilyKey]);
+        return {
+          family: "Observation",
+          entry: { id: "obs-2", text: "Prompt 2" },
+        };
+      },
+    },
+    promptFamiliesOrder: ["Observation", "Relation"],
+    promptLibrary: {},
+    promptEntryById: new Map(),
+    promptRecentIdWindow: 8,
+    promptNearDuplicateWindow: 3,
+    promptRecentFamilyWindow: 4,
+    promptRerollLimit: 2,
+    biasTagsForPromptFamily() {
+      return ["observation"];
+    },
+    getEditorText() {
+      return "";
+    },
+    renderMeta() {
+      calls.push("renderMeta");
+    },
+  };
+
+  const rerolled = context.waywordPromptRuntime.rerollPrompt(input);
+
+  assert.equal(rerolled, true);
+  assert.equal(state.prompt, "Prompt 2");
+  assert.equal(state.promptRerollsUsed, 1);
+  assert.ok(calls.includes("renderMeta"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "choosePromptFamilyAndEntry" && entry[1] === "Observation"));
 });
 
 test("recent runs view prep returns expected empty and expanded states", () => {

@@ -18,7 +18,7 @@ Current high-level load sequence:
 1. Inline boot script sets `data-theme` from local storage before first paint.
 2. `mirror-engine.iife.js` loads first among app scripts so `globalThis.WaywordMirror` exists before app orchestration uses it.
 3. `mirror-dom.js` loads before `script.js` to provide statement-only Mirror HTML helpers.
-4. Mirror/controller, DOM, config, storage, app-state, run-document, writing-feature, and UI helper scripts load next.
+4. Mirror/controller, DOM, config, storage, app-state, app runtime helpers, run-document, writing-feature, and UI helper scripts load next.
 5. `script.js` loads last and acts as the main runtime orchestrator.
 
 Important implications:
@@ -26,6 +26,31 @@ Important implications:
 - `index.html` is not passive markup; it is part of the app contract.
 - `mirror-engine.iife.js` is a committed build artifact, not the source of truth.
 - `runDocumentInit.js` attaches the canonical run-document repo and performs boot migration from legacy history into canonical storage.
+
+Current app runtime helper layer in `src/app/`:
+
+- `analysis-runtime.js` handles scoring and submit-time analysis helpers
+- `app-boot-runtime.js` handles boot observer binding and initial render sequencing
+- `app-events-runtime.js` handles primary event wiring
+- `prompt-runtime.js` handles prompt-state orchestration and reroll flow
+- `progression-runtime.js` handles progression-level state transitions
+- `run-controller-runtime.js` handles run-controller dependency assembly and registration
+
+Important constraint:
+
+- these helpers are extraction seams, not independent feature owners yet
+- `analysis-runtime.js`, `app-boot-runtime.js`, `app-events-runtime.js`, `prompt-runtime.js`, `progression-runtime.js`, and `run-controller-runtime.js` now own their behavior directly
+- some event-specific helpers outside `src/app/` still retain local fallback paths in `script.js`
+
+Current boot contract:
+
+- boot observer binding and initial render sequencing now routes through `src/app/app-boot-runtime.js`
+- `script.js` still owns later startup hooks that follow the initial render
+
+Current event contract:
+
+- editor input binding, document Escape/pointerdown handling, primary controls, and panel control wiring now route through `src/app/app-events-runtime.js`
+- `script.js` still owns nearby non-runtime helper calls such as options-surface guards and feature-specific interaction seams
 
 ## 2. Core User Flow
 
@@ -72,9 +97,15 @@ Current V1 Mirror contract:
 - low-signal input can produce a restrained fallback
 - saved runs may carry `mirrorPipelineResult` and `mirrorSessionDigest`
 
+Current submit-time analysis / scoring contract:
+
+- analysis and scoring orchestration now routes through `src/app/analysis-runtime.js`
+- `script.js` still owns the surrounding write-doc and UI integration
+- submit-time scoring and semantic flagging must stay aligned with the same analysis output shape
+
 ## 4. Prompt / Reroll System
 
-Prompt content currently lives in `script.js`. Eligibility and selection rules live in `src/features/writing/prompt-selection.js`.
+Prompt content currently lives in `script.js`. Eligibility and selection rules live in `src/features/writing/prompt-selection.js`. Prompt-state orchestration now routes through `src/app/prompt-runtime.js`, which is the current source of truth for prompt generation and reroll behavior.
 
 Current rules:
 
@@ -87,6 +118,19 @@ Protected invariants:
 
 - reroll must not remain available after the user starts typing
 - reroll and normal prompt generation must respect recent-id and near-duplicate suppression rules
+
+## 4A. Progression System
+
+Progression-level orchestration now routes through `src/app/progression-runtime.js`, which is the current source of truth for:
+
+- stored progression-level reads
+- inactivity easing on stale return
+- post-run progression advancement and fallback
+- applying active target words and timer state
+
+Protected invariant:
+
+- progression changes must continue to read from saved runs, not transient UI-only state
 
 ## 5. Recent Runs System
 
@@ -176,6 +220,12 @@ Logic coverage:
 
 - `tests/app-logic.test.cjs`
   - prompt selection and reroll gating
+  - prompt runtime state updates and reroll behavior
+  - analysis/scoring runtime behavior
+  - progression runtime behavior
+  - run-controller runtime dependency registration
+  - app boot runtime behavior
+  - app events runtime behavior
   - Recent Runs prep and interaction seams
   - Patterns transition seam
   - canonical persistence and legacy sync behavior
@@ -207,6 +257,7 @@ Highest-risk areas:
 
 - `script.js` remains the main orchestration monolith
 - `index.html` load order is part of runtime behavior
+- feature-specific event helpers outside `src/app/` still keep some local fallback paths in `script.js`
 - Mirror generation/ranking still has exact-string coupling risk across modules
 - committed `mirror-engine.iife.js` can drift from TypeScript source if not verified
 - Recent Runs has dual-surface synchronization risk

@@ -564,6 +564,13 @@
   <script src="/src/config/constants.js"></script>
   <script src="/src/data/storage.js"></script>
   <script src="/src/app/app-state.js"></script>
+  <!-- App runtime seam helpers: loaded before script.js so main orchestration can delegate to them directly. -->
+  <script src="/src/app/analysis-runtime.js"></script>
+  <script src="/src/app/app-boot-runtime.js"></script>
+  <script src="/src/app/app-events-runtime.js"></script>
+  <script src="/src/app/prompt-runtime.js"></script>
+  <script src="/src/app/progression-runtime.js"></script>
+  <script src="/src/app/run-controller-runtime.js"></script>
   <script src="/src/data/run-model.js"></script>
   <script src="/src/data/runs/schemaVersion.js"></script>
   <script src="/src/data/runs/runDocumentUtils.js"></script>

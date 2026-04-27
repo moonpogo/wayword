@@ -2011,68 +2011,48 @@ function persist() {
   window.waywordStorage.saveHistoryAndRunIds(state.history, state.savedRunIds);
 }
 
+function buildProgressionRuntimeInput() {
+  return {
+    state,
+    storage: window.waywordStorage,
+    progressionLevelKey: PROGRESSION_LEVEL_KEY,
+    progressionLevels: PROGRESSION_LEVELS,
+    inactivityEaseRunKey: INACTIVITY_EASE_RUN_KEY,
+    readSavedRunsChronological,
+    now: () => Date.now()
+  };
+}
+
+function getProgressionRuntime() {
+  const runtime = window.waywordProgressionRuntime;
+  if (!runtime) {
+    throw new Error("wayword: progression runtime is required before script.js progression orchestration");
+  }
+  return runtime;
+}
+
 function clampProgressionLevel(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return 1;
-  return Math.min(3, Math.max(1, Math.floor(x)));
+  return getProgressionRuntime().clampProgressionLevel(n);
 }
 
 function loadStoredProgressionLevel() {
-  return clampProgressionLevel(window.waywordStorage.readProgressionLevelOrDefault(PROGRESSION_LEVEL_KEY));
+  return getProgressionRuntime().loadStoredProgressionLevel(buildProgressionRuntimeInput());
 }
 
 function persistProgressionLevel() {
-  window.waywordStorage.saveProgressionLevel(PROGRESSION_LEVEL_KEY, state.progressionLevel);
+  getProgressionRuntime().persistProgressionLevel(buildProgressionRuntimeInput());
 }
 
 function getProgressionConfig(level) {
-  return PROGRESSION_LEVELS[clampProgressionLevel(level) - 1];
+  return getProgressionRuntime().getProgressionConfig(buildProgressionRuntimeInput(), level);
 }
 
 function applyProgressionToState() {
-  const cfg = getProgressionConfig(state.progressionLevel);
-  state.targetWords = cfg.targetWords;
-  state.timerSeconds = cfg.timerSeconds;
+  getProgressionRuntime().applyProgressionToState(buildProgressionRuntimeInput());
 }
 
 function recomputeProgressionLevel(options = {}) {
-  const sessionInit = Boolean(options.sessionInit);
-  const afterRun = Boolean(options.afterRun);
-  let level = clampProgressionLevel(state.progressionLevel);
-
-  const runs = readSavedRunsChronological()
-    .slice()
-    .sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
-
-  if (sessionInit && runs.length) {
-    const newest = runs[runs.length - 1];
-    const age = Date.now() - (newest.savedAt || 0);
-    if (age > 7 * 86400000) {
-      const marker = window.waywordStorage.getInactivityEaseRunMarker(INACTIVITY_EASE_RUN_KEY);
-      if (marker !== newest.runId) {
-        level = Math.max(1, level - 1);
-        window.waywordStorage.setInactivityEaseRunMarker(INACTIVITY_EASE_RUN_KEY, newest.runId);
-      }
-    }
-  }
-
-  if (afterRun) {
-    const last5 = runs.slice(-5);
-    if (last5.length === 5) {
-      const succ5 = last5.filter((r) => r.wasSuccessful === true).length;
-      if (succ5 < 2) level = Math.max(1, level - 1);
-    }
-
-    const last8 = runs.slice(-8);
-    const succ8 = last8.filter((r) => r.wasSuccessful === true).length;
-    if (succ8 >= 5 && level < 3) level = Math.min(3, level + 1);
-  }
-
-  const prev = state.progressionLevel;
-  state.progressionLevel = clampProgressionLevel(level);
-  persistProgressionLevel();
-
-  return { changed: prev !== state.progressionLevel, prevLevel: prev };
+  return getProgressionRuntime().recomputeProgressionLevel(buildProgressionRuntimeInput(), options);
 }
 
 function escapeHtml(str) {
@@ -2162,34 +2142,33 @@ function countPunctuation(text) {
  * @param {{ familyKey?: string }} [options]
  * @returns {string} prompt text (also sets state.promptId, promptFamily, lastPromptKey, history).
  */
-function generatePrompt(options) {
-  if (!Array.isArray(state.recentPromptIds)) state.recentPromptIds = [];
-  if (!Array.isArray(state.recentFamilyKeys)) state.recentFamilyKeys = [];
-  const opts = options && typeof options === "object" ? options : {};
-  const forced =
-    typeof opts.familyKey === "string" && PROMPT_FAMILIES_ORDER.includes(opts.familyKey)
-      ? opts.familyKey
-      : null;
-
-  const { family, entry } = window.waywordPromptSelection.choosePromptFamilyAndEntry({
-    forcedFamilyKey: forced,
-    recentPromptIds: state.recentPromptIds,
-    recentFamilyKeys: state.recentFamilyKeys,
+function buildPromptRuntimeInput() {
+  return {
+    state,
+    promptSelection: window.waywordPromptSelection,
     promptFamiliesOrder: PROMPT_FAMILIES_ORDER,
     promptLibrary,
     promptEntryById,
-    recentIdWindow: PROMPT_RECENT_ID_WINDOW,
-    nearDuplicateWindow: PROMPT_NEAR_DUPLICATE_WINDOW,
-    recentFamilyWindow: PROMPT_RECENT_FAMILY_WINDOW,
-  });
-  state.promptId = entry.id;
-  state.prompt = entry.text;
-  state.promptFamily = family;
-  state.lastPromptKey = `${family}::${entry.id}`;
-  state.promptBiasTags = biasTagsForPromptFamily(family);
-  state.recentPromptIds = [...state.recentPromptIds, entry.id].slice(-PROMPT_RECENT_ID_WINDOW);
-  state.recentFamilyKeys = [...state.recentFamilyKeys, family].slice(-PROMPT_RECENT_FAMILY_WINDOW);
-  return entry.text;
+    promptRecentIdWindow: PROMPT_RECENT_ID_WINDOW,
+    promptNearDuplicateWindow: PROMPT_NEAR_DUPLICATE_WINDOW,
+    promptRecentFamilyWindow: PROMPT_RECENT_FAMILY_WINDOW,
+    promptRerollLimit: PROMPT_REROLL_LIMIT,
+    biasTagsForPromptFamily,
+    getEditorText,
+    renderMeta
+  };
+}
+
+function getPromptRuntime() {
+  const runtime = window.waywordPromptRuntime;
+  if (!runtime) {
+    throw new Error("wayword: prompt runtime is required before script.js prompt orchestration");
+  }
+  return runtime;
+}
+
+function generatePrompt(options) {
+  return getPromptRuntime().generatePrompt(buildPromptRuntimeInput(), options);
 }
 
 function makeRunId() {
@@ -2222,26 +2201,11 @@ function updateEnterButtonVisibility() {
 }
 
 function canRerollPrompt() {
-  return window.waywordPromptSelection.canRerollPromptCore({
-    active: state.active,
-    submitted: state.submitted,
-    editorTextEmpty: !getEditorText().trim(),
-    promptRerollsUsed: state.promptRerollsUsed,
-    rerollLimit: PROMPT_REROLL_LIMIT,
-  });
+  return getPromptRuntime().canRerollPrompt(buildPromptRuntimeInput());
 }
 
 function rerollPrompt() {
-  if (!canRerollPrompt()) return;
-
-  const fam = String(state.promptFamily || "").trim();
-  state.prompt = generatePrompt(
-    PROMPT_FAMILIES_ORDER.includes(fam) ? { familyKey: fam } : {}
-  );
-  state.promptRerollsUsed += 1;
-
-  renderMeta();
-
+  getPromptRuntime().rerollPrompt(buildPromptRuntimeInput());
 }
 
 /** Reprompt control only — never field toggle (explicit target + propagation guard). */
@@ -2533,119 +2497,53 @@ function getActiveTargetWordsForScoring() {
   return getProgressionConfig(state.progressionLevel).targetWords;
 }
 
+function buildAnalysisRuntimeInput() {
+  return {
+    repeatLimit: state.repeatLimit,
+    exerciseWords: state.exerciseWords,
+    banned: state.banned,
+    targetWords: state.targetWords,
+    exemptWords,
+    tokenize,
+    countWords,
+    sentenceStarters,
+    sentenceStarterExamples,
+    countPerspective,
+    countPunctuation
+  };
+}
+
+function getAnalysisRuntime() {
+  const runtime = window.waywordAnalysisRuntime;
+  if (!runtime) {
+    throw new Error("wayword: analysis runtime is required before script.js analysis orchestration");
+  }
+  return runtime;
+}
+
 function scoreDeductionFromIncidentCount(n) {
-  const c = Math.max(0, Math.floor(Number(n)) || 0);
-  if (c <= 0) return 25;
-  if (c === 1) return 22;
-  if (c === 2) return 19;
-  if (c === 3) return 16;
-  if (c === 4) return 13;
-  return 10;
+  return getAnalysisRuntime().scoreDeductionFromIncidentCount(n);
 }
 
 function scoreCompletionFromTargetRatio(totalWords, activeTargetWords) {
-  const words = Math.max(0, Number(totalWords) || 0);
-  const target = Math.max(1, Number(activeTargetWords) || 1);
-  const ratio = words / target;
-  if (ratio >= 1) return { completion: 25, completionMultiplier: 1.0 };
-  if (ratio >= 0.75) return { completion: 20, completionMultiplier: 0.85 };
-  if (ratio >= 0.5) return { completion: 15, completionMultiplier: 0.6 };
-  if (ratio >= 0.25) return { completion: 10, completionMultiplier: 0.35 };
-  return { completion: 5, completionMultiplier: 0.1 };
+  return getAnalysisRuntime().scoreCompletionFromTargetRatio(totalWords, activeTargetWords);
 }
 
 function runScoreSampleCapFromWordCount(totalWords) {
-  const w = Math.max(0, Math.floor(Number(totalWords) || 0));
-  if (w <= 4) return 5;
-  if (w <= 9) return 10;
-  if (w <= 14) return 15;
-  return 100;
+  return getAnalysisRuntime().runScoreSampleCapFromWordCount(totalWords);
 }
 
 function computeRunScoreV1(analysis, repeatLimit, activeTargetWords) {
-  const limit = Math.max(1, Number(repeatLimit) || 1);
-  const targetForScore = Math.max(1, Number(activeTargetWords) || 1);
-
-  const fillerIncidents = analysis.bannedHits
-    .filter((item) => !item.isExercise)
-    .reduce((sum, item) => sum + item.count, 0);
-  const repetitionIncidents = analysis.repeated.reduce(
-    (sum, [, count]) => sum + Math.max(0, count - limit),
-    0
+  return getAnalysisRuntime().computeRunScoreV1(
+    buildAnalysisRuntimeInput(),
+    analysis,
+    repeatLimit,
+    activeTargetWords
   );
-  const openingsIncidents = analysis.repeatedStarters.reduce(
-    (sum, [, count]) => sum + Math.max(0, count - 1),
-    0
-  );
-
-  const { completion, completionMultiplier } = scoreCompletionFromTargetRatio(
-    analysis.totalWords,
-    targetForScore
-  );
-  const filler = scoreDeductionFromIncidentCount(fillerIncidents);
-  const repetition = scoreDeductionFromIncidentCount(repetitionIncidents);
-  const openings = scoreDeductionFromIncidentCount(openingsIncidents);
-  const constraintRaw = filler + repetition + openings;
-  const runScorePreCap = Math.min(100, completion + Math.round(completionMultiplier * constraintRaw));
-  const runScore = Math.min(runScorePreCap, runScoreSampleCapFromWordCount(analysis.totalWords));
-  const scoreBreakdown = {
-    completion,
-    filler,
-    repetition,
-    openings,
-    completionMultiplier
-  };
-  return { runScore, scoreBreakdown };
 }
 
 function analyze(text) {
-  const tokens = tokenize(text);
-  const counts = countWords(tokens);
-  const totalWords = tokens.length;
-  const uniqueCount = Object.keys(counts).length;
-
-  const repeated = Object.entries(counts)
-    .filter(([word, count]) => !exemptWords.has(word) && count > state.repeatLimit)
-    .sort((a, b) => b[1] - a[1]);
-
-  const exerciseWordsSet = new Set(state.exerciseWords);
-  const effectiveBanned = [...new Set([...state.banned, ...state.exerciseWords])];
-
-  const bannedHits = effectiveBanned
-    .map(word => ({ word, count: counts[word] || 0, isExercise: exerciseWordsSet.has(word) }))
-    .filter(item => item.count > 0);
-
-  const starters = sentenceStarters(text);
-  const starterCounts = countWords(starters);
-  const repeatedStarters = Object.entries(starterCounts)
-    .filter(([, count]) => count > 1)
-    .sort((a, b) => b[1] - a[1]);
-
-  const targetDelta = state.targetWords ? totalWords - state.targetWords : totalWords;
-
-  const uniqueRatio = totalWords ? uniqueCount / totalWords : 0;
-  const sentences = String(text || "").split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
-  const avgSentenceLength = sentences.length ? totalWords / sentences.length : 0;
-  const perspective = countPerspective(tokens);
-  const punctuation = countPunctuation(text);
-  const starterExampleList = sentenceStarterExamples(text);
-
-  return {
-    tokens,
-    counts,
-    totalWords,
-    uniqueCount,
-    repeated,
-    bannedHits,
-    repeatedStarters,
-    targetDelta,
-    starterCounts,
-    uniqueRatio,
-    avgSentenceLength,
-    perspective,
-    punctuation,
-    starterExampleList
-  };
+  return getAnalysisRuntime().analyze(buildAnalysisRuntimeInput(), text);
 }
 
 /**
@@ -4996,55 +4894,76 @@ function runPostSubmitAutoNewRunNow() {
   return window.waywordRunController.runPostSubmitAutoNewRunNow();
 }
 
-window.waywordRunController.registerDeps({
-  state,
-  $,
-  editorInput,
-  getEditorSurfaceComposing() {
-    return editorSurfaceComposing;
-  },
-  flushEditorSurfaceIntoWriteDocOnce,
-  getEditorText,
-  analyze,
-  getRecentEntries,
-  makeRunId,
-  persist,
-  CALIBRATION_THRESHOLD,
-  CALIBRATION_INSUFFICIENT_COPY,
-  INACTIVITY_EASE_RUN_KEY,
-  selectCalibrationObservation,
-  calibrationSubmissionHasMinimumSignal,
-  clearExerciseIfCompleted,
-  applyWriteDocSemanticFlagsFromAnalysisCore,
-  updateEnterButtonVisibility,
-  stopTimer,
-  completeWordmark,
-  getActiveTargetWordsForScoring,
-  computeRunScoreV1,
-  computeAndStoreMirrorPipelineResult,
-  recomputeProgressionLevel,
-  applyProgressionToState,
-  renderHistory,
-  renderProfileSummaryStrip,
-  renderProfile,
-  renderHighlight,
-  renderWritingState,
-  renderMeta,
-  renderSidebar,
-  queueViewportSync,
-  setExerciseWords,
-  generatePrompt,
-  setEditorText,
-  setBannedEditorOpen,
-  setOptionsOpen,
-  showProfile,
-  scheduleDeferredEditorFocus,
-  scheduleEditorDotOverlaySync,
-  syncEditorBottomChromeForCalibrationOverlay,
-  focusEditorToStart,
-  updateTimeFill,
-  waywordPostRunRenderer: window.waywordPostRunRenderer
-});
+function buildRunControllerRegistrationInput() {
+  return {
+    state,
+    $,
+    editorInput,
+    getEditorSurfaceComposing() {
+      return editorSurfaceComposing;
+    },
+    flushEditorSurfaceIntoWriteDocOnce,
+    getEditorText,
+    analyze,
+    getRecentEntries,
+    makeRunId,
+    persist,
+    CALIBRATION_THRESHOLD,
+    CALIBRATION_INSUFFICIENT_COPY,
+    INACTIVITY_EASE_RUN_KEY,
+    selectCalibrationObservation,
+    calibrationSubmissionHasMinimumSignal,
+    clearExerciseIfCompleted,
+    applyWriteDocSemanticFlagsFromAnalysisCore,
+    updateEnterButtonVisibility,
+    stopTimer,
+    completeWordmark,
+    getActiveTargetWordsForScoring,
+    computeRunScoreV1,
+    computeAndStoreMirrorPipelineResult,
+    recomputeProgressionLevel,
+    applyProgressionToState,
+    renderHistory,
+    renderProfileSummaryStrip,
+    renderProfile,
+    renderHighlight,
+    renderWritingState,
+    renderMeta,
+    renderSidebar,
+    queueViewportSync,
+    setExerciseWords,
+    generatePrompt,
+    setEditorText,
+    setBannedEditorOpen,
+    setOptionsOpen,
+    showProfile,
+    scheduleDeferredEditorFocus,
+    scheduleEditorDotOverlaySync,
+    syncEditorBottomChromeForCalibrationOverlay,
+    focusEditorToStart,
+    updateTimeFill,
+    waywordPostRunRenderer: window.waywordPostRunRenderer
+  };
+}
+
+function getRunControllerRuntime() {
+  const runtime = window.waywordRunControllerRuntime;
+  if (!runtime) {
+    throw new Error(
+      "wayword: run controller runtime is required before script.js run-controller orchestration"
+    );
+  }
+  return runtime;
+}
+
+function registerRunControllerDeps() {
+  getRunControllerRuntime().registerRunControllerDeps(
+    window.waywordRunController,
+    buildRunControllerRegistrationInput()
+  );
+}
+
+registerRunControllerDeps();
 
 function showProfile(show = true) {
   if (
@@ -5103,100 +5022,55 @@ function initZenGarden() {
    events
 ----------------------------- */
 
-if (editorInput) {
-  editorInput.addEventListener("focus", () => {
-    setFocusMode(true);
-  });
+function getAppEventsRuntime() {
+  const runtime = window.waywordAppEventsRuntime;
+  if (!runtime) {
+    throw new Error("wayword: app events runtime is required before script.js event orchestration");
+  }
+  return runtime;
+}
 
-  editorInput.addEventListener("blur", (e) => {
-    if (
-      !window.waywordMobileEditorFocusGuard ||
-      typeof window.waywordMobileEditorFocusGuard.handleEditorBlur !== "function"
-    ) {
-      return;
-    }
-    return window.waywordMobileEditorFocusGuard.handleEditorBlur(
-      {
-        state,
-        hideEditorSemanticPicker,
-        queueViewportSync,
-        getSuppressFocusExitUntil() {
-          return suppressFocusExitUntil;
-        },
-        isMobilePatternsVisible,
-        syncViewportHeightVar,
-        syncKeyboardOpenClass,
-        setFocusMode
-      },
-      e
-    );
-  });
-
-  editorInput.addEventListener("compositionstart", () => {
-    editorSurfaceComposing = true;
-  });
-
-  editorInput.addEventListener("compositionend", () => {
-    editorSurfaceComposing = false;
-    if (!state.active || state.submitted) return;
-    flushEditorSurfaceIntoWriteDocOnce();
-    tryStartTimerOnFirstMeaningfulInput();
-    pulseWordmark();
-    renderHighlight();
-    renderSidebar();
-    updateWordProgress();
-    updateEnterButtonVisibility();
-    scheduleSemanticPickerFromSelection();
-  });
-
-  editorInput.addEventListener("input", () => {
-    if (!state.active || state.submitted) return;
-    if (editorSurfaceComposing) return;
-    flushEditorSurfaceIntoWriteDocOnce();
-    tryStartTimerOnFirstMeaningfulInput();
-    pulseWordmark();
-    renderHighlight();
-    renderSidebar();
-    updateWordProgress();
-    updateEnterButtonVisibility();
-    scheduleSemanticPickerFromSelection();
-  });
-
-  editorInput.addEventListener("scroll", () => {
-    syncScroll();
-    scheduleEditorDotOverlaySync();
-    scheduleSemanticPickerFromSelection();
-  });
-
-  editorInput.addEventListener("keydown", (e) => {
-    if (
-      window.waywordCompletedUiRestartInteractions &&
-      typeof window.waywordCompletedUiRestartInteractions.handleEditorCompletedRestartKeydown ===
-        "function" &&
-      window.waywordCompletedUiRestartInteractions.handleEditorCompletedRestartKeydown(
-        {
-          state,
-          runPostSubmitAutoNewRunNow
-        },
-        e
-      )
-    ) {
-      return;
-    }
-
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      if (state.submitted) {
-        if (state.completedUiActive && !state.optionsOpen) {
-          runPostSubmitAutoNewRunNow();
-        }
-        return;
-      }
-      if (getEditorText().trim().length === 0) return;
-      submitWriting(false);
-    }
+function bindEditorInputEvents() {
+  getAppEventsRuntime().bindEditorInputEvents({
+    editorInput,
+    state,
+    setFocusMode,
+    mobileEditorFocusGuard: window.waywordMobileEditorFocusGuard,
+    hideEditorSemanticPicker,
+    queueViewportSync,
+    getSuppressFocusExitUntil() {
+      return suppressFocusExitUntil;
+    },
+    isMobilePatternsVisible,
+    syncViewportHeightVar,
+    syncKeyboardOpenClass,
+    setEditorSurfaceComposing(value) {
+      editorSurfaceComposing = Boolean(value);
+    },
+    getEditorSurfaceComposing() {
+      return editorSurfaceComposing;
+    },
+    isActiveAndEditable() {
+      return state.active && !state.submitted;
+    },
+    flushEditorSurfaceIntoWriteDocOnce,
+    tryStartTimerOnFirstMeaningfulInput,
+    pulseWordmark,
+    renderHighlight,
+    renderSidebar,
+    updateWordProgress,
+    updateEnterButtonVisibility,
+    scheduleSemanticPickerFromSelection,
+    syncScroll,
+    scheduleEditorDotOverlaySync,
+    completedUiRestartInteractions: window.waywordCompletedUiRestartInteractions,
+    runPostSubmitAutoNewRunNow,
+    getEditorText,
+    submitWriting
   });
 }
+
+bindEditorInputEvents();
 
 const { editorShell } = window.waywordDomElements.resolveEditorShell();
 
@@ -5270,85 +5144,49 @@ if (
   });
 }
 
-$("promptCard")?.addEventListener("click", (e) => {
-  const origin = domEventTargetElement(e);
-  if (!origin || !origin.closest("[data-mirror-next-pass]")) return;
-  e.preventDefault();
-  runPostSubmitAutoNewRunNow();
-});
-
-document.addEventListener("keydown", (e) => {
-  if (
-    window.waywordCompletedUiRestartInteractions &&
-    typeof window.waywordCompletedUiRestartInteractions.handleDocumentCompletedRestartKeydown ===
-      "function" &&
-    window.waywordCompletedUiRestartInteractions.handleDocumentCompletedRestartKeydown(
-      {
-        state,
-        runPostSubmitAutoNewRunNow
-      },
-      e
-    )
-  ) {
-    return;
-  }
-
-  if (e.key !== "Escape") return;
-  if (optionsUi.tryHandleEscapeForOptionsSurface()) {
-    e.preventDefault();
-    return;
-  }
-  if (recentRunsUi.tryHandleEscapeForRecentRunsSurfaces()) {
-    e.preventDefault();
-    return;
-  }
-});
-
-$("beginBtn")?.addEventListener("click", () => {
-  enterAppState({
-    afterEnter: () => scheduleDeferredEditorFocus("end"),
-    dockFocusModeForMobile: false,
+function bindPrimaryEventControls() {
+  const runtime = getAppEventsRuntime();
+  runtime.bindPromptCardRestart({
+    $,
+    domEventTargetElement,
+    runPostSubmitAutoNewRunNow
   });
-  if (isMobileViewport()) {
-    setFocusMode(true);
-  }
-  startWriting({ deferEditorFocus: true });
-});
-$("themeToggleInPanel")?.addEventListener("click", toggleTheme);
-$("styleTab")?.addEventListener("pointerdown", () => {
-  window.waywordPanelCoordination.armMobilePatternsToggleGuard({
+  runtime.bindDocumentEvents({
+    document,
+    state,
+    completedUiRestartInteractions: window.waywordCompletedUiRestartInteractions,
+    runPostSubmitAutoNewRunNow,
+    tryHandleEscapeForOptionsSurface: () => optionsUi.tryHandleEscapeForOptionsSurface(),
+    tryHandleEscapeForRecentRunsSurfaces: () => recentRunsUi.tryHandleEscapeForRecentRunsSurfaces(),
+    mobileEditorFocusGuard: window.waywordMobileEditorFocusGuard,
+    editorInput,
+    isMobileViewport
+  });
+  runtime.bindPrimaryControls({
+    $,
+    enterAppState,
+    scheduleDeferredEditorFocus,
     isMobileViewport,
-    setSuppressFocusExitUntil: (value) => (suppressFocusExitUntil = value),
+    setFocusMode,
+    startWriting,
+    toggleTheme,
+    panelCoordination: window.waywordPanelCoordination,
+    setSuppressFocusExitUntil(value) {
+      suppressFocusExitUntil = value;
+    },
     now: () => performance.now(),
-    durationMs: 320
+    showProfile,
+    logPatternsTransitionSnapshot,
+    triggerShuffle,
+    cycleRepeatLimit,
+    editorInput,
+    getEditorText,
+    submitWriting,
+    saveBannedInline
   });
-});
-$("styleTab")?.addEventListener("click", () => {
-  window.waywordPanelCoordination.togglePatternsPanelFromStyleTab({
-    $, showProfile, source: "styleTab:click", logPatternsTransitionSnapshot
-  });
-});
-$("styleTab")?.addEventListener("keydown", (e) => {
-  if (e.key !== "Enter" && e.key !== " ") return;
-  e.preventDefault();
-  window.waywordPanelCoordination.armMobilePatternsToggleGuard({
-    isMobileViewport,
-    setSuppressFocusExitUntil: (value) => (suppressFocusExitUntil = value),
-    now: () => performance.now(),
-    durationMs: 320
-  });
-  window.waywordPanelCoordination.togglePatternsPanelFromStyleTab({
-    $, showProfile, source: "styleTab:key", key: e.key, logPatternsTransitionSnapshot,
-    skipTimeoutLog: true
-  });
-});
-$("shuffleBtn")?.addEventListener("click", triggerShuffle);
-$("repeatLimitPill")?.addEventListener("click", cycleRepeatLimit);
-$("enterSubmitBtn")?.addEventListener("click", () => {
-  if (!editorInput || getEditorText().trim().length === 0) return;
-  submitWriting(false);
-});
-$("saveBannedBtn")?.addEventListener("click", saveBannedInline);
+}
+
+bindPrimaryEventControls();
 optionsUi.bindOptionsSurfaceEventGuards();
 optionsUi.bindOptionsOpenCloseControls();
 
@@ -5394,42 +5232,23 @@ if (
   });
 }
 
-document.addEventListener("pointerdown", (e) => {
-  if (
-    !window.waywordMobileEditorFocusGuard ||
-    typeof window.waywordMobileEditorFocusGuard.handleDocumentPointerDown !== "function"
-  ) {
-    return;
-  }
-  return window.waywordMobileEditorFocusGuard.handleDocumentPointerDown(
-    {
-      editorInput,
-      isMobileViewport
-    },
-    e
-  );
-});
-
 /* -----------------------------
    panel control wiring
 ----------------------------- */
 
-document.querySelectorAll("#wordModesPanel button[data-words]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    applyWordTargetFromPanel(btn.dataset.words);
+function bindPanelControlWiring() {
+  getAppEventsRuntime().bindPanelControlWiring({
+    document,
+    $,
+    applyWordTargetFromPanel,
+    applyTimerFromPanel,
+    triggerShuffle,
+    scheduleBannedPanelPersistFromPanel,
+    flushBannedPanelPersistFromPanel
   });
-});
-document.querySelectorAll("#timeModesPanel button[data-time]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    applyTimerFromPanel(btn.dataset.time);
-  });
-});
-$("shuffleBtnPanel")?.addEventListener("click", triggerShuffle);
+}
 
-$("bannedInlineInputPanel")?.addEventListener("input", scheduleBannedPanelPersistFromPanel);
-$("bannedInlineInputPanel")?.addEventListener("blur", () => {
-  flushBannedPanelPersistFromPanel();
-});
+bindPanelControlWiring();
 /* -----------------------------
    boot
 ----------------------------- */
@@ -5449,56 +5268,60 @@ if (WAYWORD_DEV_CALIBRATION_RESET_ENABLED) {
   }
 }
 
-window.addEventListener("resize", queueViewportSync);
-if (window.visualViewport) {
-  window.visualViewport.addEventListener("resize", queueViewportSync);
-  window.visualViewport.addEventListener("scroll", queueViewportSync);
+function getAppBootRuntime() {
+  const runtime = window.waywordAppBootRuntime;
+  if (!runtime) {
+    throw new Error("wayword: app boot runtime is required before script.js boot orchestration");
+  }
+  return runtime;
 }
 
-(function bindEditorShellEdgeResizeObserver() {
-  const shell = document.querySelector(".editor-shell");
-  if (!shell || typeof ResizeObserver === "undefined") return;
-  let debounceTimer = null;
-  const ro = new ResizeObserver(() => {
-    if (debounceTimer !== null) clearTimeout(debounceTimer);
-    debounceTimer = window.setTimeout(() => {
-      debounceTimer = null;
-      queueViewportSync();
-    }, 36);
+function bindBootObservers() {
+  const runtime = getAppBootRuntime();
+  runtime.bindViewportObservers({
+    window,
+    queueViewportSync
   });
-  ro.observe(shell);
-})();
-
-(function bindEditorCalibrationOverlayResizeObserver() {
-  const overlay = $("editorOverlay");
-  if (!overlay || typeof ResizeObserver === "undefined") return;
-  const ro = new ResizeObserver(() => {
-    if (overlay.classList.contains("editor-overlay--calibration") && !overlay.classList.contains("hidden")) {
-      syncEditorCalibrationOverlayClip();
-    }
+  runtime.bindEditorShellEdgeResizeObserver({
+    window,
+    document,
+    ResizeObserver: typeof ResizeObserver === "undefined" ? undefined : ResizeObserver,
+    queueViewportSync
   });
-  ro.observe(overlay);
-})();
+  runtime.bindEditorCalibrationOverlayResizeObserver({
+    $,
+    ResizeObserver: typeof ResizeObserver === "undefined" ? undefined : ResizeObserver,
+    syncEditorCalibrationOverlayClip
+  });
+}
 
-syncViewportHeightVar();
-applyTheme(state.theme);
-state.progressionLevel = loadStoredProgressionLevel();
-recomputeProgressionLevel({ sessionInit: true });
-applyProgressionToState();
-ensurePromptRerollButton();
-bindPromptClusterControlsOnce();
-renderMeta();
-renderWritingState();
-projectWriteDocToEditorFromState(0, 0, false);
-renderHighlight();
-scheduleEditorDotOverlaySync();
-renderSidebar();
-renderHistory();
-renderProfile();
-window.waywordViewController.syncPatternsLayoutMode();
-renderCalibration();
-renderProfileSummaryStrip();
-updateEnterButtonVisibility();
+function runInitialBootRender() {
+  getAppBootRuntime().runInitialRender({
+    state,
+    syncViewportHeightVar,
+    applyTheme,
+    loadStoredProgressionLevel,
+    recomputeProgressionLevel,
+    applyProgressionToState,
+    ensurePromptRerollButton,
+    bindPromptClusterControlsOnce,
+    renderMeta,
+    renderWritingState,
+    projectWriteDocToEditorFromState,
+    renderHighlight,
+    scheduleEditorDotOverlaySync,
+    renderSidebar,
+    renderHistory,
+    renderProfile,
+    syncPatternsLayoutMode: window.waywordViewController.syncPatternsLayoutMode,
+    renderCalibration,
+    renderProfileSummaryStrip,
+    updateEnterButtonVisibility
+  });
+}
+
+bindBootObservers();
+runInitialBootRender();
 
 try {
   if (new URLSearchParams(location.search).get("writeDocMapping") === "1") {
