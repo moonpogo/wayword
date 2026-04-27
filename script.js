@@ -598,6 +598,7 @@ let annotationRowPendingEditorSel = null;
 
 const {
   input,
+  editorInputScrollport,
   editorInput,
   editorDotOverlay,
   editorSemanticPicker,
@@ -1026,6 +1027,7 @@ function queueViewportSync() {
       syncRecentRailExpandedLayoutMetrics,
       syncSubmittedAnnotatedEditorSurfaces,
       scheduleEditorDotOverlaySync,
+      flushEditorDotOverlaySync,
       renderProfileSummaryStrip
     });
   }
@@ -1063,7 +1065,7 @@ function queueViewportSync() {
       renderHistory();
       requestAnimationFrame(() => syncRecentRailExpandedLayoutMetrics());
       syncSubmittedAnnotatedEditorSurfaces();
-      scheduleEditorDotOverlaySync();
+      flushEditorDotOverlaySync();
       renderProfileSummaryStrip();
       logPatternsTransitionSnapshot("queueViewportSync:raf-after-sync");
     }
@@ -1497,7 +1499,7 @@ function flushEditorSurfaceIntoWriteDocOnce() {
   const f = Math.min(focus, canonical.length);
   projectWriteDocToEditorFromState(a, f, backward);
   renderAnnotationRow();
-  scheduleEditorDotOverlaySync();
+  flushEditorDotOverlaySync();
 }
 
 function getEditorText() {
@@ -1511,7 +1513,7 @@ function setEditorText(text) {
   applyWriteDocSemanticFlagsFromAnalysis();
   projectWriteDocToEditorFromState(0, 0, false);
   renderAnnotationRow();
-  scheduleEditorDotOverlaySync();
+  flushEditorDotOverlaySync();
 }
 
 function focusEditorToEnd() {
@@ -2813,18 +2815,35 @@ function buildStarterIndexSet(text) {
 ----------------------------- */
 
 function syncScroll() {
-  if (!highlightLayer || !editorInput) return;
-  if (highlightLayer.classList.contains("hidden")) return;
-  highlightLayer.scrollTop = editorInput.scrollTop;
-  highlightLayer.scrollLeft = editorInput.scrollLeft;
+  if (!editorInput) return;
+  const port = editorInputScrollport;
+  if (highlightLayer && !highlightLayer.classList.contains("hidden") && !port) {
+    highlightLayer.scrollTop = editorInput.scrollTop;
+    highlightLayer.scrollLeft = editorInput.scrollLeft;
+  }
+  /* Legacy (no scrollport): dots are a sibling layer — keep in lockstep with scroll. */
+  if (!port) {
+    flushEditorDotOverlaySync();
+  }
 }
 
 function renderHighlight() {
   if (highlightLayer) highlightLayer.innerHTML = "";
   syncScroll();
+  if (editorInputScrollport) {
+    flushEditorDotOverlaySync();
+  }
 }
 
 let editorDotOverlayRaf = null;
+
+function flushEditorDotOverlaySync() {
+  if (editorDotOverlayRaf !== null) {
+    cancelAnimationFrame(editorDotOverlayRaf);
+    editorDotOverlayRaf = null;
+  }
+  syncEditorDotOverlay();
+}
 
 /** Coalesced geometry pass: writeDoc + Range rects only; never mutates text or writeDoc. */
 function scheduleEditorDotOverlaySync() {
@@ -2834,6 +2853,8 @@ function scheduleEditorDotOverlaySync() {
     syncEditorDotOverlay();
   });
 }
+
+window.waywordFlushEditorDotOverlaySync = flushEditorDotOverlaySync;
 
 /**
  * Dot placement from Range.getClientRects():
@@ -2884,7 +2905,12 @@ function syncEditorDotOverlay() {
     return;
   }
 
-  if (editorInput) {
+  if (editorInputScrollport) {
+    overlay.style.left = "";
+    overlay.style.top = "";
+    overlay.style.width = "";
+    overlay.style.height = "";
+  } else if (editorInput) {
     overlay.style.left = `${editorInput.offsetLeft}px`;
     overlay.style.top = `${editorInput.offsetTop}px`;
     overlay.style.width = `${editorInput.offsetWidth}px`;
@@ -2913,7 +2939,9 @@ function syncEditorDotOverlay() {
   const frag = document.createDocumentFragment();
   const oRect = overlay.getBoundingClientRect();
   const overlayW = oRect.width;
-  const overlayH = oRect.height;
+  const port = editorInputScrollport;
+  const viewH = port ? port.clientHeight : oRect.height;
+  const scTop = port ? port.scrollTop : 0;
   const submittedAnnotatedSpacing =
     state.submitted &&
     state.completedUiActive &&
@@ -2957,9 +2985,10 @@ function syncEditorDotOverlay() {
           cx = Math.max(0, Math.min(overlayW, cxIdeal));
         }
         /* Submitted annotated: do not upper-clamp toward 0 — that pulled dots up into the next line’s text. */
+        const topClampMax = scTop + viewH - bottomReservePx;
         const topClamped = submittedAnnotatedSpacing
           ? Math.max(0, top)
-          : Math.max(0, Math.min(overlayH - bottomReservePx, top));
+          : Math.max(0, Math.min(topClampMax, top));
 
         const group = document.createElement("span");
         group.className = "editor-token-dot-group";
@@ -5247,6 +5276,7 @@ function getAppEventsRuntime() {
 
 function bindEditorInputEvents() {
   getAppEventsRuntime().bindEditorInputEvents({
+    editorInputScrollport,
     editorInput,
     state,
     setFocusMode,

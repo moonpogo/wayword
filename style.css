@@ -1288,12 +1288,39 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
 .highlight-layer{
   position:absolute;
   inset:0;
-  overflow:auto;
+  overflow:visible;
   pointer-events:none;
   user-select:none;
   -webkit-user-select:none;
-  z-index:2;
+  z-index:1;
   color:var(--ink);
+}
+
+/* Scrollport: single overflow surface so text, highlights, and semantic dots share one scroll transform. */
+.editor-input-scrollport{
+  position:absolute;
+  inset:0;
+  z-index:3;
+  min-height:0;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+.editor-input-scroll-inner{
+  position:relative;
+  z-index:0;
+  min-height:100%;
+  display:grid;
+  grid-template-columns:minmax(0, 1fr);
+  grid-template-rows:minmax(0, auto);
+}
+
+.editor-input-scroll-inner > .editor-input,
+.editor-input-scroll-inner > .highlight-layer,
+.editor-input-scroll-inner > .editor-dot-overlay{
+  grid-column:1;
+  grid-row:1;
+  width:100%;
 }
 
 .highlight-layer.hidden{
@@ -1305,17 +1332,16 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
 }
 
 .editor-input{
-  position:absolute;
-  inset:0;
-  width:auto;
-  min-height:0;
+  position:relative;
+  z-index:2;
+  width:100%;
+  min-height:100%;
   border:0;
   outline:none;
   background:transparent;
   color:var(--ink);
   caret-color:var(--ink);
-  z-index:3;
-  overflow:auto;
+  overflow:visible;
   pointer-events:auto;
   user-select:text;
   -webkit-user-select:text;
@@ -1333,6 +1359,7 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
 /* Phase 2 step 5: geometry-only token dots (pointer-events none; not text, not selection). */
 .editor-dot-overlay{
   position:absolute;
+  inset:0;
   pointer-events:none;
   z-index:4;
   overflow:visible;
@@ -5245,8 +5272,18 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
 
   .editor-shell .highlight-layer,
   .editor-shell .editor-input{
-    padding:16px var(--wayword-editor-pad-inline) 38px var(--wayword-editor-pad-inline);
+    /* Bottom inset clears in-shell chrome (gear + word progress + “words” caption). */
+    padding:16px var(--wayword-editor-pad-inline) 58px var(--wayword-editor-pad-inline);
     font:17px/1.82 Georgia,"Times New Roman",serif;
+    min-height:100%;
+  }
+
+  .editor-shell .editor-input{
+    height:auto;
+  }
+
+  .editor-shell .editor-input-scrollport{
+    scroll-padding-bottom:58px;
   }
 
   .style-tab{
@@ -5273,10 +5310,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     max-height:calc(var(--vvh, 100dvh) - 140px);
   }
 
-  .highlight-layer,
-  .editor-input{
+  .editor-input-scroll-inner{
     min-height:100%;
-    height:100%;
   }
 
   .editor-bottom-chrome{
@@ -5589,7 +5624,11 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   body.focus-mode.keyboard-open .editor-shell .highlight-layer,
   body.focus-mode.keyboard-open .editor-shell .editor-input{
     padding-top:14px;
-    padding-bottom:32px;
+    padding-bottom:50px;
+  }
+
+  body.focus-mode.keyboard-open .editor-shell .editor-input-scrollport{
+    scroll-padding-bottom:50px;
   }
 
   body.focus-mode #writeView{
@@ -5700,10 +5739,17 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     max-height:min(72dvh, calc(var(--vvh, 100dvh) - 104px));
   }
 
+  body.focus-mode .editor-input-scroll-inner{
+    min-height:100%;
+  }
+
   body.focus-mode .editor-shell .highlight-layer,
   body.focus-mode .editor-shell .editor-input{
     min-height:100%;
-    height:100%;
+  }
+
+  body.focus-mode .editor-shell .editor-input{
+    height:auto;
   }
 
   body.focus-mode .below-editor-stack{
@@ -5804,8 +5850,12 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
 
   body.focus-mode .editor-shell .highlight-layer,
   body.focus-mode .editor-shell .editor-input{
-    padding:12px var(--wayword-editor-pad-inline) 27px var(--wayword-editor-pad-inline);
+    padding:12px var(--wayword-editor-pad-inline) 40px var(--wayword-editor-pad-inline);
     font:16px/1.70 Georgia,"Times New Roman",serif;
+  }
+
+  body.focus-mode .editor-shell .editor-input-scrollport{
+    scroll-padding-bottom:40px;
   }
 
   body.focus-mode .editor-bottom-chrome{
@@ -5895,8 +5945,12 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
 
   body.focus-mode .editor-shell .highlight-layer,
   body.focus-mode .editor-shell .editor-input{
-    padding:10px var(--wayword-editor-pad-inline) 23px var(--wayword-editor-pad-inline);
+    padding:10px var(--wayword-editor-pad-inline) 34px var(--wayword-editor-pad-inline);
     font:15px/1.60 Georgia,"Times New Roman",serif;
+  }
+
+  body.focus-mode .editor-shell .editor-input-scrollport{
+    scroll-padding-bottom:34px;
   }
 
   body.focus-mode .below-editor-stack{

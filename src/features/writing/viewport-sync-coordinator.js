@@ -50,7 +50,11 @@
           input.syncRecentRailExpandedLayoutMetrics();
         });
         input.syncSubmittedAnnotatedEditorSurfaces();
-        input.scheduleEditorDotOverlaySync();
+        if (typeof input.flushEditorDotOverlaySync === "function") {
+          input.flushEditorDotOverlaySync();
+        } else {
+          input.scheduleEditorDotOverlaySync();
+        }
         input.renderProfileSummaryStrip();
         input.logPatternsTransitionSnapshot("queueViewportSync:raf-after-sync");
       } finally {

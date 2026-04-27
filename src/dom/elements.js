@@ -7,6 +7,7 @@
     resolveCore() {
       return {
         input: document.querySelector('.editor-input'),
+        editorInputScrollport: byId("editorInputScrollport"),
         editorInput: byId("editorInput"),
         editorDotOverlay: byId("editorDotOverlay"),
         editorSemanticPicker: byId("editorSemanticPicker"),

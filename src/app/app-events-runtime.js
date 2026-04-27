@@ -48,11 +48,25 @@
       if (typeof input.renderMeta === "function") {
         input.renderMeta();
       }
+      if (
+        window.waywordMobileEditorCaretReveal &&
+        typeof window.waywordMobileEditorCaretReveal.schedule === "function"
+      ) {
+        window.waywordMobileEditorCaretReveal.schedule(editorInput);
+      }
     });
 
     editorInput.addEventListener("input", function () {
       if (!input.isActiveAndEditable()) return;
-      if (input.getEditorSurfaceComposing()) return;
+      if (input.getEditorSurfaceComposing()) {
+        if (
+          window.waywordMobileEditorCaretReveal &&
+          typeof window.waywordMobileEditorCaretReveal.schedule === "function"
+        ) {
+          window.waywordMobileEditorCaretReveal.schedule(editorInput);
+        }
+        return;
+      }
       input.flushEditorSurfaceIntoWriteDocOnce();
       input.tryStartTimerOnFirstMeaningfulInput();
       input.pulseWordmark();
@@ -64,13 +78,23 @@
       if (typeof input.renderMeta === "function") {
         input.renderMeta();
       }
+      if (
+        window.waywordMobileEditorCaretReveal &&
+        typeof window.waywordMobileEditorCaretReveal.schedule === "function"
+      ) {
+        window.waywordMobileEditorCaretReveal.schedule(editorInput);
+      }
     });
 
-    editorInput.addEventListener("scroll", function () {
-      input.syncScroll();
-      input.scheduleEditorDotOverlaySync();
-      input.scheduleSemanticPickerFromSelection();
-    });
+    var editorScrollSurface = input.editorInputScrollport || editorInput;
+    editorScrollSurface.addEventListener(
+      "scroll",
+      function () {
+        input.syncScroll();
+        input.scheduleSemanticPickerFromSelection();
+      },
+      { passive: true }
+    );
 
     editorInput.addEventListener("keydown", function (e) {
       if (
@@ -98,7 +122,57 @@
         if (input.getEditorText().trim().length === 0) return;
         input.submitWriting(false);
       }
+
+      var moveCaretKeys = {
+        ArrowDown: true,
+        ArrowUp: true,
+        ArrowLeft: true,
+        ArrowRight: true,
+        Home: true,
+        End: true,
+        PageUp: true,
+        PageDown: true
+      };
+      if (
+        moveCaretKeys[e.key] &&
+        window.waywordMobileEditorCaretReveal &&
+        typeof window.waywordMobileEditorCaretReveal.schedule === "function"
+      ) {
+        window.requestAnimationFrame(function () {
+          window.waywordMobileEditorCaretReveal.schedule(editorInput);
+        });
+      }
     });
+
+    editorInput.addEventListener("pointerup", function () {
+      if (
+        window.waywordMobileEditorCaretReveal &&
+        typeof window.waywordMobileEditorCaretReveal.schedule === "function"
+      ) {
+        window.waywordMobileEditorCaretReveal.schedule(editorInput);
+      }
+    });
+
+    var selectionDoc =
+      (editorInput.ownerDocument && typeof editorInput.ownerDocument.addEventListener === "function"
+        ? editorInput.ownerDocument
+        : null) ||
+      (input.document && typeof input.document.addEventListener === "function" ? input.document : null);
+    if (selectionDoc && editorInput.dataset.appEditorSelectionRevealBound !== "1") {
+      editorInput.dataset.appEditorSelectionRevealBound = "1";
+      selectionDoc.addEventListener("selectionchange", function () {
+        if (selectionDoc.activeElement !== editorInput) {
+          return;
+        }
+        if (
+          !window.waywordMobileEditorCaretReveal ||
+          typeof window.waywordMobileEditorCaretReveal.scheduleFromSelectionChange !== "function"
+        ) {
+          return;
+        }
+        window.waywordMobileEditorCaretReveal.scheduleFromSelectionChange(editorInput);
+      });
+    }
   }
 
   function bindPromptCardRestart(input) {

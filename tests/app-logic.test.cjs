@@ -603,7 +603,7 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
 
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "setFocusMode" && entry[1] === true));
   assert.ok(calls.includes("syncScroll"));
-  assert.ok(calls.includes("scheduleEditorDotOverlaySync"));
+  assert.ok(calls.includes("picker"));
   assert.ok(calls.includes("preventDefault"));
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
 
