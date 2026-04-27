@@ -3,6 +3,17 @@
     if (!Array.isArray(input.state.recentPromptIds)) input.state.recentPromptIds = [];
     if (!Array.isArray(input.state.recentFamilyKeys)) input.state.recentFamilyKeys = [];
     var opts = options && typeof options === "object" ? options : {};
+    var completedRunCount =
+      typeof input.getCompletedRunCount === "function" ? Number(input.getCompletedRunCount()) || 0 : 0;
+    var threshold = Number(input.calibrationThreshold) || 0;
+    if (
+      threshold > 0 &&
+      completedRunCount < threshold &&
+      typeof input.pickCalibrationPrompt === "function"
+    ) {
+      return input.pickCalibrationPrompt(input);
+    }
+
     var forced =
       typeof opts.familyKey === "string" && input.promptFamiliesOrder.includes(opts.familyKey)
         ? opts.familyKey
@@ -33,6 +44,13 @@
     input.state.recentFamilyKeys = input.state.recentFamilyKeys
       .concat([family])
       .slice(-input.promptRecentFamilyWindow);
+    if (
+      completedRunCount >= threshold &&
+      Array.isArray(input.state.recentCalibrationPromptIds) &&
+      input.state.recentCalibrationPromptIds.length
+    ) {
+      input.state.recentCalibrationPromptIds = [];
+    }
     return entry.text;
   }
 

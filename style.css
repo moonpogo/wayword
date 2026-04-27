@@ -1961,6 +1961,15 @@ html[data-theme="dark"] .editor-time-fill{
   }
 }
 
+/* Calibration composing: hide word target / count chrome so it does not compete with sentence nudges. */
+body.calibration-writing-mode .editor-bottom-chrome-center .editor-progress,
+body.calibration-writing-mode #wordTargetLabelPanel,
+body.calibration-writing-mode #wordModesPanel,
+body.calibration-writing-mode #wordTargetLabelSetup,
+body.calibration-writing-mode #wordModes{
+  display:none !important;
+}
+
 .editor-bottom-chrome-center .editor-progress{
   position:relative;
   inset:auto;
@@ -6120,6 +6129,71 @@ html[data-theme="dark"] .metric-explainer{
 
 .mirror-reflection-section.hidden{
   display:none;
+}
+
+.calibration-handoff-section{
+  box-sizing:border-box;
+  margin-top:0.75rem;
+  padding:0.75rem 0.85rem 0.85rem;
+  max-width:100%;
+  border-radius:10px;
+  border:1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  background:color-mix(in srgb, var(--panel) 55%, transparent);
+}
+
+.calibration-handoff-section.hidden{
+  display:none;
+}
+
+.calibration-handoff-title{
+  margin:0 0 0.35rem;
+  font-size:0.95rem;
+  font-weight:600;
+  letter-spacing:0.02em;
+  color:var(--ink);
+}
+
+.calibration-handoff-body{
+  margin:0 0 0.65rem;
+  font-size:0.88rem;
+  line-height:1.45;
+  color:var(--muted);
+}
+
+.calibration-handoff-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:0.5rem 0.65rem;
+  align-items:center;
+}
+
+.calibration-handoff-btn{
+  margin:0;
+  padding:0.45rem 0.85rem;
+  font-size:0.82rem;
+  line-height:1.35;
+  border-radius:8px;
+  cursor:pointer;
+  border:1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background:var(--panel);
+  color:var(--ink);
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+
+.calibration-handoff-btn--primary{
+  font-weight:600;
+  border-color:color-mix(in srgb, var(--ink) 18%, var(--line));
+}
+
+.calibration-handoff-btn--secondary{
+  font-weight:500;
+  background:transparent;
+}
+
+html[data-theme="dark"] .calibration-handoff-section{
+  background:color-mix(in srgb, var(--ink) 6%, var(--panel));
+  border-color:color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
 @media (min-width:981px){

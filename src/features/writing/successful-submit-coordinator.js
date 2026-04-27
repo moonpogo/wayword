@@ -96,13 +96,31 @@
   }
 
   function coordinateSuccessfulSavedRunSubmit(input) {
-    input.state.pendingNudgeLine = computePendingNudgeLine({
-      currentText: input.currentText,
-      lastMirrorPipelineResult: input.state.lastMirrorPipelineResult,
-      lastMirrorLoadFailed: input.state.lastMirrorLoadFailed,
-      promptFamily: input.state.promptFamily,
-      runId: input.run.runId,
-    });
+    var decision = input.completionDecision;
+    var threshold = Number(input.calibrationThreshold) || 0;
+    var priorLen =
+      decision && Array.isArray(decision.priorEntries) ? decision.priorEntries.length : 0;
+    var acked =
+      typeof input.readCalibrationHandoffAcknowledged === "function"
+        ? input.readCalibrationHandoffAcknowledged()
+        : true;
+    var showHandoff =
+      Boolean(decision && decision.runWasSaved) &&
+      threshold > 0 &&
+      priorLen + 1 === threshold &&
+      !acked;
+
+    if (showHandoff) {
+      input.state.pendingNudgeLine = "";
+    } else {
+      input.state.pendingNudgeLine = computePendingNudgeLine({
+        currentText: input.currentText,
+        lastMirrorPipelineResult: input.state.lastMirrorPipelineResult,
+        lastMirrorLoadFailed: input.state.lastMirrorLoadFailed,
+        promptFamily: input.state.promptFamily,
+        runId: input.run.runId,
+      });
+    }
 
     attachMirrorArtifactsToRun({
       run: input.run,

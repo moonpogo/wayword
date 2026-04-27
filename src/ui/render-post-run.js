@@ -30,6 +30,10 @@
     '<div class="mirror-reflection-eyebrow">Reflection</div>' +
     '<p class="mirror-empty mirror-empty--low-signal">Not enough language yet to notice a pattern.</p>';
 
+  var CALIBRATION_MICRO_REFLECTION_BODY_HTML =
+    '<div class="mirror-reflection-eyebrow">Reflection</div>' +
+    '<p class="mirror-empty mirror-empty--low-signal">Brief baseline drafts are enough here; fuller patterns show up once you are past a single thought.</p>';
+
   function mirrorPostRunHasSubstantiveMain(result) {
     const r = result;
     if (!r || typeof r !== "object") return false;
@@ -94,10 +98,16 @@
    *   sessionDigestsForTrends: unknown[];
    *   submittedRunText?: string;
    *   promptFamily?: string;
+   *   calibrationSubmitShortMirror?: boolean;
+   *   calibrationBaselinePostSubmit?: boolean;
    * }} input
    */
   function computeMirrorPostRunPanelParts(input) {
     if (!input.submitted || !input.completedUiActive) {
+      return { v1Body: "", recentBody: "", nextPassHtml: "" };
+    }
+    /* Baseline overlay (runs 1–4) or handoff (run 5) owns post-submit reflection; no below-editor Mirror card. */
+    if (input.calibrationHandoffVisible || input.calibrationBaselinePostSubmit) {
       return { v1Body: "", recentBody: "", nextPassHtml: "" };
     }
     let v1Body = globalThis.WaywordMirrorDom.buildMirrorPanelBodyHtml({
@@ -126,7 +136,9 @@
       isLowSignalMirrorSubmission(textForSignal) &&
       (!hasCards || !substantiveMain);
     if (useLowSignalReflection && v1Body) {
-      v1Body = LOW_SIGNAL_REFLECTION_BODY_HTML;
+      v1Body = input.calibrationSubmitShortMirror
+        ? CALIBRATION_MICRO_REFLECTION_BODY_HTML
+        : LOW_SIGNAL_REFLECTION_BODY_HTML;
     }
 
     let nextPassHtml = "";
@@ -306,6 +318,7 @@
     resetPostRunFeedbackBox,
     renderReflectionLine,
     updateMirrorReflectionSection,
-    updateMirrorNextPassSlot
+    updateMirrorNextPassSlot,
+    isLowSignalMirrorSubmission: isLowSignalMirrorSubmission
   };
 })();

@@ -432,8 +432,6 @@ const punctuationMarks = {
 
 const {
   CALIBRATION_THRESHOLD,
-  CALIBRATION_MIN_WORDS,
-  CALIBRATION_MIN_SENTENCE_UNITS,
   CALIBRATION_INSUFFICIENT_COPY,
   ZEN_GARDEN_OPENABLE,
   PROMPT_REROLL_LIMIT,
@@ -497,10 +495,34 @@ function getCategoryAccentColor(key) {
 
 const state = window.waywordAppState.initState(bannedSets[0]);
 
+/** Active drafting session still inside the calibration window (saved runs below threshold). */
+function isCalibrationComposingMode() {
+  return Boolean(state.active && !state.submitted && completedRuns() < CALIBRATION_THRESHOLD);
+}
+
+/** Sentence-length guidance for the nudge lane only; prompt text unchanged. */
+function getCalibrationProgressNudgeLine() {
+  const n = completedRuns();
+  if (n <= 1) return "One sentence will do.";
+  if (n === 2) return "One or two sentences will do.";
+  return "Two or three sentences will do.";
+}
+
+function syncCalibrationWritingModeClass() {
+  try {
+    document.body.classList.toggle("calibration-writing-mode", isCalibrationComposingMode());
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 /** Ritual line under the prompt for the current run: carryover after submit, else cold-start pool for this prompt. */
 function getActivePromptNudgeLineForRender() {
   const carried = String(state.pendingNudgeLine || "").trim();
   if (carried) return carried;
+  if (isCalibrationComposingMode()) {
+    return getCalibrationProgressNudgeLine();
+  }
   const family = String(state.promptFamily || "").trim() || "Observation";
   const seed =
     String(state.lastPromptKey || "").trim() ||
@@ -1926,21 +1948,154 @@ function completedRuns() {
   return readSavedRunsChronological().length;
 }
 
-function countCalibrationSentenceLikeUnits(text) {
-  const raw = String(text || "").trim();
-  if (!raw) return 0;
-  return raw
-    .split(/[.!?]+|\n+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .filter((s) => (s.match(/\b\w+\b/g) || []).length >= 3).length;
+const CALIBRATION_HANDOFF_ACK_STORAGE_KEY = "wayword-calibration-handoff-ack";
+
+const CALIBRATION_PROMPT_FAMILY = "Observation";
+
+const CALIBRATION_PROMPT_RECENT_WINDOW = 8;
+
+const CALIBRATION_PROMPT_ENTRIES = Object.freeze([
+  {
+    id: "cal_notice_today",
+    text: "Write one sentence about something you noticed today.",
+    nearDuplicateGroup: "cal",
+    intensity: 1,
+    structure: "calibration",
+    active: true
+  },
+  {
+    id: "cal_small_object",
+    text: "Describe a small object near you without explaining why it matters.",
+    nearDuplicateGroup: "cal",
+    intensity: 1,
+    structure: "calibration",
+    active: true
+  },
+  {
+    id: "cal_returning_thought",
+    text: "Write two sentences about a thought that keeps returning.",
+    nearDuplicateGroup: "cal",
+    intensity: 1,
+    structure: "calibration",
+    active: true
+  },
+  {
+    id: "cal_ordinary_feel",
+    text: "Name something ordinary, then describe what it feels like.",
+    nearDuplicateGroup: "cal",
+    intensity: 1,
+    structure: "calibration",
+    active: true
+  },
+  {
+    id: "cal_i_keep_noticing",
+    text: "Write one sentence beginning: I keep noticing…",
+    nearDuplicateGroup: "cal",
+    intensity: 1,
+    structure: "calibration",
+    active: true
+  },
+  {
+    id: "cal_room_visible",
+    text: "Describe the room you are in using only what can be seen.",
+    nearDuplicateGroup: "cal",
+    intensity: 1,
+    structure: "calibration",
+    active: true
+  },
+  {
+    id: "cal_almost_ignored",
+    text: "Write two sentences about something you almost ignored.",
+    nearDuplicateGroup: "cal",
+    intensity: 1,
+    structure: "calibration",
+    active: true
+  },
+  {
+    id: "cal_sensory_today",
+    text: "Describe a sound, texture, or small movement from today.",
+    nearDuplicateGroup: "cal",
+    intensity: 1,
+    structure: "calibration",
+    active: true
+  }
+]);
+
+function readCalibrationHandoffAcknowledged() {
+  try {
+    return window.localStorage.getItem(CALIBRATION_HANDOFF_ACK_STORAGE_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function ackCalibrationHandoffAcknowledged() {
+  try {
+    window.localStorage.setItem(CALIBRATION_HANDOFF_ACK_STORAGE_KEY, "1");
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+function pickCalibrationPromptForRuntime(input) {
+  const pool = CALIBRATION_PROMPT_ENTRIES;
+  if (!pool.length) {
+    throw new Error("wayword: calibration prompt pool is empty");
+  }
+  if (!Array.isArray(input.state.recentCalibrationPromptIds)) {
+    input.state.recentCalibrationPromptIds = [];
+  }
+  const windowSize = Math.min(CALIBRATION_PROMPT_RECENT_WINDOW, pool.length);
+  const recent = input.state.recentCalibrationPromptIds;
+  const blocked = new Set(recent.slice(-windowSize));
+  let candidates = pool.filter((e) => e && e.active !== false && !blocked.has(e.id));
+  if (!candidates.length) {
+    candidates = pool.filter((e) => e && e.active !== false);
+  }
+  const idx = ritualPickIndex(
+    `${Date.now()}|${recent.length}|cal-pick`,
+    candidates.length
+  );
+  const pick = candidates[idx] || candidates[0];
+  input.state.promptId = pick.id;
+  input.state.prompt = pick.text;
+  input.state.promptFamily = CALIBRATION_PROMPT_FAMILY;
+  input.state.lastPromptKey = `${CALIBRATION_PROMPT_FAMILY}::${pick.id}`;
+  input.state.promptBiasTags = input.biasTagsForPromptFamily(CALIBRATION_PROMPT_FAMILY);
+  input.state.recentCalibrationPromptIds = recent.concat([pick.id]).slice(-CALIBRATION_PROMPT_RECENT_WINDOW);
+  if (!Array.isArray(input.state.recentFamilyKeys)) input.state.recentFamilyKeys = [];
+  input.state.recentFamilyKeys = input.state.recentFamilyKeys
+    .concat([CALIBRATION_PROMPT_FAMILY])
+    .slice(-PROMPT_RECENT_FAMILY_WINDOW);
+  return pick.text;
+}
+
+function syncCalibrationHandoffIntentAfterDecision(decision) {
+  const priorEntries = Array.isArray(decision?.priorEntries) ? decision.priorEntries : [];
+  const priorLen = priorEntries.length;
+  const crosses =
+    Boolean(decision?.runWasSaved) &&
+    priorLen + 1 === CALIBRATION_THRESHOLD &&
+    !readCalibrationHandoffAcknowledged();
+  state.calibrationHandoffVisible = Boolean(crosses);
+}
+
+function syncCalibrationHandoffSurface() {
+  const section = $("calibrationHandoffSection");
+  if (!section) return;
+  const show = Boolean(
+    state.active && state.submitted && state.completedUiActive && state.calibrationHandoffVisible
+  );
+  section.classList.toggle("hidden", !show);
+  section.setAttribute("aria-hidden", show ? "false" : "true");
 }
 
 /** True when submission has enough text for calibration observation / step advance. */
 function calibrationSubmissionHasMinimumSignal(text, analysis) {
   const words = Math.max(0, Number(analysis?.totalWords) || 0);
-  if (words >= CALIBRATION_MIN_WORDS) return true;
-  return countCalibrationSentenceLikeUnits(text) >= CALIBRATION_MIN_SENTENCE_UNITS;
+  if (words >= 1) return true;
+  const trimmed = String(text || "").trim();
+  return trimmed.length > 0 && /\b\w+\b/.test(trimmed);
 }
 
 function hasProfileSignal() {
@@ -1959,9 +2114,17 @@ function waywordDevResetCalibrationForTesting() {
   state.pendingNudgeLine = "";
   state.promptBiasTags = [];
   state.recentPromptIds = [];
+  state.recentCalibrationPromptIds = [];
   state.recentFamilyKeys = [];
   state.promptId = "";
   state.mirrorEmptyFallbackSeed = "";
+  state.calibrationHandoffVisible = false;
+  state.lastSubmitCalibrationShortMirror = false;
+  try {
+    window.localStorage.removeItem(CALIBRATION_HANDOFF_ACK_STORAGE_KEY);
+  } catch (_) {
+    /* ignore */
+  }
   window.waywordStorage.removeInactivityEaseRun(INACTIVITY_EASE_RUN_KEY);
 
   state.progressionLevel = 1;
@@ -2153,6 +2316,9 @@ function buildPromptRuntimeInput() {
     promptNearDuplicateWindow: PROMPT_NEAR_DUPLICATE_WINDOW,
     promptRecentFamilyWindow: PROMPT_RECENT_FAMILY_WINDOW,
     promptRerollLimit: PROMPT_REROLL_LIMIT,
+    calibrationThreshold: CALIBRATION_THRESHOLD,
+    getCompletedRunCount: completedRuns,
+    pickCalibrationPrompt: pickCalibrationPromptForRuntime,
     biasTagsForPromptFamily,
     getEditorText,
     renderMeta
@@ -3363,7 +3529,8 @@ function syncEditorPostRunOverlay() {
       return;
     }
 
-    if (state.calibrationPostRun) {
+    /* Threshold handoff owns the 5th saved run; skip legacy in-editor calibration card when both are active. */
+    if (state.calibrationPostRun && !state.calibrationHandoffVisible) {
       const { step, observation, insufficient } = state.calibrationPostRun;
       const ins = insufficient ? "1" : "0";
       const key = `${step}|${ins}|${observation}`;
@@ -3777,6 +3944,8 @@ function renderMeta() {
       );
     }
   }
+
+  syncCalibrationWritingModeClass();
 }
 
 /** Calibration progress lives in the in-editor overlay only; this keeps header chrome in sync. */
@@ -3829,6 +3998,7 @@ function renderWritingState(options = {}) {
   window.waywordPostRunRenderer.renderReflectionLine(getPostRunReflectionLineText(mirrorPostRunParts));
   window.waywordPostRunRenderer.resetPostRunFeedbackBox();
   renderMirrorReflectionPanel(mirrorPostRunParts);
+  syncCalibrationHandoffSurface();
   if (!deferPostRunOverlaySync) {
     syncEditorPostRunOverlay();
   }
@@ -3850,6 +4020,7 @@ function renderWritingState(options = {}) {
   syncSubmittedAnnotatedEditorSurfaces();
   scheduleEditorDotOverlaySync();
   requestAnimationFrame(() => scheduleEditorDotOverlaySync());
+  syncCalibrationWritingModeClass();
 }
 
 function setSemanticLegendPillState(pillEl, count) {
@@ -4105,7 +4276,10 @@ function postRunMirrorPanelInputs() {
     mirrorEmptyFallbackSeed: state.mirrorEmptyFallbackSeed,
     sessionDigestsForTrends: collectMirrorSessionDigestsFromHistory(),
     submittedRunText: getEditorText(),
-    promptFamily: state.promptFamily
+    promptFamily: state.promptFamily,
+    calibrationHandoffVisible: Boolean(state.calibrationHandoffVisible),
+    calibrationSubmitShortMirror: Boolean(state.lastSubmitCalibrationShortMirror),
+    calibrationBaselinePostSubmit: Boolean(state.calibrationPostRun && !state.calibrationHandoffVisible)
   };
 }
 
@@ -4619,6 +4793,8 @@ function buildRepeatedWordChallengeSuggestion(topWords) {
 }
 
 function shouldHideRunsWordsStrip() {
+  /* Hide Runs/Words strip for the whole calibration window; nudge + overlay + handoff carry onboarding. */
+  if (completedRuns() < CALIBRATION_THRESHOLD) return true;
   /* Main writing column: strip is desktop-only (matches @media min-width 981px layout). */
   if (!isDesktopPatternsViewport()) return true;
   if (document.body.classList.contains("focus-mode")) return true;
@@ -4979,7 +5155,9 @@ function buildRunControllerRegistrationInput() {
     focusEditorToStart,
     updateTimeFill,
     waywordPostRunRenderer: window.waywordPostRunRenderer,
-    requestMirrorReflectionAttentionSettle
+    requestMirrorReflectionAttentionSettle,
+    syncCalibrationHandoffIntentAfterDecision,
+    readCalibrationHandoffAcknowledged
   };
 }
 
@@ -5147,6 +5325,45 @@ getEditorShellInteractions().bindEditorShellInteractions({
   focusEditorToEnd
 });
 
+function bindCalibrationHandoffControls() {
+  const viewPatternsBtn = $("calibrationHandoffViewPatternsBtn");
+  const continueBtn = $("calibrationHandoffContinueBtn");
+  if (viewPatternsBtn && viewPatternsBtn.dataset.calibrationHandoffBound !== "1") {
+    viewPatternsBtn.dataset.calibrationHandoffBound = "1";
+    viewPatternsBtn.addEventListener("click", () => {
+      ackCalibrationHandoffAcknowledged();
+      state.calibrationHandoffVisible = false;
+      if (
+        window.waywordPanelCoordination &&
+        typeof window.waywordPanelCoordination.armMobilePatternsToggleGuard === "function"
+      ) {
+        window.waywordPanelCoordination.armMobilePatternsToggleGuard({
+          isMobileViewport,
+          setSuppressFocusExitUntil(value) {
+            suppressFocusExitUntil = value;
+          },
+          now: () => performance.now(),
+          durationMs: 320
+        });
+      }
+      showProfile(true);
+      syncCalibrationHandoffSurface();
+      renderWritingState({ deferPostRunOverlaySync: false });
+      renderMeta();
+      queueViewportSync();
+    });
+  }
+  if (continueBtn && continueBtn.dataset.calibrationHandoffBound !== "1") {
+    continueBtn.dataset.calibrationHandoffBound = "1";
+    continueBtn.addEventListener("click", () => {
+      ackCalibrationHandoffAcknowledged();
+      state.calibrationHandoffVisible = false;
+      syncCalibrationHandoffSurface();
+      startWriting({ focusCaret: "start" });
+    });
+  }
+}
+
 function bindPrimaryEventControls() {
   const runtime = getAppEventsRuntime();
   runtime.bindPromptCardRestart({
@@ -5190,6 +5407,7 @@ function bindPrimaryEventControls() {
 }
 
 bindPrimaryEventControls();
+bindCalibrationHandoffControls();
 optionsUi.bindOptionsSurfaceEventGuards();
 optionsUi.bindOptionsOpenCloseControls();
 

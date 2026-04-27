@@ -107,6 +107,8 @@
     d.state.lastMirrorPipelineResult = null;
     d.state.lastMirrorLoadFailed = false;
     d.state.calibrationPostRun = null;
+    d.state.calibrationHandoffVisible = false;
+    d.state.lastSubmitCalibrationShortMirror = false;
     d.waywordPostRunRenderer.renderReflectionLine("");
 
     d.stopTimer();
@@ -166,6 +168,8 @@
     d.state.lastMirrorPipelineResult = null;
     d.state.lastMirrorLoadFailed = false;
     d.state.calibrationPostRun = null;
+    d.state.calibrationHandoffVisible = false;
+    d.state.lastSubmitCalibrationShortMirror = false;
     d.waywordPostRunRenderer.renderReflectionLine("");
 
     window.waywordPanelCoordination.closePanelsForFreshRun({
@@ -245,10 +249,17 @@
     const analysis = d.analyze(currentText);
 
     if (analysis.totalWords === 0) {
-      if (fromTimer) {
-        finalizeTimedRunExpiredWithNoText();
+      const priorLen = d.getRecentEntries().length;
+      const inCalibrationComposing = priorLen < d.CALIBRATION_THRESHOLD;
+      const trimmed = String(currentText || "").trim();
+      const allowCalibrationNonEmpty =
+        inCalibrationComposing && trimmed.length > 0 && /[A-Za-z0-9]/.test(trimmed);
+      if (!allowCalibrationNonEmpty) {
+        if (fromTimer) {
+          finalizeTimedRunExpiredWithNoText();
+        }
+        return;
       }
-      return;
     }
 
     let timeRemainingSnapshot;
@@ -352,6 +363,13 @@
       });
     }
 
+    const priorLenForCalibration = d.getRecentEntries().length;
+    d.state.lastSubmitCalibrationShortMirror =
+      priorLenForCalibration < d.CALIBRATION_THRESHOLD &&
+      d.waywordPostRunRenderer &&
+      typeof d.waywordPostRunRenderer.isLowSignalMirrorSubmission === "function" &&
+      d.waywordPostRunRenderer.isLowSignalMirrorSubmission(currentText);
+
     if (
       window.waywordCompletionDecisionCoordinator &&
       typeof window.waywordCompletionDecisionCoordinator.coordinateSubmitCompletion === "function"
@@ -365,10 +383,15 @@
         currentText: currentText,
         analysis: analysis,
         handleRunCompleted: handleRunCompleted,
+        syncCalibrationHandoffIntentAfterDecision(decision) {
+          if (typeof d.syncCalibrationHandoffIntentAfterDecision === "function") {
+            d.syncCalibrationHandoffIntentAfterDecision(decision);
+          }
+        },
         computeMirrorForSubmit() {
           computeMirrorForSubmit(currentText, run);
         },
-        routeSuccessfulSavedRun() {
+        routeSuccessfulSavedRun(decision) {
           if (
             window.waywordSuccessfulSubmitCoordinator &&
             typeof window.waywordSuccessfulSubmitCoordinator.coordinateSuccessfulSavedRunSubmit === "function"
@@ -377,6 +400,9 @@
               state: d.state,
               run: run,
               currentText: currentText,
+              completionDecision: decision,
+              calibrationThreshold: d.CALIBRATION_THRESHOLD,
+              readCalibrationHandoffAcknowledged: d.readCalibrationHandoffAcknowledged,
               canonicalSaveInput: {
                 runId: run.runId,
                 savedAt: run.savedAt,
@@ -455,6 +481,10 @@
       }
 
       handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
+      const fallbackDecision = { priorEntries, runWasSaved, insufficientCalibration };
+      if (typeof d.syncCalibrationHandoffIntentAfterDecision === "function") {
+        d.syncCalibrationHandoffIntentAfterDecision(fallbackDecision);
+      }
       computeMirrorForSubmit(currentText, run);
 
       if (runWasSaved) {
@@ -466,6 +496,13 @@
             state: d.state,
             run: run,
             currentText: currentText,
+            completionDecision: {
+              priorEntries: priorEntries,
+              runWasSaved: runWasSaved,
+              insufficientCalibration: insufficientCalibration,
+            },
+            calibrationThreshold: d.CALIBRATION_THRESHOLD,
+            readCalibrationHandoffAcknowledged: d.readCalibrationHandoffAcknowledged,
             canonicalSaveInput: {
               runId: run.runId,
               savedAt: run.savedAt,

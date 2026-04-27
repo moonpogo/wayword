@@ -1,5 +1,6 @@
 (function () {
   function handleEditorCompletedRestartKeydown(input, e) {
+    if (input.state.calibrationHandoffVisible) return false;
     if (input.state.optionsOpen || !input.state.submitted || !input.state.completedUiActive) {
       return false;
     }
@@ -26,6 +27,7 @@
   }
 
   function handleEditorSurfaceCompletedRestart(input, e) {
+    if (input.state.calibrationHandoffVisible) return false;
     if (
       input.state.active &&
       input.state.submitted &&
@@ -41,6 +43,7 @@
   }
 
   function handleDocumentCompletedRestartKeydown(input, e) {
+    if (input.state.calibrationHandoffVisible) return false;
     if (
       e.key !== "Enter" ||
       !input.state.submitted ||

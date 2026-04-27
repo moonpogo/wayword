@@ -356,6 +356,10 @@ test("run controller runtime registers built deps and keeps input callable surfa
     focusEditorToStart() {},
     updateTimeFill() {},
     waywordPostRunRenderer: { renderReflectionLine() {} },
+    syncCalibrationHandoffIntentAfterDecision() {},
+    readCalibrationHandoffAcknowledged() {
+      return false;
+    },
   };
 
   const deps = context.waywordRunControllerRuntime.registerRunControllerDeps(controller, input);
@@ -365,6 +369,8 @@ test("run controller runtime registers built deps and keeps input callable surfa
   assert.equal(deps.getEditorSurfaceComposing(), true);
   assert.equal(deps.getEditorText(), "draft");
   assert.equal(deps.CALIBRATION_THRESHOLD, 4);
+  assert.equal(typeof deps.syncCalibrationHandoffIntentAfterDecision, "function");
+  assert.equal(typeof deps.readCalibrationHandoffAcknowledged, "function");
 });
 
 test("app boot runtime binds viewport listeners and initial render sequence", () => {

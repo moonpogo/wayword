@@ -181,17 +181,24 @@ async function submitCurrentRun(session) {
   await session.click("#enterSubmitBtn");
 
   await session.waitFor(
-    "Mirror reflection cards",
+    "Post-submit surface (calibration overlay, handoff, or Mirror)",
     async () =>
       await session.execute(`
+        var overlay = document.getElementById("editorOverlay");
+        var calOverlay =
+          overlay &&
+          !overlay.classList.contains("hidden") &&
+          overlay.classList.contains("editor-overlay--calibration");
+        var handoff = document.getElementById("calibrationHandoffSection");
+        var handoffVisible = handoff && !handoff.classList.contains("hidden");
         var section = document.getElementById("mirrorReflectionSection");
         var root = document.getElementById("mirrorReflectionRoot");
-        return Boolean(
+        var mirrorReady =
           section &&
           !section.classList.contains("hidden") &&
           root &&
-          root.querySelectorAll(".mirror-card").length > 0
-        );
+          root.querySelectorAll(".mirror-card").length > 0;
+        return Boolean(calOverlay || handoffVisible || mirrorReady);
       `),
     { timeoutMs: 20000 }
   );
@@ -208,6 +215,14 @@ async function submitCurrentRun(session) {
 
 async function restartIntoNextRun(session) {
   const restarted = await session.execute(`
+    var handoff = document.getElementById("calibrationHandoffSection");
+    if (handoff && !handoff.classList.contains("hidden")) {
+      var cont = document.getElementById("calibrationHandoffContinueBtn");
+      if (cont) {
+        cont.click();
+        return true;
+      }
+    }
     if (typeof window.runPostSubmitAutoNewRunNow === "function") {
       window.runPostSubmitAutoNewRunNow();
       return true;
@@ -220,7 +235,7 @@ async function restartIntoNextRun(session) {
     return false;
   `);
 
-  assert.equal(restarted, true, "expected a post-submit restart path");
+  assert.equal(restarted, true, "expected a post-submit restart path (handoff continue, mirror nudge, or auto-run)");
 
   await session.waitFor(
     "next run editor reset",
@@ -240,7 +255,7 @@ async function restartIntoNextRun(session) {
   );
 }
 
-async function unlockPatternsTab(session) {
+async function completeCalibrationThroughHandoffContinue(session) {
   await beginRun(session);
 
   for (let index = 0; index < SMOKE_RUN_TEXTS.length; index += 1) {
@@ -250,6 +265,32 @@ async function unlockPatternsTab(session) {
       await restartIntoNextRun(session);
     }
   }
+
+  await session.execute(`
+    var sec = document.getElementById("calibrationHandoffSection");
+    if (sec && !sec.classList.contains("hidden")) {
+      var cont = document.getElementById("calibrationHandoffContinueBtn");
+      if (cont) cont.click();
+    }
+  `);
+
+  await session.waitFor(
+    "editor writable after optional calibration handoff",
+    async () =>
+      await session.execute(`
+        var editor = document.getElementById("editorInput");
+        return Boolean(
+          editor &&
+          editor.getAttribute("contenteditable") === "true" &&
+          !String(editor.textContent || "").trim().length
+        );
+      `),
+    { timeoutMs: 15000 }
+  );
+}
+
+async function unlockPatternsTab(session) {
+  await completeCalibrationThroughHandoffContinue(session);
 
   await session.waitFor(
     "Patterns tab to unlock",
@@ -541,7 +582,8 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
         appHidden: app?.getAttribute("aria-hidden") === "true",
         writeHidden: write?.classList.contains("hidden"),
         editorEditable: editor?.getAttribute("contenteditable") === "true",
-        promptLen: String(prompt?.textContent || "").trim().length
+        promptLen: String(prompt?.textContent || "").trim().length,
+        promptId: String(window.waywordAppState?.state?.promptId || "")
       };
     `);
 
@@ -549,6 +591,10 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
     assert.equal(writingSnapshot.writeHidden, false, "expected write surface visible after Begin");
     assert.equal(writingSnapshot.editorEditable, true, "expected editor to be editable after Begin");
     assert.ok(writingSnapshot.promptLen > 0, "expected a prompt to render on the writing surface");
+    assert.ok(
+      /^cal_/.test(writingSnapshot.promptId),
+      "expected first-run prompt id to come from calibration pool"
+    );
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
@@ -564,18 +610,27 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
 
     const snapshot = await session.execute(`
       var bar = document.getElementById("editorSemanticStatusBar");
+      var overlay = document.getElementById("editorOverlay");
+      var calibrationOverlay =
+        overlay &&
+        !overlay.classList.contains("hidden") &&
+        overlay.classList.contains("editor-overlay--calibration");
       return {
         evidenceControlCount: document.querySelectorAll(
           "#mirrorReflectionRoot .mirror-card__evidence-toggle, #mirrorReflectionRoot [data-mirror-evidence], #mirrorReflectionRoot [aria-controls*='evidence']"
         ).length,
         mirrorCardCount: document.querySelectorAll("#mirrorReflectionRoot .mirror-card").length,
+        calibrationOverlay,
         recentRailCount: document.querySelectorAll("#recentRailList .recent-entry").length,
         semanticBarHidden: bar ? bar.classList.contains("hidden") : true,
         semanticBarPostRunMuted: bar ? bar.classList.contains("semantic-status-bar--post-run-muted") : false
       };
     `);
 
-    assert.ok(snapshot.mirrorCardCount >= 1, "expected at least one Mirror card after submit");
+    assert.ok(
+      snapshot.mirrorCardCount >= 1 || snapshot.calibrationOverlay,
+      "expected Mirror card after post-calibration submit, or calibration baseline overlay on first-run submit"
+    );
     assert.equal(snapshot.evidenceControlCount, 0, "V1 Mirror cards should not render visible evidence controls");
     assert.ok(snapshot.recentRailCount >= 1, "expected the saved run to appear in Recent Runs");
     if (!snapshot.semanticBarHidden) {
@@ -645,6 +700,14 @@ test("browser smoke: prompt reroll works with empty editor and locks once the ed
       "expected a different prompt string after reroll while the editor was empty"
     );
 
+    const promptIdAfterReroll = await session.execute(`
+      return String(window.waywordAppState?.state?.promptId || "");
+    `);
+    assert.ok(
+      /^cal_/.test(promptIdAfterReroll),
+      "expected calibration reroll to keep prompt ids in the calibration pool"
+    );
+
     await fillEditor(session, "smoke reroll guard draft");
 
     await session.waitFor(
@@ -687,7 +750,7 @@ test("browser smoke: desktop Reflection readable when semantic pill row is hidde
   await withSmokeSession(t, async (session) => {
     await session.setWindowRect({ height: 900, width: 1600, x: 0, y: 0 });
     await loadFreshApp(session);
-    await beginRun(session);
+    await completeCalibrationThroughHandoffContinue(session);
     await fillEditor(session, DESKTOP_REFLECTION_NO_SEM_PILL_TEXT);
 
     const layoutBefore = await readDesktopWritingColumnLayoutSnapshot(session);
@@ -710,7 +773,7 @@ test("browser smoke: desktop Reflection readable when semantic pill row is visib
   await withSmokeSession(t, async (session) => {
     await session.setWindowRect({ height: 900, width: 1600, x: 0, y: 0 });
     await loadFreshApp(session);
-    await beginRun(session);
+    await completeCalibrationThroughHandoffContinue(session);
     await fillEditor(session, DESKTOP_REFLECTION_STRESS_TEXT);
 
     const layoutBefore = await readDesktopWritingColumnLayoutSnapshot(session);

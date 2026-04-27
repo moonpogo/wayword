@@ -46,7 +46,9 @@
       focusEditorToStart: input.focusEditorToStart,
       updateTimeFill: input.updateTimeFill,
       waywordPostRunRenderer: input.waywordPostRunRenderer,
-      requestMirrorReflectionAttentionSettle: input.requestMirrorReflectionAttentionSettle
+      requestMirrorReflectionAttentionSettle: input.requestMirrorReflectionAttentionSettle,
+      syncCalibrationHandoffIntentAfterDecision: input.syncCalibrationHandoffIntentAfterDecision,
+      readCalibrationHandoffAcknowledged: input.readCalibrationHandoffAcknowledged
     };
   }
 

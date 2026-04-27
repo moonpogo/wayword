@@ -57,6 +57,10 @@
       );
     }
 
+    if (typeof input.syncCalibrationHandoffIntentAfterDecision === "function") {
+      input.syncCalibrationHandoffIntentAfterDecision(decision);
+    }
+
     if (typeof input.computeMirrorForSubmit === "function") {
       input.computeMirrorForSubmit(decision);
     }

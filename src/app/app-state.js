@@ -23,6 +23,8 @@
       promptFamily: "",
       lastPromptKey: "",
       recentPromptIds: [],
+      /** Calibration-only prompt ids (never mixed into `recentPromptIds` for the main library). */
+      recentCalibrationPromptIds: [],
       recentFamilyKeys: [],
       /** Shown under the prompt for the full next active run; replaced only after the next saved run. */
       pendingNudgeLine: "",
@@ -50,6 +52,10 @@
       lastMirrorLoadFailed: false,
       /** After a saved run, set when step 1–5; observation lives here (not on reflection line). Cleared on new run. */
       calibrationPostRun: null,
+      /** True only for the post-submit surface after the saved run that reaches the calibration threshold (if not yet acknowledged). */
+      calibrationHandoffVisible: false,
+      /** Last submit was a short calibration draft; post-run mirror uses micro-reflection copy instead of low-signal rejection. Cleared on new run. */
+      lastSubmitCalibrationShortMirror: false,
       completedUiActive: false,
       /** Mobile writing field: when true, surrounding header/context is revealed (still in the same focus habitat). */
       isExpandedField: false
