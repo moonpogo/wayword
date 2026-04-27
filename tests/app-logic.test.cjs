@@ -53,6 +53,13 @@ function loadAppEventsRuntimeContext(overrides = {}) {
   });
 }
 
+function loadEditorShellInteractionsContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/writing/editor-shell-interactions.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
 function loadProgressionRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/progression-runtime.js"], {
     console: silentConsole(),
@@ -861,6 +868,94 @@ test("app events runtime binds document, primary controls, and panel controls on
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "applyTimerFromPanel" && entry[1] === "180"));
   assert.ok(calls.includes("panelShuffle"));
   assert.ok(calls.includes("flushBannedPanelPersistFromPanel"));
+});
+
+test("editor shell interactions bind once and respect blocked, restart, and focus flows", () => {
+  const scheduled = [];
+  const context = loadEditorShellInteractionsContext({
+    requestAnimationFrame(fn) {
+      scheduled.push(fn);
+      return 1;
+    },
+  });
+  const listeners = new Map();
+  const editorShell = {
+    dataset: {},
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+  };
+  const calls = [];
+  const input = {
+    editorShell,
+    resetAnnotationRowPendingEditorSel() {
+      calls.push("resetAnnotationRowPendingEditorSel");
+    },
+    handleEditorSurfaceCompletedRestart(event) {
+      calls.push(["handleEditorSurfaceCompletedRestart", event.kind]);
+      return event.kind === "restart";
+    },
+    isActiveAndEditable() {
+      calls.push("isActiveAndEditable");
+      return true;
+    },
+    focusEditorToEnd() {
+      calls.push("focusEditorToEnd");
+    },
+  };
+
+  context.waywordEditorShellInteractions.bindEditorShellInteractions(input);
+  context.waywordEditorShellInteractions.bindEditorShellInteractions(input);
+
+  assert.equal(editorShell.dataset.editorShellInteractionBound, "1");
+  assert.equal(listeners.has("pointerdown"), true);
+
+  listeners.get("pointerdown")({
+    kind: "editor",
+    target: {
+      closest(selector) {
+        return selector === "#editorInput" ? this : null;
+      },
+    },
+  });
+
+  listeners.get("pointerdown")({
+    kind: "blocked",
+    target: {
+      closest(selector) {
+        return selector === "#optionsTrigger" ? this : null;
+      },
+    },
+  });
+
+  listeners.get("pointerdown")({
+    kind: "restart",
+    target: {
+      closest() {
+        return null;
+      },
+    },
+  });
+
+  listeners.get("pointerdown")({
+    kind: "focus",
+    target: {
+      closest() {
+        return null;
+      },
+    },
+  });
+
+  assert.ok(calls.includes("resetAnnotationRowPendingEditorSel"));
+  assert.ok(
+    calls.some(
+      (entry) => Array.isArray(entry) && entry[0] === "handleEditorSurfaceCompletedRestart" && entry[1] === "restart"
+    )
+  );
+  assert.ok(calls.includes("isActiveAndEditable"));
+  assert.equal(scheduled.length, 1);
+  scheduled[0]();
+  assert.ok(calls.includes("focusEditorToEnd"));
 });
 
 test("progression runtime clamps, loads, applies, and persists levels", () => {

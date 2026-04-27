@@ -5074,75 +5074,40 @@ bindEditorInputEvents();
 
 const { editorShell } = window.waywordDomElements.resolveEditorShell();
 
-if (
-  window.waywordEditorShellInteractions &&
-  typeof window.waywordEditorShellInteractions.bindEditorShellInteractions === "function"
-) {
-  window.waywordEditorShellInteractions.bindEditorShellInteractions({
-    editorShell,
-    resetAnnotationRowPendingEditorSel() {
-      annotationRowPendingEditorSel = null;
-    },
-    handleEditorSurfaceCompletedRestart(e) {
-      return Boolean(
-        window.waywordCompletedUiRestartInteractions &&
-          typeof window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart ===
-            "function" &&
-          window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart(
-            {
-              state,
-              runPostSubmitAutoNewRunNow
-            },
-            e
-          )
-      );
-    },
-    isActiveAndEditable() {
-      return state.active && !state.submitted;
-    },
-    focusEditorToEnd
-  });
-} else {
-  editorShell?.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("#editorInput")) {
-      annotationRowPendingEditorSel = null;
-    }
-
-    const blocked =
-      e.target.closest("#optionsTrigger") ||
-      e.target.closest(".editor-progress") ||
-      e.target.closest("#editorOptionsPanel") ||
-      e.target.closest("#editorOptionsBackdrop") ||
-      e.target.closest("#enterSubmitBtn") ||
-      e.target.closest("#editorOverlay") ||
-      e.target.closest("#editorSemanticPicker") ||
-      e.target.closest("#recentWritingTrigger") ||
-      e.target.closest("#recentDrawer") ||
-      e.target.closest("#recentDrawerBackdrop");
-
-    if (blocked) return;
-    if (
-      window.waywordCompletedUiRestartInteractions &&
-      typeof window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart ===
-        "function" &&
-      window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart(
-        {
-          state,
-          runPostSubmitAutoNewRunNow
-        },
-        e
-      )
-    ) {
-      return;
-    }
-    if (!state.active || state.submitted) return;
-    if (e.target.closest("#editorInput")) return;
-
-    requestAnimationFrame(() => {
-      focusEditorToEnd();
-    });
-  });
+function getEditorShellInteractions() {
+  const runtime = window.waywordEditorShellInteractions;
+  if (!runtime || typeof runtime.bindEditorShellInteractions !== "function") {
+    throw new Error(
+      "wayword: editor shell interactions are required before script.js editor-shell orchestration"
+    );
+  }
+  return runtime;
 }
+
+getEditorShellInteractions().bindEditorShellInteractions({
+  editorShell,
+  resetAnnotationRowPendingEditorSel() {
+    annotationRowPendingEditorSel = null;
+  },
+  handleEditorSurfaceCompletedRestart(e) {
+    return Boolean(
+      window.waywordCompletedUiRestartInteractions &&
+        typeof window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart ===
+          "function" &&
+        window.waywordCompletedUiRestartInteractions.handleEditorSurfaceCompletedRestart(
+          {
+            state,
+            runPostSubmitAutoNewRunNow
+          },
+          e
+        )
+    );
+  },
+  isActiveAndEditable() {
+    return state.active && !state.submitted;
+  },
+  focusEditorToEnd
+});
 
 function bindPrimaryEventControls() {
   const runtime = getAppEventsRuntime();
