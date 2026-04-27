@@ -3,12 +3,13 @@
     if (!input.isMobileViewport()) return false;
     if (!document.body.classList.contains("focus-mode")) return false;
     document.documentElement.classList.add("focus-mode-layout-snap");
-    input.syncViewportHeightVar();
-    input.syncKeyboardOpenClass();
     document.body.classList.remove("keyboard-open");
     document.body.classList.remove("focus-mode");
     document.body.classList.remove("expanded-field");
     input.state.isExpandedField = false;
+    /* `--vvh` must use non-focus rules (layout viewport) before non-focus shell caps read it. */
+    input.syncKeyboardOpenClass();
+    input.syncViewportHeightVar();
     input.armPostFocusExitKeyboardLayoutSettle();
     input.resetWordmarkChromeMotionState();
     return true;
@@ -42,6 +43,9 @@
     }
 
     exitFocusModeForLayoutIfNeeded(input);
+    if (typeof input.renderPostRunReflectionLine === "function") {
+      input.renderPostRunReflectionLine();
+    }
     input.renderProfileSummaryStrip();
     input.queueViewportSync();
     input.logPatternsTransitionSnapshot("setFocusMode:after-disable-mobile");

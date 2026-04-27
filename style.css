@@ -5441,7 +5441,9 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     gap:10px;
     flex:1 1 auto;
     min-height:0;
+    max-height:100%;
     overflow-x:hidden;
+    overflow-y:hidden;
   }
 
   .main-column{
@@ -5449,8 +5451,12 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     flex-direction:column;
     flex:1 1 auto;
     min-height:0;
+    max-height:100%;
     gap:8px;
     overflow-x:hidden;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
   }
 
   .header{
@@ -5799,6 +5805,44 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   body.focus-mode.settings-open .editor-options-panel{
     top:0;
     max-height:calc(var(--vvh, 100dvh) - 32px);
+  }
+}
+
+/*
+ * Short portrait phones (e.g. ~393×852): header + prompt + editor floor + Mirror can exceed the
+ * flat `calc(var(--vvh) - 200px)` shell budget after focus exit, reopening the document scroll root.
+ * Pin html overflow, clip `#writeView` to the flex column, and tie editor max-height to a share of
+ * the live viewport so `.main-column` stays the vertical scroll owner.
+ */
+@media (max-width:720px) and (max-height:900px){
+  html{
+    overflow-y:hidden;
+  }
+
+  .app-write-surface{
+    max-height:100%;
+  }
+
+  #writeView{
+    max-height:100%;
+    overflow:hidden;
+  }
+
+  body:not(.focus-mode) .editor-shell{
+    min-height:clamp(160px, 36dvh, 300px);
+    min-height:clamp(160px, 36vh, 300px);
+    max-height:min(
+      420px,
+      calc(var(--vvh, 100dvh) - min(520px, max(248px, calc(var(--vvh, 100dvh) * 0.55))))
+    );
+  }
+
+  body:not(.focus-mode).keyboard-open .editor-shell{
+    min-height:clamp(140px, calc(var(--vvh, 50vh) * 0.37), 280px);
+    max-height:min(
+      380px,
+      calc(var(--vvh, 100dvh) - min(480px, max(200px, calc(var(--vvh, 100dvh) * 0.5))))
+    );
   }
 }
 

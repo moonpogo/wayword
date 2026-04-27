@@ -11,7 +11,7 @@
       submitted: false,
       targetWords: 60,
       repeatLimit: 2,
-      timerSeconds: 0,
+      timerSeconds: 120,
       timeRemaining: 0,
       /** True until first meaningful edit arms `startTimer()`; focus alone does not start the countdown. */
       timerWaitingForFirstInput: false,

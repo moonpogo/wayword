@@ -646,6 +646,92 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
   });
 });
 
+test("browser smoke: mobile focus exit with Mirror visible does not introduce document scroll", async (t) => {
+  const SCROLL_TOLERANCE_PX = 8;
+
+  await withSmokeSession(t, async (session) => {
+    await session.setWindowRect({ height: 852, width: 393, x: 0, y: 0 });
+    await loadFreshApp(session);
+    await completeCalibrationThroughHandoffContinue(session);
+
+    await session.click("#editorInput");
+    await session.waitFor(
+      "mobile focus mode active before post-calibration submit",
+      async () =>
+        await session.execute(`
+          return document.body.classList.contains("focus-mode");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    await fillEditor(session, SMOKE_RUN_TEXTS[0]);
+    await submitCurrentRun(session);
+
+    const mirrorSnapshot = await session.execute(`
+      var section = document.getElementById("mirrorReflectionSection");
+      var root = document.getElementById("mirrorReflectionRoot");
+      var cards = root ? root.querySelectorAll(".mirror-card").length : 0;
+      return {
+        mirrorSectionVisible: Boolean(section && !section.classList.contains("hidden") && cards > 0),
+        focusModeBeforeFold: document.body.classList.contains("focus-mode"),
+        cardCount: cards
+      };
+    `);
+
+    assert.ok(
+      mirrorSnapshot.mirrorSectionVisible,
+      "expected Mirror reflection section with cards after post-calibration submit"
+    );
+    assert.equal(
+      mirrorSnapshot.focusModeBeforeFold,
+      true,
+      "expected focus mode to stay active after submit while Mirror is visible (mobile blur guard)"
+    );
+
+    await session.click("#fieldExpandedToggle");
+
+    await session.waitFor(
+      "mobile focus mode clears after fold toggle",
+      async () =>
+        await session.execute(`
+          return !document.body.classList.contains("focus-mode");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    await session.waitFor(
+      "document-level scroll containment after focus exit",
+      async () =>
+        await session.execute(
+          `
+            var tol = __p0;
+            var de = document.documentElement;
+            var docOk = de.scrollHeight <= de.clientHeight + tol;
+            var bodyOk = document.body.scrollHeight <= window.innerHeight + tol;
+            return Boolean(docOk && bodyOk);
+          `,
+          [SCROLL_TOLERANCE_PX]
+        ),
+      { timeoutMs: 5000 }
+    );
+
+    const reflectionStillVisible = await session.execute(`
+      var section = document.getElementById("mirrorReflectionSection");
+      var root = document.getElementById("mirrorReflectionRoot");
+      var cards = root ? root.querySelectorAll(".mirror-card").length : 0;
+      return Boolean(section && !section.classList.contains("hidden") && cards > 0);
+    `);
+    assert.equal(
+      reflectionStillVisible,
+      true,
+      "expected Mirror reflection to remain visible after focus exit"
+    );
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
 test("browser smoke: prompt reroll works with empty editor and locks once the editor has text", async (t) => {
   await withSmokeSession(t, async (session) => {
     await loadFreshApp(session);

@@ -623,12 +623,12 @@ test("app events runtime binds document, primary controls, and panel controls on
   };
   wordBtn.dataset.words = "60";
   const timeBtn = {
-    dataset: { time: "180" },
+    dataset: { time: "240" },
     addEventListener(name, handler) {
       this[name] = handler;
     },
   };
-  timeBtn.dataset.time = "180";
+  timeBtn.dataset.time = "240";
   const nodes = new Map();
   function makeNode(id) {
     return {
@@ -878,7 +878,7 @@ test("app events runtime binds document, primary controls, and panel controls on
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "startWriting" && entry[1] === true));
   assert.ok(calls.includes("toggleTheme"));
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "applyWordTargetFromPanel" && entry[1] === "60"));
-  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "applyTimerFromPanel" && entry[1] === "180"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "applyTimerFromPanel" && entry[1] === "240"));
   assert.ok(calls.includes("panelShuffle"));
   assert.ok(calls.includes("flushBannedPanelPersistFromPanel"));
 });
@@ -991,9 +991,9 @@ test("progression runtime clamps, loads, applies, and persists levels", () => {
     },
     progressionLevelKey: "progression-key",
     progressionLevels: [
-      { level: 1, targetWords: 60, timerSeconds: 0 },
-      { level: 2, targetWords: 75, timerSeconds: 120 },
-      { level: 3, targetWords: 90, timerSeconds: 90 },
+      { level: 1, targetWords: 60, timerSeconds: 120 },
+      { level: 2, targetWords: 120, timerSeconds: 240 },
+      { level: 3, targetWords: 240, timerSeconds: 360 },
     ],
     inactivityEaseRunKey: "ease-key",
     readSavedRunsChronological() {
@@ -1008,13 +1008,13 @@ test("progression runtime clamps, loads, applies, and persists levels", () => {
   assert.equal(context.waywordProgressionRuntime.loadStoredProgressionLevel(input), 3);
   assert.deepEqual(context.waywordProgressionRuntime.getProgressionConfig(input, 2), {
     level: 2,
-    targetWords: 75,
-    timerSeconds: 120,
+    targetWords: 120,
+    timerSeconds: 240,
   });
 
   context.waywordProgressionRuntime.applyProgressionToState(input);
-  assert.equal(state.targetWords, 75);
-  assert.equal(state.timerSeconds, 120);
+  assert.equal(state.targetWords, 120);
+  assert.equal(state.timerSeconds, 240);
 
   context.waywordProgressionRuntime.persistProgressionLevel(input);
   assert.deepEqual(writes, [["progression-key", 2]]);
@@ -1053,9 +1053,9 @@ test("progression runtime eases on stale sessions and advances after strong runs
     },
     progressionLevelKey: "progression-key",
     progressionLevels: [
-      { level: 1, targetWords: 60, timerSeconds: 0 },
-      { level: 2, targetWords: 75, timerSeconds: 120 },
-      { level: 3, targetWords: 90, timerSeconds: 90 },
+      { level: 1, targetWords: 60, timerSeconds: 120 },
+      { level: 2, targetWords: 120, timerSeconds: 240 },
+      { level: 3, targetWords: 240, timerSeconds: 360 },
     ],
     inactivityEaseRunKey: "ease-key",
     readSavedRunsChronological() {

@@ -69,7 +69,9 @@
       }
       if (!runWasSaved) return;
       const step = priorEntries.length + 1;
-      const observation = String(d.selectCalibrationObservation(text, priorEntries) || "").trim();
+      const observation = String(
+        d.selectCalibrationObservation(text, priorEntries, step <= d.CALIBRATION_THRESHOLD) || ""
+      ).trim();
       if (step <= d.CALIBRATION_THRESHOLD) {
         d.state.calibrationPostRun = { step, observation, insufficient: false };
         d.state.lastRunFeedback = "";

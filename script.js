@@ -732,12 +732,12 @@ function exitFocusModeForLayoutIfNeeded() {
   if (!isMobileViewport()) return false;
   if (!document.body.classList.contains("focus-mode")) return false;
   document.documentElement.classList.add("focus-mode-layout-snap");
-  syncViewportHeightVar();
-  syncKeyboardOpenClass();
   document.body.classList.remove("keyboard-open");
   document.body.classList.remove("focus-mode");
   document.body.classList.remove("expanded-field");
   state.isExpandedField = false;
+  syncKeyboardOpenClass();
+  syncViewportHeightVar();
   armPostFocusExitKeyboardLayoutSettle();
   resetWordmarkChromeMotionState();
   return true;
@@ -821,6 +821,7 @@ function setFocusMode(enabled) {
     return;
   }
   exitFocusModeForLayoutIfNeeded();
+  window.waywordPostRunRenderer.renderReflectionLine(getPostRunReflectionLineText());
   renderProfileSummaryStrip();
   queueViewportSync();
   logPatternsTransitionSnapshot("setFocusMode:after-disable-mobile");
@@ -841,10 +842,10 @@ function settleNonFocusBaselineAfterPatternsClose() {
     suppressKeyboardOpenTruthUntil,
     performance.now() + 1400
   );
-  syncViewportHeightVar();
   document.body.classList.remove("focus-mode", "expanded-field", "keyboard-open", "patterns-open");
   document.documentElement.classList.remove("focus-mode-layout-snap");
   state.isExpandedField = false;
+  syncViewportHeightVar();
   window.waywordViewController.syncPatternsLayoutMode();
   renderProfile();
   syncExpandedFieldClass();
@@ -1866,7 +1867,7 @@ function applyWordTargetFromPanel(nextWords) {
   }
 
   const n = Number(nextWords);
-  if (!Number.isFinite(n) || ![60, 75, 90].includes(n)) return;
+  if (!Number.isFinite(n) || ![60, 120, 240].includes(n)) return;
   state.targetWords = state.targetWords === n ? 0 : n;
   setActiveModeButton("wordModesPanel", "words", state.targetWords);
   setActiveModeButton("wordModes", "words", state.targetWords);
@@ -1898,8 +1899,8 @@ function applyTimerFromPanel(nextSeconds) {
   }
 
   const n = Number(nextSeconds);
-  if (!Number.isFinite(n) || ![60, 180, 300].includes(n)) return;
-  state.timerSeconds = state.timerSeconds === n ? 0 : n;
+  if (!Number.isFinite(n) || ![120, 240, 360].includes(n)) return;
+  state.timerSeconds = n;
   stopTimer();
   state.timeRemaining = 0;
   state.timerWaitingForFirstInput = Boolean(state.timerSeconds);
@@ -3850,7 +3851,7 @@ function syncWordTargetLabels() {
 
   const t = Number(state.targetWords) || 0;
   const text =
-    t === 75 ? "Write to 75 words" : t === 90 ? "Write to 90 words" : "Write to 60 words";
+    t === 120 ? "Write to 120 words" : t === 240 ? "Write to 240 words" : "Write to 60 words";
   const panel = $("wordTargetLabelPanel");
   const setup = $("wordTargetLabelSetup");
   if (panel) panel.textContent = text;
@@ -4107,6 +4108,75 @@ function getRecentEntries() {
   return readSavedRunsChronological().map((entry) => ({ text: String(entry?.text || "") }));
 }
 
+/**
+ * 4+ letter tokens in MIRROR_STOPWORDS (src/features/mirror/constants/stopwords.ts).
+ * Repetition scoring uses \\b\\w{4,}\\b, so shorter stopwords never enter the repetition bucket.
+ */
+const CALIBRATION_REPETITION_LOW_SIGNAL_WORDS = new Set([
+  "about",
+  "above",
+  "across",
+  "after",
+  "against",
+  "again",
+  "also",
+  "among",
+  "another",
+  "around",
+  "because",
+  "before",
+  "below",
+  "between",
+  "both",
+  "been",
+  "being",
+  "down",
+  "during",
+  "each",
+  "even",
+  "ever",
+  "every",
+  "from",
+  "further",
+  "here",
+  "into",
+  "just",
+  "like",
+  "more",
+  "most",
+  "much",
+  "only",
+  "once",
+  "onto",
+  "other",
+  "over",
+  "same",
+  "some",
+  "such",
+  "than",
+  "then",
+  "there",
+  "these",
+  "this",
+  "those",
+  "that",
+  "through",
+  "until",
+  "upon",
+  "very",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "while",
+  "whom",
+  "whose",
+  "with",
+  "within",
+  "without"
+]);
+
 function analyzeDraftStats(text) {
   const raw = String(text || "");
   const sentenceParts = raw
@@ -4141,9 +4211,13 @@ function analyzeDraftStats(text) {
   }
 
   const repetitions = Object.create(null);
+  const repetitionsContent = Object.create(null);
   const repetitionWords = raw.toLowerCase().match(/\b\w{4,}\b/g) || [];
   for (const word of repetitionWords) {
     repetitions[word] = (repetitions[word] || 0) + 1;
+    if (!CALIBRATION_REPETITION_LOW_SIGNAL_WORDS.has(word)) {
+      repetitionsContent[word] = (repetitionsContent[word] || 0) + 1;
+    }
   }
   let repetitionCount = 0;
   let maxRepeat4 = 0;
@@ -4151,12 +4225,20 @@ function analyzeDraftStats(text) {
     maxRepeat4 = Math.max(maxRepeat4, count);
     if (count > 1) repetitionCount += 1;
   }
+  let repetitionCountContent = 0;
+  let maxRepeat4Content = 0;
+  for (const count of Object.values(repetitionsContent)) {
+    maxRepeat4Content = Math.max(maxRepeat4Content, count);
+    if (count > 1) repetitionCountContent += 1;
+  }
 
   return {
     avgSentenceLength,
     fragmentCount,
     repetitionCount,
     maxRepeat4,
+    repetitionCountContent,
+    maxRepeat4Content,
     totalWords
   };
 }
@@ -4206,6 +4288,12 @@ const CALIBRATION_OBS_LONG = [
   "Average sentence length sits above your recent baseline.",
   "Sentences run longer than in your last few saved runs."
 ];
+const CALIBRATION_OBS_FALLBACK = [
+  "A baseline is still forming.",
+  "This pass stays close to the prompt.",
+  "The signal is still light.",
+  "A pattern is not clear yet."
+];
 
 function pickCalibrationObservationPhrase(phrases, seed) {
   if (!phrases.length) return "";
@@ -4215,8 +4303,9 @@ function pickCalibrationObservationPhrase(phrases, seed) {
 
 /**
  * Calibration observation: one plain line, dominant signal only (repetition → openings → fragmentation → long sentences → fallback).
+ * @param {boolean} [ensureBaselineCardNonEmpty] When true (runs 1–threshold on the baseline overlay), never return an empty string; uses CALIBRATION_OBS_FALLBACK deterministically. Post-threshold runs pass false so lastRunFeedback stays unchanged when no line matches.
  */
-function selectCalibrationObservation(text, priorEntries) {
+function selectCalibrationObservation(text, priorEntries, ensureBaselineCardNonEmpty) {
   const raw = String(text || "").trim();
   const t = analyzeDraftStats(raw);
   const baseline = buildBaseline(priorEntries);
@@ -4234,15 +4323,17 @@ function selectCalibrationObservation(text, priorEntries) {
     .map((s) => s.trim())
     .filter(Boolean).length;
 
+  const rc = t.repetitionCountContent || 0;
+  const mr = t.maxRepeat4Content || 0;
   const repetitionApplies =
     (t.totalWords || 0) >= minWordsForLexical &&
-    (t.repetitionCount >= 2 || (t.repetitionCount >= 1 && t.maxRepeat4 >= 4));
+    (rc >= 2 || (rc >= 1 && mr >= 4));
 
   if (repetitionApplies) {
-    if (t.repetitionCount === 1 && t.maxRepeat4 >= 5) return "One word appears often.";
-    if (t.repetitionCount >= 3 || t.maxRepeat4 >= 6) return "You repeat certain words.";
-    if (t.repetitionCount === 1) return "You return to the same word.";
-    if (t.repetitionCount === 2) return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
+    if (rc === 1 && mr >= 5) return "One word appears often.";
+    if (rc >= 3 || mr >= 6) return "You repeat certain words.";
+    if (rc === 1) return "You return to the same word.";
+    if (rc === 2) return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
     return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
   }
 
@@ -4279,6 +4370,9 @@ function selectCalibrationObservation(text, priorEntries) {
       : pickCalibrationObservationPhrase(CALIBRATION_OBS_LONG, seed);
   }
 
+  if (ensureBaselineCardNonEmpty) {
+    return pickCalibrationObservationPhrase(CALIBRATION_OBS_FALLBACK, seed);
+  }
   return "";
 }
 

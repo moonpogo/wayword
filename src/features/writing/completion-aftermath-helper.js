@@ -10,7 +10,10 @@
 
   function applySavedRunCalibrationAftermath(input) {
     var step = input.priorEntries.length + 1;
-    var observation = String(input.selectCalibrationObservation(input.text, input.priorEntries) || "").trim();
+    var ensureBaselineLine = step <= input.calibrationThreshold;
+    var observation = String(
+      input.selectCalibrationObservation(input.text, input.priorEntries, ensureBaselineLine) || ""
+    ).trim();
     if (step <= input.calibrationThreshold) {
       input.state.calibrationPostRun = { step: step, observation: observation, insufficient: false };
       input.state.lastRunFeedback = "";

@@ -24,9 +24,9 @@
     /** Soft family spacing: weight inversely to recent picks of same family in this window. */
     PROMPT_RECENT_FAMILY_WINDOW: 4,
     PROGRESSION_LEVELS: [
-      { level: 1, targetWords: 60, timerSeconds: 0 },
-      { level: 2, targetWords: 75, timerSeconds: 120 },
-      { level: 3, targetWords: 90, timerSeconds: 90 },
+      { level: 1, targetWords: 60, timerSeconds: 120 },
+      { level: 2, targetWords: 120, timerSeconds: 240 },
+      { level: 3, targetWords: 240, timerSeconds: 360 },
     ],
     PROGRESSION_LEVEL_KEY: "wayword-progression-level",
     INACTIVITY_EASE_RUN_KEY: "wayword-inactivity-eased-for-run",
@@ -63,7 +63,7 @@
       "night",
     ]),
     METRIC_EXPLAINER_KEYS: new Set(["filler", "repetition", "openings"]),
-    SHUFFLE_TARGET_WORDS: [60, 75, 90],
-    SHUFFLE_TIMER_SECONDS: [60, 180, 300],
+    SHUFFLE_TARGET_WORDS: [60, 120, 240],
+    SHUFFLE_TIMER_SECONDS: [120, 240, 360],
   });
 })();
