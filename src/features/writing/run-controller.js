@@ -534,6 +534,7 @@
         renderMeta: d.renderMeta,
         renderSidebar: d.renderSidebar,
         queueViewportSync: d.queueViewportSync,
+        requestMirrorReflectionAttentionSettle: d.requestMirrorReflectionAttentionSettle,
         pulseEditorShellAfterSubmit: pulseEditorShellAfterSubmit,
       });
     } else {
@@ -541,6 +542,9 @@
       d.renderWritingState({ deferPostRunOverlaySync: false });
       d.renderMeta();
       d.renderSidebar();
+      if (typeof d.requestMirrorReflectionAttentionSettle === "function") {
+        d.requestMirrorReflectionAttentionSettle();
+      }
       d.queueViewportSync();
       pulseEditorShellAfterSubmit();
     }

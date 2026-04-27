@@ -563,18 +563,28 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
     await submitCurrentRun(session);
 
     const snapshot = await session.execute(`
+      var bar = document.getElementById("editorSemanticStatusBar");
       return {
         evidenceControlCount: document.querySelectorAll(
           "#mirrorReflectionRoot .mirror-card__evidence-toggle, #mirrorReflectionRoot [data-mirror-evidence], #mirrorReflectionRoot [aria-controls*='evidence']"
         ).length,
         mirrorCardCount: document.querySelectorAll("#mirrorReflectionRoot .mirror-card").length,
-        recentRailCount: document.querySelectorAll("#recentRailList .recent-entry").length
+        recentRailCount: document.querySelectorAll("#recentRailList .recent-entry").length,
+        semanticBarHidden: bar ? bar.classList.contains("hidden") : true,
+        semanticBarPostRunMuted: bar ? bar.classList.contains("semantic-status-bar--post-run-muted") : false
       };
     `);
 
     assert.ok(snapshot.mirrorCardCount >= 1, "expected at least one Mirror card after submit");
     assert.equal(snapshot.evidenceControlCount, 0, "V1 Mirror cards should not render visible evidence controls");
     assert.ok(snapshot.recentRailCount >= 1, "expected the saved run to appear in Recent Runs");
+    if (!snapshot.semanticBarHidden) {
+      assert.equal(
+        snapshot.semanticBarPostRunMuted,
+        true,
+        "expected semantic legend row to enter post-submit muted mode when visible alongside Mirror"
+      );
+    }
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);

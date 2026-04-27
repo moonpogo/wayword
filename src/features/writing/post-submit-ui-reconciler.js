@@ -31,6 +31,9 @@
     input.renderWritingState({ deferPostRunOverlaySync: false });
     input.renderMeta();
     input.renderSidebar();
+    if (typeof input.requestMirrorReflectionAttentionSettle === "function") {
+      input.requestMirrorReflectionAttentionSettle();
+    }
     input.queueViewportSync();
     input.pulseEditorShellAfterSubmit();
   }

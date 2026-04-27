@@ -3408,6 +3408,34 @@ function prefersReducedUiMotion() {
   }
 }
 
+/** Throttle for {@link requestMirrorReflectionAttentionSettle} across post-submit re-renders. */
+let waywordMirrorReflectionSettleLastAt = 0;
+
+/**
+ * After submit, gently bring Mirror into view when the reflection panel has content.
+ * Skipped for reduced motion; throttled so `renderWritingState` re-entries do not repeat scroll.
+ */
+function requestMirrorReflectionAttentionSettle() {
+  if (!state.submitted || !state.completedUiActive) return;
+  if (prefersReducedUiMotion()) return;
+  const section = $("mirrorReflectionSection");
+  if (!section || section.classList.contains("hidden")) return;
+  const root = $("mirrorReflectionRoot");
+  if (!root || !String(root.innerHTML || "").trim()) return;
+
+  const now = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+  if (now - waywordMirrorReflectionSettleLastAt < 900) return;
+  waywordMirrorReflectionSettleLastAt = now;
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      try {
+        section.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      } catch (_) {}
+    });
+  });
+}
+
 let recentRunsUi = null;
 let optionsUi = null;
 
@@ -3768,6 +3796,10 @@ function renderCalibration() {
 function renderWritingState(options = {}) {
   if (!editorInput) return;
 
+  if (!state.submitted || !state.completedUiActive) {
+    waywordMirrorReflectionSettleLastAt = 0;
+  }
+
   const deferPostRunOverlaySync = Boolean(options.deferPostRunOverlaySync);
 
   if (
@@ -3844,6 +3876,7 @@ function renderLegend(analysis) {
     if (bar) {
       const pills = [fillerPill, repetitionPill, openingPill, bluePill].filter(Boolean);
       bar.classList.toggle("hidden", !pills.some((p) => !p.classList.contains("hidden")));
+      bar.classList.remove("semantic-status-bar--post-run-muted");
     }
     return;
   }
@@ -3860,6 +3893,9 @@ function renderLegend(analysis) {
   if (bar) {
     const pills = [fillerPill, repetitionPill, openingPill, bluePill].filter(Boolean);
     bar.classList.toggle("hidden", !pills.some((p) => !p.classList.contains("hidden")));
+    const mutePostRunSemanticBar =
+      Boolean(state.submitted && state.completedUiActive) && !bar.classList.contains("hidden");
+    bar.classList.toggle("semantic-status-bar--post-run-muted", mutePostRunSemanticBar);
   }
 }
 
@@ -4942,7 +4978,8 @@ function buildRunControllerRegistrationInput() {
     syncEditorBottomChromeForCalibrationOverlay,
     focusEditorToStart,
     updateTimeFill,
-    waywordPostRunRenderer: window.waywordPostRunRenderer
+    waywordPostRunRenderer: window.waywordPostRunRenderer,
+    requestMirrorReflectionAttentionSettle
   };
 }
 

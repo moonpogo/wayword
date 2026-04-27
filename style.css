@@ -1212,7 +1212,7 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
 /* Post-submit: quick, understated settle (closure, not reward). */
 .editor-shell.editor-shell--submit-complete .editor-input,
 .editor-shell.editor-shell--submit-complete .editor-dot-overlay{
-  animation:wayword-editor-settle 0.16s cubic-bezier(0.25, 0.46, 0.45, 1) both;
+  animation:wayword-editor-settle 0.12s cubic-bezier(0.25, 0.46, 0.45, 1) both;
 }
 
 .editor-shell.editor-shell--submit-complete .editor-input[contenteditable="false"]{
@@ -1221,8 +1221,8 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
 
 @keyframes wayword-editor-settle{
   0%{
-    transform:translate3d(0, 2px, 0);
-    opacity:0.96;
+    transform:translate3d(0, 1px, 0);
+    opacity:0.99;
   }
   100%{
     transform:translate3d(0, 0, 0);
@@ -1233,11 +1233,11 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
 @media (prefers-reduced-motion:reduce){
   .editor-shell.editor-shell--submit-complete .editor-input,
   .editor-shell.editor-shell--submit-complete .editor-dot-overlay{
-    animation:wayword-editor-settle-reduced 0.14s ease-out both;
+    animation:wayword-editor-settle-reduced 0.1s ease-out both;
   }
 
   @keyframes wayword-editor-settle-reduced{
-    0%{ opacity:0.96; }
+    0%{ opacity:0.99; }
     100%{ opacity:1; }
   }
 }
@@ -2707,6 +2707,20 @@ html[data-theme="dark"] .annotation-dot--challenge{
 #editorSemanticStatusBar{
   opacity:0.9;
   justify-content:center;
+}
+
+/* Completed post-submit: pills stay available but defer visually to Mirror (class from script.js). */
+#editorSemanticStatusBar.semantic-status-bar--post-run-muted{
+  opacity:0.5;
+  transition:opacity 0.22s ease;
+}
+
+#editorSemanticStatusBar.semantic-status-bar--post-run-muted .legend-pill:not(.legend-pill--inactive){
+  opacity:0.88;
+}
+
+#editorSemanticStatusBar.semantic-status-bar--post-run-muted .legend-pill--inactive{
+  opacity:0.2;
 }
 
 #editorSemanticStatusBar .legend-pill{

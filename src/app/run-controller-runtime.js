@@ -45,7 +45,8 @@
       syncEditorBottomChromeForCalibrationOverlay: input.syncEditorBottomChromeForCalibrationOverlay,
       focusEditorToStart: input.focusEditorToStart,
       updateTimeFill: input.updateTimeFill,
-      waywordPostRunRenderer: input.waywordPostRunRenderer
+      waywordPostRunRenderer: input.waywordPostRunRenderer,
+      requestMirrorReflectionAttentionSettle: input.requestMirrorReflectionAttentionSettle
     };
   }
 
