@@ -50,7 +50,7 @@ const promptLibrary = {
     },
     {
       id: "observation_rooftop_surface",
-      text: "Describe a rooftop at the hour the light goes thin: underfoot, rim, heat—not the postcard skyline.",
+      text: "Describe a rooftop at the hour the light goes thin: underfoot, rim, heat, not the postcard skyline.",
       nearDuplicateGroup: "rooftop",
       intensity: 2,
       structure: "describe_scene",
@@ -74,7 +74,7 @@ const promptLibrary = {
     },
     {
       id: "observation_waiting_room_plain",
-      text: "Describe a waiting room: light, vinyl, posture, and the clock—without turning the room into metaphor.",
+      text: "Describe a waiting room: light, vinyl, posture, and the clock, without turning the room into metaphor.",
       nearDuplicateGroup: "waiting_room",
       intensity: 2,
       structure: "describe_scene",
@@ -132,7 +132,7 @@ const promptLibrary = {
     },
     {
       id: "relation_being_let_go",
-      text: "Write a scene where someone realizes they are already being let go—without accusation or summary.",
+      text: "Write a scene where someone realizes they are already being let go, without accusation or summary.",
       nearDuplicateGroup: "loss_edge",
       intensity: 3,
       structure: "scene_dialogue",
@@ -198,7 +198,7 @@ const promptLibrary = {
     },
     {
       id: "tension_forgiveness_movement",
-      text: "Write about forgiveness as movement through a house: doors, hands, small tasks—not a verdict on anyone.",
+      text: "Write about forgiveness as movement through a house: doors, hands, small tasks, not a verdict on anyone.",
       nearDuplicateGroup: "forgiveness",
       intensity: 2,
       structure: "physical_channel",
@@ -206,7 +206,7 @@ const promptLibrary = {
     },
     {
       id: "tension_care_as_upkeep",
-      text: "Write about care that looks like upkeep—what gets checked, tightened, or left quietly running.",
+      text: "Write about care that looks like upkeep: what gets checked, tightened, or left quietly running.",
       nearDuplicateGroup: "care_work",
       intensity: 2,
       structure: "describe_scene",
@@ -216,7 +216,7 @@ const promptLibrary = {
   Possibility: [
     {
       id: "possibility_day_almost",
-      text: "Write about a day that almost went differently—only near misses; do not use the phrase what if.",
+      text: "Write about a day that almost went differently. Only near misses. Do not use the phrase what if.",
       nearDuplicateGroup: "near_miss",
       intensity: 2,
       structure: "fork_aftermath",
@@ -224,7 +224,7 @@ const promptLibrary = {
     },
     {
       id: "possibility_choice_in_space",
-      text: "Write about a decision that still takes up space in a room—something that keeps getting moved, avoided, or walked around.",
+      text: "Write about a decision that still takes up space in a room, something that keeps getting moved, avoided, or walked around.",
       nearDuplicateGroup: "unmade_choice",
       intensity: 2,
       structure: "describe_scene",
@@ -242,7 +242,7 @@ const promptLibrary = {
   Constraint: [
     {
       id: "constraint_hunger_channels",
-      text: "Write about hunger using only smell, temperature, and motion—never name food or eating.",
+      text: "Write about hunger using only smell, temperature, and motion. Never name food or eating.",
       nearDuplicateGroup: "withhold_food",
       intensity: 2,
       structure: "withhold_category",
@@ -250,7 +250,7 @@ const promptLibrary = {
     },
     {
       id: "constraint_shame_posture",
-      text: "Write about shame using only posture and distance—no emotion words.",
+      text: "Write about shame using only posture and distance. No emotion words.",
       nearDuplicateGroup: "withhold_emotion",
       intensity: 3,
       structure: "withhold_category",
@@ -258,7 +258,7 @@ const promptLibrary = {
     },
     {
       id: "constraint_body_channels",
-      text: "Write about a body using only weight, torque, and where the hands go—no anatomy labels.",
+      text: "Write about a body using only weight, torque, and where the hands go. No anatomy labels.",
       nearDuplicateGroup: "body_channel",
       intensity: 2,
       structure: "physical_channel",
@@ -266,7 +266,7 @@ const promptLibrary = {
     },
     {
       id: "constraint_meal_non_food",
-      text: "Write about a meal as weight, warmth, and silence between people—not what is on the plate.",
+      text: "Write about a meal as weight, warmth, and silence between people, not what is on the plate.",
       nearDuplicateGroup: "meal_non_food",
       intensity: 2,
       structure: "physical_channel",
@@ -282,7 +282,7 @@ for (const fam of PROMPT_FAMILIES_ORDER) {
   }
 }
 
-/** Ritual Loop V1 — internal family tags only (not shown in UI). */
+/** Ritual Loop V1: internal family tags only (not shown in UI). */
 function biasTagsForPromptFamily(familyKey) {
   const key = String(familyKey || "").trim();
   return key ? [`family:${key}`] : [];
@@ -321,7 +321,7 @@ const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
     "Hold one fork in view.",
     "Stay with the near-miss.",
     "Keep the refusal felt, not explained.",
-    "One path not taken—keep it concrete."
+    "One path not taken. Keep it concrete."
   ],
   Constraint: [
     "Don't name the feeling yet.",
