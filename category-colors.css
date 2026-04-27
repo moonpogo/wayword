@@ -5,11 +5,16 @@
  * (surfaces, borders, dots, meters, chips, etc.) is derived in style.css
  * from these tokens via var(--color-*) and color-mix().
  *
+ * Calibrated so small semantic dots (shared size/opacity rules) read at
+ * similar perceived weight: repetition is a slightly softer violet than the
+ * legacy electric purple; filler/openings/challenge nudged for a tighter
+ * luminance band without losing hue identity.
+ *
  * Do not duplicate these hex values elsewhere.
  */
 :root {
-  --color-filler: #2FA4A9;
-  --color-repetition: #7B61FF;
-  --color-openings: #3F7BFF;
-  --color-challenge: #D14FC4;
+  --color-filler: #2A9A9F;
+  --color-repetition: #7B6DED;
+  --color-openings: #3E78F4;
+  --color-challenge: #CA50BD;
 }

@@ -1388,13 +1388,7 @@ html[data-theme="dark"] .editor-token-dot{
 
 .editor-token-dot--repetition{
   background:var(--color-repetition);
-  opacity:1;
-  box-shadow:0 1px 2px color-mix(in srgb, var(--color-repetition) 42%, transparent);
-}
-
-/* When multiple semantic dots share a token, keep repetition visually tied to the word. */
-.editor-token-dot-group .editor-token-dot:not(.editor-token-dot--repetition){
-  opacity:0.58;
+  opacity:0.94;
 }
 
 .editor-token-dot--opening{
@@ -1414,12 +1408,7 @@ html[data-theme="dark"] .editor-token-dot--filler{
 
 html[data-theme="dark"] .editor-token-dot--repetition{
   background:color-mix(in srgb, var(--color-repetition) 84%, var(--ink));
-  opacity:1;
-  box-shadow:0 1px 3px color-mix(in srgb, var(--color-repetition) 35%, rgba(0,0,0,0.45));
-}
-
-html[data-theme="dark"] .editor-token-dot-group .editor-token-dot:not(.editor-token-dot--repetition){
-  opacity:0.52;
+  opacity:0.96;
 }
 
 html[data-theme="dark"] .editor-token-dot--opening{
@@ -2474,8 +2463,7 @@ html[data-theme="dark"] .annotation-dot{
 
 .annotation-dot--repetition{
   background:var(--color-repetition);
-  opacity:1;
-  box-shadow:0 0 0 1px color-mix(in srgb, var(--color-repetition) 55%, var(--paper));
+  opacity:0.92;
 }
 
 .annotation-dot--opening{
@@ -2488,15 +2476,6 @@ html[data-theme="dark"] .annotation-dot{
   opacity:0.92;
 }
 
-.annotation-slot-dots .annotation-dot:not(.annotation-dot--repetition){
-  opacity:0.62;
-}
-
-.annotation-slot-dots .annotation-dot--repetition{
-  opacity:1;
-  transform:translateY(-2px);
-}
-
 html[data-theme="dark"] .annotation-dot--filler{
   background:color-mix(in srgb, var(--color-filler) 84%, var(--ink));
   opacity:0.94;
@@ -2504,8 +2483,7 @@ html[data-theme="dark"] .annotation-dot--filler{
 
 html[data-theme="dark"] .annotation-dot--repetition{
   background:color-mix(in srgb, var(--color-repetition) 84%, var(--ink));
-  opacity:1;
-  box-shadow:0 0 0 1px color-mix(in srgb, var(--color-repetition) 50%, rgba(0,0,0,0.4));
+  opacity:0.94;
 }
 
 html[data-theme="dark"] .annotation-dot--opening{
@@ -2622,9 +2600,6 @@ html[data-theme="dark"] .annotation-dot--challenge{
 
 .dot-repetition{
   background:var(--color-repetition);
-  opacity:1;
-  box-shadow:0 0.06em 0.12em color-mix(in srgb, var(--color-repetition) 38%, transparent);
-  transform:translateY(-0.06em);
 }
 
 .dot-openings{
