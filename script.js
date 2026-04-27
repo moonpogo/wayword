@@ -5066,7 +5066,8 @@ function bindEditorInputEvents() {
     completedUiRestartInteractions: window.waywordCompletedUiRestartInteractions,
     runPostSubmitAutoNewRunNow,
     getEditorText,
-    submitWriting
+    submitWriting,
+    renderMeta
   });
 }
 

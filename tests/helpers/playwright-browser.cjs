@@ -37,8 +37,8 @@ class PlaywrightSession {
     );
   }
 
-  async click(selector) {
-    await this.page.click(selector, { timeout: 15000 });
+  async click(selector, options = {}) {
+    await this.page.click(selector, { timeout: 15000, ...options });
   }
 
   async waitFor(label, predicate, options = {}) {

@@ -1,5 +1,15 @@
 # QA Regression Checklist
 
+## Automated regression bundle (core flows)
+
+Run these in order when hardening or before a V1-sensitive merge:
+
+1. **`npm test`** — Node logic tests (`tests/app-logic.test.cjs`, mirror pipeline, patterns aggregation).
+2. **`node --check script.js`** — Syntax-only guard on the frozen runtime bundle.
+3. **`npm run test:smoke`** — Playwright Chromium checks for landing → begin, writing → submit → Mirror, prompt reroll gating, Recent Runs drawer/rail, Patterns, and mobile focus/patterns paths (requires devDependency install / Chromium).
+
+Shortcut (same three steps): **`npm run test:regression`**
+
 ## Must run before V1-sensitive merge
 - [ ] Run `npm test`
 - [ ] Run `npm run verify:mirror-bundle`

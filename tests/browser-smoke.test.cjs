@@ -112,6 +112,26 @@ async function loadFreshApp(session) {
   await installErrorTrap(session);
 }
 
+async function waitForLandingGateVisible(session) {
+  await session.waitFor(
+    "landing gate visible before begin",
+    async () =>
+      await session.execute(`
+        var landing = document.getElementById("landingView");
+        var begin = document.getElementById("beginBtn");
+        var app = document.getElementById("appView");
+        return Boolean(
+          landing &&
+          !landing.classList.contains("hidden") &&
+          begin &&
+          app &&
+          app.getAttribute("aria-hidden") === "true"
+        );
+      `),
+    { timeoutMs: 10000 }
+  );
+}
+
 async function beginRun(session) {
   await session.click("#beginBtn");
   await session.waitFor(
@@ -489,6 +509,52 @@ async function readElementViewportBox(session, selector, options = {}) {
   );
 }
 
+test("browser smoke: landing -> begin leaves writing surface ready", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await loadFreshApp(session);
+    await waitForLandingGateVisible(session);
+
+    const landingSnapshot = await session.execute(`
+      var shell = document.querySelector(".app-shell");
+      return {
+        beginVisible: Boolean(
+          document.getElementById("beginBtn") &&
+          document.getElementById("beginBtn").offsetParent !== null
+        ),
+        appHidden: document.getElementById("appView")?.getAttribute("aria-hidden") === "true",
+        landingShell: shell ? shell.classList.contains("app-shell--landing") : false
+      };
+    `);
+
+    assert.equal(landingSnapshot.appHidden, true, "expected app chrome hidden on landing");
+    assert.equal(landingSnapshot.beginVisible, true, "expected Begin control visible on landing");
+    assert.equal(landingSnapshot.landingShell, true, "expected landing shell state before Begin");
+
+    await beginRun(session);
+
+    const writingSnapshot = await session.execute(`
+      var app = document.getElementById("appView");
+      var write = document.getElementById("writeView");
+      var editor = document.getElementById("editorInput");
+      var prompt = document.getElementById("promptText");
+      return {
+        appHidden: app?.getAttribute("aria-hidden") === "true",
+        writeHidden: write?.classList.contains("hidden"),
+        editorEditable: editor?.getAttribute("contenteditable") === "true",
+        promptLen: String(prompt?.textContent || "").trim().length
+      };
+    `);
+
+    assert.equal(writingSnapshot.appHidden, false, "expected app chrome visible after Begin");
+    assert.equal(writingSnapshot.writeHidden, false, "expected write surface visible after Begin");
+    assert.equal(writingSnapshot.editorEditable, true, "expected editor to be editable after Begin");
+    assert.ok(writingSnapshot.promptLen > 0, "expected a prompt to render on the writing surface");
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
 test("browser smoke: begin -> write -> submit renders Mirror without visible evidence controls", async (t) => {
   await withSmokeSession(t, async (session) => {
     await loadFreshApp(session);
@@ -509,6 +575,98 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
     assert.ok(snapshot.mirrorCardCount >= 1, "expected at least one Mirror card after submit");
     assert.equal(snapshot.evidenceControlCount, 0, "V1 Mirror cards should not render visible evidence controls");
     assert.ok(snapshot.recentRailCount >= 1, "expected the saved run to appear in Recent Runs");
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: prompt reroll works with empty editor and locks once the editor has text", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await loadFreshApp(session);
+    await beginRun(session);
+
+    await session.waitFor(
+      "prompt reroll control ready",
+      async () =>
+        await session.execute(`
+          var btn = document.getElementById("promptRerollBtn");
+          var pt = document.getElementById("promptText");
+          return Boolean(
+            btn &&
+            !btn.classList.contains("hidden") &&
+            btn.disabled === false &&
+            btn.dataset.rerolls === "2" &&
+            pt &&
+            String(pt.textContent || "").trim().length > 0
+          );
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const before = await session.execute(`
+      var pt = document.getElementById("promptText");
+      return {
+        prompt: String(pt.textContent || "").trim(),
+        rerolls: document.getElementById("promptRerollBtn")?.dataset.rerolls || ""
+      };
+    `);
+
+    await session.click("#promptRerollBtn");
+
+    await session.waitFor(
+      "prompt reroll consumed one credit",
+      async () =>
+        await session.execute(`
+          var btn = document.getElementById("promptRerollBtn");
+          return Boolean(btn && btn.dataset.rerolls === "1");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const afterReroll = await session.execute(`
+      var pt = document.getElementById("promptText");
+      return String(pt.textContent || "").trim();
+    `);
+
+    assert.notEqual(
+      afterReroll,
+      before.prompt,
+      "expected a different prompt string after reroll while the editor was empty"
+    );
+
+    await fillEditor(session, "smoke reroll guard draft");
+
+    await session.waitFor(
+      "prompt reroll disabled when editor has text",
+      async () =>
+        await session.execute(`
+          var btn = document.getElementById("promptRerollBtn");
+          return Boolean(btn && btn.disabled === true && btn.classList.contains("locked"));
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const promptWithDraft = await session.execute(`
+      return String(document.getElementById("promptText")?.textContent || "").trim();
+    `);
+
+    assert.equal(
+      promptWithDraft,
+      afterReroll,
+      "expected prompt copy to stay stable once the draft is present (reroll is empty-only)"
+    );
+
+    const rerollSnapshot = await session.execute(`
+      var btn = document.getElementById("promptRerollBtn");
+      return {
+        rerolls: btn ? btn.dataset.rerolls : "",
+        disabled: Boolean(btn && btn.disabled)
+      };
+    `);
+
+    assert.equal(rerollSnapshot.rerolls, "1", "expected first reroll to consume exactly one credit");
+    assert.equal(rerollSnapshot.disabled, true, "expected reroll control to stay disabled while the editor holds text");
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
@@ -684,6 +842,48 @@ test("browser smoke: Recent Runs drawer opens and closes around a saved run", as
     await session.click("#recentDrawerCloseBtn");
     await session.waitFor(
       "Recent Runs drawer close",
+      async () =>
+        await session.execute(`
+          var drawer = document.getElementById("recentDrawer");
+          return Boolean(drawer && drawer.getAttribute("aria-hidden") === "true");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: mobile Recent Runs drawer opens and closes after a saved run", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await session.setWindowRect({ height: 844, width: 390, x: 0, y: 0 });
+    await loadFreshApp(session);
+    await beginRun(session);
+    await fillEditor(session, SMOKE_RUN_TEXTS[2]);
+    await submitCurrentRun(session);
+
+    const opened = await session.execute(`
+      var t = document.getElementById("recentWritingTrigger");
+      if (!t) return false;
+      t.scrollIntoView({ block: "center", inline: "nearest" });
+      t.click();
+      return true;
+    `);
+    assert.equal(opened, true, "expected Recent Runs trigger to exist after submit on mobile");
+    await session.waitFor(
+      "mobile Recent Runs drawer open",
+      async () =>
+        await session.execute(`
+          var drawer = document.getElementById("recentDrawer");
+          return Boolean(drawer && drawer.getAttribute("aria-hidden") === "false");
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    await session.click("#recentDrawerCloseBtn");
+    await session.waitFor(
+      "mobile Recent Runs drawer close",
       async () =>
         await session.execute(`
           var drawer = document.getElementById("recentDrawer");

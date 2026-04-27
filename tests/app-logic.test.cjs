@@ -555,6 +555,9 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
     updateEnterButtonVisibility() {
       calls.push("button");
     },
+    renderMeta() {
+      calls.push("renderMeta");
+    },
     scheduleSemanticPickerFromSelection() {
       calls.push("picker");
     },
@@ -597,6 +600,10 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   assert.ok(calls.includes("scheduleEditorDotOverlaySync"));
   assert.ok(calls.includes("preventDefault"));
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
+
+  calls.length = 0;
+  listeners.get("input")();
+  assert.ok(calls.includes("renderMeta"), "expected editor input to refresh meta (including prompt reroll affordance)");
 });
 
 test("app events runtime binds document, primary controls, and panel controls once", () => {
@@ -1259,6 +1266,47 @@ test("prompt runtime reroll respects eligibility and rerenders meta", () => {
   assert.equal(state.promptRerollsUsed, 1);
   assert.ok(calls.includes("renderMeta"));
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "choosePromptFamilyAndEntry" && entry[1] === "Observation"));
+});
+
+test("prompt runtime reroll is a no-op when editor text is not empty", () => {
+  const promptSelection = loadPromptSelectionContext().waywordPromptSelection;
+  const context = loadPromptRuntimeContext();
+  const state = {
+    active: true,
+    submitted: false,
+    promptRerollsUsed: 0,
+    prompt: "Hold this copy",
+    promptId: "hold-1",
+    promptFamily: "Observation",
+    recentPromptIds: [],
+    recentFamilyKeys: [],
+  };
+  const input = {
+    state,
+    promptSelection,
+    promptFamiliesOrder: ["Observation"],
+    promptLibrary: {},
+    promptEntryById: new Map(),
+    promptRecentIdWindow: 8,
+    promptNearDuplicateWindow: 3,
+    promptRecentFamilyWindow: 4,
+    promptRerollLimit: 2,
+    biasTagsForPromptFamily() {
+      return [];
+    },
+    getEditorText() {
+      return "not empty";
+    },
+    renderMeta() {
+      assert.fail("renderMeta should not run when reroll is blocked");
+    },
+  };
+
+  const ok = context.waywordPromptRuntime.rerollPrompt(input);
+
+  assert.equal(ok, false);
+  assert.equal(state.promptRerollsUsed, 0);
+  assert.equal(state.prompt, "Hold this copy");
 });
 
 test("recent runs view prep returns expected empty and expanded states", () => {

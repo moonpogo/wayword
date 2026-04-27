@@ -45,6 +45,9 @@
       input.updateWordProgress();
       input.updateEnterButtonVisibility();
       input.scheduleSemanticPickerFromSelection();
+      if (typeof input.renderMeta === "function") {
+        input.renderMeta();
+      }
     });
 
     editorInput.addEventListener("input", function () {
@@ -58,6 +61,9 @@
       input.updateWordProgress();
       input.updateEnterButtonVisibility();
       input.scheduleSemanticPickerFromSelection();
+      if (typeof input.renderMeta === "function") {
+        input.renderMeta();
+      }
     });
 
     editorInput.addEventListener("scroll", function () {
