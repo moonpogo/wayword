@@ -10,11 +10,19 @@ Run these in order when hardening or before a V1-sensitive merge:
 
 Shortcut (same three steps): **`npm run test:regression`**
 
+For a **faster gate without Playwright**, `npm run verify:merge` runs the logic tests, `node --check script.js`, and the mirror + patterns surface validators (see `package.json`).
+
+## Default pre-merge gate (`script.js` / runtime seams)
+
+For merges that touch **`script.js`**, **`index.html`** script include order, or **`src/app/`** / **`src/features/`** modules loaded before or by `script.js`, run at least:
+
+- **`npm run verify:merge`** — one command for: `npm test`, `node --check script.js`, `verify:mirror-bundle`, `verify:patterns-surface` (no Playwright).
+
+When Playwright is available, also run **`npm run test:regression`** so browser smoke runs on top of the same logic + syntax checks.
+
 ## Must run before V1-sensitive merge
-- [ ] Run `npm test`
-- [ ] Run `npm run verify:mirror-bundle`
-- [ ] Run `npm run verify:patterns-surface`
-- [ ] Run `npm run test:smoke` when Playwright/browser prerequisites are available on the machine
+- [ ] Run **`npm run verify:merge`** (logic tests, `script.js` syntax check, mirror bundle + patterns surface validators)
+- [ ] Run **`npm run test:regression`** when Playwright/browser prerequisites are available (includes `npm run test:smoke`)
 - [ ] Manual sanity where automation is still weaker: landing -> Begin -> write -> submit, reroll while empty only, Recent Runs drawer/rail, Patterns after enough saved runs, refresh persistence on a saved corpus
 
 ## Core entry

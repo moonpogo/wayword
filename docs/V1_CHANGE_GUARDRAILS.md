@@ -27,10 +27,8 @@ Use this checklist before making any V1-sensitive change.
 
 ## Required Verification For V1-Sensitive Work
 
-- Run `npm test`.
-- Run `npm run verify:mirror-bundle`.
-- Run `npm run verify:patterns-surface`.
-- Run `npm run test:smoke` when environment support is available.
+- Run **`npm run verify:merge`** as the default bundled gate (runs `npm test`, `node --check script.js`, `verify:mirror-bundle`, and `verify:patterns-surface`; no Playwright).
+- Run **`npm run test:regression`** when Playwright is available (adds browser smoke on top of the same logic + syntax checks).
 - Run the manual sanity items in `docs/QA_REGRESSION_CHECKLIST.md` for any risk not fully covered by automation.
 
 ## Escalate Before Merging If The Change Touches

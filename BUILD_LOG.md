@@ -201,3 +201,9 @@ This pass is a working-tree stabilization pass, not a released commit.
 - `mirror-engine.iife.js` still needs a separate bundle-sync pass.
 - Dead evidence CSS selectors remain in `style.css`; they are no longer wired in the active runtime, but the stylesheet cleanup was left out of this narrow pass.
 - Broader ownership issues in `script.js`, persistence ambiguity, and browser smoke-test coverage remain out of scope for this change.
+
+## 2026-04-27: Pre-merge drift guard (npm + docs)
+
+- Added **`npm run verify:merge`** in `package.json`: bundles `npm test`, `node --check script.js`, `verify:mirror-bundle`, and `verify:patterns-surface` so the default automated gate does not depend on remembering four separate commands (still no CI workflow change).
+- **`docs/QA_REGRESSION_CHECKLIST.md`**: calls out when to run `verify:merge` vs full `test:regression` for changes touching `script.js` / `index.html` / runtime seams.
+- **`docs/V1_CHANGE_GUARDRAILS.md`**: required verification now leads with `verify:merge` and optional `test:regression` when Playwright is available.

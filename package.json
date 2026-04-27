@@ -18,6 +18,7 @@
     "test:smoke": "node --test tests/browser-smoke.test.cjs",
     "test:logic": "node --test tests/app-logic.test.cjs tests/mirror-pipeline.test.cjs tests/patterns-aggregation.test.cjs",
     "test": "npm run test:logic",
+    "verify:merge": "npm test && node --check script.js && npm run verify:mirror-bundle && npm run verify:patterns-surface",
     "test:regression": "npm test && node --check script.js && npm run test:smoke"
   },
   "repository": {
