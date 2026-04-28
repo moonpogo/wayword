@@ -1,75 +1,102 @@
 # Wayword
 
-Current V1 product contract source of truth: `docs/V1_PRODUCT_SPEC.md`.
+Current V1 product contract source of truth: docs/V1_PRODUCT_SPEC.md
 
-A writing tool that shows you how you think.
+Most writing tools try to improve your writing.
 
-Write. See what emerges.
+Wayword helps you notice how you write.
 
-Wayword is a minimal writing environment that lets you write, submit, and see restrained observations about visible patterns in the draft.
+A minimal writing practice built around short runs, prompts, and restrained reflection.
 
-It is not a notes app.
-It is not a document editor.
-
-It is a space for observation.
+Write.  
+Submit.  
+See what surfaces.  
+Begin again.
 
 ---
 
-## What it does
+## What Wayword is
 
-- Surfaces patterns in a submitted draft
-- Highlights repetition, structure, variation, and drift
-- Shows recurring signals across saved runs
-- Returns simple observational feedback after each run
-- Stores runs locally in the browser
+Wayword is not a notes app.  
+It is not a document editor.  
+It is not an AI writing assistant.
 
-The goal is not to optimize writing.
+It is a space for observation.
 
-The goal is to make you aware of how you think, through what you write.
+Each writing run is brief, bounded, and intentionally simple.
+
+After you submit, Wayword returns restrained observations about visible patterns in the draft. Not advice. Not diagnosis. Not correction.
+
+The aim is not to optimize writing.
+
+The aim is awareness through writing.
 
 ---
 
 ## Core loop
 
-1. Receive a prompt
-2. Write without interruption
-3. Submit
-4. See what emerges
-5. Press Enter to begin again
+1. Receive a prompt  
+2. Write without interruption  
+3. Submit the run  
+4. Notice what surfaces  
+5. Begin again
+
+Small loops.  
+Repeated over time.
 
 ---
 
-## Design principles
+## What it does
 
-- Minimal interface, no clutter
-- Feedback over instruction
-- Observation over judgment
-- Behavior over theory
+- Prompted writing runs designed for reflection  
+- Submit-time Mirror observations  
+- Pattern signals across saved runs  
+- Recent Runs and Patterns views for longer-horizon noticing  
+- Local-first storage in the browser  
+- Keyboard-forward, lightweight interaction
 
-Everything in the app exists to support the writing loop.
+Wayword does not tell you how to write better.
+
+It helps you notice what your writing is already doing.
 
 ---
 
-## Features
+## Principles
 
-- Submit-time Mirror reflections
-- Pattern and structure highlighting
-- Session feedback (score, variation, sentence shape)
-- Prompt system across multiple modes
-- Keyboard-driven interaction (Enter to restart)
-- Lightweight recent-runs and patterns views over time
+- Observation over judgment  
+- Restraint over analysis  
+- Feedback over instruction  
+- Simplicity over feature sprawl  
+- Behavior over abstraction
+
+Everything in the app serves the writing loop.
 
 ---
 
 ## Philosophy
 
-Wayword treats writing as a system you can observe.
+Writing leaves traces.
 
-Not something to perfect.
-Something to notice.
+Repetition, hesitation, drift, rhythm, return.
 
-Patterns reveal themselves through repetition.
-Clarity comes from seeing structure and recurrence.
+Often those patterns are hard to see while writing.
+
+Wayword is built around a simple premise:
+
+If you can notice patterns in your writing,  
+you may begin noticing patterns in attention itself.
+
+---
+
+## Tech
+
+- HTML  
+- CSS  
+- JavaScript  
+- No frameworks  
+- Local-first by default
+
+Built for speed, durability, and restraint.
 
 ---
 
@@ -77,32 +104,27 @@ Clarity comes from seeing structure and recurrence.
 
 Active development.
 
-This is an evolving system. Features are added carefully to preserve the core experience.
+The product evolves carefully.
+
+New features are added only when they deepen the core loop rather than distract from it.
 
 ---
 
 ## Contributor docs
 
-For any V1-sensitive change, start here before editing code:
+For V1-sensitive changes, start here before touching code:
 
-- `docs/V1_ARCHITECTURE_SNAPSHOT.md` — current architecture, protected seams, and known risks
-- `docs/V1_CHANGE_GUARDRAILS.md` — pre-change checklist for V1-sensitive work
-- `docs/QA_REGRESSION_CHECKLIST.md` — merge-time verification and manual sanity checks
-- `src/app/README.md` — map of extracted app runtime seams and fallback expectations
-
----
-
-## Tech
-
-- HTML / CSS / JavaScript
-- No frameworks
-- Designed for speed and simplicity
+- docs/V1_ARCHITECTURE_SNAPSHOT.md
+- docs/V1_CHANGE_GUARDRAILS.md
+- docs/QA_REGRESSION_CHECKLIST.md
+- src/app/README.md
 
 ---
 
 ## Usage
 
-Open the app and begin writing.
+Open the app.
 
-Press Enter to submit a run.
-Press Enter again to begin a new one.
+Begin writing.
+
+Return tomorrow.

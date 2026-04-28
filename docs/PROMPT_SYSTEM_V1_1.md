@@ -1,5 +1,7 @@
 # Prompt system v1.1
 
+Editorial doctrine (private): `docs/EDITORIAL_DOCTRINE.md`.
+
 ## Families (source of truth: `script.js` → `promptLibrary`)
 
 | Family | Posture |
