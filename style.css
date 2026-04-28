@@ -937,6 +937,35 @@ html[data-theme="dark"] .theme-moon{
   #writeView .side-column{
     display:none;
   }
+
+  /*
+   * Safari/WebKit: first paint or landing → app can briefly retain desktop `display:grid` + `subgrid`
+   * plumbing so a second column still reserves width even though rail markup is hidden. Re-assert the
+   * tablet shell stack and a single explicit write column (matches post-refresh computed layout).
+   */
+  .app-write-surface{
+    display:block;
+    grid-template-columns:none;
+    column-gap:normal;
+    align-items:stretch;
+  }
+
+  #writeView{
+    display:block;
+    grid-column:auto;
+    grid-row:auto;
+  }
+
+  #writeView > .layout{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr);
+    grid-column:auto;
+  }
+
+  #writeView .main-column{
+    grid-column:auto;
+    max-width:none;
+  }
 }
 
 .card{
