@@ -229,7 +229,7 @@
     return `
       <div class="editor-overlay-calibration${mod}" role="dialog" aria-labelledby="editorCalibProgress">
         <div class="editor-overlay-calibration-head">
-          <span class="editor-overlay-calibration-label">Finding your baseline</span>
+          <span class="editor-overlay-calibration-label">Collecting baseline</span>
           <span id="editorCalibProgress" class="editor-overlay-calibration-progress">${step} of ${calibrationThreshold}</span>
         </div>
         <div class="editor-overlay-calibration-meter-wrap">

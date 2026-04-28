@@ -423,9 +423,9 @@ function isCalibrationComposingMode() {
 /** Sentence-length guidance for the nudge lane only; prompt text unchanged. */
 function getCalibrationProgressNudgeLine() {
   const n = completedRuns();
-  if (n <= 1) return "One sentence will do.";
-  if (n === 2) return "One or two sentences will do.";
-  return "Two or three sentences will do.";
+  if (n <= 1) return "Keep it short.";
+  if (n === 2) return "One or two lines.";
+  return "Two or three lines.";
 }
 
 function syncCalibrationWritingModeClass() {
