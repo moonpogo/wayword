@@ -1095,6 +1095,191 @@ test("browser smoke: Patterns view opens after five saved runs", async (t) => {
   });
 });
 
+test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await loadFreshApp(session);
+    await unlockPatternsTab(session);
+
+    await session.click("#styleTab");
+    await session.waitFor(
+      "Patterns view open",
+      async () =>
+        await session.execute(`
+          var profileView = document.getElementById("profileView");
+          return Boolean(profileView && !profileView.classList.contains("hidden"));
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    const expectedCount = SMOKE_RUN_TEXTS.length;
+    const expectedTitle = `Clear ${expectedCount} saved runs?`;
+
+    const footerBefore = await session.execute(`
+      var footer = document.getElementById("profilePatternsFooter");
+      return {
+        exists: Boolean(footer),
+        hidden: footer ? footer.classList.contains("hidden") : true
+      };
+    `);
+    assert.equal(footerBefore.exists, true, "expected Patterns footer element");
+    assert.equal(footerBefore.hidden, false, "expected Clear Saved Runs footer when runs exist");
+
+    await session.click("#clearSavedRunsOpenBtn");
+    await session.waitFor(
+      "clear saved runs modal visible",
+      async () =>
+        await session.execute(`
+          var backdrop = document.getElementById("clearSavedRunsBackdrop");
+          return Boolean(backdrop && !backdrop.classList.contains("hidden"));
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const modalBeforeCancel = await session.execute(`
+      var title = document.getElementById("clearSavedRunsTitle");
+      return {
+        title: title ? String(title.textContent || "").trim() : "",
+        runsLen:
+          typeof window.waywordSavedRunsRead !== "undefined" &&
+          typeof window.waywordSavedRunsRead.listSavedRunsChronological === "function"
+            ? window.waywordSavedRunsRead.listSavedRunsChronological().length
+            : null
+      };
+    `);
+    assert.equal(modalBeforeCancel.title, expectedTitle, "confirmation title should reflect saved run count");
+    assert.equal(modalBeforeCancel.runsLen, expectedCount, "saved runs count should match smoke corpus");
+
+    await session.click("#clearSavedRunsCancelBtn");
+    await session.waitFor(
+      "modal closed after cancel",
+      async () =>
+        await session.execute(`
+          var backdrop = document.getElementById("clearSavedRunsBackdrop");
+          return Boolean(backdrop && backdrop.classList.contains("hidden"));
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    const runsAfterCancel = await session.execute(`
+      return window.waywordSavedRunsRead &&
+        typeof window.waywordSavedRunsRead.listSavedRunsChronological === "function"
+        ? window.waywordSavedRunsRead.listSavedRunsChronological().length
+        : null;
+    `);
+    assert.equal(runsAfterCancel, expectedCount, "cancel must not remove saved runs");
+
+    await session.click("#clearSavedRunsOpenBtn");
+    await session.waitFor(
+      "clear saved runs modal visible again",
+      async () =>
+        await session.execute(`
+          var backdrop = document.getElementById("clearSavedRunsBackdrop");
+          return Boolean(backdrop && !backdrop.classList.contains("hidden"));
+        `),
+      { timeoutMs: 10000 }
+    );
+
+    await session.click("#clearSavedRunsConfirmBtn");
+    await session.waitFor(
+      "saved runs cleared",
+      async () =>
+        await session.execute(`
+          var backdrop = document.getElementById("clearSavedRunsBackdrop");
+          var cleared =
+            backdrop &&
+            backdrop.classList.contains("hidden") &&
+            window.waywordSavedRunsRead &&
+            typeof window.waywordSavedRunsRead.listSavedRunsChronological === "function" &&
+            window.waywordSavedRunsRead.listSavedRunsChronological().length === 0;
+          return Boolean(cleared);
+        `),
+      { timeoutMs: 15000 }
+    );
+
+    const footerAfter = await session.execute(`
+      var footer = document.getElementById("profilePatternsFooter");
+      return footer ? footer.classList.contains("hidden") : null;
+    `);
+    assert.equal(footerAfter, true, "footer action hidden when there are no saved runs");
+
+    const patternsLockedAfterClear = await session.execute(`
+      var callouts = document.getElementById("patternCallouts");
+      var tab = document.getElementById("styleTab");
+      var profileView = document.getElementById("profileView");
+      var writeView = document.getElementById("writeView");
+      return {
+        styleTabHidden: Boolean(tab && tab.classList.contains("hidden")),
+        calloutsLen: callouts ? String(callouts.textContent || "").trim().length : 0,
+        profileHidden: Boolean(profileView && profileView.classList.contains("hidden")),
+        writeViewVisible: Boolean(writeView && !writeView.classList.contains("hidden"))
+      };
+    `);
+    assert.equal(patternsLockedAfterClear.styleTabHidden, true, "Patterns tab hides below calibration threshold after clear");
+    assert.equal(patternsLockedAfterClear.profileHidden, true, "Patterns panel closes immediately after clear");
+    assert.equal(patternsLockedAfterClear.writeViewVisible, true, "writing surface remains visible after clear");
+
+    const patternsDuplicateCheck = await session.execute(`
+      var pv = document.getElementById("profileView");
+      var titles = pv ? pv.querySelectorAll(".profile-locked-title") : [];
+      var util = document.querySelector("#profileView .profile-patterns-utility");
+      return {
+        almostThereCount: titles.length,
+        utilityHidden: util ? util.classList.contains("hidden") : null
+      };
+    `);
+    assert.equal(patternsDuplicateCheck.almostThereCount, 1, "Patterns shows one locked block, not duplicated");
+    assert.equal(patternsDuplicateCheck.utilityHidden, true, "repeated-words strip hidden when Patterns locked after clear");
+
+    const postClearPromptSnapshot = await session.execute(`
+      return {
+        promptId: String(window.waywordAppState?.state?.promptId || ""),
+        handoffAck: String(window.localStorage.getItem("wayword-calibration-handoff-ack") || ""),
+        runCount:
+          window.waywordSavedRunsRead &&
+          typeof window.waywordSavedRunsRead.listSavedRunsChronological === "function"
+            ? window.waywordSavedRunsRead.listSavedRunsChronological().length
+            : null
+      };
+    `);
+    assert.ok(
+      /^cal_/.test(postClearPromptSnapshot.promptId),
+      "expected prompt selection to reset to calibration pool after clear"
+    );
+    assert.equal(postClearPromptSnapshot.handoffAck, "", "expected calibration handoff acknowledgment to reset");
+    assert.equal(postClearPromptSnapshot.runCount, 0, "expected saved run count to be zero after clear");
+
+    for (let index = 0; index < SMOKE_RUN_TEXTS.length; index += 1) {
+      await fillEditor(session, SMOKE_RUN_TEXTS[index]);
+      await submitCurrentRun(session);
+      if (index < SMOKE_RUN_TEXTS.length - 1) {
+        await restartIntoNextRun(session);
+      }
+    }
+
+    await session.waitFor(
+      "post-clear calibration handoff appears on threshold run",
+      async () =>
+        await session.execute(`
+          var sec = document.getElementById("calibrationHandoffSection");
+          var continueBtn = document.getElementById("calibrationHandoffContinueBtn");
+          var viewPatternsBtn = document.getElementById("calibrationHandoffViewPatternsBtn");
+          return Boolean(
+            sec &&
+            !sec.classList.contains("hidden") &&
+            continueBtn &&
+            continueBtn.offsetParent !== null &&
+            viewPatternsBtn &&
+            viewPatternsBtn.offsetParent !== null
+          );
+        `),
+      { timeoutMs: 20000 }
+    );
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
 test("browser smoke: desktop Patterns closes on narrow breakpoint resize and returns to writing", async (t) => {
   await withSmokeSession(t, async (session) => {
     await session.setWindowRect({ height: 900, width: 1280, x: 0, y: 0 });

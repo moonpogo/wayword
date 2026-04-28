@@ -9,6 +9,7 @@ import {
   buildLowSignalMirrorPipelineResult,
   mirrorFeaturesAreLowSignal
 } from "./mirrorLowSignalGuard.js";
+import { applyThinRefusalExperiment } from "./mirrorExperiments.js";
 
 export function runMirrorPipeline(input: MirrorSessionInput): MirrorPipelineResult {
   const features = analyzeText(input);
@@ -18,8 +19,9 @@ export function runMirrorPipeline(input: MirrorSessionInput): MirrorPipelineResu
   const raw = buildReflectionCandidates(features, normalizeText(input.text));
   const ranked = rankReflections(raw);
   const deduped = dedupeReflections(ranked);
-  return selectFinalReflections(deduped, features.sessionId, {
+  const selected = selectFinalReflections(deduped, features.sessionId, {
     recentReflectionFamilyKeys: input.recentReflectionFamilyKeys,
     sentenceCountForFallback: features.sentenceCount
   });
+  return applyThinRefusalExperiment(input, selected);
 }

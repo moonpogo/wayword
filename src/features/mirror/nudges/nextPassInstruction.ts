@@ -16,31 +16,32 @@ import {
   MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
   MIRROR_HEADLINE_SHIFT_TURNS,
   isMirrorHesitationStandardNudgeStatement,
+  MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE,
+  MIRROR_HEADLINE_LOW_SIGNAL_SURFACE,
   normMirrorReflectionHeadline
 } from "../constants/mirrorSessionHeadlines.js";
+import { mirrorBonsaiHeadlinesActive } from "../constants/mirrorBonsaiLexicon.js";
 import type { MirrorPipelineResult, MirrorSelectedReflection } from "../types/mirrorTypes.js";
 
-const PROMPT_FAMILIES = new Set([
-  "Observation",
-  "Relation",
-  "Tension",
-  "Possibility",
-  "Constraint"
-]);
+const PROMPT_FAMILIES = new Set(["Scene", "Relation", "Pressure", "Constraint"]);
 
 /**
  * Restrained copy when the mirror cannot lean on strong surface text / cards.
- * Stays modest, and does not imply a prescribed follow-up run on the same prompt.
+ * Default surface string; with bonsai headlines active, runtime nudges prefer {@link MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE}.
  */
-export const MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK =
-  "With a little more language on the page, patterns get easier to notice.";
+export const MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK = MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
+
+function thinSignalLeadLine(): string {
+  return mirrorBonsaiHeadlinesActive()
+    ? MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE
+    : MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
+}
 
 /**
  * Default when load fails, stack is empty, or mapping yields no line.
- * Observation-shaped, not a “do this next” brief.
  */
 export const MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION =
-  "What stands out in the draft you just wrote?";
+  "What stands out on the page in this draft?";
 
 export type MirrorAttentionalNudgeOpts = {
   /** Prompt family label from the active ritual (keeps phrasing in the same world). */
@@ -101,81 +102,83 @@ function pickDriverReflection(result: MirrorPipelineResult): MirrorSelectedRefle
   return first ?? null;
 }
 
-const NUDGE_LOW_SIGNAL: readonly string[] = [
-  MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK,
-  "A fuller stretch of writing usually gives the mirror more to work with.",
-  "What becomes a little easier to see with a few more sentences on the page?",
-  "When the page has more on it, small echoes are easier to hear."
-];
+function nudgeLowSignalPool(): readonly string[] {
+  return [
+    thinSignalLeadLine(),
+    "Add more sentences; look again.",
+    "Stretch the passage; patterns need surface.",
+    "Stay in the draft longer before judging it."
+  ];
+}
 
 const NUDGE_GENERIC: readonly string[] = [
   MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION,
-  "Where does the thread invite another glance?",
-  "What detail keeps catching your attention?",
-  "What remains unattended in what you wrote?"
+  "What pulls focus on a second pass?",
+  "One detail still open at the close?",
+  "What reads unfinished at the end?"
 ];
 
-/** When the mirror is soft fallback but the draft has real length: honest, low-claim prompts. */
+/** When the mirror is soft fallback but the draft has real length: low-claim prompts. */
 const NUDGE_FALLBACK_AMBIGUOUS: readonly string[] = [
-  "What still feels open (not wrong, just unsettled) in what you wrote?",
-  "Where would you trust your own read more than a slick echo?",
-  "If the mirror stays this quiet, what one thread do you still want to follow?"
+  "What stays open in this draft?",
+  "Where does a direct reread read firmer than this line?",
+  "What thread still stops short of the next sentence?"
 ];
 
 const NUDGE_REPETITION: readonly string[] = [
-  "What shifts if the same pressure shows up somewhere else?",
-  "Where does the return feel different when you look again?",
-  "What happens if that insistence loosens without vanishing?",
-  "What opens if another word carries a slice of that weight?"
+  "Try the same pressure elsewhere on the page.",
+  "Watch the next return of that word.",
+  "Let repetition move, not thicken.",
+  "Trade weight to a plainer synonym once."
 ];
 
 const NUDGE_CADENCE_TIGHTENS: readonly string[] = [
-  "What if a later stretch lets the breath lengthen again?",
-  "Where could the motion redistribute after that late tightening?",
-  "What changes if one paragraph lets the line run a little longer?"
+  "Let one later stretch lengthen.",
+  "Where does tight late cadence redistribute?",
+  "Open the line once after compression."
 ];
 
 const NUDGE_CADENCE_LENGTHEN: readonly string[] = [
-  "What happens if a middle passage holds a shorter beat for a moment?",
-  "Where does a tighter line change the glide of what follows?",
-  "What shifts if length gathers earlier instead of at the edge?"
+  "Hold one middle beat short.",
+  "Where does early length change what follows?",
+  "Tighten one passage before the close."
 ];
 
 const NUDGE_CADENCE_ALTERNATION: readonly string[] = [
-  "What happens if one section holds a steadier stride?",
-  "Where does the alternation want a softer hand in what follows?",
-  "What remains if the swing between long and short quiets for a beat?"
+  "Hold one section to a steadier stride.",
+  "Let long and short trade without theatrics.",
+  "Quiet the swing between long and short once."
 ];
 
 const NUDGE_CADENCE_DEFAULT: readonly string[] = [
-  "Where would you redistribute the motion?",
-  "What changes if the pulse of the lines shifts mid-piece?",
-  "What shows up if you follow the cadence into a neighboring texture?"
+  "Redistribute length on a second pass.",
+  "Shift cadence mid-piece deliberately.",
+  "Follow the rhythm into an adjacent paragraph."
 ];
 
 const NUDGE_ABSTRACT_LEANS: readonly string[] = [
-  "What becomes touchable if the ideas rest in one place a little longer?",
-  "Where does a single image want to carry more of the thinking?",
-  "What surfaces if the abstractions lean toward one scene-stain?"
+  "Let one idea land in one image.",
+  "Park abstraction in a single concrete beat.",
+  "Hold one concept in one place."
 ];
 
 const NUDGE_CONCRETE_LEANS: readonly string[] = [
-  "Where does the idea begin to surface behind the detail?",
-  "What shifts if the objects fall away for a breath (not erased, just quieter)?",
-  "What remains if the scene quiets further and something else hums?"
+  "Let the idea surface behind the detail.",
+  "Pull back objects for one beat.",
+  "State the thought the scene implies."
 ];
 
 const NUDGE_ABSTRACTION_BALANCED: readonly string[] = [
-  "What interests you if idea and image keep trading places?",
-  "Where does one kind of attention want a little more room?",
-  "What would you watch for in the handoff between scene and thought?"
+  "Watch idea and image trade slots.",
+  "Give one attention type more room.",
+  "Note where scene and thought hand off."
 ];
 
 const NUDGE_HESITATION: readonly string[] = [
-  "What changes when the cushioning thins, without forcing a harder voice?",
-  "Where does a line want to stand without the immediate softener?",
-  "What clarity appears if the qualification arrives a beat later?",
-  "What shifts if you let one assertion stay unaccompanied for a line?"
+  "Thin the cushioning; keep the line plain.",
+  "Drop one softener.",
+  "Let one assertion stand alone one line.",
+  "Delay the qualifier one beat."
 ];
 
 /**
@@ -196,7 +199,7 @@ export function nextPassInstructionFromMirrorPipelineResult(
   }
 
   if (lowSignal) {
-    return pickLine(seedWithFamily(`${seed}|low-signal`, family), NUDGE_LOW_SIGNAL);
+    return pickLine(seedWithFamily(`${seed}|low-signal`, family), nudgeLowSignalPool());
   }
 
   const driver = pickDriverReflection(result);
@@ -208,7 +211,7 @@ export function nextPassInstructionFromMirrorPipelineResult(
   const n = normStatement(driver.statement);
 
   if (cat === "low_signal") {
-    return pickLine(seedWithFamily(`${seed}|mirror-low-signal`, family), NUDGE_LOW_SIGNAL);
+    return pickLine(seedWithFamily(`${seed}|mirror-low-signal`, family), nudgeLowSignalPool());
   }
 
   if (cat === "fallback" || isMirrorFallbackSoftStatement(driver.statement)) {

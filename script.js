@@ -1,5 +1,5 @@
-/** v1.1 prompt families (fixed set). See `docs/PROMPT_SYSTEM_V1_1.md`. */
-const PROMPT_FAMILIES_ORDER = ["Observation", "Relation", "Tension", "Possibility", "Constraint"];
+/** Mirror Keeper Redaction v1 — production families: Scene, Relation, Pressure, Constraint. Calibration is a separate mode (not in this order). */
+const PROMPT_FAMILIES_ORDER = ["Scene", "Relation", "Pressure", "Constraint"];
 
 /**
  * @typedef {{ id: string, text: string, nearDuplicateGroup: string, intensity: number, structure: string, active: boolean }} PromptEntryV11
@@ -7,58 +7,26 @@ const PROMPT_FAMILIES_ORDER = ["Observation", "Relation", "Tension", "Possibilit
 
 /** @type {Record<string, PromptEntryV11[]>} */
 const promptLibrary = {
-  Observation: [
+  Scene: [
     {
       id: "observation_kitchen_left",
-      text: "Describe a kitchen after everyone has left.",
+      text: "A kitchen after everyone left.",
       nearDuplicateGroup: "empty_after",
       intensity: 2,
       structure: "describe_scene",
       active: true
     },
     {
-      id: "observation_cheap_object_serious",
-      text: "Describe a cheap object with absolute seriousness.",
-      nearDuplicateGroup: "object_focus",
-      intensity: 2,
-      structure: "describe_scene",
-      active: true
-    },
-    {
-      id: "observation_corner_private_life",
-      text: "Describe a neighborhood corner as if it had a private life.",
-      nearDuplicateGroup: "place_animacy",
-      intensity: 2,
-      structure: "describe_scene",
-      active: true
-    },
-    {
-      id: "observation_bus_empty_full",
-      text: "Describe an empty bus as if it were full.",
-      nearDuplicateGroup: "empty_container",
-      intensity: 2,
-      structure: "describe_scene",
-      active: true
-    },
-    {
       id: "observation_room_residue",
-      text: "Describe a room using only what stays in it when you cannot name doors or windows.",
+      text: "A room read through residue—doors and windows unnamed.",
       nearDuplicateGroup: "room_rule",
       intensity: 2,
       structure: "describe_scene",
       active: true
     },
     {
-      id: "observation_rooftop_surface",
-      text: "Describe a rooftop at the hour the light goes thin: underfoot, rim, heat, not the postcard skyline.",
-      nearDuplicateGroup: "rooftop",
-      intensity: 2,
-      structure: "describe_scene",
-      active: true
-    },
-    {
       id: "observation_bench_witness",
-      text: "Describe a public park bench as if it were a witness.",
+      text: "A public bench scored where hands brace.",
       nearDuplicateGroup: "witness_object",
       intensity: 2,
       structure: "describe_scene",
@@ -66,7 +34,7 @@ const promptLibrary = {
     },
     {
       id: "observation_hallway_memory",
-      text: "Describe a hallway as if it remembers everyone who passed through it.",
+      text: "A hallway narrowed by footfall and closing doors.",
       nearDuplicateGroup: "corridor_memory",
       intensity: 2,
       structure: "describe_scene",
@@ -74,7 +42,7 @@ const promptLibrary = {
     },
     {
       id: "observation_waiting_room_plain",
-      text: "Describe a waiting room: light, vinyl, posture, and the clock, without turning the room into metaphor.",
+      text: "Waiting room: light, vinyl, posture, clock. No metaphor.",
       nearDuplicateGroup: "waiting_room",
       intensity: 2,
       structure: "describe_scene",
@@ -82,16 +50,32 @@ const promptLibrary = {
     },
     {
       id: "observation_cup_crack",
-      text: "Write about a cup with a crack in it. Do not use the word broken or any clear synonym for broken.",
+      text: "A cracked cup. Do not use broken or a clear synonym.",
       nearDuplicateGroup: "withhold_word",
       intensity: 2,
       structure: "describe_scene",
       active: true
     },
     {
-      id: "observation_stairwell_gravity",
-      text: "Describe a stairwell as if gravity there were personal.",
-      nearDuplicateGroup: "vertical_place",
+      id: "scene_room_after_departure",
+      text: "Write one room after departure.",
+      nearDuplicateGroup: "room_after_departure",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "scene_object_carries_decision",
+      text: "One object staged where a decision lands.",
+      nearDuplicateGroup: "object_decision",
+      intensity: 2,
+      structure: "describe_scene",
+      active: true
+    },
+    {
+      id: "scene_one_paragraph_place",
+      text: "One paragraph, one place, no explanation.",
+      nearDuplicateGroup: "one_place",
       intensity: 2,
       structure: "describe_scene",
       active: true
@@ -100,31 +84,15 @@ const promptLibrary = {
   Relation: [
     {
       id: "relation_kind_lie_known",
-      text: "Write a scene where someone lies kindly and the other person knows it.",
+      text: "Someone lies kindly; the other knows.",
       nearDuplicateGroup: "kind_deception",
       intensity: 3,
       structure: "scene_dialogue",
       active: true
     },
     {
-      id: "relation_conversation_unhappened",
-      text: "Write about a conversation that never quite happened.",
-      nearDuplicateGroup: "unsaid",
-      intensity: 2,
-      structure: "scene_dialogue",
-      active: true
-    },
-    {
-      id: "relation_kind_wrong_reason",
-      text: "Write a scene in which someone is kind for the wrong reason.",
-      nearDuplicateGroup: "wrong_kindness",
-      intensity: 3,
-      structure: "scene_dialogue",
-      active: true
-    },
-    {
       id: "relation_call_after_silence",
-      text: "Two people finish a call. Neither names what changed. Write only the silence after the line goes dead.",
+      text: "Two people end a call. Write the silence only.",
       nearDuplicateGroup: "call_gap",
       intensity: 3,
       structure: "interpersonal_gap",
@@ -132,7 +100,7 @@ const promptLibrary = {
     },
     {
       id: "relation_being_let_go",
-      text: "Write a scene where someone realizes they are already being let go, without accusation or summary.",
+      text: "Someone realizes they are already being let go—no accusation, no summary.",
       nearDuplicateGroup: "loss_edge",
       intensity: 3,
       structure: "scene_dialogue",
@@ -140,25 +108,17 @@ const promptLibrary = {
     },
     {
       id: "relation_unsent_surface",
-      text: "Someone writes a message they will not send. Show only the writing surface and the hand.",
+      text: "A message unsent. Only the surface and the hand.",
       nearDuplicateGroup: "unsent",
       intensity: 2,
       structure: "scene_dialogue",
       active: true
-    },
-    {
-      id: "relation_person_through_leavings",
-      text: "Write about a person through the things they leave behind.",
-      nearDuplicateGroup: "trace",
-      intensity: 2,
-      structure: "describe_scene",
-      active: true
     }
   ],
-  Tension: [
+  Pressure: [
     {
       id: "tension_confession_avoids_wrong",
-      text: "Write a confession that avoids the actual wrongdoing.",
+      text: "Write a confession that avoids the act.",
       nearDuplicateGroup: "withhold_act",
       intensity: 3,
       structure: "withhold_category",
@@ -166,7 +126,7 @@ const promptLibrary = {
     },
     {
       id: "tension_violence_in_tone",
-      text: "Write a small story where the only violence is in the tone.",
+      text: "The only violence is in the tone.",
       nearDuplicateGroup: "tone_violence",
       intensity: 3,
       structure: "scene_dialogue",
@@ -174,7 +134,7 @@ const promptLibrary = {
     },
     {
       id: "tension_envy_unadmitted",
-      text: "Write about envy without admitting it.",
+      text: "Envy without naming it.",
       nearDuplicateGroup: "withhold_emotion",
       intensity: 3,
       structure: "withhold_category",
@@ -182,49 +142,23 @@ const promptLibrary = {
     },
     {
       id: "tension_grief_physical_only",
-      text: "Describe grief using only physical details.",
+      text: "Show grief through motion only.",
       nearDuplicateGroup: "grief_body",
       intensity: 3,
       structure: "physical_channel",
       active: true
     },
     {
-      id: "tension_relief_too_late",
-      text: "Write about relief that arrives too late.",
-      nearDuplicateGroup: "aftermath",
-      intensity: 3,
-      structure: "fork_aftermath",
-      active: true
-    },
-    {
       id: "tension_forgiveness_movement",
-      text: "Write about forgiveness as movement through a house: doors, hands, small tasks, not a verdict on anyone.",
+      text: "Forgiveness as movement through a house—doors, hands, tasks. No verdict.",
       nearDuplicateGroup: "forgiveness",
       intensity: 2,
       structure: "physical_channel",
       active: true
     },
     {
-      id: "tension_care_as_upkeep",
-      text: "Write about care that looks like upkeep: what gets checked, tightened, or left quietly running.",
-      nearDuplicateGroup: "care_work",
-      intensity: 2,
-      structure: "describe_scene",
-      active: true
-    }
-  ],
-  Possibility: [
-    {
-      id: "possibility_day_almost",
-      text: "Write about a day that almost went differently. Only near misses. Do not use the phrase what if.",
-      nearDuplicateGroup: "near_miss",
-      intensity: 2,
-      structure: "fork_aftermath",
-      active: true
-    },
-    {
       id: "possibility_choice_in_space",
-      text: "Write about a decision that still takes up space in a room, something that keeps getting moved, avoided, or walked around.",
+      text: "A decision still in the room—moved, avoided, walked around.",
       nearDuplicateGroup: "unmade_choice",
       intensity: 2,
       structure: "describe_scene",
@@ -232,7 +166,7 @@ const promptLibrary = {
     },
     {
       id: "possibility_after_refusal",
-      text: "Write a scene that opens the moment after the better offer was refused.",
+      text: "An offer declined. Start one minute later.",
       nearDuplicateGroup: "refusal_after",
       intensity: 3,
       structure: "fork_aftermath",
@@ -242,7 +176,7 @@ const promptLibrary = {
   Constraint: [
     {
       id: "constraint_hunger_channels",
-      text: "Write about hunger using only smell, temperature, and motion. Never name food or eating.",
+      text: "Write hunger without naming food.",
       nearDuplicateGroup: "withhold_food",
       intensity: 2,
       structure: "withhold_category",
@@ -250,7 +184,7 @@ const promptLibrary = {
     },
     {
       id: "constraint_shame_posture",
-      text: "Write about shame using only posture and distance. No emotion words.",
+      text: "Write shame through distance and posture only.",
       nearDuplicateGroup: "withhold_emotion",
       intensity: 3,
       structure: "withhold_category",
@@ -258,16 +192,8 @@ const promptLibrary = {
     },
     {
       id: "constraint_body_channels",
-      text: "Write about a body using only weight, torque, and where the hands go. No anatomy labels.",
+      text: "Write the body through weight, torque, and hands.",
       nearDuplicateGroup: "body_channel",
-      intensity: 2,
-      structure: "physical_channel",
-      active: true
-    },
-    {
-      id: "constraint_meal_non_food",
-      text: "Write about a meal as weight, warmth, and silence between people, not what is on the plate.",
-      nearDuplicateGroup: "meal_non_food",
       intensity: 2,
       structure: "physical_channel",
       active: true
@@ -299,7 +225,7 @@ function ritualPickIndex(seed, modulus) {
 }
 
 const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
-  Observation: [
+  Scene: [
     "Keep this in one place.",
     "Stay with one moment.",
     "Use only what can be seen.",
@@ -308,20 +234,14 @@ const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
   Relation: [
     "Use only spoken lines.",
     "Two people. One exchange.",
-    "No summary of how they feel.",
+    "No naming of feeling—only what is said.",
     "Keep it to one room and one moment."
   ],
-  Tension: [
+  Pressure: [
     "Stop before it blows up.",
     "Keep one worry present. Don't solve it.",
     "Let someone almost say the hard thing.",
-    "Stop before anyone wins."
-  ],
-  Possibility: [
-    "Hold one fork in view.",
-    "Stay with the near-miss.",
-    "Keep the refusal felt, not explained.",
-    "One path not taken. Keep it concrete."
+    "Keep the near-miss concrete."
   ],
   Constraint: [
     "Don't name the feeling yet.",
@@ -351,7 +271,7 @@ const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
     "Let the sentences change length as you go."
   ],
   opening: [
-    "Let the first beat land before you widen the lens.",
+    "Let the first beat land before the lens widens.",
     "Hold the opening image one beat longer.",
     "Start with one clear motion, then widen.",
     "Keep the first paragraph to one room of attention."
@@ -359,12 +279,12 @@ const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
   shift: [
     "Let one turn stay sharp before the next move.",
     "After one pivot, stay with the new angle a while.",
-    "Hold the lane change long enough to feel it.",
+    "Hold the lane change long enough to read.",
     "One swerve, then commit to the new line."
   ],
   hesitation_qualification: [
     "Say it plainly.",
-    "Say it without maybe or kind of.",
+    "Say it without hedging.",
     "Open with one plain sentence.",
     "One straight fact. No cushion."
   ],
@@ -375,10 +295,10 @@ const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
     "Let the ending stay open."
   ],
   low_signal: [
-    "Write a few more sentences, then look again.",
-    "Add a little more on the page before the next run.",
-    "Give the next stretch a bit more room to land.",
-    "Let the next pass carry a little more language."
+    "Signal is thin. Add surface.",
+    "Write more sentences; look again.",
+    "Give the page more room.",
+    "Stay with the draft longer."
   ]
 });
 
@@ -388,10 +308,10 @@ const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
  */
 
 function buildRitualNudgeV1({ priorPromptFamily, hadMainReflection, mainCategory, seed }) {
-  const family = String(priorPromptFamily || "").trim() || "Observation";
+  const family = String(priorPromptFamily || "").trim() || "Scene";
   const s = seed != null ? String(seed) : "";
   if (!hadMainReflection) {
-    const pool = RITUAL_NO_MAIN_NUDGE_BY_FAMILY[family] || RITUAL_NO_MAIN_NUDGE_BY_FAMILY.Observation;
+    const pool = RITUAL_NO_MAIN_NUDGE_BY_FAMILY[family] || RITUAL_NO_MAIN_NUDGE_BY_FAMILY.Scene;
     const idx = ritualPickIndex(`${s}|no-main|${family}`, pool.length);
     return pool[idx];
   }
@@ -523,7 +443,7 @@ function getActivePromptNudgeLineForRender() {
   if (isCalibrationComposingMode()) {
     return getCalibrationProgressNudgeLine();
   }
-  const family = String(state.promptFamily || "").trim() || "Observation";
+  const family = String(state.promptFamily || "").trim() || "Scene";
   const seed =
     String(state.lastPromptKey || "").trim() ||
     String(state.prompt || "").trim() ||
@@ -1975,14 +1895,14 @@ function completedRuns() {
 
 const CALIBRATION_HANDOFF_ACK_STORAGE_KEY = "wayword-calibration-handoff-ack";
 
-const CALIBRATION_PROMPT_FAMILY = "Observation";
+const CALIBRATION_PROMPT_FAMILY = "Calibration";
 
-const CALIBRATION_PROMPT_RECENT_WINDOW = 8;
+const CALIBRATION_PROMPT_RECENT_WINDOW = 5;
 
 const CALIBRATION_PROMPT_ENTRIES = Object.freeze([
   {
-    id: "cal_notice_today",
-    text: "Write one sentence about something you noticed today.",
+    id: "cal_room_after",
+    text: "Write one room after departure.",
     nearDuplicateGroup: "cal",
     intensity: 1,
     structure: "calibration",
@@ -1990,7 +1910,7 @@ const CALIBRATION_PROMPT_ENTRIES = Object.freeze([
   },
   {
     id: "cal_small_object",
-    text: "Describe a small object near you without explaining why it matters.",
+    text: "Describe one small object near you. No explanation.",
     nearDuplicateGroup: "cal",
     intensity: 1,
     structure: "calibration",
@@ -1998,30 +1918,14 @@ const CALIBRATION_PROMPT_ENTRIES = Object.freeze([
   },
   {
     id: "cal_returning_thought",
-    text: "Write two sentences about a thought that keeps returning.",
+    text: "Write one thought; return to it in a new sentence.",
     nearDuplicateGroup: "cal",
     intensity: 1,
     structure: "calibration",
     active: true
   },
   {
-    id: "cal_ordinary_feel",
-    text: "Name something ordinary, then describe what it feels like.",
-    nearDuplicateGroup: "cal",
-    intensity: 1,
-    structure: "calibration",
-    active: true
-  },
-  {
-    id: "cal_i_keep_noticing",
-    text: "Write one sentence beginning: I keep noticing…",
-    nearDuplicateGroup: "cal",
-    intensity: 1,
-    structure: "calibration",
-    active: true
-  },
-  {
-    id: "cal_room_visible",
+    id: "cal_visible_room",
     text: "Describe the room you are in using only what can be seen.",
     nearDuplicateGroup: "cal",
     intensity: 1,
@@ -2029,16 +1933,8 @@ const CALIBRATION_PROMPT_ENTRIES = Object.freeze([
     active: true
   },
   {
-    id: "cal_almost_ignored",
-    text: "Write two sentences about something you almost ignored.",
-    nearDuplicateGroup: "cal",
-    intensity: 1,
-    structure: "calibration",
-    active: true
-  },
-  {
-    id: "cal_sensory_today",
-    text: "Describe a sound, texture, or small movement from today.",
+    id: "cal_almost_missed",
+    text: "One sentence: what you almost missed today.",
     nearDuplicateGroup: "cal",
     intensity: 1,
     structure: "calibration",
@@ -2127,8 +2023,8 @@ function hasProfileSignal() {
   return completedRuns() >= CALIBRATION_THRESHOLD;
 }
 
-/** WAYWORD_DEV_CALIBRATION_RESET — local/testing only; not for production UX. */
-function waywordDevResetCalibrationForTesting() {
+/** Canonical calibration reset (fresh local state, used by dev hook and Clear Saved Runs). */
+function resetCalibrationStateToFreshStart() {
   state.history = [];
   state.savedRunIds = new Set();
   state.calibrationPostRun = null;
@@ -2193,6 +2089,11 @@ function waywordDevResetCalibrationForTesting() {
   renderProfileSummaryStrip();
   renderProfile();
   queueViewportSync();
+}
+
+/** WAYWORD_DEV_CALIBRATION_RESET — local/testing convenience wrapper. */
+function waywordDevResetCalibrationForTesting() {
+  resetCalibrationStateToFreshStart();
 }
 
 function persist() {
@@ -4296,16 +4197,19 @@ function buildBaseline(entries) {
 }
 
 const CALIBRATION_OBS_REPETITION = [
-  "You repeat certain words.",
-  "One word appears often.",
-  "You return to the same word."
+  "Certain words recur.",
+  "One word returns across short spans.",
+  "The same word surfaces again."
 ];
 const CALIBRATION_OBS_OPENINGS = [
-  "You start lines the same way.",
-  "Your openings are similar.",
-  "You reuse the same start."
+  "Sentence openings repeat.",
+  "Opening phrases echo.",
+  "The same line start recurs."
 ];
-const CALIBRATION_OBS_FRAGMENTATION = ["Your lines are short.", "You break your thoughts up."];
+const CALIBRATION_OBS_FRAGMENTATION = [
+  "Lines run short.",
+  "Thought fragments across many short units."
+];
 const CALIBRATION_OBS_LONG = [
   "Average sentence length sits above your recent baseline.",
   "Sentences run longer than in your last few saved runs."
@@ -4352,9 +4256,9 @@ function selectCalibrationObservation(text, priorEntries, ensureBaselineCardNonE
     (rc >= 2 || (rc >= 1 && mr >= 4));
 
   if (repetitionApplies) {
-    if (rc === 1 && mr >= 5) return "One word appears often.";
-    if (rc >= 3 || mr >= 6) return "You repeat certain words.";
-    if (rc === 1) return "You return to the same word.";
+    if (rc === 1 && mr >= 5) return "One word returns across short spans.";
+    if (rc >= 3 || mr >= 6) return "Certain words recur.";
+    if (rc === 1) return "The same word surfaces again.";
     if (rc === 2) return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
     return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
   }
@@ -4458,7 +4362,12 @@ function collectRecentMirrorFamilyKeys(maxRuns) {
 
 function computeAndStoreMirrorPipelineResult(text, run) {
   const recentKeys = collectRecentMirrorFamilyKeys(4);
-  const out = window.waywordMirrorController.computeMirrorPipelineOutcome(text, run, recentKeys);
+  const out = window.waywordMirrorController.computeMirrorPipelineOutcome(
+    text,
+    run,
+    recentKeys,
+    completedRuns() < CALIBRATION_THRESHOLD
+  );
   state.lastMirrorPipelineResult = out.result;
   state.lastMirrorLoadFailed = out.loadFailed;
 }
@@ -4744,6 +4653,86 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
   });
 }
 
+function syncClearSavedRunsFooter() {
+  const footer = $("profilePatternsFooter");
+  if (!footer) return;
+  const show = completedRuns() > 0;
+  footer.classList.toggle("hidden", !show);
+  footer.setAttribute("aria-hidden", show ? "false" : "true");
+}
+
+function setClearSavedRunsConfirmModalOpen(open) {
+  const backdrop = $("clearSavedRunsBackdrop");
+  const panel = $("clearSavedRunsPanel");
+  if (!backdrop || !panel) return;
+  const isOpen = Boolean(open);
+  backdrop.classList.toggle("hidden", !isOpen);
+  backdrop.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+  document.body.classList.toggle("clear-saved-runs-confirm-open", isOpen);
+}
+
+function openClearSavedRunsConfirmModal() {
+  const n = completedRuns();
+  if (n === 0) return;
+  const title = $("clearSavedRunsTitle");
+  if (title) title.textContent = `Clear ${n} saved runs?`;
+  setClearSavedRunsConfirmModalOpen(true);
+  $("clearSavedRunsCancelBtn")?.focus();
+}
+
+function closeClearSavedRunsConfirmModal() {
+  setClearSavedRunsConfirmModalOpen(false);
+  const footer = $("profilePatternsFooter");
+  if (footer && !footer.classList.contains("hidden")) {
+    $("clearSavedRunsOpenBtn")?.focus();
+  }
+}
+
+function clearAllSavedRunsFromStorageAndState() {
+  if (completedRuns() === 0) return;
+  resetCalibrationStateToFreshStart();
+  const profileView = $("profileView");
+  const patternsNowAvailable = hasProfileSignal();
+  const patternsVisible = Boolean(profileView && !profileView.classList.contains("hidden"));
+  if (!patternsNowAvailable && patternsVisible) {
+    if (isMobileViewport()) {
+      settleNonFocusBaselineAfterPatternsClose();
+    } else if (profileView) {
+      profileView.classList.remove("profile-view--enter-from", "profile-view--recede");
+      profileView.classList.add("hidden");
+      window.waywordViewController.syncPatternsLayoutMode();
+      queueViewportSync();
+    }
+  }
+}
+
+function bindClearSavedRunsPatternsControlsOnce() {
+  if (document.documentElement.dataset.clearSavedRunsUiBound === "1") return;
+  document.documentElement.dataset.clearSavedRunsUiBound = "1";
+
+  $("clearSavedRunsOpenBtn")?.addEventListener("click", () => openClearSavedRunsConfirmModal());
+
+  $("clearSavedRunsCancelBtn")?.addEventListener("click", () => closeClearSavedRunsConfirmModal());
+
+  $("clearSavedRunsConfirmBtn")?.addEventListener("click", () => {
+    clearAllSavedRunsFromStorageAndState();
+    setClearSavedRunsConfirmModalOpen(false);
+  });
+
+  $("clearSavedRunsBackdrop")?.addEventListener("click", (e) => {
+    if (e.target === $("clearSavedRunsBackdrop")) closeClearSavedRunsConfirmModal();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const backdrop = $("clearSavedRunsBackdrop");
+    if (!backdrop || backdrop.classList.contains("hidden")) return;
+    e.preventDefault();
+    closeClearSavedRunsConfirmModal();
+  });
+}
+
 /**
  * Review Runs (drawer + rail) — invariants for `renderHistory`:
  * - Drawer (#recentDrawerList) and rail (#recentRailList) must stay in sync on row shape and per-run data.
@@ -4755,6 +4744,7 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
  * - Row data comes from the canonical run document repo via `readSavedRunsNewestFirst()` (newest first).
  */
 function renderHistory() {
+  try {
   const drawerList = $("recentDrawerList");
   const railList = $("recentRailList");
   const drawerFooter = $("recentDrawerFooter");
@@ -4848,6 +4838,9 @@ function renderHistory() {
     trigger.setAttribute("aria-disabled", "false");
   }
   syncRecentRailExpandedChrome();
+  } finally {
+    syncClearSavedRunsFooter();
+  }
 }
 
 function setRecentDrawerOpen(open, options = {}) {
@@ -4902,24 +4895,36 @@ function aggregateProfile() {
 }
 
 function renderProfileLocked() {
-  const runs = completedRuns();
-  const remaining = Math.max(0, CALIBRATION_THRESHOLD - runs);
+  try {
+    const runs = completedRuns();
+    const remaining = Math.max(0, CALIBRATION_THRESHOLD - runs);
 
-  const lockedHtml = window.waywordPatternsRenderer.buildProfileLockedPanelInnerHtml(remaining, runs);
+    const lockedHtml = window.waywordPatternsRenderer.buildProfileLockedPanelInnerHtml(remaining, runs);
 
-  ["patternsRepeatedChallengeRoot", "patternCallouts"].forEach((id) => {
-    const el = $(id);
-    if (el) el.innerHTML = lockedHtml;
-  });
+    /* Locked state belongs in hero copy only; repeated-words card is unlocked-only (same HTML in both caused duplicate blocks). */
+    const calloutsEl = $("patternCallouts");
+    if (calloutsEl) calloutsEl.innerHTML = lockedHtml;
 
-  if ($("profileHeroSummary")) {
-    const hero = $("profileHeroSummary");
-    if (runs) {
-      const agg = aggregateProfile();
-      hero.textContent = `Runs ${agg.totalRuns} · Words ${agg.totalWords}`;
-    } else {
-      hero.textContent = "";
+    const challengeRoot = $("patternsRepeatedChallengeRoot");
+    if (challengeRoot) challengeRoot.innerHTML = "";
+
+    const patternsUtilityWrap = document.querySelector("#profileView .profile-patterns-utility");
+    if (patternsUtilityWrap) {
+      patternsUtilityWrap.classList.add("hidden");
+      patternsUtilityWrap.setAttribute("aria-hidden", "true");
     }
+
+    if ($("profileHeroSummary")) {
+      const hero = $("profileHeroSummary");
+      if (runs) {
+        const agg = aggregateProfile();
+        hero.textContent = `Runs ${agg.totalRuns} · Words ${agg.totalWords}`;
+      } else {
+        hero.textContent = "";
+      }
+    }
+  } finally {
+    syncClearSavedRunsFooter();
   }
 }
 
@@ -4979,9 +4984,16 @@ function renderProfileSummaryStrip() {
 }
 
 function renderProfile() {
+  try {
   if (!hasProfileSignal()) {
     renderProfileLocked();
     return;
+  }
+
+  const patternsUtilityWrap = document.querySelector("#profileView .profile-patterns-utility");
+  if (patternsUtilityWrap) {
+    patternsUtilityWrap.classList.remove("hidden");
+    patternsUtilityWrap.setAttribute("aria-hidden", "false");
   }
 
   const agg = aggregateProfile();
@@ -5058,6 +5070,9 @@ function renderProfile() {
       $("patternCallouts").innerHTML =
         window.waywordPatternsRenderer.buildPatternCalloutsLegacySectionHtml(calloutsWithStarters);
     }
+  }
+  } finally {
+    syncClearSavedRunsFooter();
   }
 }
 
@@ -5709,6 +5724,7 @@ bindMetricExplainerDelegation("recentDrawerList");
 bindMetricExplainerDelegation("recentRailList");
 recentRunsUi.bindRecentRunsOpenCloseControls();
 recentRunsUi.bindRecentRunsExpandDismissUi();
+bindClearSavedRunsPatternsControlsOnce();
 
 queueViewportSync();
 schedulePostLayoutViewportReconcile();

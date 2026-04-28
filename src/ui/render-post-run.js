@@ -7,6 +7,34 @@
     return window.matchMedia("(max-width: 720px)").matches;
   }
 
+  function mirrorBonsaiHeadlinesProbe() {
+    try {
+      if (globalThis.__WAYWORD_MIRROR_BONSAI_HEADLINES__) return true;
+      if (typeof localStorage !== "undefined" && localStorage.getItem("wayword-mirror-bonsai-headlines") === "1") {
+        return true;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return false;
+  }
+
+  function experimentalTheCutProbe() {
+    try {
+      if (globalThis.__WAYWORD_EXPERIMENTAL_THE_CUT__) return true;
+      if (typeof localStorage !== "undefined" && localStorage.getItem("wayword-experimental-the-cut") === "1") {
+        return true;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return false;
+  }
+
+  function lowSignalThinMirrorLine() {
+    return mirrorBonsaiHeadlinesProbe() ? "Signal is thin. Continue." : "Signal is thin. Add surface.";
+  }
+
   function escapeHtml(str) {
     return String(str || "")
       .replace(/&/g, "&amp;")
@@ -26,13 +54,18 @@
     return false;
   }
 
-  var LOW_SIGNAL_REFLECTION_BODY_HTML =
-    '<div class="mirror-reflection-eyebrow">Reflection</div>' +
-    '<p class="mirror-empty mirror-empty--low-signal">Not enough language yet to notice a pattern.</p>';
+  function lowSignalReflectionBodyHtml() {
+    return (
+      '<div class="mirror-reflection-eyebrow">Reflection</div>' +
+      '<p class="mirror-empty mirror-empty--low-signal">' +
+      escapeHtml(lowSignalThinMirrorLine()) +
+      "</p>"
+    );
+  }
 
   var CALIBRATION_MICRO_REFLECTION_BODY_HTML =
     '<div class="mirror-reflection-eyebrow">Reflection</div>' +
-    '<p class="mirror-empty mirror-empty--low-signal">Brief baseline drafts are enough here; fuller patterns show up once you are past a single thought.</p>';
+    '<p class="mirror-empty mirror-empty--low-signal">Baseline stays short here; fuller signal comes after more language.</p>';
 
   function mirrorPostRunHasSubstantiveMain(result) {
     const r = result;
@@ -138,7 +171,7 @@
     if (useLowSignalReflection && v1Body) {
       v1Body = input.calibrationSubmitShortMirror
         ? CALIBRATION_MICRO_REFLECTION_BODY_HTML
-        : LOW_SIGNAL_REFLECTION_BODY_HTML;
+        : lowSignalReflectionBodyHtml();
     }
 
     let nextPassHtml = "";
@@ -147,7 +180,7 @@
       const fallbackLine =
         mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
           ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
-          : "What stands out in the draft you just wrote?";
+          : "What stands out on the page in this draft?";
       const submissionWordCount =
         mirror && typeof mirror.tokenizeText === "function"
           ? mirror.tokenizeText(String(textForSignal || "")).length
@@ -170,6 +203,13 @@
           : fallbackLine;
       const esc = escapeHtml(String(line || "").trim() || fallbackLine);
       nextPassHtml = `<button type="button" class="mirror-next-pass-nudge" data-mirror-next-pass="1" aria-label="Begin a new writing run">${esc}</button>`;
+      if (experimentalTheCutProbe()) {
+        nextPassHtml +=
+          '<p class="mirror-the-cut-hint" data-the-cut-hint="1">' +
+          '<span class="mirror-the-cut-copy">Remove one sentence. Keep the stronger piece.</span> ' +
+          '<button type="button" class="mirror-the-cut-skip linkish" data-the-cut-skip="1">Skip</button>' +
+          "</p>";
+      }
     }
 
     return { v1Body, recentBody, nextPassHtml };

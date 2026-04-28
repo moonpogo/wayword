@@ -44,7 +44,7 @@ export function detectConsistencyVariationCandidates(
         id: "pattern_consistency_vs_variation:sentence_length_tight",
         dedupeKey: "consistency:sentence_length_band",
         rankScore: Math.round(200 - span * 40) + cadMeans.length * 5,
-        statement: "Sentence length settles into a steady band across saved runs with enough lines to compare.",
+        statement: "Sentence length holds a narrow band across qualifying drafts.",
         evidence: [
           {
             text: `Across ${cadMeans.length} saved drafts with enough sentences to read shape, averages stayed between ${mm.min.toFixed(
@@ -59,7 +59,7 @@ export function detectConsistencyVariationCandidates(
         id: "pattern_consistency_vs_variation:sentence_length_wide",
         dedupeKey: "variation:sentence_length_band",
         rankScore: Math.round(span * 25) + cadMeans.length * 4,
-        statement: "Sentence length swings more widely across saved runs with enough lines to compare.",
+        statement: "Sentence length swings wide across qualifying drafts.",
         evidence: [
           {
             text: `Across ${cadMeans.length} saved drafts with enough sentences to read shape, averages ranged from ${mm.min.toFixed(
@@ -82,7 +82,7 @@ export function detectConsistencyVariationCandidates(
         id: "pattern_consistency_vs_variation:abstraction_ratio_tight",
         dedupeKey: "consistency:abstraction_ratio_std",
         rankScore: Math.round(160 - std * 500) + ratios.length * 6,
-        statement: "Abstract and concrete wording settle into a similar mix run after run.",
+        statement: "Abstract and concrete stay in a tight mix run to run.",
         evidence: [
           {
             text: `Across ${ratios.length} saved drafts with enough material on both sides to compare, that mix stayed tight from run to run.`
@@ -95,7 +95,7 @@ export function detectConsistencyVariationCandidates(
         id: "pattern_consistency_vs_variation:abstraction_ratio_loose",
         dedupeKey: "variation:abstraction_ratio_std",
         rankScore: Math.round(std * 420) + ratios.length * 5,
-        statement: "The balance between abstraction and detail shifts across runs.",
+        statement: "The ideas-to-detail balance shifts across runs.",
         evidence: [
           {
             text: `Across ${ratios.length} saved drafts with enough material on both sides to compare, that balance still moved meaningfully from run to run.`

@@ -10,7 +10,7 @@ export function normMirrorReflectionHeadline(s: string): string {
 }
 
 /** Substring shared by all named-repetition headlines; rank/specificity match on this fragment. */
-export const MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times on the page";
+export const MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns.";
 
 /**
  * When no category clears selection floors: one soft, observational line (not diagnostic).
@@ -21,14 +21,14 @@ export const MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times
  * measured cadence read when nothing qualified.
  */
 export const MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS = [
-  "It stays on one line the whole way through.",
-  "One sentence carries the whole span here."
+  "One sentence holds the span.",
+  "Still a single line."
 ] as const;
 
 export const MIRROR_HEADLINE_FALLBACK_SOFT_MULTI_SENTENCE_VARIANTS = [
-  "No single pattern reads clearly enough to name here yet.",
-  "Nothing here grabs the mirror as one decisive habit yet.",
-  "The piece doesn't narrow to one obvious angle yet."
+  "No pattern resolves yet.",
+  "Still flat on the meter.",
+  "Nothing dominant enough to name."
 ] as const;
 
 /** Retired cadence-shaped fallbacks — still recognized for `isMirrorFallbackSoftStatement`. */
@@ -49,7 +49,7 @@ export const MIRROR_HEADLINE_FALLBACK_SOFT_VARIANTS = [
 /** Back-compat alias; prefer `pickMirrorFallbackSoftStatement` at selection time. */
 export const MIRROR_HEADLINE_FALLBACK_SOFT = MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS[0];
 
-function hashSessionSalt(sessionId: string, salt: string): number {
+export function hashSessionSalt(sessionId: string, salt: string): number {
   const s = `${sessionId}|${salt}`;
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i += 1) {
@@ -84,34 +84,42 @@ export function isMirrorFallbackSoftStatement(statement: string): boolean {
   return FALLBACK_SOFT_NORM_SET.has(normMirrorReflectionHeadline(statement));
 }
 
-/** Very short / thin-structure submissions: plain capacity line (not an error, not poetic). */
-export const MIRROR_HEADLINE_LOW_SIGNAL = "Not enough here to notice a pattern yet.";
+/** Very short / thin-structure submissions (standard). */
+export const MIRROR_HEADLINE_LOW_SIGNAL_SURFACE = "Signal is thin. Add surface.";
+
+/** Monastic / bonsai headline experiment: low-signal line (reversible via `mirrorBonsaiHeadlinesActive`). */
+export const MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE = "Signal is thin. Continue.";
+
+/** Default export name kept for bundles expecting `MIRROR_HEADLINE_LOW_SIGNAL`. */
+export const MIRROR_HEADLINE_LOW_SIGNAL = MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
+
+/** Unified monastic hesitation headline when bonsai mode is on. */
+export const MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC = "Assertion bends.";
+
+/** Optional supporting pressure line (repetition-adjacent, rare). */
+export const MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE = "A single word is doing too much work.";
 
 export function mirrorHeadlineRepetitionNamed(word: string): string {
-  return `\u201c${word}\u201d ${MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER}.`;
+  return `\u201c${word}\u201d returns.`;
 }
 
 /** Cadence */
-export const MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS = "The ending tightens noticeably.";
-export const MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN = "Lines lengthen near the end.";
+export const MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS = "The ending compresses.";
+export const MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN = "The ending opens.";
 export const MIRROR_HEADLINE_CADENCE_ALTERNATION = "Short and long lines trade places.";
 
 /** Opening (first-quarter sentence length vs rest; mutually gated vs strong cadence cards). */
-export const MIRROR_HEADLINE_OPENING_DIRECT = "It opens directly.";
-export const MIRROR_HEADLINE_OPENING_MOMENT =
-  "The opening takes a moment before anything lands.";
-export const MIRROR_HEADLINE_OPENING_LOOSE = "It starts loose before settling.";
+export const MIRROR_HEADLINE_OPENING_DIRECT = "The first move lands immediately.";
+export const MIRROR_HEADLINE_OPENING_MOMENT = "The first move delays impact.";
+export const MIRROR_HEADLINE_OPENING_LOOSE = "The opening widens before it commits.";
 
 /** Shift (half-session lean flagged, below abstraction movement headline bars). */
-export const MIRROR_HEADLINE_SHIFT_TURNS = "It turns partway through.";
-export const MIRROR_HEADLINE_SHIFT_HOLDS = "The direction shifts once, then holds.";
-export const MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER = "It starts one way, then leans another.";
+export const MIRROR_HEADLINE_SHIFT_TURNS = "The piece pivots once, then stabilizes.";
+export const MIRROR_HEADLINE_SHIFT_HOLDS = "The piece pivots once, then stabilizes.";
+export const MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER = "The piece pivots once, then stabilizes.";
 
 /** Abstraction / concrete */
-export const MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS = [
-  "Ideas and concrete detail stay in balance.",
-  "Abstract language and concrete detail hold about the same weight."
-] as const;
+export const MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS = ["Ideas and scene hold balance."] as const;
 
 export const MIRROR_HEADLINE_ABSTRACTION_BALANCE = MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS[0];
 
@@ -130,8 +138,8 @@ export function isMirrorAbstractionBalanceStatement(statement: string): boolean 
 }
 
 export const MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS = [
-  "Both idea-words and image-words appear frequently.",
-  "Idea language and image language both show up often."
+  "Ideas and scene both keep surfacing.",
+  "Idea language and image language both recur."
 ] as const;
 
 export const MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS[0];
@@ -154,14 +162,14 @@ export function isMirrorAbstractionBothFrequentStatement(statement: string): boo
 export const MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL =
   "The back half leans more conceptual than scene-based.";
 export const MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER = "Concrete detail carries more of the later passages.";
-export const MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "It leans more on ideas than on what can be seen.";
-export const MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Concrete detail carries more than the ideas here.";
+export const MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "Ideas outweigh scene.";
+export const MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Scene outweighs ideas.";
 
 /** Hesitation / qualification — qualified-after family (session-picked for copy variety). */
 export const MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS = [
-  "A statement appears, then softens right after.",
-  "Something is stated, then almost immediately hedged.",
-  "The sentence makes its move, then tempers the landing."
+  "Stated; then softened in the same breath.",
+  "Claim, then pullback.",
+  "Statement; immediate qualifier."
 ] as const;
 
 export const MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER =
@@ -185,13 +193,13 @@ export function isMirrorHesitationQualifiedAfterStatement(statement: string): bo
   return HESITATION_QUALIFIED_AFTER_NORM_SET.has(normMirrorReflectionHeadline(statement));
 }
 
-export const MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertions are often followed by softening.";
+export const MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertion is followed by softening.";
 
 /** General / revised-softening family (session-picked). */
 export const MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS = [
-  "Statements are often revised or softened.",
-  "What lands on the page keeps revising its own emphasis.",
-  "The voice circles back to adjust what it just said."
+  "The line revises itself before landing.",
+  "Emphasis shifts mid-sentence.",
+  "The sentence adjusts its own force."
 ] as const;
 
 export const MIRROR_HEADLINE_HESITATION_REVISED = MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS[0];
@@ -217,7 +225,8 @@ export function isMirrorHesitationStandardNudgeStatement(statement: string): boo
   return (
     HESITATION_QUALIFIED_AFTER_NORM_SET.has(n) ||
     HESITATION_REVISED_FAMILY_NORM_SET.has(n) ||
-    n === normMirrorReflectionHeadline(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)
+    n === normMirrorReflectionHeadline(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) ||
+    n === normMirrorReflectionHeadline(MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC)
   );
 }
 

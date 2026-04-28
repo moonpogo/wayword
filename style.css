@@ -1171,6 +1171,30 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
   display:none;
 }
 
+.mirror-the-cut-hint{
+  margin:0.4rem 0 0;
+  font-size:0.78rem;
+  line-height:1.35;
+  color:var(--muted);
+  font-style:normal;
+  font-weight:400;
+}
+.mirror-the-cut-skip{
+  display:inline;
+  margin:0;
+  padding:0;
+  background:none;
+  border:none;
+  color:var(--muted);
+  font:inherit;
+  text-decoration:underline;
+  text-underline-offset:0.12em;
+  cursor:pointer;
+}
+.mirror-the-cut-skip:hover{
+  color:var(--ink);
+}
+
 .prompt-reroll-btn{
   width:40px;
   height:40px;
@@ -4089,6 +4113,193 @@ body.recent-drawer-open{
   gap:16px;
 }
 
+.profile-patterns-footer{
+  margin-top:8px;
+  padding-top:16px;
+  border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  display:flex;
+  justify-content:center;
+}
+
+.profile-patterns-footer__action{
+  border:none;
+  background:none;
+  padding:6px 8px;
+  margin:0;
+  font:inherit;
+  font-size:11px;
+  line-height:1.35;
+  letter-spacing:0.03em;
+  color:color-mix(in srgb, var(--muted) 88%, transparent);
+  cursor:pointer;
+  text-decoration:underline;
+  text-underline-offset:3px;
+  opacity:0.68;
+}
+
+.profile-patterns-footer__action:hover{
+  opacity:0.92;
+  color:var(--muted);
+}
+
+/* Clear Saved Runs: faint full-viewport scrim + sheet floated slightly above center (scoped to #clearSavedRunsBackdrop) */
+#clearSavedRunsBackdrop.editor-options-backdrop,
+#clearSavedRunsBackdrop.dim-layer{
+  background:rgba(18, 16, 12, 0.055);
+}
+
+html[data-theme="dark"] #clearSavedRunsBackdrop.editor-options-backdrop,
+html[data-theme="dark"] #clearSavedRunsBackdrop.dim-layer{
+  background:rgba(4, 3, 2, 0.22);
+}
+
+.clear-saved-runs-modal.settings-modal{
+  width:min(100%, 356px);
+  max-height:none;
+  gap:8px;
+  padding:12px 14px 11px;
+  border-radius:18px;
+  border-color:color-mix(in srgb, var(--line) 42%, transparent);
+  box-shadow:
+    0 8px 28px rgba(18, 14, 10, 0.07),
+    0 1px 3px rgba(18, 14, 10, 0.04);
+}
+
+html[data-theme="dark"] .clear-saved-runs-modal.settings-modal{
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.22),
+    0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Float sheet upward vs default centered overlay so it reads as modal layer, not inline card */
+.editor-options-backdrop:not(.hidden) .clear-saved-runs-modal.settings-modal{
+  transform:translateY(calc(-18px - 3vmin)) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce){
+  .editor-options-backdrop:not(.hidden) .clear-saved-runs-modal.settings-modal{
+    transform:translateY(-14px) scale(1);
+  }
+}
+
+.clear-saved-runs-modal__title{
+  margin:0;
+  font-size:15px;
+  font-weight:500;
+  line-height:1.38;
+  letter-spacing:-0.01em;
+}
+
+.clear-saved-runs-modal__support{
+  margin:0;
+  margin-top:-2px;
+  font-size:13px;
+  line-height:1.4;
+  color:var(--muted);
+}
+
+.clear-saved-runs-modal__actions{
+  display:flex;
+  width:100%;
+  box-sizing:border-box;
+  gap:10px;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top:6px;
+  padding-top:9px;
+  border-top:1px solid color-mix(in srgb, var(--line) 28%, transparent);
+}
+
+.clear-saved-runs-modal__btn{
+  appearance:none;
+  border-radius:999px;
+  padding:7px 13px;
+  font:inherit;
+  font-size:13px;
+  font-weight:500;
+  cursor:pointer;
+}
+
+.clear-saved-runs-modal__btn--cancel{
+  border:1px solid transparent;
+  background:transparent;
+  color:color-mix(in srgb, var(--muted) 94%, var(--text));
+  font-weight:400;
+  padding-inline:10px;
+  flex-shrink:0;
+}
+
+.clear-saved-runs-modal__btn--cancel:hover{
+  color:var(--muted);
+  background:rgba(0, 0, 0, 0.035);
+}
+
+html[data-theme="dark"] .clear-saved-runs-modal__btn--cancel:hover{
+  background:rgba(255, 255, 255, 0.045);
+}
+
+.clear-saved-runs-modal__btn--danger{
+  border:1px solid rgba(110, 52, 52, 0.22);
+  background:rgba(130, 52, 52, 0.055);
+  color:color-mix(in srgb, #6b2323 82%, var(--text));
+  font-weight:500;
+  flex-shrink:0;
+}
+
+html[data-theme="dark"] .clear-saved-runs-modal__btn--danger{
+  border-color:rgba(215, 170, 170, 0.2);
+  background:rgba(220, 140, 140, 0.065);
+  color:color-mix(in srgb, #e8c8c8 88%, var(--text));
+}
+
+.clear-saved-runs-modal__btn--danger:hover{
+  filter:brightness(0.985);
+}
+
+@media (max-width:980px){
+  .clear-saved-runs-modal.settings-modal{
+    width:min(100%, 304px);
+    padding:11px 12px 10px;
+    gap:7px;
+  }
+
+  .clear-saved-runs-modal__title{
+    font-size:14.5px;
+  }
+
+  .clear-saved-runs-modal__support{
+    font-size:12.5px;
+  }
+
+  .clear-saved-runs-modal__actions{
+    margin-top:5px;
+    padding-top:8px;
+  }
+}
+
+@media (max-width:480px){
+  .clear-saved-runs-modal.settings-modal{
+    width:min(calc(100vw - 28px), 288px);
+    padding:10px 11px 9px;
+    gap:6px;
+  }
+
+  .clear-saved-runs-modal__actions{
+    padding-top:7px;
+  }
+}
+
+body.clear-saved-runs-confirm-open{
+  overflow:hidden;
+  overscroll-behavior:none;
+  touch-action:none;
+}
+
+body.clear-saved-runs-confirm-open .clear-saved-runs-modal{
+  touch-action:auto;
+}
+
 #profileView:not(.hidden){
   transition:opacity var(--motion-duration-panel) var(--motion-ease-out),
     transform var(--motion-duration-panel) var(--motion-ease-out);
@@ -4474,7 +4685,8 @@ html[data-theme="dark"] .dim-layer{
   transition:opacity 0.34s ease-out, transform 0.34s ease-out;
 }
 
-.editor-options-backdrop:not(.hidden) .editor-options-panel{
+.editor-options-backdrop:not(.hidden) .editor-options-panel,
+.editor-options-backdrop:not(.hidden) .settings-modal{
   opacity:1;
   transform:translateY(0) scale(1);
 }

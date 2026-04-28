@@ -2,7 +2,11 @@ import {
   MIRROR_LOW_SIGNAL_MAX_WORDS_EXCLUSIVE,
   MIRROR_LOW_SIGNAL_STRUCTURE_MIN_WORDS
 } from "../constants/generationThresholds.js";
-import { MIRROR_HEADLINE_LOW_SIGNAL } from "../constants/mirrorSessionHeadlines.js";
+import { mirrorBonsaiHeadlinesActive } from "../constants/mirrorBonsaiLexicon.js";
+import {
+  MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE,
+  MIRROR_HEADLINE_LOW_SIGNAL_SURFACE
+} from "../constants/mirrorSessionHeadlines.js";
 import type { MirrorFeatures, MirrorPipelineResult, MirrorSelectedReflection } from "../types/mirrorTypes.js";
 
 /**
@@ -18,10 +22,13 @@ export function mirrorFeaturesAreLowSignal(features: MirrorFeatures): boolean {
 }
 
 export function buildLowSignalMirrorPipelineResult(sessionId: string): MirrorPipelineResult {
+  const line = mirrorBonsaiHeadlinesActive()
+    ? MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE
+    : MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
   const main: MirrorSelectedReflection = {
     id: `low_signal:${sessionId}`,
     category: "low_signal",
-    statement: MIRROR_HEADLINE_LOW_SIGNAL,
+    statement: line,
     evidence: [],
     role: "main",
     rankScore: 0

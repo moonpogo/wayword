@@ -79,7 +79,7 @@ test("mirror pipeline low-signal guard handles fragment input", () => {
   const result = runMirrorPipeline({ text: "Tired.", sessionId: "WEAK-03" });
   assert.ok(result.main);
   assert.equal(result.main.category, "low_signal");
-  assert.equal(result.main.statement, "Not enough here to notice a pattern yet.");
+  assert.equal(result.main.statement, "Signal is thin. Add surface.");
   assert.deepEqual(result.supporting, []);
 });
 

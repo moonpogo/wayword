@@ -20,6 +20,10 @@ import {
   MIRROR_HEADLINE_SHIFT_TURNS,
   MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS,
   MIRROR_HEADLINE_LOW_SIGNAL,
+  MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE,
+  MIRROR_HEADLINE_LOW_SIGNAL_SURFACE,
+  MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE,
+  MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC,
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
   isMirrorHesitationQualifiedAfterStatement,
   isMirrorHesitationRevisedFamilyStatement,
@@ -41,11 +45,18 @@ function norm(s: string): string {
 export function mirrorStatementSpecificity(statement: string): number {
   const n = norm(statement);
   if (isMirrorFallbackSoftStatement(statement)) return 5;
-  if (n === norm(MIRROR_HEADLINE_LOW_SIGNAL)) return 6;
+  if (
+    n === norm(MIRROR_HEADLINE_LOW_SIGNAL) ||
+    n === norm(MIRROR_HEADLINE_LOW_SIGNAL_SURFACE) ||
+    n === norm(MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE)
+  ) {
+    return 6;
+  }
   if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
 
   // Named recurrence should beat most non-directional observations.
   if (n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) return 100;
+  if (n === norm(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE)) return 62;
 
   // Directional abstraction movement should lead when present.
   if (
@@ -85,6 +96,7 @@ export function mirrorStatementSpecificity(statement: string): number {
   }
 
   if (isMirrorHesitationQualifiedAfterStatement(statement)) return 58;
+  if (n === norm(MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC)) return 57;
   if (n === norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)) return 56;
   if (isMirrorHesitationRevisedFamilyStatement(statement)) return 40;
 

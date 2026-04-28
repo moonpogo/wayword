@@ -5,7 +5,7 @@
     var fallbackLine =
       mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
         ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
-        : "What stands out in the draft you just wrote?";
+        : "What stands out on the page in this draft?";
     var nudgeLowSig =
       typeof window.waywordPostRunRenderer?.computeMirrorAttentionalNudgeLowSignal === "function"
         ? window.waywordPostRunRenderer.computeMirrorAttentionalNudgeLowSignal(

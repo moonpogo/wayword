@@ -88,7 +88,7 @@ function tryLexicalCandidate(aggregate: MirrorRecentDigestsAggregate): MirrorRec
   const best = gated[0];
   const n = aggregate.qualifyingSessionCount;
   const rankScore = 42 + best.distinctSessionCount * 14 + Math.min(18, best.totalTopListCount);
-  const statement = `“${best.word}” recurs across recent drafts.`;
+  const statement = `\u201c${best.word}\u201d recurs across drafts.`;
   return {
     id: `recent_lexical_anchor:${best.word}`,
     category: "recent_lexical_anchor",
@@ -112,7 +112,7 @@ function tryAbstractionCandidate(aggregate: MirrorRecentDigestsAggregate): Mirro
   const ratios = sessions.map((s) => s.abstractConcreteRatio);
   const meanRatio = ratios.reduce((a, b) => a + b, 0) / Math.max(ratios.length, 1);
   const rankScore = 48 + ideaLean * 11 + Math.min(14, meanRatio * 4);
-  const statement = "Across recent drafts, language leans toward ideas over scenes.";
+  const statement = "Language leans toward ideas over scenes.";
   return {
     id: "recent_abstraction_lean:aggregate",
     category: "recent_abstraction_lean",
@@ -131,7 +131,7 @@ function tryHesitationCandidate(aggregate: MirrorRecentDigestsAggregate): Mirror
   if (qualPattern < MIN_SESSIONS_FOR_CROSS_SESSION_PATTERN) return null;
 
   const rankScore = 46 + qualPattern * 10;
-  const statement = "Across recent drafts, statements are often qualified just after they appear.";
+  const statement = "Qualifiers follow assertions across recent drafts.";
   return {
     id: "recent_hesitation_qualification:aggregate",
     category: "recent_hesitation_qualification",

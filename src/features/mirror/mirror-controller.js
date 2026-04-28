@@ -1,4 +1,20 @@
 (function () {
+  try {
+    if (typeof localStorage !== "undefined") {
+      if (localStorage.getItem("wayword-mirror-bonsai-headlines") === "1") {
+        globalThis.__WAYWORD_MIRROR_BONSAI_HEADLINES__ = true;
+      }
+      if (localStorage.getItem("wayword-mirror-refusal-experiment") === "1") {
+        globalThis.__WAYWORD_MIRROR_REFUSAL_EXPERIMENT__ = true;
+      }
+      if (localStorage.getItem("wayword-experimental-the-cut") === "1") {
+        globalThis.__WAYWORD_EXPERIMENTAL_THE_CUT__ = true;
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
   function mirrorPipelineAvailable() {
     return Boolean(
       typeof globalThis !== "undefined" &&
@@ -45,7 +61,7 @@
       return globalThis.WaywordMirror.buildMirrorSessionDigest(input);
     },
 
-    computeMirrorPipelineOutcome(text, run, recentReflectionFamilyKeys) {
+    computeMirrorPipelineOutcome(text, run, recentReflectionFamilyKeys, calibrationIncomplete) {
       if (!mirrorPipelineAvailable()) {
         return { result: null, loadFailed: true };
       }
@@ -58,6 +74,9 @@
         };
         if (Array.isArray(recentReflectionFamilyKeys) && recentReflectionFamilyKeys.length) {
           payload.recentReflectionFamilyKeys = recentReflectionFamilyKeys;
+        }
+        if (calibrationIncomplete === true) {
+          payload.calibrationIncomplete = true;
         }
         const result = globalThis.WaywordMirror.runMirrorPipeline(payload);
         return { result, loadFailed: false };

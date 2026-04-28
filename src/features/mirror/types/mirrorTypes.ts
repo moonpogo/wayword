@@ -15,6 +15,10 @@ export interface MirrorSessionInput {
   startedAt?: number;
   endedAt?: number;
   /**
+   * When true, user has not finished calibration runs — disables thin-refusal experiment only.
+   */
+  calibrationIncomplete?: boolean;
+  /**
    * Main-line reflection family keys from prior completed runs, most recent first.
    * Used to down-rank near-duplicate “families” across the review loop.
    */
@@ -170,7 +174,8 @@ export interface MirrorPipelineResult {
   main: MirrorSelectedReflection | null;
   /**
    * Optional secondary lines only when `MirrorReflectionCandidate.supportsPrimary` is set on the
-   * candidate; each must meet the support floor and use a distinct category from `main`.
+   * candidate; each must meet the support floor. Usually a distinct category from `main`;
+   * bonsai mode may attach a rare second `repetition` pressure line when the primary is named repetition.
    */
   supporting: MirrorSelectedReflection[];
 }

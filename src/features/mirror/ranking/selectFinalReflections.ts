@@ -8,6 +8,7 @@ import {
   MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS,
   MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE,
   MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER,
+  MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE,
   isMirrorAbstractionBalanceStatement,
   isMirrorAbstractionBothFrequentStatement,
   normMirrorReflectionHeadline,
@@ -177,7 +178,17 @@ export function selectFinalReflections(
   for (const c of ordered) {
     if (supporting.length >= MIRROR_SELECTION_MAX_SUPPORTING) break;
     if (c === chosen) continue;
-    if (used.has(c.category)) continue;
+    if (used.has(c.category)) {
+      const dupOk =
+        chosen.category === "repetition" &&
+        c.category === "repetition" &&
+        c.supportsPrimary &&
+        ((norm(c.statement) === norm(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE) &&
+          chosen.statement.includes("\u201c")) ||
+          (norm(chosen.statement) === norm(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE) &&
+            c.statement.includes("\u201c")));
+      if (!dupOk) continue;
+    }
     if (!c.supportsPrimary) continue;
     if (c.rankScore < MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT) continue;
     supporting.push(asSelected(c, "support"));

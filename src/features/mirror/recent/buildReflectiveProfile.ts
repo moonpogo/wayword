@@ -32,7 +32,7 @@ function clauseFor(pattern: MirrorRecentTrend): string | null {
     case "recent_abstraction_lean":
       return "Language leans toward ideas over scenes";
     case "recent_hesitation_qualification":
-      return "Statements are often qualified just after they’re made";
+      return "Qualifiers follow assertions";
     case "pattern_recurring_signal":
     case "pattern_shift_over_time":
     case "pattern_consistency_vs_variation":
@@ -53,7 +53,7 @@ function standaloneSentence(pattern: MirrorRecentTrend): string | null {
     case "recent_abstraction_lean":
       return "Language leans toward ideas over scenes.";
     case "recent_hesitation_qualification":
-      return "Statements are often qualified just after they’re made.";
+      return "Qualifiers follow assertions.";
     case "pattern_recurring_signal":
     case "pattern_shift_over_time":
     case "pattern_consistency_vs_variation": {

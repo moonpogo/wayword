@@ -9,7 +9,7 @@ const {
 
 function buildPromptLibrary() {
   const promptLibrary = {
-    Observation: [
+    Scene: [
       { id: "obs-1", text: "Prompt 1", nearDuplicateGroup: "obs-a", active: true },
       { id: "obs-2", text: "Prompt 2", nearDuplicateGroup: "obs-a", active: true },
       { id: "obs-3", text: "Prompt 3", nearDuplicateGroup: "obs-b", active: true },
@@ -218,10 +218,10 @@ test("prompt selection avoids immediate repeat ids and near-duplicate groups whe
   const { promptLibrary, promptEntryById } = buildPromptLibrary();
 
   const chosen = context.waywordPromptSelection.choosePromptFamilyAndEntry({
-    forcedFamilyKey: "Observation",
+    forcedFamilyKey: "Scene",
     recentPromptIds: ["obs-1"],
-    recentFamilyKeys: ["Observation"],
-    promptFamiliesOrder: ["Observation", "Relation"],
+    recentFamilyKeys: ["Scene"],
+    promptFamiliesOrder: ["Scene", "Relation"],
     promptLibrary,
     promptEntryById,
     recentIdWindow: 8,
@@ -230,7 +230,7 @@ test("prompt selection avoids immediate repeat ids and near-duplicate groups whe
     rng: () => 0,
   });
 
-  assert.equal(chosen.family, "Observation");
+  assert.equal(chosen.family, "Scene");
   assert.equal(chosen.entry.id, "obs-3");
   assert.notEqual(chosen.entry.nearDuplicateGroup, "obs-a");
 });
@@ -240,10 +240,10 @@ test("prompt selection falls across families when the forced family is exhausted
   const { promptLibrary, promptEntryById } = buildPromptLibrary();
 
   const chosen = context.waywordPromptSelection.choosePromptFamilyAndEntry({
-    forcedFamilyKey: "Observation",
+    forcedFamilyKey: "Scene",
     recentPromptIds: ["obs-1", "obs-2", "obs-3"],
-    recentFamilyKeys: ["Observation", "Observation"],
-    promptFamiliesOrder: ["Observation", "Relation"],
+    recentFamilyKeys: ["Scene", "Scene"],
+    promptFamiliesOrder: ["Scene", "Relation"],
     promptLibrary,
     promptEntryById,
     recentIdWindow: 8,
@@ -1182,7 +1182,7 @@ test("prompt runtime generates prompt and updates prompt history state", () => {
   const context = loadPromptRuntimeContext();
   const state = {
     recentPromptIds: ["obs-0"],
-    recentFamilyKeys: ["Observation"],
+    recentFamilyKeys: ["Scene"],
   };
   const input = {
     state,
@@ -1194,7 +1194,7 @@ test("prompt runtime generates prompt and updates prompt history state", () => {
         };
       },
     },
-    promptFamiliesOrder: ["Observation", "Relation"],
+    promptFamiliesOrder: ["Scene", "Relation"],
     promptLibrary: {},
     promptEntryById: new Map(),
     promptRecentIdWindow: 3,
@@ -1219,7 +1219,7 @@ test("prompt runtime generates prompt and updates prompt history state", () => {
   assert.equal(state.lastPromptKey, "Relation::rel-2");
   assert.deepEqual(state.promptBiasTags, ["relation"]);
   assert.deepEqual(state.recentPromptIds, ["obs-0", "rel-2"]);
-  assert.deepEqual(state.recentFamilyKeys, ["Observation", "Relation"]);
+  assert.deepEqual(state.recentFamilyKeys, ["Scene", "Relation"]);
 });
 
 test("prompt runtime reroll respects eligibility and rerenders meta", () => {
@@ -1229,7 +1229,7 @@ test("prompt runtime reroll respects eligibility and rerenders meta", () => {
     active: true,
     submitted: false,
     promptRerollsUsed: 0,
-    promptFamily: "Observation",
+    promptFamily: "Scene",
     recentPromptIds: [],
     recentFamilyKeys: [],
   };
@@ -1242,12 +1242,12 @@ test("prompt runtime reroll respects eligibility and rerenders meta", () => {
       choosePromptFamilyAndEntry(args) {
         calls.push(["choosePromptFamilyAndEntry", args.forcedFamilyKey]);
         return {
-          family: "Observation",
+          family: "Scene",
           entry: { id: "obs-2", text: "Prompt 2" },
         };
       },
     },
-    promptFamiliesOrder: ["Observation", "Relation"],
+    promptFamiliesOrder: ["Scene", "Relation"],
     promptLibrary: {},
     promptEntryById: new Map(),
     promptRecentIdWindow: 8,
@@ -1255,7 +1255,7 @@ test("prompt runtime reroll respects eligibility and rerenders meta", () => {
     promptRecentFamilyWindow: 4,
     promptRerollLimit: 2,
     biasTagsForPromptFamily() {
-      return ["observation"];
+      return ["scene"];
     },
     getEditorText() {
       return "";
@@ -1271,7 +1271,7 @@ test("prompt runtime reroll respects eligibility and rerenders meta", () => {
   assert.equal(state.prompt, "Prompt 2");
   assert.equal(state.promptRerollsUsed, 1);
   assert.ok(calls.includes("renderMeta"));
-  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "choosePromptFamilyAndEntry" && entry[1] === "Observation"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "choosePromptFamilyAndEntry" && entry[1] === "Scene"));
 });
 
 test("prompt runtime reroll is a no-op when editor text is not empty", () => {
@@ -1283,14 +1283,14 @@ test("prompt runtime reroll is a no-op when editor text is not empty", () => {
     promptRerollsUsed: 0,
     prompt: "Hold this copy",
     promptId: "hold-1",
-    promptFamily: "Observation",
+    promptFamily: "Scene",
     recentPromptIds: [],
     recentFamilyKeys: [],
   };
   const input = {
     state,
     promptSelection,
-    promptFamiliesOrder: ["Observation"],
+    promptFamiliesOrder: ["Scene"],
     promptLibrary: {},
     promptEntryById: new Map(),
     promptRecentIdWindow: 8,

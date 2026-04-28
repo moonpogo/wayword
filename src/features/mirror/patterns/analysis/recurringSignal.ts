@@ -113,7 +113,7 @@ export function detectRecurringSignalCandidates(
       id: "pattern_recurring_signal:abstraction:idea_lean",
       dedupeKey: "recurring:abstraction_idea",
       rankScore: idea * 100 + (idea - concrete) * 10,
-      statement: "Writing tilts toward ideas more often than concrete detail across saved drafts.",
+      statement: "Drafts here lean toward ideas over concrete detail.",
       evidence: [
         {
           text: `That tilt showed in ${idea} of ${n} saved drafts counted here, compared with ${concrete} drafts leaning the other way.`
@@ -126,7 +126,7 @@ export function detectRecurringSignalCandidates(
       id: "pattern_recurring_signal:abstraction:concrete_lean",
       dedupeKey: "recurring:abstraction_concrete",
       rankScore: concrete * 100 + (concrete - idea) * 10,
-      statement: "Writing tilts toward concrete detail more often than abstract wording across saved drafts.",
+      statement: "Drafts here lean toward concrete detail over abstract wording.",
       evidence: [
         {
           text: `That tilt showed in ${concrete} of ${n} saved drafts counted here, compared with ${idea} drafts leaning the other way.`
@@ -145,7 +145,7 @@ export function detectRecurringSignalCandidates(
       id: "pattern_recurring_signal:hesitation:density",
       dedupeKey: "recurring:qualification_density",
       rankScore: qual * 95,
-      statement: "Softening markers show up again and again across saved drafts.",
+      statement: "Softening marks repeat across saved drafts.",
       evidence: recurringQualificationEvidence(qual, n)
     });
   }

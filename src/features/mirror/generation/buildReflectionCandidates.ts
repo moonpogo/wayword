@@ -69,10 +69,14 @@ import {
   MIRROR_HEADLINE_SHIFT_HOLDS,
   MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
   MIRROR_HEADLINE_SHIFT_TURNS,
+  MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE,
+  MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC,
+  hashSessionSalt,
   mirrorHeadlineRepetitionNamed,
   pickMirrorAbstractionBalanceStatement,
   pickMirrorAbstractionBothFrequentStatement
 } from "../constants/mirrorSessionHeadlines.js";
+import { mirrorBonsaiHeadlinesActive } from "../constants/mirrorBonsaiLexicon.js";
 import type {
   MirrorEvidence,
   MirrorFeatures,
@@ -89,10 +93,11 @@ function candidate(
   statement: string,
   evidence: MirrorEvidence[],
   rankScore: number,
-  supportsPrimary = false
+  supportsPrimary = false,
+  idOverride?: string
 ): MirrorReflectionCandidate {
   const base: MirrorReflectionCandidate = {
-    id: `${category}:${sessionId}`,
+    id: idOverride ?? `${category}:${sessionId}`,
     category,
     statement,
     evidence,
@@ -268,8 +273,75 @@ function tryRepetition(features: MirrorFeatures): MirrorReflectionCandidate | nu
   const multiNamed = list.filter((e) =>
     repetitionLemmaEligibleForNamedHeadline(e.word, e.count, features, shortOverride, list)
   ).length;
-  const rankScore = Math.min(100, picked.count * 14 + (multiNamed > 1 ? 5 : 0));
+  const rankScore = Math.min(
+    100,
+    picked.count * 14 + (multiNamed > 1 ? 5 : 0) + (mirrorBonsaiHeadlinesActive() ? 3 : 0)
+  );
   return candidate("repetition", features.sessionId, statement, [], rankScore);
+}
+
+/** Rare bonsai-only supporting line when multiple lemmas qualify for named repetition. */
+function tryRepetitionGenericPressureSupport(
+  features: MirrorFeatures,
+  named: MirrorReflectionCandidate | null
+): MirrorReflectionCandidate | null {
+  if (!mirrorBonsaiHeadlinesActive() || !named) return null;
+
+  const shortOverride = repetitionShortTextOverrideEligible(features);
+  const list = features.topRepeatedWords;
+  const multiNamed = list.filter((e) =>
+    repetitionLemmaEligibleForNamedHeadline(e.word, e.count, features, shortOverride, list)
+  ).length;
+  if (multiNamed < 2) return null;
+
+  return candidate(
+    "repetition",
+    features.sessionId,
+    MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE,
+    [],
+    Math.max(38, Math.min(54, named.rankScore - 6)),
+    true,
+    `repetition_pressure:${features.sessionId}`
+  );
+}
+
+/** ~12% of strong multi-lemma repetition runs (bonsai): generic primary, named line as support. */
+function tryRepetitionBonsaiGenericPrimaryPair(
+  features: MirrorFeatures,
+  named: MirrorReflectionCandidate
+): [MirrorReflectionCandidate, MirrorReflectionCandidate] | null {
+  if (!mirrorBonsaiHeadlinesActive()) return null;
+
+  const shortOverride = repetitionShortTextOverrideEligible(features);
+  const list = features.topRepeatedWords;
+  const multiNamed = list.filter((e) =>
+    repetitionLemmaEligibleForNamedHeadline(e.word, e.count, features, shortOverride, list)
+  ).length;
+  if (multiNamed < 2) return null;
+  if (named.rankScore < 72) return null;
+
+  const h = hashSessionSalt(features.sessionId, "repetitionGenericPrimary") % 100;
+  if (h >= 12) return null;
+
+  const genericPrimary = candidate(
+    "repetition",
+    features.sessionId,
+    MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE,
+    [],
+    Math.min(100, named.rankScore + 12),
+    false,
+    `repetition_generic_primary:${features.sessionId}`
+  );
+  const namedSupport = candidate(
+    "repetition",
+    features.sessionId,
+    named.statement,
+    [],
+    named.rankScore,
+    true,
+    `repetition_named:${features.sessionId}`
+  );
+  return [genericPrimary, namedSupport];
 }
 
 function tryCadence(features: MirrorFeatures): MirrorReflectionCandidate | null {
@@ -339,9 +411,13 @@ function tryOpening(features: MirrorFeatures): MirrorReflectionCandidate | null 
   if (!eligible.length) return null;
 
   const order: Array<"moment" | "loose" | "direct"> = ["moment", "loose", "direct"];
-  const ordered = order
+  let ordered = order
     .map((k) => eligible.find((e) => e.key === k))
     .filter((e): e is { key: "moment" | "loose" | "direct"; statement: string } => Boolean(e));
+  if (mirrorBonsaiHeadlinesActive()) {
+    const momentOnly = ordered.find((e) => e.key === "moment");
+    if (momentOnly) ordered = [momentOnly];
+  }
   const pick = ordered[pickVariantIndex(features.sessionId, "opening") % ordered.length]!;
   const rankScore = 46 + Math.min(10, (firstQ + lastQ) * 0.8);
   return candidate("opening", features.sessionId, pick.statement, [], rankScore);
@@ -563,6 +639,9 @@ function tryHesitation(
   } else {
     statement = pickMirrorHesitationRevisedGeneralStatement(features.sessionId, headlineFingerprint);
   }
+  if (mirrorBonsaiHeadlinesActive()) {
+    statement = MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC;
+  }
 
   let rankScore = Math.min(54, 24 + total * 2.2 + per100 * 0.7);
   if (soft < 3 && turn >= 2 && !phraseAugmentLong) rankScore -= 10;
@@ -590,7 +669,14 @@ export function buildReflectionCandidates(
   const out: MirrorReflectionCandidate[] = [];
 
   const rep = tryRepetition(features);
-  if (rep) out.push(rep);
+  const genericPrimaryPair = rep ? tryRepetitionBonsaiGenericPrimaryPair(features, rep) : null;
+  if (genericPrimaryPair) {
+    out.push(genericPrimaryPair[0], genericPrimaryPair[1]);
+  } else {
+    if (rep) out.push(rep);
+    const repPressure = tryRepetitionGenericPressureSupport(features, rep);
+    if (repPressure) out.push(repPressure);
+  }
 
   const abs = tryAbstraction(features, _sourceText);
   if (abs) out.push(abs);

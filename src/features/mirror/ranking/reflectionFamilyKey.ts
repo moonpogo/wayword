@@ -9,6 +9,7 @@ import {
   MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS,
   MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN,
   MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING,
+  MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC,
   MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS,
   MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS,
   MIRROR_HEADLINE_OPENING_DIRECT,
@@ -17,6 +18,7 @@ import {
   MIRROR_HEADLINE_SHIFT_HOLDS,
   MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER,
   MIRROR_HEADLINE_SHIFT_TURNS,
+  MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE,
   normMirrorReflectionHeadline
 } from "../constants/mirrorSessionHeadlines.js";
 import type { MirrorReflection, MirrorReflectionCandidate } from "../types/mirrorTypes.js";
@@ -39,7 +41,9 @@ const NORM_TO_FAMILY: Record<string, string> = {
   [norm(MIRROR_HEADLINE_SHIFT_TURNS)]: "shift:turns",
   [norm(MIRROR_HEADLINE_SHIFT_HOLDS)]: "shift:holds",
   [norm(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)]: "shift:leans_another",
-  [norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)]: "hesitation:assertions_softening"
+  [norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)]: "hesitation:assertions_softening",
+  [norm(MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC)]: "hesitation:bonsai",
+  [norm(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE)]: "repetition:generic_pressure"
 };
 
 for (const line of MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS) {
@@ -71,6 +75,9 @@ export function mirrorReflectionFamilyKey(
     return "low_signal";
   }
   if (reflection.category === "repetition") {
+    if (n === norm(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE)) {
+      return "repetition:generic_pressure";
+    }
     const m = reflection.statement.match(/\u201c([^\u201d]+)\u201d/i);
     const w = m ? norm(m[1] ?? "") : "";
     return w ? `repetition:named:${w}` : "repetition:named";

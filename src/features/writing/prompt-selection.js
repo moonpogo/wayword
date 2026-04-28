@@ -154,7 +154,7 @@
     const entry = pickRandomFromArray(all, ctx.rng);
     if (!entry) {
       return {
-        family: "Observation",
+        family: "Scene",
         entry: {
           id: "fallback_write_stretch",
           text: "Write for one uninterrupted stretch.",
@@ -167,7 +167,7 @@
     }
     const fam =
       ctx.promptFamiliesOrder.find((f) => (ctx.promptLibrary[f] || []).some((e) => e.id === entry.id)) ||
-      "Observation";
+      "Scene";
     return { family: fam, entry };
   }
 

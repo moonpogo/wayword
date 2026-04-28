@@ -14,10 +14,10 @@
   }
 
   var MIRROR_EMPTY_FALLBACK_LINES = [
-    "A clean pass. Try pushing one element further.",
-    "Nothing strong yet. Lean harder in one direction.",
-    "Even a small shift would give this shape.",
-    "Pick one thing and exaggerate it."
+    "No main line yet. Add one more turn of pressure.",
+    "Still quiet. Push one element further.",
+    "Even a small shift would change the read.",
+    "Pick one thing and press it."
   ];
 
   function pickMirrorEmptyFallbackLine(seed) {

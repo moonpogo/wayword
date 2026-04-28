@@ -438,7 +438,7 @@
             });
           } else {
             console.error("wayword: successful submit coordinator missing; falling back to inline submit success flow");
-            d.state.pendingNudgeLine = "What stands out in the draft you just wrote?";
+            d.state.pendingNudgeLine = "What stands out on the page in this draft?";
             window.waywordRunModel.attachMirrorSnapshotToRun(
               run,
               d.state.lastMirrorPipelineResult,
@@ -538,7 +538,7 @@
           });
         } else {
           console.error("wayword: successful submit coordinator missing; falling back to inline submit success flow");
-          d.state.pendingNudgeLine = "What stands out in the draft you just wrote?";
+          d.state.pendingNudgeLine = "What stands out on the page in this draft?";
           window.waywordRunModel.attachMirrorSnapshotToRun(
             run,
             d.state.lastMirrorPipelineResult,

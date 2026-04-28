@@ -51,7 +51,7 @@ export function detectShiftOverTimeCandidates(
         id: `pattern_shift_over_time:abstraction_ratio:${toward}`,
         dedupeKey: "shift:abstraction_ratio",
         rankScore: Math.round(Math.abs(delta) * 200) + earlyAbsRatios.length + lateAbsRatios.length,
-        statement: "The balance between ideas and detail shifts across saved runs.",
+        statement: "Ideas and detail shift between early and late runs.",
         evidence: [
           {
             text: `Earlier saved runs grouped toward one side of that balance; more recent ones grouped toward the other (each window spans ${earlyAbsRatios.length} and ${lateAbsRatios.length} drafts).`
@@ -74,7 +74,7 @@ export function detectShiftOverTimeCandidates(
         id: `pattern_shift_over_time:sentence_length:${toward}`,
         dedupeKey: "shift:sentence_length_mean",
         rankScore: Math.round(Math.abs(delta) * 40) + earlyCad.length + lateCad.length,
-        statement: "Sentence length moves between earlier and more recent saved runs.",
+        statement: "Sentence length drifts between early and late runs.",
         evidence: [
           {
             text: `Across comparable stretches of saved work, the average drifted from about ${e.toFixed(1)} to about ${l.toFixed(
@@ -99,7 +99,7 @@ export function detectShiftOverTimeCandidates(
         id: `pattern_shift_over_time:qualifier_rate:${toward}`,
         dedupeKey: "shift:qualifier_per100",
         rankScore: Math.round(Math.abs(delta) * 80) + earlyQ.length + lateQ.length,
-        statement: "Hedging lands thicker in one stretch of saved runs than in another.",
+        statement: "Hedging clusters more in one window than the other.",
         evidence: [
           {
             text: `One stretch of saved runs carried more softening markers than the other when those windows are compared.`

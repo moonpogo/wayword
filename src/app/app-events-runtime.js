@@ -181,6 +181,15 @@
     promptCard.dataset.appPromptCardBound = "1";
     promptCard.addEventListener("click", function (e) {
       var origin = input.domEventTargetElement(e);
+      var skipCut = origin && origin.closest("[data-the-cut-skip]");
+      if (skipCut) {
+        e.preventDefault();
+        var hint = skipCut.closest("[data-the-cut-hint]");
+        if (hint && hint.parentNode) {
+          hint.parentNode.removeChild(hint);
+        }
+        return;
+      }
       if (!origin || !origin.closest("[data-mirror-next-pass]")) return;
       e.preventDefault();
       input.runPostSubmitAutoNewRunNow();

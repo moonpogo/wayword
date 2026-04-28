@@ -7,7 +7,7 @@ export function recurringLexicalEvidence(
 ): ReadonlyArray<MirrorRecentTrendEvidence> {
   return [
     {
-      text: `“${displayWord}” showed up again in ${hitSessions} of ${includedDrafts} saved drafts counted here.`
+      text: `\u201c${displayWord}\u201d appeared in ${hitSessions} of ${includedDrafts} qualifying drafts.`
     }
   ];
 }
@@ -18,7 +18,7 @@ export function recurringQualificationEvidence(
 ): ReadonlyArray<MirrorRecentTrendEvidence> {
   return [
     {
-      text: `Softening markers sat heavier in ${hitSessions} of ${includedDrafts} saved drafts counted here.`
+      text: `Softening sits heavier in ${hitSessions} of ${includedDrafts} qualifying drafts.`
     }
   ];
 }

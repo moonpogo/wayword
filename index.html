@@ -574,12 +574,44 @@
             <div id="patternsRepeatedChallengeRoot" class="patterns-repeated-challenge-card"></div>
           </section>
         </div>
+
+        <footer id="profilePatternsFooter" class="profile-patterns-footer hidden" aria-hidden="true">
+          <button id="clearSavedRunsOpenBtn" type="button" class="profile-patterns-footer__action">
+            Clear Saved Runs
+          </button>
+        </footer>
       </section>
+
+      <div
+        id="clearSavedRunsBackdrop"
+        class="editor-options-backdrop dim-layer hidden"
+        aria-hidden="true"
+      >
+        <div
+          id="clearSavedRunsPanel"
+          class="settings-modal clear-saved-runs-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="clearSavedRunsTitle"
+          aria-hidden="true"
+        >
+          <h2 id="clearSavedRunsTitle" class="clear-saved-runs-modal__title"></h2>
+          <p class="clear-saved-runs-modal__support">This cannot be undone.</p>
+          <div class="clear-saved-runs-modal__actions">
+            <button id="clearSavedRunsCancelBtn" type="button" class="clear-saved-runs-modal__btn clear-saved-runs-modal__btn--cancel">
+              Cancel
+            </button>
+            <button id="clearSavedRunsConfirmBtn" type="button" class="clear-saved-runs-modal__btn clear-saved-runs-modal__btn--danger">
+              Clear Runs
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Bump ?v= when changing mirror-engine.iife.js, script.js, or Patterns UI scripts (cache safety). -->
-  <script src="/mirror-engine.iife.js?v=20260422-patterns-sot"></script>
+  <script src="/mirror-engine.iife.js?v=20260427-bonsai-pass-three"></script>
   <script src="/mirror-dom.js"></script>
   <script src="/src/features/mirror/mirror-controller.js"></script>
   <script src="/src/dom/elements.js"></script>
@@ -655,6 +687,6 @@
   <script src="/src/ui/patterns-repeat-lexical-gate.js?v=20260422-patterns-sot"></script>
   <script src="/src/ui/render-post-run.js"></script>
   <script src="/src/ui/view-controller.js"></script>
-  <script src="/script.js?v=20260422-patterns-sot-2"></script>
+  <script src="/script.js?v=20260427-clear-saved-runs"></script>
 </body>
 </html>

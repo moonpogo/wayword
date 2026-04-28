@@ -626,15 +626,15 @@ var WaywordMirror = (() => {
   function normMirrorReflectionHeadline(s) {
     return s.trim().toLowerCase().replace(/\s+/g, " ");
   }
-  var MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns several times on the page";
+  var MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER = "returns.";
   var MIRROR_HEADLINE_FALLBACK_SOFT_SINGLE_SENTENCE_VARIANTS = [
-    "It stays on one line the whole way through.",
-    "One sentence carries the whole span here."
+    "One sentence holds the span.",
+    "Still a single line."
   ];
   var MIRROR_HEADLINE_FALLBACK_SOFT_MULTI_SENTENCE_VARIANTS = [
-    "No single pattern reads clearly enough to name here yet.",
-    "Nothing here grabs the mirror as one decisive habit yet.",
-    "The piece doesn't narrow to one obvious angle yet."
+    "No pattern resolves yet.",
+    "Still flat on the meter.",
+    "Nothing dominant enough to name."
   ];
   var MIRROR_HEADLINE_FALLBACK_SOFT_LEGACY_VARIANTS = [
     "The shape stays steady from start to finish.",
@@ -674,23 +674,24 @@ var WaywordMirror = (() => {
   function isMirrorFallbackSoftStatement(statement) {
     return FALLBACK_SOFT_NORM_SET.has(normMirrorReflectionHeadline(statement));
   }
-  var MIRROR_HEADLINE_LOW_SIGNAL = "Not enough here to notice a pattern yet.";
+  var MIRROR_HEADLINE_LOW_SIGNAL_SURFACE = "Signal is thin. Add surface.";
+  var MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE = "Signal is thin. Continue.";
+  var MIRROR_HEADLINE_LOW_SIGNAL = MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
+  var MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC = "Assertion bends.";
+  var MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE = "A single word is doing too much work.";
   function mirrorHeadlineRepetitionNamed(word) {
-    return `\u201C${word}\u201D ${MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER}.`;
+    return `\u201C${word}\u201D returns.`;
   }
-  var MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS = "The ending tightens noticeably.";
-  var MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN = "Lines lengthen near the end.";
+  var MIRROR_HEADLINE_CADENCE_ENDING_TIGHTENS = "The ending compresses.";
+  var MIRROR_HEADLINE_CADENCE_LINES_LENGTHEN = "The ending opens.";
   var MIRROR_HEADLINE_CADENCE_ALTERNATION = "Short and long lines trade places.";
-  var MIRROR_HEADLINE_OPENING_DIRECT = "It opens directly.";
-  var MIRROR_HEADLINE_OPENING_MOMENT = "The opening takes a moment before anything lands.";
-  var MIRROR_HEADLINE_OPENING_LOOSE = "It starts loose before settling.";
-  var MIRROR_HEADLINE_SHIFT_TURNS = "It turns partway through.";
-  var MIRROR_HEADLINE_SHIFT_HOLDS = "The direction shifts once, then holds.";
-  var MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER = "It starts one way, then leans another.";
-  var MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS = [
-    "Ideas and concrete detail stay in balance.",
-    "Abstract language and concrete detail hold about the same weight."
-  ];
+  var MIRROR_HEADLINE_OPENING_DIRECT = "The first move lands immediately.";
+  var MIRROR_HEADLINE_OPENING_MOMENT = "The first move delays impact.";
+  var MIRROR_HEADLINE_OPENING_LOOSE = "The opening widens before it commits.";
+  var MIRROR_HEADLINE_SHIFT_TURNS = "The piece pivots once, then stabilizes.";
+  var MIRROR_HEADLINE_SHIFT_HOLDS = "The piece pivots once, then stabilizes.";
+  var MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER = "The piece pivots once, then stabilizes.";
+  var MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS = ["Ideas and scene hold balance."];
   var MIRROR_HEADLINE_ABSTRACTION_BALANCE = MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS[0];
   function pickMirrorAbstractionBalanceStatement(sessionId) {
     const idx = hashSessionSalt(sessionId, "abstractionBalance") % MIRROR_HEADLINE_ABSTRACTION_BALANCE_VARIANTS.length;
@@ -703,8 +704,8 @@ var WaywordMirror = (() => {
     return ABSTRACTION_BALANCE_NORM_SET.has(normMirrorReflectionHeadline(statement));
   }
   var MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS = [
-    "Both idea-words and image-words appear frequently.",
-    "Idea language and image language both show up often."
+    "Ideas and scene both keep surfacing.",
+    "Idea language and image language both recur."
   ];
   var MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT = MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS[0];
   function pickMirrorAbstractionBothFrequentStatement(sessionId) {
@@ -719,12 +720,12 @@ var WaywordMirror = (() => {
   }
   var MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL = "The back half leans more conceptual than scene-based.";
   var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER = "Concrete detail carries more of the later passages.";
-  var MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "It leans more on ideas than on what can be seen.";
-  var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Concrete detail carries more than the ideas here.";
+  var MIRROR_HEADLINE_ABSTRACTION_IDEAS_DOMINATE = "Ideas outweigh scene.";
+  var MIRROR_HEADLINE_ABSTRACTION_CONCRETE_OUTWEIGHS = "Scene outweighs ideas.";
   var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS = [
-    "A statement appears, then softens right after.",
-    "Something is stated, then almost immediately hedged.",
-    "The sentence makes its move, then tempers the landing."
+    "Stated; then softened in the same breath.",
+    "Claim, then pullback.",
+    "Statement; immediate qualifier."
   ];
   var MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER = MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS[0];
   function pickMirrorHesitationQualifiedAfterStatement(sessionId, fingerprint = "") {
@@ -739,11 +740,11 @@ var WaywordMirror = (() => {
   function isMirrorHesitationQualifiedAfterStatement(statement) {
     return HESITATION_QUALIFIED_AFTER_NORM_SET.has(normMirrorReflectionHeadline(statement));
   }
-  var MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertions are often followed by softening.";
+  var MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING = "Assertion is followed by softening.";
   var MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS = [
-    "Statements are often revised or softened.",
-    "What lands on the page keeps revising its own emphasis.",
-    "The voice circles back to adjust what it just said."
+    "The line revises itself before landing.",
+    "Emphasis shifts mid-sentence.",
+    "The sentence adjusts its own force."
   ];
   var MIRROR_HEADLINE_HESITATION_REVISED = MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS[0];
   function pickMirrorHesitationRevisedGeneralStatement(sessionId, fingerprint = "") {
@@ -760,7 +761,7 @@ var WaywordMirror = (() => {
   }
   function isMirrorHesitationStandardNudgeStatement(statement) {
     const n = normMirrorReflectionHeadline(statement);
-    return HESITATION_QUALIFIED_AFTER_NORM_SET.has(n) || HESITATION_REVISED_FAMILY_NORM_SET.has(n) || n === normMirrorReflectionHeadline(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING);
+    return HESITATION_QUALIFIED_AFTER_NORM_SET.has(n) || HESITATION_REVISED_FAMILY_NORM_SET.has(n) || n === normMirrorReflectionHeadline(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING) || n === normMirrorReflectionHeadline(MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC);
   }
   var MIRROR_HEADLINE_GENERIC_FALLBACK_SET_MEMBERS = [
     ...MIRROR_HEADLINE_ABSTRACTION_BOTH_FREQUENT_VARIANTS,
@@ -768,11 +769,34 @@ var WaywordMirror = (() => {
     ...MIRROR_HEADLINE_HESITATION_REVISED_VARIANTS
   ];
 
+  // src/features/mirror/constants/mirrorBonsaiLexicon.ts
+  function readLocalStorageFlag(key) {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        return window.localStorage.getItem(key) === "1";
+      }
+    } catch {
+    }
+    return false;
+  }
+  function mirrorBonsaiHeadlinesActive() {
+    if (typeof globalThis !== "undefined" && Boolean(globalThis.__WAYWORD_MIRROR_BONSAI_HEADLINES__)) {
+      return true;
+    }
+    return readLocalStorageFlag("wayword-mirror-bonsai-headlines");
+  }
+  function mirrorThinRefusalExperimentActive() {
+    if (typeof globalThis !== "undefined" && Boolean(globalThis.__WAYWORD_MIRROR_REFUSAL_EXPERIMENT__)) {
+      return true;
+    }
+    return readLocalStorageFlag("wayword-mirror-refusal-experiment");
+  }
+
   // src/features/mirror/generation/buildReflectionCandidates.ts
   var CONCRETE_LEX_SET = new Set(MIRROR_CONCRETE_WORDS.map((w) => w.toLowerCase()));
-  function candidate(category, sessionId, statement, evidence, rankScore, supportsPrimary = false) {
+  function candidate(category, sessionId, statement, evidence, rankScore, supportsPrimary = false, idOverride) {
     const base = {
-      id: `${category}:${sessionId}`,
+      id: idOverride ?? `${category}:${sessionId}`,
       category,
       statement,
       evidence,
@@ -893,8 +917,60 @@ var WaywordMirror = (() => {
     const multiNamed = list.filter(
       (e) => repetitionLemmaEligibleForNamedHeadline(e.word, e.count, features, shortOverride, list)
     ).length;
-    const rankScore = Math.min(100, picked.count * 14 + (multiNamed > 1 ? 5 : 0));
+    const rankScore = Math.min(
+      100,
+      picked.count * 14 + (multiNamed > 1 ? 5 : 0) + (mirrorBonsaiHeadlinesActive() ? 3 : 0)
+    );
     return candidate("repetition", features.sessionId, statement, [], rankScore);
+  }
+  function tryRepetitionGenericPressureSupport(features, named) {
+    if (!mirrorBonsaiHeadlinesActive() || !named) return null;
+    const shortOverride = repetitionShortTextOverrideEligible(features);
+    const list = features.topRepeatedWords;
+    const multiNamed = list.filter(
+      (e) => repetitionLemmaEligibleForNamedHeadline(e.word, e.count, features, shortOverride, list)
+    ).length;
+    if (multiNamed < 2) return null;
+    return candidate(
+      "repetition",
+      features.sessionId,
+      MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE,
+      [],
+      Math.max(38, Math.min(54, named.rankScore - 6)),
+      true,
+      `repetition_pressure:${features.sessionId}`
+    );
+  }
+  function tryRepetitionBonsaiGenericPrimaryPair(features, named) {
+    if (!mirrorBonsaiHeadlinesActive()) return null;
+    const shortOverride = repetitionShortTextOverrideEligible(features);
+    const list = features.topRepeatedWords;
+    const multiNamed = list.filter(
+      (e) => repetitionLemmaEligibleForNamedHeadline(e.word, e.count, features, shortOverride, list)
+    ).length;
+    if (multiNamed < 2) return null;
+    if (named.rankScore < 72) return null;
+    const h = hashSessionSalt(features.sessionId, "repetitionGenericPrimary") % 100;
+    if (h >= 12) return null;
+    const genericPrimary = candidate(
+      "repetition",
+      features.sessionId,
+      MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE,
+      [],
+      Math.min(100, named.rankScore + 12),
+      false,
+      `repetition_generic_primary:${features.sessionId}`
+    );
+    const namedSupport = candidate(
+      "repetition",
+      features.sessionId,
+      named.statement,
+      [],
+      named.rankScore,
+      true,
+      `repetition_named:${features.sessionId}`
+    );
+    return [genericPrimary, namedSupport];
   }
   function tryCadence(features) {
     const c = features.cadenceProfile;
@@ -946,7 +1022,11 @@ var WaywordMirror = (() => {
     }
     if (!eligible.length) return null;
     const order = ["moment", "loose", "direct"];
-    const ordered = order.map((k) => eligible.find((e) => e.key === k)).filter((e) => Boolean(e));
+    let ordered = order.map((k) => eligible.find((e) => e.key === k)).filter((e) => Boolean(e));
+    if (mirrorBonsaiHeadlinesActive()) {
+      const momentOnly = ordered.find((e) => e.key === "moment");
+      if (momentOnly) ordered = [momentOnly];
+    }
     const pick = ordered[pickVariantIndex(features.sessionId, "opening") % ordered.length];
     const rankScore = 46 + Math.min(10, (firstQ + lastQ) * 0.8);
     return candidate("opening", features.sessionId, pick.statement, [], rankScore);
@@ -1065,6 +1145,9 @@ var WaywordMirror = (() => {
     } else {
       statement = pickMirrorHesitationRevisedGeneralStatement(features.sessionId, headlineFingerprint);
     }
+    if (mirrorBonsaiHeadlinesActive()) {
+      statement = MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC;
+    }
     let rankScore = Math.min(54, 24 + total * 2.2 + per100 * 0.7);
     if (soft < 3 && turn >= 2 && !phraseAugmentLong) rankScore -= 10;
     if (shortOverride) rankScore = Math.min(54, rankScore + 4);
@@ -1082,7 +1165,14 @@ var WaywordMirror = (() => {
   function buildReflectionCandidates(features, _sourceText) {
     const out = [];
     const rep = tryRepetition(features);
-    if (rep) out.push(rep);
+    const genericPrimaryPair = rep ? tryRepetitionBonsaiGenericPrimaryPair(features, rep) : null;
+    if (genericPrimaryPair) {
+      out.push(genericPrimaryPair[0], genericPrimaryPair[1]);
+    } else {
+      if (rep) out.push(rep);
+      const repPressure = tryRepetitionGenericPressureSupport(features, rep);
+      if (repPressure) out.push(repPressure);
+    }
     const abs = tryAbstraction(features, _sourceText);
     if (abs) out.push(abs);
     const cad = tryCadence(features);
@@ -1106,9 +1196,12 @@ var WaywordMirror = (() => {
   function mirrorStatementSpecificity(statement) {
     const n = norm(statement);
     if (isMirrorFallbackSoftStatement(statement)) return 5;
-    if (n === norm(MIRROR_HEADLINE_LOW_SIGNAL)) return 6;
+    if (n === norm(MIRROR_HEADLINE_LOW_SIGNAL) || n === norm(MIRROR_HEADLINE_LOW_SIGNAL_SURFACE) || n === norm(MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE)) {
+      return 6;
+    }
     if (GENERIC_FALLBACK_STATEMENTS.has(n)) return 20;
     if (n.includes(MIRROR_HEADLINE_REPETITION_CONTAINS_MARKER)) return 100;
+    if (n === norm(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE)) return 62;
     if (n === norm(MIRROR_HEADLINE_ABSTRACTION_BACK_HALF_CONCEPTUAL) || n === norm(MIRROR_HEADLINE_ABSTRACTION_CONCRETE_LATER)) {
       return 110;
     }
@@ -1126,6 +1219,7 @@ var WaywordMirror = (() => {
       return 82;
     }
     if (isMirrorHesitationQualifiedAfterStatement(statement)) return 58;
+    if (n === norm(MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC)) return 57;
     if (n === norm(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)) return 56;
     if (isMirrorHesitationRevisedFamilyStatement(statement)) return 40;
     return 40;
@@ -1188,14 +1282,33 @@ var WaywordMirror = (() => {
   }
 
   // src/features/mirror/ranking/dedupeReflections.ts
+  function normStmt(s) {
+    return s.trim().toLowerCase().replace(/\s+/g, " ");
+  }
   function dedupeReflections(candidates) {
     const byCategory = /* @__PURE__ */ new Map();
     for (const c of candidates) {
-      const prev = byCategory.get(c.category);
-      if (!prev || compareRanked(c, prev) < 0) byCategory.set(c.category, c);
+      const arr = byCategory.get(c.category) ?? [];
+      arr.push(c);
+      byCategory.set(c.category, arr);
+    }
+    const merged = [];
+    for (const [cat, list] of byCategory) {
+      if (cat === "repetition" && list.length > 1) {
+        const genNorm = normStmt(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE);
+        const generic = list.find((x) => normStmt(x.statement) === genNorm);
+        const named = list.filter((x) => x.statement.includes("\u201C"));
+        if (generic && named.length >= 1) {
+          const bestNamed = named.reduce((a, b) => compareRanked(a, b) < 0 ? a : b);
+          merged.push(bestNamed, generic);
+          continue;
+        }
+      }
+      const winner = list.reduce((a, b) => compareRanked(a, b) < 0 ? a : b);
+      merged.push(winner);
     }
     const byStatement = /* @__PURE__ */ new Map();
-    for (const c of byCategory.values()) {
+    for (const c of merged) {
       const key = c.statement.trim().toLowerCase().replace(/\s+/g, " ");
       const prev = byStatement.get(key);
       if (!prev || compareRanked(c, prev) < 0) byStatement.set(key, c);
@@ -1221,7 +1334,9 @@ var WaywordMirror = (() => {
     [norm3(MIRROR_HEADLINE_SHIFT_TURNS)]: "shift:turns",
     [norm3(MIRROR_HEADLINE_SHIFT_HOLDS)]: "shift:holds",
     [norm3(MIRROR_HEADLINE_SHIFT_LEANS_ANOTHER)]: "shift:leans_another",
-    [norm3(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)]: "hesitation:assertions_softening"
+    [norm3(MIRROR_HEADLINE_HESITATION_ASSERTIONS_SOFTENING)]: "hesitation:assertions_softening",
+    [norm3(MIRROR_HEADLINE_HESITATION_BONSAI_MONASTIC)]: "hesitation:bonsai",
+    [norm3(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE)]: "repetition:generic_pressure"
   };
   for (const line of MIRROR_HEADLINE_HESITATION_QUALIFIED_AFTER_VARIANTS) {
     NORM_TO_FAMILY[norm3(line)] = "hesitation:qualified_after";
@@ -1244,6 +1359,9 @@ var WaywordMirror = (() => {
       return "low_signal";
     }
     if (reflection.category === "repetition") {
+      if (n === norm3(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE)) {
+        return "repetition:generic_pressure";
+      }
       const m = reflection.statement.match(/\u201c([^\u201d]+)\u201d/i);
       const w = m ? norm3(m[1] ?? "") : "";
       return w ? `repetition:named:${w}` : "repetition:named";
@@ -1366,7 +1484,10 @@ var WaywordMirror = (() => {
     for (const c of ordered) {
       if (supporting.length >= MIRROR_SELECTION_MAX_SUPPORTING) break;
       if (c === chosen) continue;
-      if (used.has(c.category)) continue;
+      if (used.has(c.category)) {
+        const dupOk = chosen.category === "repetition" && c.category === "repetition" && c.supportsPrimary && (norm4(c.statement) === norm4(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE) && chosen.statement.includes("\u201C") || norm4(chosen.statement) === norm4(MIRROR_HEADLINE_REPETITION_GENERIC_PRESSURE) && c.statement.includes("\u201C"));
+        if (!dupOk) continue;
+      }
       if (!c.supportsPrimary) continue;
       if (c.rankScore < MIRROR_SELECTION_MIN_RANK_SCORE_FOR_SUPPORT) continue;
       supporting.push(asSelected(c, "support"));
@@ -1384,15 +1505,41 @@ var WaywordMirror = (() => {
     return false;
   }
   function buildLowSignalMirrorPipelineResult(sessionId) {
+    const line = mirrorBonsaiHeadlinesActive() ? MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE : MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
     const main = {
       id: `low_signal:${sessionId}`,
       category: "low_signal",
-      statement: MIRROR_HEADLINE_LOW_SIGNAL,
+      statement: line,
       evidence: [],
       role: "main",
       rankScore: 0
     };
     return { main, supporting: [] };
+  }
+
+  // src/features/mirror/pipeline/mirrorExperiments.ts
+  function applyThinRefusalExperiment(input, result) {
+    if (!mirrorThinRefusalExperimentActive()) return result;
+    if (input.calibrationIncomplete) return result;
+    const main = result.main;
+    if (!main) return result;
+    if (main.category === "low_signal") return result;
+    const isSoft = main.category === "fallback" || main.statement && isMirrorFallbackSoftStatement(main.statement);
+    if (!isSoft) return result;
+    const sessionId = String(input.sessionId ?? "wayword");
+    const h = hashSessionSalt(sessionId, "mirrorThinRefusal");
+    if (h % 100 >= 2) return result;
+    const thinLine = mirrorBonsaiHeadlinesActive() ? MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE : MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
+    const refusalMain = {
+      ...main,
+      id: `low_signal_refusal:${sessionId}`,
+      category: "low_signal",
+      statement: thinLine,
+      evidence: [],
+      rankScore: 0,
+      role: "main"
+    };
+    return { main: refusalMain, supporting: [] };
   }
 
   // src/features/mirror/pipeline/runMirrorPipeline.ts
@@ -1404,10 +1551,11 @@ var WaywordMirror = (() => {
     const raw = buildReflectionCandidates(features, normalizeText(input.text));
     const ranked = rankReflections(raw);
     const deduped = dedupeReflections(ranked);
-    return selectFinalReflections(deduped, features.sessionId, {
+    const selected = selectFinalReflections(deduped, features.sessionId, {
       recentReflectionFamilyKeys: input.recentReflectionFamilyKeys,
       sentenceCountForFallback: features.sentenceCount
     });
+    return applyThinRefusalExperiment(input, selected);
   }
 
   // src/features/mirror/recent/buildMirrorSessionDigest.ts
@@ -1491,7 +1639,7 @@ var WaywordMirror = (() => {
       case "recent_abstraction_lean":
         return "Language leans toward ideas over scenes";
       case "recent_hesitation_qualification":
-        return "Statements are often qualified just after they\u2019re made";
+        return "Qualifiers follow assertions";
       case "pattern_recurring_signal":
       case "pattern_shift_over_time":
       case "pattern_consistency_vs_variation":
@@ -1510,7 +1658,7 @@ var WaywordMirror = (() => {
       case "recent_abstraction_lean":
         return "Language leans toward ideas over scenes.";
       case "recent_hesitation_qualification":
-        return "Statements are often qualified just after they\u2019re made.";
+        return "Qualifiers follow assertions.";
       case "pattern_recurring_signal":
       case "pattern_shift_over_time":
       case "pattern_consistency_vs_variation": {
@@ -1576,7 +1724,7 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:sentence_length_tight",
           dedupeKey: "consistency:sentence_length_band",
           rankScore: Math.round(200 - span * 40) + cadMeans.length * 5,
-          statement: "Sentence length settles into a steady band across saved runs with enough lines to compare.",
+          statement: "Sentence length holds a narrow band across qualifying drafts.",
           evidence: [
             {
               text: `Across ${cadMeans.length} saved drafts with enough sentences to read shape, averages stayed between ${mm.min.toFixed(
@@ -1591,7 +1739,7 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:sentence_length_wide",
           dedupeKey: "variation:sentence_length_band",
           rankScore: Math.round(span * 25) + cadMeans.length * 4,
-          statement: "Sentence length swings more widely across saved runs with enough lines to compare.",
+          statement: "Sentence length swings wide across qualifying drafts.",
           evidence: [
             {
               text: `Across ${cadMeans.length} saved drafts with enough sentences to read shape, averages ranged from ${mm.min.toFixed(
@@ -1611,7 +1759,7 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:abstraction_ratio_tight",
           dedupeKey: "consistency:abstraction_ratio_std",
           rankScore: Math.round(160 - std * 500) + ratios.length * 6,
-          statement: "Abstract and concrete wording settle into a similar mix run after run.",
+          statement: "Abstract and concrete stay in a tight mix run to run.",
           evidence: [
             {
               text: `Across ${ratios.length} saved drafts with enough material on both sides to compare, that mix stayed tight from run to run.`
@@ -1624,7 +1772,7 @@ var WaywordMirror = (() => {
           id: "pattern_consistency_vs_variation:abstraction_ratio_loose",
           dedupeKey: "variation:abstraction_ratio_std",
           rankScore: Math.round(std * 420) + ratios.length * 5,
-          statement: "The balance between abstraction and detail shifts across runs.",
+          statement: "The ideas-to-detail balance shifts across runs.",
           evidence: [
             {
               text: `Across ${ratios.length} saved drafts with enough material on both sides to compare, that balance still moved meaningfully from run to run.`
@@ -1671,14 +1819,14 @@ var WaywordMirror = (() => {
   function recurringLexicalEvidence(displayWord, hitSessions, includedDrafts) {
     return [
       {
-        text: `\u201C${displayWord}\u201D showed up again in ${hitSessions} of ${includedDrafts} saved drafts counted here.`
+        text: `\u201C${displayWord}\u201D appeared in ${hitSessions} of ${includedDrafts} qualifying drafts.`
       }
     ];
   }
   function recurringQualificationEvidence(hitSessions, includedDrafts) {
     return [
       {
-        text: `Softening markers sat heavier in ${hitSessions} of ${includedDrafts} saved drafts counted here.`
+        text: `Softening sits heavier in ${hitSessions} of ${includedDrafts} qualifying drafts.`
       }
     ];
   }
@@ -1728,9 +1876,9 @@ var WaywordMirror = (() => {
   function minSessionsRecurring(n) {
     return Math.max(2, Math.ceil(0.55 * n));
   }
-  function aggregateLexical(window) {
+  function aggregateLexical(window2) {
     const byKey = /* @__PURE__ */ new Map();
-    for (const d of window) {
+    for (const d of window2) {
       const seenInDigest = /* @__PURE__ */ new Set();
       for (const row of d.topRepeatedWords) {
         const key = row.word.toLowerCase();
@@ -1758,12 +1906,12 @@ var WaywordMirror = (() => {
     }
     return best;
   }
-  function detectRecurringSignalCandidates(window) {
-    const n = window.length;
+  function detectRecurringSignalCandidates(window2) {
+    const n = window2.length;
     if (n < 2) return [];
     const minSessions = minSessionsRecurring(n);
     const out = [];
-    const lexicalMap = aggregateLexical(window);
+    const lexicalMap = aggregateLexical(window2);
     const bestLex = pickBestLexical(lexicalMap, minSessions);
     if (bestLex) {
       const w = bestLex.displayWord;
@@ -1779,7 +1927,7 @@ var WaywordMirror = (() => {
     }
     let idea = 0;
     let concrete = 0;
-    for (const d of window) {
+    for (const d of window2) {
       if (sessionAbstractIdeaLean(d)) idea += 1;
       else if (sessionAbstractConcreteLean(d)) concrete += 1;
     }
@@ -1789,7 +1937,7 @@ var WaywordMirror = (() => {
         id: "pattern_recurring_signal:abstraction:idea_lean",
         dedupeKey: "recurring:abstraction_idea",
         rankScore: idea * 100 + (idea - concrete) * 10,
-        statement: "Writing tilts toward ideas more often than concrete detail across saved drafts.",
+        statement: "Drafts here lean toward ideas over concrete detail.",
         evidence: [
           {
             text: `That tilt showed in ${idea} of ${n} saved drafts counted here, compared with ${concrete} drafts leaning the other way.`
@@ -1802,7 +1950,7 @@ var WaywordMirror = (() => {
         id: "pattern_recurring_signal:abstraction:concrete_lean",
         dedupeKey: "recurring:abstraction_concrete",
         rankScore: concrete * 100 + (concrete - idea) * 10,
-        statement: "Writing tilts toward concrete detail more often than abstract wording across saved drafts.",
+        statement: "Drafts here lean toward concrete detail over abstract wording.",
         evidence: [
           {
             text: `That tilt showed in ${concrete} of ${n} saved drafts counted here, compared with ${idea} drafts leaning the other way.`
@@ -1811,7 +1959,7 @@ var WaywordMirror = (() => {
       });
     }
     let qual = 0;
-    for (const d of window) {
+    for (const d of window2) {
       if (sessionQualifierDensityPattern(d)) qual += 1;
     }
     if (qual >= minSessions) {
@@ -1820,7 +1968,7 @@ var WaywordMirror = (() => {
         id: "pattern_recurring_signal:hesitation:density",
         dedupeKey: "recurring:qualification_density",
         rankScore: qual * 95,
-        statement: "Softening markers show up again and again across saved drafts.",
+        statement: "Softening marks repeat across saved drafts.",
         evidence: recurringQualificationEvidence(qual, n)
       });
     }
@@ -1876,7 +2024,7 @@ var WaywordMirror = (() => {
           id: `pattern_shift_over_time:abstraction_ratio:${toward}`,
           dedupeKey: "shift:abstraction_ratio",
           rankScore: Math.round(Math.abs(delta) * 200) + earlyAbsRatios.length + lateAbsRatios.length,
-          statement: "The balance between ideas and detail shifts across saved runs.",
+          statement: "Ideas and detail shift between early and late runs.",
           evidence: [
             {
               text: `Earlier saved runs grouped toward one side of that balance; more recent ones grouped toward the other (each window spans ${earlyAbsRatios.length} and ${lateAbsRatios.length} drafts).`
@@ -1898,7 +2046,7 @@ var WaywordMirror = (() => {
           id: `pattern_shift_over_time:sentence_length:${toward}`,
           dedupeKey: "shift:sentence_length_mean",
           rankScore: Math.round(Math.abs(delta) * 40) + earlyCad.length + lateCad.length,
-          statement: "Sentence length moves between earlier and more recent saved runs.",
+          statement: "Sentence length drifts between early and late runs.",
           evidence: [
             {
               text: `Across comparable stretches of saved work, the average drifted from about ${e.toFixed(1)} to about ${l.toFixed(
@@ -1922,7 +2070,7 @@ var WaywordMirror = (() => {
           id: `pattern_shift_over_time:qualifier_rate:${toward}`,
           dedupeKey: "shift:qualifier_per100",
           rankScore: Math.round(Math.abs(delta) * 80) + earlyQ.length + lateQ.length,
-          statement: "Hedging lands thicker in one stretch of saved runs than in another.",
+          statement: "Hedging clusters more in one window than the other.",
           evidence: [
             {
               text: `One stretch of saved runs carried more softening markers than the other when those windows are compared.`
@@ -2169,7 +2317,7 @@ var WaywordMirror = (() => {
     const best = gated[0];
     const n = aggregate.qualifyingSessionCount;
     const rankScore = 42 + best.distinctSessionCount * 14 + Math.min(18, best.totalTopListCount);
-    const statement = `\u201C${best.word}\u201D recurs across recent drafts.`;
+    const statement = `\u201C${best.word}\u201D recurs across drafts.`;
     return {
       id: `recent_lexical_anchor:${best.word}`,
       category: "recent_lexical_anchor",
@@ -2191,7 +2339,7 @@ var WaywordMirror = (() => {
     const ratios = sessions.map((s) => s.abstractConcreteRatio);
     const meanRatio = ratios.reduce((a, b) => a + b, 0) / Math.max(ratios.length, 1);
     const rankScore = 48 + ideaLean * 11 + Math.min(14, meanRatio * 4);
-    const statement = "Across recent drafts, language leans toward ideas over scenes.";
+    const statement = "Language leans toward ideas over scenes.";
     return {
       id: "recent_abstraction_lean:aggregate",
       category: "recent_abstraction_lean",
@@ -2208,7 +2356,7 @@ var WaywordMirror = (() => {
     }
     if (qualPattern < MIN_SESSIONS_FOR_CROSS_SESSION_PATTERN) return null;
     const rankScore = 46 + qualPattern * 10;
-    const statement = "Across recent drafts, statements are often qualified just after they appear.";
+    const statement = "Qualifiers follow assertions across recent drafts.";
     return {
       id: "recent_hesitation_qualification:aggregate",
       category: "recent_hesitation_qualification",
@@ -2289,15 +2437,12 @@ var WaywordMirror = (() => {
   }
 
   // src/features/mirror/nudges/nextPassInstruction.ts
-  var PROMPT_FAMILIES = /* @__PURE__ */ new Set([
-    "Observation",
-    "Relation",
-    "Tension",
-    "Possibility",
-    "Constraint"
-  ]);
-  var MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK = "With a little more language on the page, patterns get easier to notice.";
-  var MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION = "What stands out in the draft you just wrote?";
+  var PROMPT_FAMILIES = /* @__PURE__ */ new Set(["Scene", "Relation", "Pressure", "Constraint"]);
+  var MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK = MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
+  function thinSignalLeadLine() {
+    return mirrorBonsaiHeadlinesActive() ? MIRROR_HEADLINE_LOW_SIGNAL_CONTINUE : MIRROR_HEADLINE_LOW_SIGNAL_SURFACE;
+  }
+  var MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION = "What stands out on the page in this draft?";
   function normStatement(s) {
     return normMirrorReflectionHeadline(s);
   }
@@ -2331,69 +2476,71 @@ var WaywordMirror = (() => {
     const first = supporting.find((c) => c && String(c.statement || "").trim());
     return first ?? null;
   }
-  var NUDGE_LOW_SIGNAL = [
-    MIRROR_NEXT_PASS_LOW_SIGNAL_FALLBACK,
-    "A fuller stretch of writing usually gives the mirror more to work with.",
-    "What becomes a little easier to see with a few more sentences on the page?",
-    "When the page has more on it, small echoes are easier to hear."
-  ];
+  function nudgeLowSignalPool() {
+    return [
+      thinSignalLeadLine(),
+      "Add more sentences; look again.",
+      "Stretch the passage; patterns need surface.",
+      "Stay in the draft longer before judging it."
+    ];
+  }
   var NUDGE_GENERIC = [
     MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION,
-    "Where does the thread invite another glance?",
-    "What detail keeps catching your attention?",
-    "What remains unattended in what you wrote?"
+    "What pulls focus on a second pass?",
+    "One detail still open at the close?",
+    "What reads unfinished at the end?"
   ];
   var NUDGE_FALLBACK_AMBIGUOUS = [
-    "What still feels open (not wrong, just unsettled) in what you wrote?",
-    "Where would you trust your own read more than a slick echo?",
-    "If the mirror stays this quiet, what one thread do you still want to follow?"
+    "What stays open in this draft?",
+    "Where does a direct reread read firmer than this line?",
+    "What thread still stops short of the next sentence?"
   ];
   var NUDGE_REPETITION = [
-    "What shifts if the same pressure shows up somewhere else?",
-    "Where does the return feel different when you look again?",
-    "What happens if that insistence loosens without vanishing?",
-    "What opens if another word carries a slice of that weight?"
+    "Try the same pressure elsewhere on the page.",
+    "Watch the next return of that word.",
+    "Let repetition move, not thicken.",
+    "Trade weight to a plainer synonym once."
   ];
   var NUDGE_CADENCE_TIGHTENS = [
-    "What if a later stretch lets the breath lengthen again?",
-    "Where could the motion redistribute after that late tightening?",
-    "What changes if one paragraph lets the line run a little longer?"
+    "Let one later stretch lengthen.",
+    "Where does tight late cadence redistribute?",
+    "Open the line once after compression."
   ];
   var NUDGE_CADENCE_LENGTHEN = [
-    "What happens if a middle passage holds a shorter beat for a moment?",
-    "Where does a tighter line change the glide of what follows?",
-    "What shifts if length gathers earlier instead of at the edge?"
+    "Hold one middle beat short.",
+    "Where does early length change what follows?",
+    "Tighten one passage before the close."
   ];
   var NUDGE_CADENCE_ALTERNATION = [
-    "What happens if one section holds a steadier stride?",
-    "Where does the alternation want a softer hand in what follows?",
-    "What remains if the swing between long and short quiets for a beat?"
+    "Hold one section to a steadier stride.",
+    "Let long and short trade without theatrics.",
+    "Quiet the swing between long and short once."
   ];
   var NUDGE_CADENCE_DEFAULT = [
-    "Where would you redistribute the motion?",
-    "What changes if the pulse of the lines shifts mid-piece?",
-    "What shows up if you follow the cadence into a neighboring texture?"
+    "Redistribute length on a second pass.",
+    "Shift cadence mid-piece deliberately.",
+    "Follow the rhythm into an adjacent paragraph."
   ];
   var NUDGE_ABSTRACT_LEANS = [
-    "What becomes touchable if the ideas rest in one place a little longer?",
-    "Where does a single image want to carry more of the thinking?",
-    "What surfaces if the abstractions lean toward one scene-stain?"
+    "Let one idea land in one image.",
+    "Park abstraction in a single concrete beat.",
+    "Hold one concept in one place."
   ];
   var NUDGE_CONCRETE_LEANS = [
-    "Where does the idea begin to surface behind the detail?",
-    "What shifts if the objects fall away for a breath (not erased, just quieter)?",
-    "What remains if the scene quiets further and something else hums?"
+    "Let the idea surface behind the detail.",
+    "Pull back objects for one beat.",
+    "State the thought the scene implies."
   ];
   var NUDGE_ABSTRACTION_BALANCED = [
-    "What interests you if idea and image keep trading places?",
-    "Where does one kind of attention want a little more room?",
-    "What would you watch for in the handoff between scene and thought?"
+    "Watch idea and image trade slots.",
+    "Give one attention type more room.",
+    "Note where scene and thought hand off."
   ];
   var NUDGE_HESITATION = [
-    "What changes when the cushioning thins, without forcing a harder voice?",
-    "Where does a line want to stand without the immediate softener?",
-    "What clarity appears if the qualification arrives a beat later?",
-    "What shifts if you let one assertion stay unaccompanied for a line?"
+    "Thin the cushioning; keep the line plain.",
+    "Drop one softener.",
+    "Let one assertion stand alone one line.",
+    "Delay the qualifier one beat."
   ];
   function nextPassInstructionFromMirrorPipelineResult(result, loadFailed, opts) {
     const seed = String(opts?.seed ?? "").trim() || "wayword";
@@ -2403,7 +2550,7 @@ var WaywordMirror = (() => {
       return pickLine(seedWithFamily(`${seed}|load-fail`, family), NUDGE_GENERIC);
     }
     if (lowSignal) {
-      return pickLine(seedWithFamily(`${seed}|low-signal`, family), NUDGE_LOW_SIGNAL);
+      return pickLine(seedWithFamily(`${seed}|low-signal`, family), nudgeLowSignalPool());
     }
     const driver = pickDriverReflection(result);
     if (!driver) {
@@ -2412,7 +2559,7 @@ var WaywordMirror = (() => {
     const cat = driver.category;
     const n = normStatement(driver.statement);
     if (cat === "low_signal") {
-      return pickLine(seedWithFamily(`${seed}|mirror-low-signal`, family), NUDGE_LOW_SIGNAL);
+      return pickLine(seedWithFamily(`${seed}|mirror-low-signal`, family), nudgeLowSignalPool());
     }
     if (cat === "fallback" || isMirrorFallbackSoftStatement(driver.statement)) {
       const wcRaw = opts?.submissionWordCount;
