@@ -5,6 +5,19 @@
       input.window.visualViewport.addEventListener("resize", input.queueViewportSync);
       input.window.visualViewport.addEventListener("scroll", input.queueViewportSync);
     }
+    try {
+      var desktopRailMq = input.window.matchMedia("(min-width: 981px)");
+      var onDesktopRailMqChange = function () {
+        input.queueViewportSync();
+      };
+      if (desktopRailMq.addEventListener) {
+        desktopRailMq.addEventListener("change", onDesktopRailMqChange);
+      } else if (desktopRailMq.addListener) {
+        desktopRailMq.addListener(onDesktopRailMqChange);
+      }
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   function bindEditorShellEdgeResizeObserver(input) {

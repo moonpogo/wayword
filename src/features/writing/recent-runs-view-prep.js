@@ -91,6 +91,15 @@
     const railExpanded = global.document.body.classList.contains("recent-rail-expanded");
     if (!deps.isDesktopPatternsViewport()) {
       writeView.style.removeProperty("--review-runs-rail-expanded-max-h");
+      /*
+       * `renderHistory` + `syncRecentRailExpandedChrome` can run in frame N while Safari still reports
+       * a wide layout viewport; the follow-up `syncRecentRailExpandedLayoutMetrics` RAF often runs in
+       * frame N+1 after the width settles. Without this guard, `body.recent-rail-expanded` and rail
+       * backdrop chrome can stick on below the desktop rail breakpoint (dead horizontal band).
+       */
+      if (railExpanded) {
+        syncRecentRailExpandedChrome(deps);
+      }
       return;
     }
     if (!railExpanded && !forceExpanded) {

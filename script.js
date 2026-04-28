@@ -1004,6 +1004,18 @@ function scheduleCalibrationOverlayGeometrySync() {
   });
 }
 
+/**
+ * Safari can report a transient wide layout viewport on first paint / landing exit; `queueViewportSync`
+ * already runs on resize, but a follow-up pass after the next layout commits matches post-refresh state.
+ */
+function schedulePostLayoutViewportReconcile() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      queueViewportSync();
+    });
+  });
+}
+
 function queueViewportSync() {
   if (
     window.waywordViewportSyncCoordinator &&
@@ -1624,6 +1636,7 @@ function enterAppState(options = {}) {
     window.waywordPanelCoordination.closePanelsForAppEntry({ showProfile, setOptionsOpen });
     afterEnter?.();
     queueViewportSync();
+    schedulePostLayoutViewportReconcile();
   };
 
   if (prefersReducedUiMotion()) {
@@ -5689,3 +5702,16 @@ recentRunsUi.bindRecentRunsOpenCloseControls();
 recentRunsUi.bindRecentRunsExpandDismissUi();
 
 queueViewportSync();
+schedulePostLayoutViewportReconcile();
+
+try {
+  window.addEventListener(
+    "load",
+    () => {
+      schedulePostLayoutViewportReconcile();
+    },
+    { once: true }
+  );
+} catch (_) {
+  /* ignore */
+}
