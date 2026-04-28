@@ -18,7 +18,7 @@ const promptLibrary = {
     },
     {
       id: "observation_room_residue",
-      text: "A room read through residue—doors and windows unnamed.",
+      text: "A room read through residue: doors and windows unnamed.",
       nearDuplicateGroup: "room_rule",
       intensity: 2,
       structure: "describe_scene",
@@ -100,7 +100,7 @@ const promptLibrary = {
     },
     {
       id: "relation_being_let_go",
-      text: "Someone realizes they are already being let go—no accusation, no summary.",
+      text: "Someone realizes they are already being let go. No accusation, no summary.",
       nearDuplicateGroup: "loss_edge",
       intensity: 3,
       structure: "scene_dialogue",
@@ -150,7 +150,7 @@ const promptLibrary = {
     },
     {
       id: "tension_forgiveness_movement",
-      text: "Forgiveness as movement through a house—doors, hands, tasks. No verdict.",
+      text: "Forgiveness as movement through a house: doors, hands, tasks. No verdict.",
       nearDuplicateGroup: "forgiveness",
       intensity: 2,
       structure: "physical_channel",
@@ -158,7 +158,7 @@ const promptLibrary = {
     },
     {
       id: "possibility_choice_in_space",
-      text: "A decision still in the room—moved, avoided, walked around.",
+      text: "A decision still in the room: moved, avoided, walked around.",
       nearDuplicateGroup: "unmade_choice",
       intensity: 2,
       structure: "describe_scene",
@@ -234,7 +234,7 @@ const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
   Relation: [
     "Use only spoken lines.",
     "Two people. One exchange.",
-    "No naming of feeling—only what is said.",
+    "No naming of feeling; only what is said.",
     "Keep it to one room and one moment."
   ],
   Pressure: [

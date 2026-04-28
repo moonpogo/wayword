@@ -129,7 +129,7 @@
 
     return {
       headline: "Not much to echo back yet.",
-      support: "Enough to continue—little saved material for a sharp cross-run read.",
+      support: "Enough to continue, with little saved material for a sharp cross-run read.",
       direction: "More saved drafts deepen cross-run reflection.",
       suggestedExerciseWord: "",
     };
@@ -206,7 +206,7 @@
 
     return `
       <div class="section-title card-section-title patterns-repeated-challenge__title">Repeated words</div>
-      <p class="patterns-repeated-tool-note">Saved-run word counts — for choosing a practice challenge below.</p>
+      <p class="patterns-repeated-tool-note">Saved-run word counts for choosing a practice challenge below.</p>
       ${wordsHtml}
       ${challengeHtml}
     `;
