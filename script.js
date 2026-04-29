@@ -2004,9 +2004,9 @@ function syncCalibrationHandoffIntentAfterDecision(decision) {
 function syncCalibrationHandoffSurface() {
   const section = $("calibrationHandoffSection");
   if (!section) return;
-  const show = Boolean(
-    state.active && state.submitted && state.completedUiActive && state.calibrationHandoffVisible
-  );
+  const show =
+    deriveCurrentPostSubmitPhase() ===
+    window.waywordPostSubmitPhase.PHASES.SUBMITTED_CALIBRATION_HANDOFF;
   section.classList.toggle("hidden", !show);
   section.setAttribute("aria-hidden", show ? "false" : "true");
 }
@@ -4316,7 +4316,16 @@ function collectMirrorSessionDigestsFromHistory() {
   return out;
 }
 
+function deriveCurrentPostSubmitPhase(options = {}) {
+  return window.waywordPostSubmitPhase.derivePostSubmitPhase({
+    state,
+    mirrorLowSignal: Boolean(options.mirrorLowSignal)
+  });
+}
+
 function postRunMirrorPanelInputs() {
+  const phase = deriveCurrentPostSubmitPhase();
+  const phaseRenderFlags = window.waywordPostSubmitPhase.postRunRenderFlagsFromPhase(phase);
   return {
     submitted: state.submitted,
     completedUiActive: state.completedUiActive,
@@ -4326,9 +4335,10 @@ function postRunMirrorPanelInputs() {
     sessionDigestsForTrends: collectMirrorSessionDigestsFromHistory(),
     submittedRunText: getEditorText(),
     promptFamily: state.promptFamily,
-    calibrationHandoffVisible: Boolean(state.calibrationHandoffVisible),
+    postSubmitPhase: phase,
+    calibrationHandoffVisible: phaseRenderFlags.calibrationHandoffVisible,
     calibrationSubmitShortMirror: Boolean(state.lastSubmitCalibrationShortMirror),
-    calibrationBaselinePostSubmit: Boolean(state.calibrationPostRun && !state.calibrationHandoffVisible)
+    calibrationBaselinePostSubmit: phaseRenderFlags.calibrationBaselinePostSubmit
   };
 }
 

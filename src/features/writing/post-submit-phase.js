@@ -20,6 +20,34 @@
     );
   }
 
+  function isSubmittedPhase(phase) {
+    return (
+      phase === PHASES.SUBMITTED_CALIBRATION_BASELINE ||
+      phase === PHASES.SUBMITTED_CALIBRATION_INSUFFICIENT ||
+      phase === PHASES.SUBMITTED_CALIBRATION_HANDOFF ||
+      phase === PHASES.SUBMITTED_MIRROR_LOW_SIGNAL ||
+      phase === PHASES.SUBMITTED_MIRROR_READY ||
+      phase === PHASES.SUBMITTED_MIRROR_UNAVAILABLE
+    );
+  }
+
+  function phaseBlocksCompletedRestart(phase) {
+    return phase === PHASES.SUBMITTED_CALIBRATION_HANDOFF;
+  }
+
+  function phaseAllowsCompletedRestart(phase) {
+    return isSubmittedPhase(phase) && !phaseBlocksCompletedRestart(phase);
+  }
+
+  function postRunRenderFlagsFromPhase(phase) {
+    return {
+      calibrationHandoffVisible: phase === PHASES.SUBMITTED_CALIBRATION_HANDOFF,
+      calibrationBaselinePostSubmit:
+        phase === PHASES.SUBMITTED_CALIBRATION_BASELINE ||
+        phase === PHASES.SUBMITTED_CALIBRATION_INSUFFICIENT,
+    };
+  }
+
   /**
    * Read-only post-submit phase derivation.
    * Does not own state, routing, rendering, persistence, or restart behavior.
@@ -71,5 +99,8 @@
   window.waywordPostSubmitPhase = {
     PHASES: PHASES,
     derivePostSubmitPhase: derivePostSubmitPhase,
+    phaseAllowsCompletedRestart: phaseAllowsCompletedRestart,
+    phaseBlocksCompletedRestart: phaseBlocksCompletedRestart,
+    postRunRenderFlagsFromPhase: postRunRenderFlagsFromPhase,
   };
 })();

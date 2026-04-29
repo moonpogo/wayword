@@ -93,6 +93,18 @@ function loadPostSubmitPhaseContext() {
   });
 }
 
+function loadCompletedUiRestartContext() {
+  return loadBrowserScripts(
+    [
+      "src/features/writing/post-submit-phase.js",
+      "src/features/writing/completed-ui-restart-interactions.js",
+    ],
+    {
+      console: silentConsole(),
+    }
+  );
+}
+
 function loadRecentRunsInteractionContext(documentStub) {
   return loadBrowserScripts(["src/features/writing/recent-runs-interaction.js"], {
     console: silentConsole(),
@@ -1428,6 +1440,7 @@ test("post-submit phase derivation names current run/post-submit scenarios", () 
   const context = loadPostSubmitPhaseContext();
   const derive = context.waywordPostSubmitPhase.derivePostSubmitPhase;
   const P = context.waywordPostSubmitPhase.PHASES;
+  const renderFlags = context.waywordPostSubmitPhase.postRunRenderFlagsFromPhase;
 
   assert.equal(derive({ state: { active: false } }), P.IDLE);
   assert.equal(
@@ -1519,6 +1532,96 @@ test("post-submit phase derivation names current run/post-submit scenarios", () 
     }),
     P.SUBMITTED_MIRROR_UNAVAILABLE
   );
+
+  const handoffFlags = renderFlags(P.SUBMITTED_CALIBRATION_HANDOFF);
+  assert.equal(handoffFlags.calibrationHandoffVisible, true);
+  assert.equal(handoffFlags.calibrationBaselinePostSubmit, false);
+
+  const baselineFlags = renderFlags(P.SUBMITTED_CALIBRATION_BASELINE);
+  assert.equal(baselineFlags.calibrationHandoffVisible, false);
+  assert.equal(baselineFlags.calibrationBaselinePostSubmit, true);
+
+  const insufficientFlags = renderFlags(P.SUBMITTED_CALIBRATION_INSUFFICIENT);
+  assert.equal(insufficientFlags.calibrationHandoffVisible, false);
+  assert.equal(insufficientFlags.calibrationBaselinePostSubmit, true);
+
+  const lowSignalFlags = renderFlags(P.SUBMITTED_MIRROR_LOW_SIGNAL);
+  assert.equal(lowSignalFlags.calibrationHandoffVisible, false);
+  assert.equal(lowSignalFlags.calibrationBaselinePostSubmit, false);
+});
+
+test("completed restart routing uses post-submit phase gating", () => {
+  const context = loadCompletedUiRestartContext();
+  const interactions = context.waywordCompletedUiRestartInteractions;
+  const calls = [];
+  const normalState = {
+    active: true,
+    submitted: true,
+    completedUiActive: true,
+    optionsOpen: false,
+    lastMirrorPipelineResult: {
+      main: { category: "repetition", statement: "One word keeps returning." },
+    },
+  };
+  const handoffState = {
+    active: true,
+    submitted: true,
+    completedUiActive: true,
+    optionsOpen: false,
+    calibrationHandoffVisible: true,
+  };
+  const inputFor = (state) => ({
+    state,
+    runPostSubmitAutoNewRunNow() {
+      calls.push("restart");
+    },
+  });
+
+  const normalEvent = {
+    key: "Enter",
+    shiftKey: false,
+    preventDefault() {
+      calls.push("preventDefault");
+    },
+  };
+  assert.equal(
+    interactions.handleEditorCompletedRestartKeydown(inputFor(normalState), normalEvent),
+    true
+  );
+  assert.deepEqual(calls, ["preventDefault", "restart"]);
+
+  calls.length = 0;
+  assert.equal(
+    interactions.handleEditorCompletedRestartKeydown(inputFor(handoffState), normalEvent),
+    false
+  );
+  assert.deepEqual(calls, []);
+
+  calls.length = 0;
+  assert.equal(
+    interactions.handleEditorSurfaceCompletedRestart(inputFor(normalState), {
+      target: { closest: (selector) => (selector === "#editorInput" ? true : null) },
+    }),
+    true
+  );
+  assert.deepEqual(calls, ["restart"]);
+
+  calls.length = 0;
+  assert.equal(
+    interactions.handleDocumentCompletedRestartKeydown(inputFor(handoffState), {
+      key: "Enter",
+      shiftKey: false,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      target: {},
+      preventDefault() {
+        calls.push("preventDefault");
+      },
+    }),
+    false
+  );
+  assert.deepEqual(calls, []);
 });
 
 test("saved-run persistence writes canonical documents and reads them back in both orders", () => {

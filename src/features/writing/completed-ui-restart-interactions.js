@@ -1,7 +1,19 @@
 (function () {
+  function currentPhase(input) {
+    return window.waywordPostSubmitPhase.derivePostSubmitPhase({ state: input.state });
+  }
+
+  function restartBlockedByPhase(input) {
+    return window.waywordPostSubmitPhase.phaseBlocksCompletedRestart(currentPhase(input));
+  }
+
+  function restartAllowedByPhase(input) {
+    return window.waywordPostSubmitPhase.phaseAllowsCompletedRestart(currentPhase(input));
+  }
+
   function handleEditorCompletedRestartKeydown(input, e) {
-    if (input.state.calibrationHandoffVisible) return false;
-    if (input.state.optionsOpen || !input.state.submitted || !input.state.completedUiActive) {
+    if (restartBlockedByPhase(input)) return false;
+    if (input.state.optionsOpen || !restartAllowedByPhase(input)) {
       return false;
     }
 
@@ -27,11 +39,10 @@
   }
 
   function handleEditorSurfaceCompletedRestart(input, e) {
-    if (input.state.calibrationHandoffVisible) return false;
+    if (restartBlockedByPhase(input)) return false;
     if (
       input.state.active &&
-      input.state.submitted &&
-      input.state.completedUiActive &&
+      restartAllowedByPhase(input) &&
       !input.state.optionsOpen &&
       e.target.closest("#editorInput")
     ) {
@@ -43,11 +54,10 @@
   }
 
   function handleDocumentCompletedRestartKeydown(input, e) {
-    if (input.state.calibrationHandoffVisible) return false;
+    if (restartBlockedByPhase(input)) return false;
     if (
       e.key !== "Enter" ||
-      !input.state.submitted ||
-      !input.state.completedUiActive ||
+      !restartAllowedByPhase(input) ||
       e.shiftKey ||
       e.metaKey ||
       e.ctrlKey ||
