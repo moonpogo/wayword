@@ -32,6 +32,19 @@ function loadPromptSelectionContext() {
   });
 }
 
+function loadPromptDataContext() {
+  return loadBrowserScripts(
+    [
+      "src/features/prompts/prompt-library.js",
+      "src/features/prompts/calibration-prompts.js",
+      "src/features/writing/prompt-selection.js",
+    ],
+    {
+      console: silentConsole(),
+    }
+  );
+}
+
 function loadRunControllerRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/run-controller-runtime.js"], {
     console: silentConsole(),
@@ -272,6 +285,71 @@ test("prompt selection falls across families when the forced family is exhausted
 
   assert.equal(chosen.family, "Relation");
   assert.equal(chosen.entry.id, "rel-1");
+});
+
+test("extracted prompt data preserves family names, counts, and deterministic selection", () => {
+  const context = loadPromptDataContext();
+  const promptData = context.waywordPromptLibrary;
+  const calibrationData = context.waywordCalibrationPrompts;
+  const promptSelection = context.waywordPromptSelection;
+
+  const familyOrder = Array.from(promptData.PROMPT_FAMILIES_ORDER);
+  assert.deepEqual(familyOrder, [
+    "Scene",
+    "Relation",
+    "Pressure",
+    "Constraint",
+  ]);
+  assert.deepEqual(
+    Object.fromEntries(
+      familyOrder.map((family) => [
+        family,
+        promptData.promptLibrary[family].length,
+      ])
+    ),
+    { Scene: 9, Relation: 4, Pressure: 7, Constraint: 3 }
+  );
+  assert.equal(
+    familyOrder.reduce(
+      (sum, family) => sum + promptData.promptLibrary[family].length,
+      0
+    ),
+    23
+  );
+  assert.equal(calibrationData.CALIBRATION_PROMPT_FAMILY, "Calibration");
+  assert.equal(calibrationData.CALIBRATION_PROMPT_RECENT_WINDOW, 5);
+  assert.deepEqual(
+    Array.from(calibrationData.CALIBRATION_PROMPT_ENTRIES, (entry) => entry.id),
+    [
+      "cal_room_after",
+      "cal_small_object",
+      "cal_returning_thought",
+      "cal_visible_room",
+      "cal_almost_missed",
+    ]
+  );
+
+  const promptEntryById = new Map();
+  for (const family of familyOrder) {
+    for (const entry of promptData.promptLibrary[family] || []) {
+      promptEntryById.set(entry.id, { ...entry, family });
+    }
+  }
+  const chosen = promptSelection.choosePromptFamilyAndEntry({
+    forcedFamilyKey: null,
+    recentPromptIds: [],
+    recentFamilyKeys: [],
+    promptFamiliesOrder: familyOrder,
+    promptLibrary: promptData.promptLibrary,
+    promptEntryById,
+    recentIdWindow: 8,
+    nearDuplicateWindow: 3,
+    recentFamilyWindow: 4,
+    rng: () => 0,
+  });
+
+  assert.equal(chosen.family, "Scene");
+  assert.equal(chosen.entry.id, "observation_kitchen_left");
 });
 
 test("reroll gating stays tied to active, unsubmitted, empty-editor state", () => {

@@ -22,18 +22,19 @@ Current `index.html` script order is part of the runtime contract. `script.js` l
 | 14 | `src/app/run-controller-runtime.js` | `window.waywordRunControllerRuntime` |
 | 15 | `src/data/run-model.js` | `window.waywordRunModel` |
 | 16-24 | `src/data/runs/*` | schema constants, run document utils/model/markdown/repo/migration/init/read/persist globals |
-| 25-27 | Prompt/semantic writing helpers | prompt selection/interactions and semantic picker globals |
-| 28 | `src/features/writing/post-submit-phase.js` | `window.waywordPostSubmitPhase`; pure post-submit phase derivation and restart/render policy helpers |
-| 29 | `src/features/writing/completed-ui-restart-interactions.js` | `window.waywordCompletedUiRestartInteractions`; consumes `waywordPostSubmitPhase` |
-| 30-56 | Remaining `src/features/writing/*` helpers | editor, focus, viewport, submit, completion, options, patterns, and run-controller globals |
-| 57 | `src/ui/render-history.js` | `window.waywordHistoryRenderer` |
-| 58-60 | Recent Runs helpers | view prep, render coordinator, interaction/transition globals |
-| 61-63 | `src/features/ui/*` | panel, recent-runs, options coordination globals |
-| 64 | `src/ui/render-patterns.js` | `window.waywordPatternsRenderer` |
-| 65 | `src/ui/patterns-repeat-lexical-gate.js` | `window.waywordPatternsLexicalGate` |
-| 66 | `src/ui/render-post-run.js` | `window.waywordPostRunRenderer` |
-| 67 | `src/ui/view-controller.js` | `window.waywordViewController` |
-| 68 | `script.js` | Main orchestrator; consumes all above |
+| 25-26 | `src/features/prompts/*` | `window.waywordPromptLibrary`, `window.waywordCalibrationPrompts`; consumed by `script.js` prompt setup |
+| 27-29 | Prompt/semantic writing helpers | prompt selection/interactions and semantic picker globals |
+| 30 | `src/features/writing/post-submit-phase.js` | `window.waywordPostSubmitPhase`; pure post-submit phase derivation and restart/render policy helpers |
+| 31 | `src/features/writing/completed-ui-restart-interactions.js` | `window.waywordCompletedUiRestartInteractions`; consumes `waywordPostSubmitPhase` |
+| 32-58 | Remaining `src/features/writing/*` helpers | editor, focus, viewport, submit, completion, options, patterns, and run-controller globals |
+| 59 | `src/ui/render-history.js` | `window.waywordHistoryRenderer` |
+| 60-62 | Recent Runs helpers | view prep, render coordinator, interaction/transition globals |
+| 63-65 | `src/features/ui/*` | panel, recent-runs, options coordination globals |
+| 66 | `src/ui/render-patterns.js` | `window.waywordPatternsRenderer` |
+| 67 | `src/ui/patterns-repeat-lexical-gate.js` | `window.waywordPatternsLexicalGate` |
+| 68 | `src/ui/render-post-run.js` | `window.waywordPostRunRenderer` |
+| 69 | `src/ui/view-controller.js` | `window.waywordViewController` |
+| 70 | `script.js` | Main orchestrator; consumes all above |
 
 ## `script.js` Consumes
 
@@ -41,6 +42,7 @@ Current `index.html` script order is part of the runtime contract. `script.js` l
 - DOM/config/state: `waywordDomElements`, `waywordConfig`, `waywordStorage`, `waywordAppState`.
 - Runtime seams: `waywordAnalysisRuntime`, `waywordAppBootRuntime`, `waywordAppEventsRuntime`, `waywordPromptRuntime`, `waywordProgressionRuntime`, `waywordRunControllerRuntime`.
 - Run persistence: `waywordRunModel`, `waywordRunDocumentRepo`, `waywordSavedRunsRead`, `waywordSavedRunPersistence`.
+- Prompt data: `waywordPromptLibrary`, `waywordCalibrationPrompts`.
 - Writing helpers: `waywordPostSubmitPhase`, `waywordCompletedUiRestartInteractions`, run controller, submit prep, submit Mirror analysis, completion decision/aftermath, successful submit, post-submit reconciler, prompt interactions, focus/viewport/options/patterns coordinators.
 - UI renderers: `waywordHistoryRenderer`, `waywordRecentRunsViewPrep`, `waywordRecentRunsRenderCoordinator`, `waywordPatternsRenderer`, `waywordPostRunRenderer`, `waywordViewController`.
 
