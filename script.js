@@ -4653,12 +4653,20 @@ function bindMetricExplainerDelegation(listId = "recentDrawerList") {
   });
 }
 
+function syncWaywordResearchFormLinks() {
+  const url = window.waywordConfig && window.waywordConfig.WAYWORD_RESEARCH_FORM_URL;
+  if (!url || typeof url !== "string") return;
+  document.querySelectorAll('a[data-wayword-research-form="1"]').forEach((a) => {
+    a.setAttribute("href", url);
+  });
+}
+
 function syncClearSavedRunsFooter() {
-  const footer = $("profilePatternsFooter");
-  if (!footer) return;
+  const clearWrap = $("profilePatternsClearWrap");
+  if (!clearWrap) return;
   const show = completedRuns() > 0;
-  footer.classList.toggle("hidden", !show);
-  footer.setAttribute("aria-hidden", show ? "false" : "true");
+  clearWrap.classList.toggle("hidden", !show);
+  clearWrap.setAttribute("aria-hidden", show ? "false" : "true");
 }
 
 function setClearSavedRunsConfirmModalOpen(open) {
@@ -4683,9 +4691,10 @@ function openClearSavedRunsConfirmModal() {
 
 function closeClearSavedRunsConfirmModal() {
   setClearSavedRunsConfirmModalOpen(false);
-  const footer = $("profilePatternsFooter");
-  if (footer && !footer.classList.contains("hidden")) {
-    $("clearSavedRunsOpenBtn")?.focus();
+  const clearWrap = $("profilePatternsClearWrap");
+  const clearBtn = $("clearSavedRunsOpenBtn");
+  if (clearWrap && !clearWrap.classList.contains("hidden") && clearBtn) {
+    clearBtn.focus();
   }
 }
 
@@ -5568,6 +5577,7 @@ function bindPrimaryEventControls() {
 }
 
 bindPrimaryEventControls();
+syncWaywordResearchFormLinks();
 bindCalibrationHandoffControls();
 optionsUi.bindOptionsSurfaceEventGuards();
 optionsUi.bindOptionsOpenCloseControls();

@@ -4117,6 +4117,57 @@ body.recent-drawer-open{
   margin-top:8px;
   padding-top:16px;
   border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.profile-patterns-footer__inner{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:14px;
+  max-width:100%;
+  box-sizing:border-box;
+}
+
+.profile-patterns-feedback{
+  text-align:center;
+  max-width:18rem;
+  padding:0 4px;
+  box-sizing:border-box;
+}
+
+.profile-patterns-feedback__title{
+  margin:0 0 4px;
+  font-size:0.75rem;
+  font-weight:600;
+  letter-spacing:0.02em;
+  color:var(--ink);
+  opacity:0.88;
+}
+
+.profile-patterns-feedback__body{
+  margin:0 0 6px;
+  font-size:0.8rem;
+  line-height:1.45;
+  color:var(--muted);
+}
+
+.profile-patterns-feedback__link{
+  display:inline-block;
+  font-size:0.75rem;
+  line-height:1.35;
+  color:color-mix(in srgb, var(--muted) 92%, var(--ink));
+  text-decoration:underline;
+  text-underline-offset:3px;
+  font-weight:500;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+
+.profile-patterns-feedback__link:hover{
+  color:var(--muted);
+}
+
+.profile-patterns-clear-wrap{
   display:flex;
   justify-content:center;
 }
@@ -6589,9 +6640,51 @@ html[data-theme="dark"] .metric-explainer{
   background:transparent;
 }
 
+.calibration-handoff-feedback{
+  margin-top:0.6rem;
+  padding-top:0.55rem;
+  border-top:1px solid color-mix(in srgb, var(--line) 50%, transparent);
+}
+
+.calibration-handoff-feedback__title{
+  margin:0 0 0.3rem;
+  font-size:0.8rem;
+  font-weight:600;
+  letter-spacing:0.02em;
+  color:var(--ink);
+  opacity:0.9;
+}
+
+.calibration-handoff-feedback__body{
+  margin:0 0 0.4rem;
+  font-size:0.78rem;
+  line-height:1.45;
+  color:var(--muted);
+}
+
+.calibration-handoff-feedback__link{
+  display:inline-block;
+  font-size:0.78rem;
+  line-height:1.35;
+  color:color-mix(in srgb, var(--muted) 94%, var(--ink));
+  text-decoration:underline;
+  text-underline-offset:2px;
+  font-weight:500;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+
+.calibration-handoff-feedback__link:hover{
+  color:var(--muted);
+}
+
 html[data-theme="dark"] .calibration-handoff-section{
   background:color-mix(in srgb, var(--ink) 6%, var(--panel));
   border-color:color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+html[data-theme="dark"] .calibration-handoff-feedback{
+  border-top-color:color-mix(in srgb, var(--ink) 20%, transparent);
 }
 
 @media (min-width:981px){

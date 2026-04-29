@@ -1116,13 +1116,14 @@ test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (
 
     const footerBefore = await session.execute(`
       var footer = document.getElementById("profilePatternsFooter");
+      var clearWrap = document.getElementById("profilePatternsClearWrap");
       return {
         exists: Boolean(footer),
-        hidden: footer ? footer.classList.contains("hidden") : true
+        clearHidden: clearWrap ? clearWrap.classList.contains("hidden") : true
       };
     `);
     assert.equal(footerBefore.exists, true, "expected Patterns footer element");
-    assert.equal(footerBefore.hidden, false, "expected Clear Saved Runs footer when runs exist");
+    assert.equal(footerBefore.clearHidden, false, "expected Clear Saved Runs control when runs exist");
 
     await session.click("#clearSavedRunsOpenBtn");
     await session.waitFor(
@@ -1197,10 +1198,10 @@ test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (
     );
 
     const footerAfter = await session.execute(`
-      var footer = document.getElementById("profilePatternsFooter");
-      return footer ? footer.classList.contains("hidden") : null;
+      var clearWrap = document.getElementById("profilePatternsClearWrap");
+      return clearWrap ? clearWrap.classList.contains("hidden") : null;
     `);
-    assert.equal(footerAfter, true, "footer action hidden when there are no saved runs");
+    assert.equal(footerAfter, true, "Clear Saved Runs hidden when there are no saved runs");
 
     const patternsLockedAfterClear = await session.execute(`
       var callouts = document.getElementById("patternCallouts");

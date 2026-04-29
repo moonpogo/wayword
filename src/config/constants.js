@@ -64,5 +64,7 @@
     METRIC_EXPLAINER_KEYS: new Set(["filler", "repetition", "openings"]),
     SHUFFLE_TARGET_WORDS: [60, 120, 240],
     SHUFFLE_TIMER_SECONDS: [120, 240, 360],
+    /** External research / feedback form (Tally); anchor hrefs set via `syncWaywordResearchFormLinks` in script.js. */
+    WAYWORD_RESEARCH_FORM_URL: "https://tally.so/r/9q6jvY",
   });
 })();
