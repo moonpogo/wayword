@@ -4100,6 +4100,69 @@ function collectMirrorSessionDigestsFromHistory() {
   return out;
 }
 
+function countWordsFromTextForUnlock(text) {
+  const t = String(text || "").toLowerCase();
+  const tokens = t.match(/[a-z][a-z'-]*/g) || [];
+  return tokens;
+}
+
+function runQualifiesForFirstPatternUnlock(run) {
+  const text = String(run?.text || "");
+  const tokens = countWordsFromTextForUnlock(text);
+  const wordCount = Math.max(0, Number(run?.wordCount ?? run?.words) || tokens.length);
+  const alphaChars = (text.match(/[A-Za-z]/g) || []).length;
+  const uniqueCount = new Set(tokens).size;
+  const uniqueRatio = wordCount > 0 ? uniqueCount / wordCount : 0;
+  const sentenceCount = text
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean).length;
+  const obviousTestLike =
+    /\b(asdf|qwerty|lorem ipsum|test run|testing)\b/i.test(text) ||
+    (wordCount >= 18 && uniqueCount <= 5) ||
+    (wordCount >= 24 && uniqueRatio < 0.2);
+  if (obviousTestLike) return false;
+  const baselineLength = wordCount >= 24 || alphaChars >= 90;
+  const baselineSubstance = uniqueCount >= 8 || sentenceCount >= 2;
+  return baselineLength && baselineSubstance;
+}
+
+function countQualifyingRunsForFirstPatternUnlock(runs) {
+  const list = Array.isArray(runs) ? runs : [];
+  return list.reduce((count, run) => count + (runQualifiesForFirstPatternUnlock(run) ? 1 : 0), 0);
+}
+
+function computePatternUnlockProgress() {
+  const requiredCount = 3;
+  const agg = aggregateProfile();
+  const runs = readSavedRunsChronological();
+  const qualifyingCount = countQualifyingRunsForFirstPatternUnlock(runs);
+  return {
+    totalSavedRuns: Math.max(0, Number(agg?.totalRuns) || 0),
+    totalWords: Math.max(0, Number(agg?.totalWords) || 0),
+    qualifyingPatternRunsCount: qualifyingCount,
+    requiredCount,
+    cappedProgressCount: Math.min(qualifyingCount, requiredCount),
+  };
+}
+
+function renderProfileHeroSummary(unlockProgress) {
+  const hero = $("profileHeroSummary");
+  if (!hero) return;
+  const progress = unlockProgress && typeof unlockProgress === "object" ? unlockProgress : computePatternUnlockProgress();
+  const runs = Math.max(0, Number(progress.totalSavedRuns) || 0);
+  if (!runs) {
+    hero.textContent = "";
+    return;
+  }
+  const words = Math.max(0, Number(progress.totalWords) || 0);
+  const qualifying = Math.max(0, Number(progress.qualifyingPatternRunsCount) || 0);
+  hero.textContent =
+    Number.isFinite(qualifying)
+      ? `Runs ${runs} · Words ${words} · ${qualifying} qualifying ${qualifying === 1 ? "trace" : "traces"}`
+      : `Runs ${runs} · Words ${words}`;
+}
+
 function deriveCurrentPostSubmitPhase(options = {}) {
   return window.waywordPostSubmitPhase.derivePostSubmitPhase({
     state,
@@ -4699,10 +4762,8 @@ function aggregateProfile() {
 
 function renderProfileLocked() {
   try {
-    const runs = completedRuns();
-    const remaining = Math.max(0, CALIBRATION_THRESHOLD - runs);
-
-    const lockedHtml = window.waywordPatternsRenderer.buildProfileLockedPanelInnerHtml(remaining, runs);
+    const unlockProgress = computePatternUnlockProgress();
+    const lockedHtml = window.waywordPatternsRenderer.buildProfileLockedPanelInnerHtml(unlockProgress);
 
     /* Locked state belongs in hero copy only; repeated-words card is unlocked-only (same HTML in both caused duplicate blocks). */
     const calloutsEl = $("patternCallouts");
@@ -4717,15 +4778,7 @@ function renderProfileLocked() {
       patternsUtilityWrap.setAttribute("aria-hidden", "true");
     }
 
-    if ($("profileHeroSummary")) {
-      const hero = $("profileHeroSummary");
-      if (runs) {
-        const agg = aggregateProfile();
-        hero.textContent = `Runs ${agg.totalRuns} · Words ${agg.totalWords}`;
-      } else {
-        hero.textContent = "";
-      }
-    }
+    renderProfileHeroSummary(unlockProgress);
   } finally {
     syncClearSavedRunsFooter();
   }
@@ -4804,9 +4857,7 @@ function renderProfile() {
   const avgUniqueRatio = agg.totalUniqueRatio / runs;
   const avgFiller = agg.fillerHits / runs;
 
-  if ($("profileHeroSummary")) {
-    $("profileHeroSummary").textContent = `Runs ${agg.totalRuns} · Words ${agg.totalWords}`;
-  }
+  renderProfileHeroSummary(computePatternUnlockProgress());
 
   const topWords = Object.entries(agg.wordFreq)
     .filter(([, c]) => c > 1)
@@ -4855,7 +4906,8 @@ function renderProfile() {
   if ($("patternCallouts")) {
     if (window.waywordMirrorController.mirrorPatternsProfileAvailable()) {
       const patternsMirrorHero = window.waywordPatternsRenderer.buildPatternsMirrorHeroHtml(
-        collectMirrorSessionDigestsFromHistory()
+        collectMirrorSessionDigestsFromHistory(),
+        computePatternUnlockProgress()
       );
       $("patternCallouts").innerHTML =
         patternsMirrorHero != null

@@ -1727,20 +1727,32 @@ test("patterns renderer preserves locked and empty-state output contracts", () =
   const context = loadPatternsRendererContext();
   const renderer = context.waywordPatternsRenderer;
 
-  const locked = renderer.buildProfileLockedPanelInnerHtml(2, 3);
+  const locked = renderer.buildProfileLockedPanelInnerHtml({
+    totalSavedRuns: 3,
+    totalWords: 120,
+    qualifyingPatternRunsCount: 2,
+    requiredCount: 3,
+    cappedProgressCount: 2,
+  });
   assert.match(locked, /profile-locked/);
-  assert.match(locked, /Almost there/);
-  assert.match(locked, /Save 2 more runs/);
-  assert.match(locked, /3 of 5 saved/);
+  assert.match(locked, /CROSS-RUN PATTERN/);
+  assert.match(locked, /Your first reflective pattern is forming/);
+  assert.match(locked, /2 of 3 traces gathered/);
+  assert.match(locked, /pattern-trace-formation/);
 
   assert.match(renderer.patternsMirrorHeroEmptyHtml(), /No cross-run pattern has surfaced yet/);
   assert.match(
-    renderer.patternsMirrorHeroInsufficientRunsHtml(),
-    /Three qualifying saved drafts are needed/
+    renderer.patternsMirrorHeroInsufficientRunsHtml({
+      totalSavedRuns: 5,
+      qualifyingPatternRunsCount: 0,
+      requiredCount: 3,
+      cappedProgressCount: 0,
+    }),
+    /Saved runs are present\. Longer drafts reveal more stable patterns/
   );
   assert.match(
     renderer.patternsMirrorHeroNoStrongPatternHtml(),
-    /Enough drafts are saved, but no pattern has repeated clearly/
+    /Enough traces are saved\.<br>No stable pattern has surfaced yet\./
   );
 });
 
@@ -1771,7 +1783,7 @@ test("patterns renderer preserves mirror hero path selection contracts", () => {
   }).waywordPatternsRenderer;
   assert.match(
     noStrong.buildPatternsMirrorHeroHtml([{ v: 1, id: "digest-1" }]),
-    /no pattern has repeated clearly/
+    /No stable pattern has surfaced yet/
   );
 
   const promoted = loadPatternsRendererContext({
@@ -1824,7 +1836,7 @@ test("patterns repeated-word challenge rendering preserves selection and begin g
     selectedChallengeSet: new Set(),
     draftChallengeWords: [],
   });
-  assert.match(unselectedHtml, /Tap a word above/);
+  assert.match(unselectedHtml, /Try one run without one repeated word/);
   assert.doesNotMatch(unselectedHtml, /Begin challenge/);
 
   const emptyHtml = renderer.buildPatternsRepeatedChallengeRootInnerHtml({

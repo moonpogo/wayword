@@ -7,10 +7,52 @@
     );
   }
 
-  function patternsMirrorHeroInsufficientRunsHtml() {
+  function buildPatternFormationIndicatorSvg(progressCount) {
+    const active = Math.max(0, Math.min(2, Number(progressCount) || 0));
+    const dotCenters = [32, 84, 136];
+    const marks = [0, 1, 2]
+      .map((i) => {
+        const isActive = i < active;
+        const cls = isActive ? "is-active" : "is-ghost";
+        const cx = dotCenters[i];
+        return `<circle class="trace-dot ${cls}" cx="${cx}" cy="22" r="4.5"></circle>`;
+      })
+      .join("");
+    return (
+      '<svg class="pattern-trace-formation" viewBox="0 0 168 44" width="168" height="44" aria-hidden="true" focusable="false">' +
+      '<line class="trace-link" x1="50" y1="22" x2="66" y2="22"></line>' +
+      '<line class="trace-link" x1="102" y1="22" x2="118" y2="22"></line>' +
+      marks +
+      "</svg>"
+    );
+  }
+
+  function buildProfileLockedPanelInnerHtml(progress) {
+    const safe = progress && typeof progress === "object" ? progress : {};
+    const qualifyingCount = Math.max(0, Number(safe.qualifyingPatternRunsCount) || 0);
+    const requiredCount = Math.max(1, Number(safe.requiredCount) || 3);
+    const cappedProgressCount = Math.max(
+      0,
+      Math.min(requiredCount, Number(safe.cappedProgressCount) || 0)
+    );
+    const totalSavedRuns = Math.max(0, Number(safe.totalSavedRuns) || 0);
+    const showDefensive = totalSavedRuns >= requiredCount && qualifyingCount === 0;
+
+    return `
+    <div class="profile-locked profile-locked--pattern-formation">
+      <div class="profile-locked-title">CROSS-RUN PATTERN</div>
+      <div class="profile-locked-copy">Your first reflective pattern is forming.</div>
+      <div class="profile-locked-formation-visual">${buildPatternFormationIndicatorSvg(cappedProgressCount)}</div>
+      <div class="profile-locked-copy profile-locked-copy--status">${cappedProgressCount} of ${requiredCount} traces gathered</div>
+      ${showDefensive ? '<div class="profile-locked-copy profile-locked-copy--quiet">Saved runs are present. Longer drafts reveal more stable patterns.</div>' : ""}
+    </div>
+  `;
+  }
+
+  function patternsMirrorHeroInsufficientRunsHtml(progress) {
     return (
       '<div class="patterns-mirror-hero patterns-mirror-hero--empty patterns-mirror-hero--empty-insufficient">' +
-      '<p class="patterns-mirror-empty">Three qualifying saved drafts are needed before patterns can surface.</p>' +
+      buildProfileLockedPanelInnerHtml(progress) +
       "</div>"
     );
   }
@@ -18,7 +60,7 @@
   function patternsMirrorHeroNoStrongPatternHtml() {
     return (
       '<div class="patterns-mirror-hero patterns-mirror-hero--empty patterns-mirror-hero--empty-no-strong">' +
-      '<p class="patterns-mirror-empty">Enough drafts are saved, but no pattern has repeated clearly.</p>' +
+      '<p class="patterns-mirror-empty">Enough traces are saved.<br>No stable pattern has surfaced yet.</p>' +
       "</div>"
     );
   }
@@ -27,7 +69,7 @@
    * Patterns hero: digest-backed profile line + promoted reflection cards, or a quiet empty state.
    * Returns `null` only when the mirror bundle does not expose `getPatternsProfileFromDigests` (legacy builds).
    */
-  function buildPatternsMirrorHeroHtml(digests) {
+  function buildPatternsMirrorHeroHtml(digests, unlockProgress) {
     if (!window.waywordMirrorController.mirrorPatternsProfileAvailable()) {
       return null;
     }
@@ -68,7 +110,11 @@
     }
 
     if (emptyState === "insufficient_runs") {
-      return patternsMirrorHeroInsufficientRunsHtml();
+      const unlockCount = Math.max(0, Number(unlockProgress?.cappedProgressCount) || 0);
+      if (unlockCount >= 3) {
+        return patternsMirrorHeroNoStrongPatternHtml();
+      }
+      return patternsMirrorHeroInsufficientRunsHtml(unlockProgress);
     }
     if (emptyState === "no_strong_pattern") {
       return patternsMirrorHeroNoStrongPatternHtml();
@@ -135,16 +181,6 @@
     };
   }
 
-  function buildProfileLockedPanelInnerHtml(remaining, runs) {
-    return `
-    <div class="profile-locked">
-      <div class="profile-locked-title">Almost there</div>
-      <div class="profile-locked-copy">Save ${remaining} more ${remaining === 1 ? "run" : "runs"} to open reflection across saved drafts here.</div>
-      <div class="profile-locked-copy">${runs} of ${window.waywordConfig.CALIBRATION_THRESHOLD} saved.</div>
-    </div>
-  `;
-  }
-
   function buildPatternCalloutsLegacySectionHtml(calloutsWithStarters) {
     return `
       <div class="history-item"><strong>${calloutsWithStarters.headline}</strong></div>
@@ -201,13 +237,13 @@
           </button>
         </div>`
       : gatedPairs.length
-        ? `<p class="patterns-challenge-hint">Tap a word above to try leaving it out for one run.</p>`
+        ? ""
         : "";
 
     return `
       <div class="section-title card-section-title patterns-repeated-challenge__title">Practice from repeats</div>
-      <p class="patterns-repeated-tool-note">A small exercise from repeated words in saved runs.</p>
       ${wordsHtml}
+      ${gatedPairs.length ? '<p class="patterns-repeated-tool-note">Try one run without one repeated word.</p>' : ""}
       ${challengeHtml}
     `;
   }

@@ -4052,8 +4052,8 @@ body.recent-drawer-open{
 .profile-hero-copy{
   display:flex;
   flex-direction:column;
-  gap:10px;
-  margin-bottom:12px;
+  gap:8px;
+  margin-bottom:14px;
   min-width:0;
 }
 
@@ -4090,9 +4090,68 @@ body.recent-drawer-open{
 .profile-hero-copy .patterns-mirror-hero--empty .patterns-mirror-empty{
   margin:0;
   font-size:0.95rem;
+  line-height:1.52;
+  font-weight:400;
+  color:var(--muted);
+}
+.profile-hero-copy .profile-locked--pattern-formation{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.profile-hero-copy .profile-locked-title{
+  margin:0;
+  font-size:0.73rem;
+  line-height:1.3;
+  letter-spacing:0.09em;
+  font-weight:600;
+  color:color-mix(in srgb, var(--ink) 82%, var(--muted));
+}
+.profile-hero-copy .profile-locked-copy{
+  margin:0;
+  font-size:0.95rem;
   line-height:1.58;
   font-weight:400;
   color:var(--muted);
+}
+.profile-hero-copy .profile-locked-copy--status{
+  font-size:0.88rem;
+  line-height:1.45;
+  color:color-mix(in srgb, var(--muted) 90%, var(--ink));
+}
+.profile-hero-copy .profile-locked-copy--quiet{
+  font-size:0.82rem;
+  line-height:1.46;
+  color:color-mix(in srgb, var(--muted) 82%, transparent);
+}
+.profile-hero-copy .profile-locked-formation-visual{
+  margin:2px 0 0;
+}
+.profile-hero-copy .pattern-trace-formation{
+  display:block;
+  width:min(100%, 168px);
+  height:auto;
+  overflow:visible;
+}
+.profile-hero-copy .pattern-trace-formation .trace-link{
+  stroke:color-mix(in srgb, var(--line) 88%, var(--ink));
+  stroke-width:0.72;
+  stroke-linecap:round;
+  opacity:0.52;
+}
+.profile-hero-copy .pattern-trace-formation .trace-dot{
+  vector-effect:non-scaling-stroke;
+}
+.profile-hero-copy .pattern-trace-formation .trace-dot.is-active{
+  fill:color-mix(in srgb, var(--ink) 74%, var(--line));
+  stroke:color-mix(in srgb, var(--ink) 84%, var(--line));
+  stroke-width:1;
+}
+.profile-hero-copy .pattern-trace-formation .trace-dot.is-ghost{
+  fill:transparent;
+  stroke:color-mix(in srgb, var(--line) 72%, var(--ink));
+  stroke-width:1;
+  opacity:0.9;
 }
 .profile-hero-copy .mirror-stack--patterns-promoted{
   gap:0.55rem;
@@ -4105,6 +4164,12 @@ body.recent-drawer-open{
 .profile-hero .run-stats-inline{
   text-align:left;
   width:100%;
+  margin-top:2px;
+  margin-bottom:8px;
+  font-size:0.8rem;
+  line-height:1.35;
+  letter-spacing:0.01em;
+  color:color-mix(in srgb, var(--muted) 88%, var(--ink));
 }
 
 .profile-stack{
@@ -4114,8 +4179,8 @@ body.recent-drawer-open{
 }
 
 .profile-patterns-footer{
-  margin-top:8px;
-  padding-top:16px;
+  margin-top:6px;
+  padding-top:18px;
   border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent);
 }
 
@@ -4175,7 +4240,7 @@ body.recent-drawer-open{
 .profile-patterns-clear-wrap--panel-end{
   flex-shrink:0;
   margin-top:auto;
-  padding-top:20px;
+  padding-top:24px;
 }
 
 .profile-patterns-footer__action{
@@ -4388,7 +4453,8 @@ body.clear-saved-runs-confirm-open .clear-saved-runs-modal{
 .profile-hero{
   background:rgba(0,0,0,0.035);
   border-radius:18px;
-  padding:18px;
+  padding:18px 18px 16px;
+  border-bottom:1px solid color-mix(in srgb, var(--line) 52%, transparent);
 }
 
 html[data-theme="dark"] .profile-hero{
@@ -4396,24 +4462,25 @@ html[data-theme="dark"] .profile-hero{
 }
 
 .profile-patterns-utility{
-  margin-top:2px;
+  margin-top:4px;
 }
 
 .patterns-repeated-challenge-card{
   border:1px solid var(--line);
   border-radius:16px;
-  padding:15px;
+  padding:15px 15px 14px;
   background:var(--panel);
+  border-bottom:1px solid color-mix(in srgb, var(--line) 58%, transparent);
 }
 
 .patterns-repeated-challenge__title{
-  margin-bottom:10px;
+  margin-bottom:8px;
 }
 
 .patterns-repeated-tool-note{
-  margin:0 0 10px;
-  font-size:12px;
-  line-height:1.45;
+  margin:11px 0 9px;
+  font-size:0.83rem;
+  line-height:1.4;
   color:var(--muted);
 }
 
@@ -4458,7 +4525,7 @@ html[data-theme="dark"] .profile-hero{
 }
 
 .patterns-repeated-empty{
-  margin:0;
+  margin:2px 0 6px;
   font-size:15px;
   line-height:1.48;
   color:var(--muted);
@@ -4468,9 +4535,9 @@ html[data-theme="dark"] .profile-hero{
   display:flex;
   flex-wrap:wrap;
   align-items:baseline;
-  gap:0.24rem 0.55rem;
+  gap:0.32rem 0.62rem;
   margin:2px 0 0;
-  line-height:1.45;
+  line-height:1.28;
   min-width:0;
   max-width:100%;
   width:100%;
@@ -4489,7 +4556,7 @@ html[data-theme="dark"] .profile-hero{
   font-family:inherit;
   font-size:0.94em;
   font-weight:500;
-  letter-spacing:-0.01em;
+  letter-spacing:0;
   line-height:inherit;
   cursor:pointer;
   box-sizing:border-box;
