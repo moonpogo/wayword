@@ -36,9 +36,9 @@ const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
     "Pick one detail and stay with it."
   ],
   Relation: [
-    "Use only spoken lines.",
+    "Use spoken lines only. Let the silence live underneath them.",
     "Two people. One exchange.",
-    "No naming of feeling; only what is said.",
+    "No naming the feeling. Let what is said carry it.",
     "Keep it to one room and one moment."
   ],
   Pressure: [
@@ -53,6 +53,10 @@ const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
     "Leave the obvious label out.",
     "Leave the main feeling unnamed."
   ]
+});
+
+const RITUAL_NUDGE_BLOCKLIST_BY_PROMPT_STRUCTURE = Object.freeze({
+  interpersonal_gap: ["spoken lines", "one exchange", "what is said"],
 });
 
 const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
@@ -106,16 +110,28 @@ const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
   ]
 });
 
+function filterRitualNudgePoolForPrompt(pool, promptStructure) {
+  const structure = String(promptStructure || "").trim();
+  const blocked = RITUAL_NUDGE_BLOCKLIST_BY_PROMPT_STRUCTURE[structure];
+  if (!blocked || !blocked.length) return pool;
+  const filtered = pool.filter((line) => {
+    const text = String(line || "").toLowerCase();
+    return !blocked.some((phrase) => text.includes(phrase));
+  });
+  return filtered.length ? filtered : pool;
+}
+
 /**
  * Ritual nudge for the run after this one. Deterministic; never quotes mirror text.
- * @param {{ priorPromptFamily: string, hadMainReflection: boolean, mainCategory: string | null, seed: string }} input
+ * @param {{ priorPromptFamily: string, promptStructure?: string, hadMainReflection: boolean, mainCategory: string | null, seed: string }} input
  */
 
-function buildRitualNudgeV1({ priorPromptFamily, hadMainReflection, mainCategory, seed }) {
+function buildRitualNudgeV1({ priorPromptFamily, promptStructure, hadMainReflection, mainCategory, seed }) {
   const family = String(priorPromptFamily || "").trim() || "Scene";
   const s = seed != null ? String(seed) : "";
   if (!hadMainReflection) {
-    const pool = RITUAL_NO_MAIN_NUDGE_BY_FAMILY[family] || RITUAL_NO_MAIN_NUDGE_BY_FAMILY.Scene;
+    const basePool = RITUAL_NO_MAIN_NUDGE_BY_FAMILY[family] || RITUAL_NO_MAIN_NUDGE_BY_FAMILY.Scene;
+    const pool = filterRitualNudgePoolForPrompt(basePool, promptStructure);
     const idx = ritualPickIndex(`${s}|no-main|${family}`, pool.length);
     return pool[idx];
   }
@@ -248,12 +264,14 @@ function getActivePromptNudgeLineForRender() {
     return getCalibrationProgressNudgeLine();
   }
   const family = String(state.promptFamily || "").trim() || "Scene";
+  const promptEntry = promptEntryById.get(String(state.promptId || ""));
   const seed =
     String(state.lastPromptKey || "").trim() ||
     String(state.prompt || "").trim() ||
     "wayword";
   return buildRitualNudgeV1({
     priorPromptFamily: family,
+    promptStructure: promptEntry?.structure,
     hadMainReflection: false,
     mainCategory: null,
     seed
