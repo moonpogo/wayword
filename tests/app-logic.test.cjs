@@ -107,6 +107,35 @@ function loadRecentRunsRenderCoordinatorContext() {
   });
 }
 
+function loadPatternsRendererContext(overrides = {}) {
+  return loadBrowserScripts(
+    ["src/ui/patterns-repeat-lexical-gate.js", "src/ui/render-patterns.js"],
+    {
+      console: silentConsole(),
+      escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      },
+      mirrorReflectionCardHtml(card) {
+        return `<article class="mirror-card"><p>${String(card?.statement || "")}</p></article>`;
+      },
+      waywordConfig: { CALIBRATION_THRESHOLD: 5 },
+      waywordMirrorController: {
+        mirrorPatternsProfileAvailable() {
+          return false;
+        },
+        getPatternsProfileFromDigests() {
+          throw new Error("unexpected patterns mirror call");
+        },
+      },
+      ...overrides,
+    }
+  );
+}
+
 function loadPostSubmitPhaseContext() {
   return loadBrowserScripts(["src/features/writing/post-submit-phase.js"], {
     console: silentConsole(),
@@ -1692,6 +1721,118 @@ test("patterns transition coordinator closes mobile profile shell state", () => 
   assert.equal(bodyClass.contains("keyboard-open"), false);
   assert.equal(docElClass.contains("focus-mode-layout-snap"), false);
   assert.equal(state.isExpandedField, false);
+});
+
+test("patterns renderer preserves locked and empty-state output contracts", () => {
+  const context = loadPatternsRendererContext();
+  const renderer = context.waywordPatternsRenderer;
+
+  const locked = renderer.buildProfileLockedPanelInnerHtml(2, 3);
+  assert.match(locked, /profile-locked/);
+  assert.match(locked, /Almost there/);
+  assert.match(locked, /Save 2 more runs/);
+  assert.match(locked, /3 of 5 saved/);
+
+  assert.match(renderer.patternsMirrorHeroEmptyHtml(), /No cross-run pattern has surfaced yet/);
+  assert.match(
+    renderer.patternsMirrorHeroInsufficientRunsHtml(),
+    /Three qualifying saved drafts are needed/
+  );
+  assert.match(
+    renderer.patternsMirrorHeroNoStrongPatternHtml(),
+    /Enough drafts are saved, but no pattern has repeated clearly/
+  );
+});
+
+test("patterns renderer preserves mirror hero path selection contracts", () => {
+  const unavailable = loadPatternsRendererContext({
+    waywordMirrorController: {
+      mirrorPatternsProfileAvailable() {
+        return false;
+      },
+    },
+  }).waywordPatternsRenderer;
+  assert.equal(unavailable.buildPatternsMirrorHeroHtml([{ v: 1 }]), null);
+
+  const noStrong = loadPatternsRendererContext({
+    waywordMirrorController: {
+      mirrorPatternsProfileAvailable() {
+        return true;
+      },
+      getPatternsProfileFromDigests(digests) {
+        assert.deepEqual(digests, [{ v: 1, id: "digest-1" }]);
+        return {
+          promotedPatterns: [],
+          profile: "",
+          patternsEmptyState: "no_strong_pattern",
+        };
+      },
+    },
+  }).waywordPatternsRenderer;
+  assert.match(
+    noStrong.buildPatternsMirrorHeroHtml([{ v: 1, id: "digest-1" }]),
+    /no pattern has repeated clearly/
+  );
+
+  const promoted = loadPatternsRendererContext({
+    waywordMirrorController: {
+      mirrorPatternsProfileAvailable() {
+        return true;
+      },
+      getPatternsProfileFromDigests() {
+        return {
+          promotedPatterns: [
+            { statement: "One word keeps returning." },
+            { statement: "Openings repeat across drafts." },
+          ],
+          profile: "The drafts circle repeated language.",
+          patternsEmptyState: null,
+        };
+      },
+    },
+  }).waywordPatternsRenderer;
+  const html = promoted.buildPatternsMirrorHeroHtml([{ v: 1 }]);
+  assert.match(html, /patterns-mirror-profile/);
+  assert.match(html, /The drafts circle repeated language/);
+  assert.match(html, /One word keeps returning/);
+  assert.match(html, /Openings repeat across drafts/);
+  assert.doesNotMatch(html, /mirror-card__evidence-toggle/);
+});
+
+test("patterns repeated-word challenge rendering preserves selection and begin gating", () => {
+  const context = loadPatternsRendererContext();
+  const renderer = context.waywordPatternsRenderer;
+
+  const selectedHtml = renderer.buildPatternsRepeatedChallengeRootInnerHtml({
+    topWords: [
+      ["threshold", 6],
+      ["the", 20],
+      ["returning", 4],
+    ],
+    selectedChallengeSet: new Set(["threshold"]),
+    draftChallengeWords: ["threshold", "missing"],
+  });
+  assert.match(selectedHtml, /patterns-word-chip is-selected/);
+  assert.match(selectedHtml, /data-challenge-word="threshold"/);
+  assert.doesNotMatch(selectedHtml, /data-challenge-word="the"/);
+  assert.doesNotMatch(selectedHtml, /missing/);
+  assert.match(selectedHtml, /Begin challenge/);
+  assert.match(selectedHtml, /without using the word <strong>threshold<\/strong>/);
+
+  const unselectedHtml = renderer.buildPatternsRepeatedChallengeRootInnerHtml({
+    topWords: [["threshold", 6]],
+    selectedChallengeSet: new Set(),
+    draftChallengeWords: [],
+  });
+  assert.match(unselectedHtml, /Tap a word above/);
+  assert.doesNotMatch(unselectedHtml, /Begin challenge/);
+
+  const emptyHtml = renderer.buildPatternsRepeatedChallengeRootInnerHtml({
+    topWords: [["the", 99]],
+    selectedChallengeSet: new Set(),
+    draftChallengeWords: [],
+  });
+  assert.match(emptyHtml, /No strong repeat targets across saved runs yet/);
 });
 
 test("post-submit phase derivation names current run/post-submit scenarios", () => {
