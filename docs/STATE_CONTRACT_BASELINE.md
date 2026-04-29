@@ -74,7 +74,7 @@ Invariant: `submitted=true` plus `completedUiActive=true` plus `active=false` is
 
 ## Prompt Families
 
-Current runtime main prompt families in `script.js`:
+Current runtime main prompt families in `src/features/prompts/prompt-library.js`:
 
 - `Scene`
 - `Relation`
@@ -84,8 +84,6 @@ Current runtime main prompt families in `script.js`:
 Current calibration family:
 
 - `Calibration`
-
-Note: `docs/PROMPT_SYSTEM_V1_1.md` currently describes different family names. Treat that as known docs/runtime drift until resolved by a later prompt subsystem phase.
 
 ## Canonical + Legacy Persistence
 

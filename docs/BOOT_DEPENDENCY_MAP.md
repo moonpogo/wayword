@@ -42,7 +42,7 @@ Current `index.html` script order is part of the runtime contract. `script.js` l
 - DOM/config/state: `waywordDomElements`, `waywordConfig`, `waywordStorage`, `waywordAppState`.
 - Runtime seams: `waywordAnalysisRuntime`, `waywordAppBootRuntime`, `waywordAppEventsRuntime`, `waywordPromptRuntime`, `waywordProgressionRuntime`, `waywordRunControllerRuntime`.
 - Run persistence: `waywordRunModel`, `waywordRunDocumentRepo`, `waywordSavedRunsRead`, `waywordSavedRunPersistence`.
-- Prompt data: `waywordPromptLibrary`, `waywordCalibrationPrompts`.
+- Prompt data: `waywordPromptLibrary`, `waywordCalibrationPrompts`; these extracted modules are the prompt corpus/family source of truth.
 - Writing helpers: `waywordPostSubmitPhase`, `waywordCompletedUiRestartInteractions`, run controller, submit prep, submit Mirror analysis, completion decision/aftermath, successful submit, post-submit reconciler, prompt interactions, focus/viewport/options/patterns coordinators.
 - UI renderers: `waywordHistoryRenderer`, `waywordRecentRunsViewPrep`, `waywordRecentRunsRenderCoordinator`, `waywordPatternsRenderer`, `waywordPostRunRenderer`, `waywordViewController`.
 

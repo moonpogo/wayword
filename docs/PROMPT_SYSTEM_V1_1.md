@@ -2,17 +2,22 @@
 
 Editorial doctrine (private): `docs/EDITORIAL_DOCTRINE.md`.
 
-## Families (source of truth: `script.js` → `promptLibrary`)
+## Families
 
 | Family | Posture |
 |--------|---------|
-| **Observation** | Outward notice: place, residue, concrete scene (includes former **Object** prompts). |
+| **Scene** | Outward notice: place, residue, concrete scene, objects, and physical staging. |
 | **Relation** | Between people: unsaid, kindness, avoidance, trace. |
-| **Tension** | Pressure, withholding, edge, cost. |
-| **Possibility** | Forks and near-misses, kept intentionally small. |
+| **Pressure** | Pressure, withholding, edge, cost, forks, and near-misses. |
 | **Constraint** | Explicit rule on the sentence (withholding channels/categories). |
+| **Calibration** | Separate onboarding/calibration prompt family; not part of main random family order. |
 
-Removed as families: **Indirection**, **Social**, **Object** (material redistributed).
+Source of truth:
+
+- Main family order and prompt corpus: `src/features/prompts/prompt-library.js`
+- Calibration family and prompt corpus: `src/features/prompts/calibration-prompts.js`
+
+Removed as runtime families: **Indirection**, **Social**, **Object**, **Observation**, **Tension**, **Possibility** (material redistributed).
 
 ## History (compact)
 
@@ -24,6 +29,7 @@ Removed as families: **Indirection**, **Social**, **Object** (material redistrib
 
 - Default: weighted family pick among families with eligible prompts, then uniform random among eligible in that family.
 - Reroll: **in-family first** (`familyKey: state.promptFamily`); relax near-duplicate; then **one** cross-family sweep if still empty.
+- Calibration: while saved runs are below the calibration threshold, prompt generation uses the separate **Calibration** pool instead of the main family order.
 
 ## Constants
 

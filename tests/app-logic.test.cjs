@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const test = require("node:test");
 const {
   createClassList,
@@ -350,6 +351,22 @@ test("extracted prompt data preserves family names, counts, and deterministic se
 
   assert.equal(chosen.family, "Scene");
   assert.equal(chosen.entry.id, "observation_kitchen_left");
+});
+
+test("prompt system docs list the runtime prompt families", () => {
+  const context = loadPromptDataContext();
+  const familyOrder = Array.from(context.waywordPromptLibrary.PROMPT_FAMILIES_ORDER);
+  const calibrationFamily = context.waywordCalibrationPrompts.CALIBRATION_PROMPT_FAMILY;
+  const doc = fs.readFileSync("docs/PROMPT_SYSTEM_V1_1.md", "utf8");
+  const documentedFamilies = doc
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\| \*\*([^*]+)\*\* \|/))
+    .filter(Boolean)
+    .map((match) => match[1]);
+
+  assert.deepEqual(documentedFamilies, familyOrder.concat([calibrationFamily]));
+  assert.match(doc, /src\/features\/prompts\/prompt-library\.js/);
+  assert.match(doc, /src\/features\/prompts\/calibration-prompts\.js/);
 });
 
 test("reroll gating stays tied to active, unsubmitted, empty-editor state", () => {
