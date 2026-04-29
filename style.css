@@ -4123,7 +4123,7 @@ body.recent-drawer-open{
   display:flex;
   flex-direction:column;
   align-items:center;
-  gap:14px;
+  gap:0;
   max-width:100%;
   box-sizing:border-box;
 }
@@ -4170,6 +4170,12 @@ body.recent-drawer-open{
 .profile-patterns-clear-wrap{
   display:flex;
   justify-content:center;
+}
+
+.profile-patterns-clear-wrap--panel-end{
+  flex-shrink:0;
+  margin-top:auto;
+  padding-top:20px;
 }
 
 .profile-patterns-footer__action{
@@ -4352,6 +4358,9 @@ body.clear-saved-runs-confirm-open .clear-saved-runs-modal{
 }
 
 #profileView:not(.hidden){
+  display:flex;
+  flex-direction:column;
+  min-height:0;
   transition:opacity var(--motion-duration-panel) var(--motion-ease-out),
     transform var(--motion-duration-panel) var(--motion-ease-out);
   opacity:1;
@@ -5321,7 +5330,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   #writeView .side-column.rail-mode-patterns #profileView{
-    display:block;
+    display:flex;
+    flex-direction:column;
     flex:1 1 auto;
     min-height:0;
     max-height:100%;
