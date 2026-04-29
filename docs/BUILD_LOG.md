@@ -150,17 +150,17 @@ This pass is a working-tree stabilization pass, not a released commit.
 ### What this pass updates
 
 - Fills `docs/V1_PRODUCT_SPEC.md` as the current V1 product source of truth.
-- Reconciles `MIRROR_V1_DOCTRINE.md`, `docs/STATE_FLOW.md`, and `docs/QA_REGRESSION_CHECKLIST.md` to the same evidence contract.
+- Reconciles `docs/MIRROR_V1_DOCTRINE.md`, `docs/STATE_FLOW.md`, and `docs/QA_REGRESSION_CHECKLIST.md` to the same evidence contract.
 - Adds source-of-truth notes to historical / partially stale engineering docs.
 - Removes dead runtime evidence-toggle wiring that no longer corresponds to rendered DOM.
 
 ### Files changed in this pass
 
-- `BUILD_LOG.md`
-- `MIRROR_V1_DOCTRINE.md`
+- `docs/BUILD_LOG.md`
+- `docs/MIRROR_V1_DOCTRINE.md`
 - `README.md`
-- `STRUCTURAL_AUDIT.md`
-- `SYSTEM_OWNERSHIP.md`
+- `docs/STRUCTURAL_AUDIT.md`
+- `docs/SYSTEM_OWNERSHIP.md`
 - `docs/QA_REGRESSION_CHECKLIST.md`
 - `docs/STATE_FLOW.md`
 - `docs/V1_PRODUCT_SPEC.md`

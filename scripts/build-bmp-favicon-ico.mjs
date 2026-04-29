@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Writes favicon.ico using BMP (DIB) bitmaps — Safari historically rejects PNG-in-ICO.
- * Reads favicon-16x16.png and favicon-32x32.png from repo root (RGBA PNG).
+ * Reads assets/icons/favicon-16x16.png and assets/icons/favicon-32x32.png (RGBA PNG).
  */
 import fs from "fs";
 import path from "path";
@@ -10,6 +10,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
+const iconsDir = path.join(root, "assets", "icons");
 
 function decodePngRgba(buf) {
   if (buf.slice(0, 8).toString("hex") !== "89504e470d0a1a0a") throw new Error("not png");
@@ -134,13 +135,13 @@ function buildIco(images) {
 const sizes = [16, 32];
 const images = [];
 for (const s of sizes) {
-  const pngPath = path.join(root, `favicon-${s}x${s}.png`);
+  const pngPath = path.join(iconsDir, `favicon-${s}x${s}.png`);
   const { width, height, rgba } = decodePngRgba(fs.readFileSync(pngPath));
   if (width !== s || height !== s) throw new Error(`expected ${s}x${s}, got ${width}x${height}`);
   images.push({ width, height, dib: dib32ForIco(width, height, rgba) });
 }
 
 const ico = buildIco(images);
-const outPath = path.join(root, "favicon.ico");
+const outPath = path.join(iconsDir, "favicon.ico");
 fs.writeFileSync(outPath, ico);
 console.log("wrote", outPath, ico.length, "bytes");

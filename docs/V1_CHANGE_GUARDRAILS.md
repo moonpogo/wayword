@@ -49,4 +49,4 @@ Use this checklist before making any V1-sensitive change.
 - no CSS cleanup
 - no bundle rebuild unless explicitly required by the intended change
 
-If a change needs to cross one of these guardrails, document the reason in `BUILD_LOG.md` and call out the risk explicitly in the PR or task summary.
+If a change needs to cross one of these guardrails, document the reason in `docs/BUILD_LOG.md` and call out the risk explicitly in the PR or task summary.

@@ -1,6 +1,6 @@
 # Mirror V1 — Internal evaluation corpus
 
-**Purpose:** Regression and acceptance checks so we can see whether session output **matches** `MIRROR_V1_DOCTRINE.md` and the intended Mirror V1 product contract.
+**Purpose:** Regression and acceptance checks so we can see whether session output **matches** `docs/MIRROR_V1_DOCTRINE.md` and the intended Mirror V1 product contract.
 
 **How to use:** Run the Mirror V1 pipeline on each **input text** (session body only). Compare results to **expected categories**, **expected output shape**, and **acceptable / unacceptable** language. Mismatches are either engine drift or corpus expectations that need tightening—record which.
 

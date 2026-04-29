@@ -1,6 +1,6 @@
 /**
  * Structured Wayword mirror evaluation corpus (review harness).
- * Spec: WAYWORD_EVALUATION_CORPUS.md (initial cases, section 8).
+ * Spec: docs/WAYWORD_EVALUATION_CORPUS.md (initial cases, section 8).
  *
  * @typedef {Object} WaywordEvaluationCase
  * @property {string} id

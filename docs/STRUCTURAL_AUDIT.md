@@ -105,7 +105,7 @@ Scope: `main` as source of truth. Focus is seams, coupling, and regression risk 
 - **Why risky:** Onboarding and searchability suffer; easy to wire the wrong element when adding controls.
 - **Files:** `script.js`, `index.html`, `style.css` (`settings-open`, `settings-modal`, …)
 - **Severity:** **Low**
-- **Cleanup direction:** Document the mapping in `SYSTEM_OWNERSHIP.md` / one comment block, or rename IDs in a focused PR (risky for saved bookmarks/tests — only if you have them).
+- **Cleanup direction:** Document the mapping in `docs/SYSTEM_OWNERSHIP.md` / one comment block, or rename IDs in a focused PR (risky for saved bookmarks/tests — only if you have them).
 - **Timing:** **Quick win** = documentation only; **rename** = schedule when you can regression-test UI.
 
 ### I. `generateReflections.ts` as a misleading entry point
