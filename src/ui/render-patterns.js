@@ -205,8 +205,8 @@
         : "";
 
     return `
-      <div class="section-title card-section-title patterns-repeated-challenge__title">Repeated words</div>
-      <p class="patterns-repeated-tool-note">Saved-run word counts for choosing a practice challenge below.</p>
+      <div class="section-title card-section-title patterns-repeated-challenge__title">Practice from repeats</div>
+      <p class="patterns-repeated-tool-note">A small exercise from repeated words in saved runs.</p>
       ${wordsHtml}
       ${challengeHtml}
     `;
