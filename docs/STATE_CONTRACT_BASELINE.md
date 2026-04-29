@@ -15,6 +15,22 @@ Phase 0 snapshot of current state contracts before selected-seam migration.
 | `state.pendingNudgeLine` | Under-prompt nudge carried into the next active run after saved submit, except handoff clears it. |
 | `state.pendingRecentDrawerExpand` | Recent Runs drawer focus/expansion intent after save. |
 
+## Derived Post-Submit Phase Vocabulary
+
+Phase 1 adds a read-only derived vocabulary in `src/features/writing/post-submit-phase.js`.
+It does not currently drive rendering, routing, persistence, restart behavior, or state mutation.
+
+| Phase | Derived from current flags |
+| --- | --- |
+| `idle` | No active writing session. |
+| `drafting` | Active session is not in completed post-submit UI. |
+| `submitted_calibration_baseline` | Submitted/completed state has a non-insufficient `calibrationPostRun`. |
+| `submitted_calibration_insufficient` | Submitted/completed state has `calibrationPostRun.insufficient`. |
+| `submitted_calibration_handoff` | `calibrationHandoffVisible` is true; this takes precedence over baseline payload. |
+| `submitted_mirror_low_signal` | Mirror result is low-signal, or caller supplies the current renderer's low-signal predicate result. |
+| `submitted_mirror_ready` | Submitted/completed state reaches normal Mirror rendering. |
+| `submitted_mirror_unavailable` | Last Mirror load/API call failed. |
+
 ## Calibration Flags
 
 | State / key | Current meaning |

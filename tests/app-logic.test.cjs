@@ -87,6 +87,12 @@ function loadRecentRunsPrepContext() {
   });
 }
 
+function loadPostSubmitPhaseContext() {
+  return loadBrowserScripts(["src/features/writing/post-submit-phase.js"], {
+    console: silentConsole(),
+  });
+}
+
 function loadRecentRunsInteractionContext(documentStub) {
   return loadBrowserScripts(["src/features/writing/recent-runs-interaction.js"], {
     console: silentConsole(),
@@ -1416,6 +1422,103 @@ test("patterns transition coordinator closes mobile profile shell state", () => 
   assert.equal(bodyClass.contains("keyboard-open"), false);
   assert.equal(docElClass.contains("focus-mode-layout-snap"), false);
   assert.equal(state.isExpandedField, false);
+});
+
+test("post-submit phase derivation names current run/post-submit scenarios", () => {
+  const context = loadPostSubmitPhaseContext();
+  const derive = context.waywordPostSubmitPhase.derivePostSubmitPhase;
+  const P = context.waywordPostSubmitPhase.PHASES;
+
+  assert.equal(derive({ state: { active: false } }), P.IDLE);
+  assert.equal(
+    derive({ state: { active: true, submitted: false, completedUiActive: false } }),
+    P.DRAFTING
+  );
+  assert.equal(
+    derive({
+      state: {
+        active: true,
+        submitted: true,
+        completedUiActive: true,
+        calibrationPostRun: { step: 1, observation: "Baseline", insufficient: false },
+      },
+    }),
+    P.SUBMITTED_CALIBRATION_BASELINE
+  );
+  assert.equal(
+    derive({
+      state: {
+        active: true,
+        submitted: true,
+        completedUiActive: true,
+        calibrationPostRun: { step: 1, observation: "Add enough writing.", insufficient: true },
+      },
+    }),
+    P.SUBMITTED_CALIBRATION_INSUFFICIENT
+  );
+  assert.equal(
+    derive({
+      state: {
+        active: true,
+        submitted: true,
+        completedUiActive: true,
+        calibrationHandoffVisible: true,
+        calibrationPostRun: { step: 5, observation: "Baseline", insufficient: false },
+      },
+    }),
+    P.SUBMITTED_CALIBRATION_HANDOFF
+  );
+  assert.equal(
+    derive({
+      state: {
+        active: true,
+        submitted: true,
+        completedUiActive: true,
+        lastMirrorPipelineResult: {
+          main: { category: "repetition", statement: "One word keeps returning." },
+        },
+      },
+    }),
+    P.SUBMITTED_MIRROR_READY
+  );
+  assert.equal(
+    derive({
+      state: {
+        active: true,
+        submitted: true,
+        completedUiActive: true,
+        lastMirrorPipelineResult: {
+          main: { category: "low_signal", statement: "Signal is thin." },
+        },
+      },
+    }),
+    P.SUBMITTED_MIRROR_LOW_SIGNAL
+  );
+  assert.equal(
+    derive({
+      state: {
+        active: true,
+        submitted: true,
+        completedUiActive: true,
+        lastMirrorPipelineResult: {
+          main: { category: "fallback", statement: "No strong pattern resolves yet." },
+        },
+      },
+      mirrorLowSignal: true,
+    }),
+    P.SUBMITTED_MIRROR_LOW_SIGNAL
+  );
+  assert.equal(
+    derive({
+      state: {
+        active: true,
+        submitted: true,
+        completedUiActive: true,
+        lastMirrorLoadFailed: true,
+      },
+    }),
+    P.SUBMITTED_MIRROR_UNAVAILABLE
+  );
 });
 
 test("saved-run persistence writes canonical documents and reads them back in both orders", () => {
