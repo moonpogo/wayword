@@ -17,8 +17,8 @@ Phase 0 snapshot of current state contracts before selected-seam migration.
 
 ## Derived Post-Submit Phase Vocabulary
 
-Phase 1 adds a read-only derived vocabulary in `src/features/writing/post-submit-phase.js`.
-It does not currently drive rendering, routing, persistence, restart behavior, or state mutation.
+Phase 1 added a read-only derived vocabulary in `src/features/writing/post-submit-phase.js`.
+Phase 2 routes only narrow post-submit render flags and completed-restart gating through it.
 
 | Phase | Derived from current flags |
 | --- | --- |
@@ -30,6 +30,8 @@ It does not currently drive rendering, routing, persistence, restart behavior, o
 | `submitted_mirror_low_signal` | Mirror result is low-signal, or caller supplies the current renderer's low-signal predicate result. |
 | `submitted_mirror_ready` | Submitted/completed state reaches normal Mirror rendering. |
 | `submitted_mirror_unavailable` | Last Mirror load/API call failed. |
+
+Invariant: `submitted=true` plus `completedUiActive=true` plus `active=false` is invalid-by-design for post-submit UI. Current phase derivation treats it as `idle`, and completed-restart handlers must not restart from it.
 
 ## Calibration Flags
 

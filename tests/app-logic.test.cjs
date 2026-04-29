@@ -1444,6 +1444,10 @@ test("post-submit phase derivation names current run/post-submit scenarios", () 
 
   assert.equal(derive({ state: { active: false } }), P.IDLE);
   assert.equal(
+    derive({ state: { active: false, submitted: true, completedUiActive: true } }),
+    P.IDLE
+  );
+  assert.equal(
     derive({ state: { active: true, submitted: false, completedUiActive: false } }),
     P.DRAFTING
   );
@@ -1570,6 +1574,15 @@ test("completed restart routing uses post-submit phase gating", () => {
     optionsOpen: false,
     calibrationHandoffVisible: true,
   };
+  const inactiveCompletedState = {
+    active: false,
+    submitted: true,
+    completedUiActive: true,
+    optionsOpen: false,
+    lastMirrorPipelineResult: {
+      main: { category: "repetition", statement: "One word keeps returning." },
+    },
+  };
   const inputFor = (state) => ({
     state,
     runPostSubmitAutoNewRunNow() {
@@ -1609,6 +1622,30 @@ test("completed restart routing uses post-submit phase gating", () => {
   calls.length = 0;
   assert.equal(
     interactions.handleDocumentCompletedRestartKeydown(inputFor(handoffState), {
+      key: "Enter",
+      shiftKey: false,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      target: {},
+      preventDefault() {
+        calls.push("preventDefault");
+      },
+    }),
+    false
+  );
+  assert.deepEqual(calls, []);
+
+  calls.length = 0;
+  assert.equal(
+    interactions.handleEditorCompletedRestartKeydown(inputFor(inactiveCompletedState), normalEvent),
+    false
+  );
+  assert.deepEqual(calls, []);
+
+  calls.length = 0;
+  assert.equal(
+    interactions.handleDocumentCompletedRestartKeydown(inputFor(inactiveCompletedState), {
       key: "Enter",
       shiftKey: false,
       metaKey: false,
