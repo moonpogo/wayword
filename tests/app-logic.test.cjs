@@ -101,6 +101,12 @@ function loadRecentRunsPrepContext() {
   });
 }
 
+function loadRecentRunsRenderCoordinatorContext() {
+  return loadBrowserScripts(["src/features/writing/recent-runs-render-coordinator.js"], {
+    console: silentConsole(),
+  });
+}
+
 function loadPostSubmitPhaseContext() {
   return loadBrowserScripts(["src/features/writing/post-submit-phase.js"], {
     console: silentConsole(),
@@ -1451,6 +1457,13 @@ test("recent runs view prep returns expected empty and expanded states", () => {
   assert.equal(filled.totalCount, 3);
   assert.deepEqual(filled.drawerSlice.map((run) => run.runId), ["run-3", "run-2"]);
   assert.deepEqual(filled.railSlice.map((run) => run.runId), ["run-3"]);
+  assert.deepEqual(filled.drawer.runs.map((run) => run.runId), ["run-3", "run-2"]);
+  assert.deepEqual(filled.rail.runs.map((run) => run.runId), ["run-3"]);
+  assert.equal(filled.drawer.idPrefix, "draw");
+  assert.equal(filled.rail.idPrefix, "rail");
+  assert.equal(filled.drawer.footerVisible, true);
+  assert.equal(filled.rail.footerVisible, true);
+  assert.equal(filled.drawer.runs[0], filled.rail.runs[0]);
 
   const expanded = prep({
     runsNewestFirst: [{ runId: "run-2" }, { runId: "run-1" }],
@@ -1462,6 +1475,156 @@ test("recent runs view prep returns expected empty and expanded states", () => {
   assert.equal(expanded.drawerRunsExpandedBody, true);
   assert.deepEqual(expanded.drawerSlice.map((run) => run.runId), ["run-2", "run-1"]);
   assert.deepEqual(expanded.railSlice.map((run) => run.runId), ["run-2", "run-1"]);
+  assert.deepEqual(expanded.drawer.runs.map((run) => run.runId), ["run-2", "run-1"]);
+  assert.deepEqual(expanded.rail.runs.map((run) => run.runId), ["run-2", "run-1"]);
+  assert.equal(expanded.drawer.footerVisible, false);
+  assert.equal(expanded.rail.footerVisible, false);
+});
+
+test("recent runs render coordinator honors view-model surface contracts", () => {
+  const prepContext = loadRecentRunsPrepContext();
+  const renderContext = loadRecentRunsRenderCoordinatorContext();
+  const prep = prepContext.waywordRecentRunsViewPrep.prepareRecentRunsViewModel;
+  const render = renderContext.waywordRecentRunsRenderCoordinator.renderRecentRunsSurfaces;
+  const runs = [{ runId: "run-4" }, { runId: "run-3" }, { runId: "run-2" }, { runId: "run-1" }];
+  const recentVm = prep({
+    runsNewestFirst: runs,
+    historyExpanded: false,
+    capDrawer: 3,
+    capRail: 2,
+  });
+  const drawerClass = createClassList(["hidden"]);
+  const railClass = createClassList(["hidden"]);
+  const calls = [];
+  const drawerList = { innerHTML: "" };
+  const railList = { innerHTML: "" };
+  const drawerFooter = {
+    classList: drawerClass,
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const railFooter = {
+    classList: railClass,
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const drawerMoreBtn = { textContent: "" };
+  const railMoreBtn = { textContent: "" };
+
+  render({
+    recentVm,
+    drawerList,
+    railList,
+    drawerFooter,
+    railFooter,
+    drawerMoreBtn,
+    railMoreBtn,
+    trigger: null,
+    buildRecentEntriesHtml(items, idPrefix) {
+      calls.push([idPrefix, items.map((run) => run.runId)]);
+      return `${idPrefix}:${items.map((run) => run.runId).join(",")}`;
+    },
+    syncRecentDrawerRunsExpandedBodyClass(value) {
+      calls.push(["expandedBody", value]);
+    },
+    syncRecentRailExpandedChrome() {
+      calls.push(["railChrome"]);
+    },
+  });
+
+  assert.equal(drawerList.innerHTML, "draw:run-4,run-3,run-2");
+  assert.equal(railList.innerHTML, "rail:run-4,run-3");
+  assert.deepEqual(calls[0], ["draw", ["run-4", "run-3", "run-2"]]);
+  assert.deepEqual(calls[1], ["rail", ["run-4", "run-3"]]);
+  assert.equal(drawerClass.contains("hidden"), false);
+  assert.equal(railClass.contains("hidden"), false);
+  assert.equal(drawerFooter.attrs["aria-hidden"], "false");
+  assert.equal(railFooter.attrs["aria-hidden"], "false");
+  assert.equal(drawerMoreBtn.textContent, "View older runs");
+  assert.equal(railMoreBtn.textContent, "View older runs");
+});
+
+test("recent runs render coordinator honors empty and expanded footer contracts", () => {
+  const prepContext = loadRecentRunsPrepContext();
+  const renderContext = loadRecentRunsRenderCoordinatorContext();
+  const prep = prepContext.waywordRecentRunsViewPrep.prepareRecentRunsViewModel;
+  const render = renderContext.waywordRecentRunsRenderCoordinator.renderRecentRunsSurfaces;
+
+  const makeFooter = () => ({
+    classList: createClassList(),
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  });
+  const makeBaseInput = (recentVm) => {
+    const drawerFooter = makeFooter();
+    const railFooter = makeFooter();
+    const calls = [];
+    return {
+      calls,
+      input: {
+        recentVm,
+        state: { recentRunsHistoryExpanded: true },
+        allLists: [
+          { id: "recentDrawerList", innerHTML: "" },
+          { id: "recentRailList", innerHTML: "" },
+        ],
+        drawerList: { innerHTML: "" },
+        railList: { innerHTML: "" },
+        drawerFooter,
+        railFooter,
+        drawerMoreBtn: { textContent: "" },
+        railMoreBtn: { textContent: "" },
+        trigger: null,
+        isRecentDrawerOpen: () => true,
+        isDesktopPatternsViewport: () => true,
+        getRecentListEmptyInnerHtml(isDrawer) {
+          return isDrawer ? "drawer empty" : "rail empty";
+        },
+        buildRecentEntriesHtml(items, idPrefix) {
+          return `${idPrefix}:${items.map((run) => run.runId).join(",")}`;
+        },
+        syncRecentDrawerRunsExpandedBodyClass(value) {
+          calls.push(["expandedBody", value]);
+        },
+        syncRecentRailExpandedChrome() {
+          calls.push(["railChrome"]);
+        },
+      },
+    };
+  };
+
+  const emptyCase = makeBaseInput(
+    prep({ runsNewestFirst: [], historyExpanded: true, capDrawer: 2, capRail: 1 })
+  );
+  render(emptyCase.input);
+  assert.equal(emptyCase.input.state.recentRunsHistoryExpanded, false);
+  assert.equal(emptyCase.input.allLists[0].innerHTML, "drawer empty");
+  assert.equal(emptyCase.input.allLists[1].innerHTML, "rail empty");
+  assert.equal(emptyCase.input.drawerFooter.classList.contains("hidden"), true);
+  assert.equal(emptyCase.input.railFooter.classList.contains("hidden"), true);
+  assert.deepEqual(emptyCase.calls, [["expandedBody", false], ["railChrome"]]);
+
+  const expandedVm = prep({
+    runsNewestFirst: [{ runId: "run-3" }, { runId: "run-2" }, { runId: "run-1" }],
+    historyExpanded: true,
+    capDrawer: 1,
+    capRail: 1,
+  });
+  const expandedCase = makeBaseInput(expandedVm);
+  render(expandedCase.input);
+  assert.equal(expandedCase.input.drawerList.innerHTML, "draw:run-3,run-2,run-1");
+  assert.equal(expandedCase.input.railList.innerHTML, "rail:run-3,run-2,run-1");
+  assert.equal(expandedCase.input.drawerFooter.classList.contains("hidden"), true);
+  assert.equal(expandedCase.input.railFooter.classList.contains("hidden"), true);
+  assert.equal(expandedCase.input.drawerMoreBtn.textContent, "Show fewer");
+  assert.equal(expandedCase.input.railMoreBtn.textContent, "Show fewer");
+  assert.deepEqual(expandedCase.calls, [["expandedBody", true], ["railChrome"]]);
 });
 
 test("recent runs row expansion keeps a single open entry and toggles aria-expanded", () => {

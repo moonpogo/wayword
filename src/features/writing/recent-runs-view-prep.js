@@ -19,6 +19,8 @@
    *       totalCount: number,
    *       expanded: boolean,
    *       drawerRunsExpandedBody: boolean,
+   *       drawer: { runs: unknown[], idPrefix: "draw", cap: number, footerVisible: boolean },
+   *       rail: { runs: unknown[], idPrefix: "rail", cap: number, footerVisible: boolean },
    *       drawerSlice: unknown[],
    *       railSlice: unknown[],
    *       capDrawer: number,
@@ -39,14 +41,30 @@
 
     const drawerCap = expanded ? totalCount : capDrawer;
     const railCap = expanded ? totalCount : capRail;
+    const drawerSlice = runs.slice(0, drawerCap);
+    const railSlice = runs.slice(0, railCap);
+    const drawerFooterVisible = !expanded && totalCount > capDrawer;
+    const railFooterVisible = !expanded && totalCount > capRail;
 
     return {
       isEmpty: false,
       totalCount,
       expanded,
       drawerRunsExpandedBody: expanded && totalCount > 0,
-      drawerSlice: runs.slice(0, drawerCap),
-      railSlice: runs.slice(0, railCap),
+      drawer: {
+        runs: drawerSlice,
+        idPrefix: "draw",
+        cap: capDrawer,
+        footerVisible: drawerFooterVisible,
+      },
+      rail: {
+        runs: railSlice,
+        idPrefix: "rail",
+        cap: capRail,
+        footerVisible: railFooterVisible,
+      },
+      drawerSlice,
+      railSlice,
       capDrawer,
       capRail,
     };

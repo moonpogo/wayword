@@ -1,7 +1,7 @@
 (function () {
-  function setRecentRunsOverflowFooter(footer, totalCount, cap, hideOverflowLink) {
+  function setRecentRunsOverflowFooter(footer, visible) {
     if (!footer) return;
-    var show = !hideOverflowLink && totalCount > cap;
+    var show = Boolean(visible);
     footer.classList.toggle("hidden", !show);
     footer.setAttribute("aria-hidden", show ? "false" : "true");
   }
@@ -56,21 +56,31 @@
 
   function renderFilledRecentRunsState(input) {
     var recentVm = input.recentVm;
+    var drawer = recentVm.drawer || {
+      runs: recentVm.drawerSlice,
+      idPrefix: "draw",
+      footerVisible: !recentVm.expanded && recentVm.totalCount > recentVm.capDrawer,
+    };
+    var rail = recentVm.rail || {
+      runs: recentVm.railSlice,
+      idPrefix: "rail",
+      footerVisible: !recentVm.expanded && recentVm.totalCount > recentVm.capRail,
+    };
     renderRecentRunsList(
       input.drawerList,
-      recentVm.drawerSlice,
-      "draw",
+      drawer.runs,
+      drawer.idPrefix,
       input.buildRecentEntriesHtml
     );
-    setRecentRunsOverflowFooter(input.drawerFooter, recentVm.totalCount, recentVm.capDrawer, recentVm.expanded);
+    setRecentRunsOverflowFooter(input.drawerFooter, drawer.footerVisible);
 
     renderRecentRunsList(
       input.railList,
-      recentVm.railSlice,
-      "rail",
+      rail.runs,
+      rail.idPrefix,
       input.buildRecentEntriesHtml
     );
-    setRecentRunsOverflowFooter(input.railFooter, recentVm.totalCount, recentVm.capRail, recentVm.expanded);
+    setRecentRunsOverflowFooter(input.railFooter, rail.footerVisible);
 
     input.syncRecentDrawerRunsExpandedBodyClass(recentVm.drawerRunsExpandedBody);
     syncRecentRunsMoreButtonLabels(recentVm.expanded, input.drawerMoreBtn, input.railMoreBtn);
