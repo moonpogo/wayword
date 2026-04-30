@@ -128,3 +128,17 @@ Almanac, past seasons, annual cycle, motif returns, deeper strata, exports and y
 4. Next candidate instrument: Trace Field, using existing repeated-word data.
 5. Later candidate: Pulse.
 6. Delay Drift Atlas until enough longitudinal data exists.
+
+## Dev Fixture Notes
+Local development can preview deterministic Season Wheel patterns without writing fake runs.
+
+On localhost, 127.0.0.1, or file protocol:
+- `waywordDevSeasonFixtures.availableFixtures`
+- `waywordDevSeasonFixtures.useFixture("sparse")`
+- `waywordDevSeasonFixtures.useFixture("moderate")`
+- `waywordDevSeasonFixtures.useFixture("heavy")`
+- `waywordDevSeasonFixtures.useFixture("clustered")`
+- `waywordDevSeasonFixtures.useFixture("steady")`
+- `waywordDevSeasonFixtures.clearFixture()`
+
+These fixtures only affect the Season section rendering path. They do not modify saved runs or localStorage.

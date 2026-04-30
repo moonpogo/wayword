@@ -1748,7 +1748,7 @@ test("patterns renderer preserves locked and empty-state output contracts", () =
       requiredCount: 3,
       cappedProgressCount: 0,
     }),
-    /Saved runs are present\. Longer drafts reveal more stable patterns/
+    /Longer drafts reveal more stable patterns/
   );
   assert.match(
     renderer.patternsMirrorHeroNoStrongPatternHtml(),
@@ -1844,7 +1844,7 @@ test("patterns repeated-word challenge rendering preserves selection and begin g
     selectedChallengeSet: new Set(),
     draftChallengeWords: [],
   });
-  assert.match(emptyHtml, /No strong repeat targets across saved runs yet/);
+  assert.match(emptyHtml, /No strong repeat targets yet/);
 });
 
 test("post-submit phase derivation names current run/post-submit scenarios", () => {

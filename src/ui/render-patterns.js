@@ -15,13 +15,13 @@
         const isActive = i < active;
         const cls = isActive ? "is-active" : "is-ghost";
         const cx = dotCenters[i];
-        return `<circle class="trace-dot ${cls}" cx="${cx}" cy="22" r="4.5"></circle>`;
+        return `<circle class="trace-dot ${cls}" cx="${cx}" cy="18" r="4.5"></circle>`;
       })
       .join("");
     return (
-      '<svg class="pattern-trace-formation" viewBox="0 0 168 44" width="168" height="44" aria-hidden="true" focusable="false">' +
-      '<line class="trace-link" x1="50" y1="22" x2="66" y2="22"></line>' +
-      '<line class="trace-link" x1="102" y1="22" x2="118" y2="22"></line>' +
+      '<svg class="pattern-trace-formation" viewBox="0 0 168 36" width="168" height="36" aria-hidden="true" focusable="false">' +
+      '<line class="trace-link" x1="50" y1="18" x2="66" y2="18"></line>' +
+      '<line class="trace-link" x1="102" y1="18" x2="118" y2="18"></line>' +
       marks +
       "</svg>"
     );
@@ -40,11 +40,11 @@
 
     return `
     <div class="profile-locked profile-locked--pattern-formation">
-      <div class="profile-locked-title">CROSS-RUN PATTERN</div>
+      <div class="section-title card-section-title profile-locked-title">CROSS-RUN PATTERN</div>
       <div class="profile-locked-copy">Your first reflective pattern is forming.</div>
       <div class="profile-locked-formation-visual">${buildPatternFormationIndicatorSvg(cappedProgressCount)}</div>
       <div class="profile-locked-copy profile-locked-copy--status">${cappedProgressCount} of ${requiredCount} traces gathered</div>
-      ${showDefensive ? '<div class="profile-locked-copy profile-locked-copy--quiet">Saved runs are present. Longer drafts reveal more stable patterns.</div>' : ""}
+      ${showDefensive ? '<div class="profile-locked-copy profile-locked-copy--quiet">Longer drafts reveal more stable patterns.</div>' : ""}
     </div>
   `;
   }
@@ -225,7 +225,7 @@
             })
             .join("")}
          </div>`
-      : `<p class="patterns-repeated-empty">No strong repeat targets across saved runs yet.</p>`;
+      : `<p class="patterns-repeated-empty">No strong repeat targets yet.</p>`;
 
     const challengeHtml = safeDraft.length
       ? `<div class="patterns-challenge-block">
@@ -241,7 +241,7 @@
         : "";
 
     return `
-      <div class="section-title card-section-title patterns-repeated-challenge__title">Practice from repeats</div>
+      <div class="section-title card-section-title patterns-repeated-challenge__title">PRACTICE FROM REPEATS</div>
       ${wordsHtml}
       ${gatedPairs.length ? '<p class="patterns-repeated-tool-note">Try one run without one repeated word.</p>' : ""}
       ${challengeHtml}

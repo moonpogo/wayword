@@ -4814,6 +4814,88 @@ function buildSeasonDayBuckets(seasonalRows) {
   return buckets;
 }
 
+let devSeasonFixtureName = null;
+
+function seasonDayKeysLast90Local() {
+  const now = new Date();
+  now.setHours(12, 0, 0, 0);
+  const keys = [];
+  for (let i = 89; i >= 0; i -= 1) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    keys.push(toDayKeyLocal(d));
+  }
+  return keys;
+}
+
+function buildFixtureCountMapSparse() {
+  return new Map([[4, 1], [19, 1], [37, 2], [58, 1], [82, 1]]);
+}
+
+function buildFixtureCountMapModerate() {
+  const out = new Map();
+  for (let i = 0; i < 90; i += 1) {
+    if (i % 4 === 0 || i % 9 === 2) out.set(i, i % 12 === 0 ? 2 : 1);
+  }
+  out.set(34, 2);
+  out.set(35, 2);
+  out.set(62, 3);
+  return out;
+}
+
+function buildFixtureCountMapHeavy() {
+  const out = new Map();
+  for (let i = 0; i < 90; i += 1) {
+    if (i % 5 === 0) continue;
+    let count = 1;
+    if (i % 7 === 0) count = 2;
+    if (i % 13 === 0) count = 3;
+    out.set(i, count);
+  }
+  return out;
+}
+
+function buildFixtureCountMapClustered() {
+  const out = new Map();
+  for (let i = 8; i <= 18; i += 1) out.set(i, i === 13 ? 3 : i % 3 === 0 ? 2 : 1);
+  for (let i = 34; i <= 45; i += 1) out.set(i, i === 40 ? 3 : i % 4 === 0 ? 2 : 1);
+  for (let i = 62; i <= 72; i += 1) out.set(i, i === 67 ? 3 : i % 3 === 1 ? 2 : 1);
+  for (let i = 82; i <= 88; i += 1) out.set(i, i === 85 ? 2 : 1);
+  return out;
+}
+
+function buildFixtureCountMapSteady() {
+  const out = new Map();
+  for (let i = 1; i < 90; i += 3) out.set(i, i % 12 === 1 ? 2 : 1);
+  return out;
+}
+
+function fixtureCountMapByName(name) {
+  const n = String(name || "").toLowerCase();
+  if (n === "sparse") return buildFixtureCountMapSparse();
+  if (n === "moderate") return buildFixtureCountMapModerate();
+  if (n === "heavy") return buildFixtureCountMapHeavy();
+  if (n === "clustered") return buildFixtureCountMapClustered();
+  if (n === "steady") return buildFixtureCountMapSteady();
+  return null;
+}
+
+function buildDevSeasonFixtureViewModel(name) {
+  const countMap = fixtureCountMapByName(name);
+  if (!countMap) return null;
+  const dayKeys = seasonDayKeysLast90Local();
+  const dayBuckets = new Map();
+  let runsCount = 0;
+  for (const [index, count] of countMap.entries()) {
+    const i = Number(index);
+    if (!Number.isInteger(i) || i < 0 || i >= dayKeys.length) continue;
+    const c = Math.max(1, Number(count) || 1);
+    dayBuckets.set(dayKeys[i], c);
+    runsCount += c;
+  }
+  return { dayBuckets, runsCount };
+}
+
 function buildCurrentSeasonGridModel(dayBuckets) {
   const now = new Date();
   now.setHours(12, 0, 0, 0);
@@ -4861,10 +4943,13 @@ function renderCurrentSeasonPanel() {
   const wrap = $("currentSeasonPanel");
   if (!root || !wrap) return;
   const seasonLabel = currentMeteorologicalSeasonLabel(new Date());
+  const fixtureVm = WAYWORD_DEV_CALIBRATION_RESET_ENABLED
+    ? buildDevSeasonFixtureViewModel(devSeasonFixtureName)
+    : null;
   const savedRuns = readSavedRunsChronological();
-  const seasonalRows = seasonalRunsLast90DaysFromSavedRuns(savedRuns);
-  const dayBuckets = buildSeasonDayBuckets(seasonalRows);
-  const runsCount = seasonalRows.length;
+  const seasonalRows = fixtureVm ? [] : seasonalRunsLast90DaysFromSavedRuns(savedRuns);
+  const dayBuckets = fixtureVm ? fixtureVm.dayBuckets : buildSeasonDayBuckets(seasonalRows);
+  const runsCount = fixtureVm ? fixtureVm.runsCount : seasonalRows.length;
   const activeDays = dayBuckets.size;
 
   if (runsCount <= 0) {
@@ -4889,7 +4974,9 @@ function renderCurrentSeasonPanel() {
       const t = totalMarks > 1 ? index / (totalMarks - 1) : 0;
       const angle = arcStartDeg + t * arcSweepDeg;
       const monthBoundary = index > 0 && index % 30 === 0 ? " is-month-boundary" : "";
-      return `<span class="season-wheel__mark is-level-${d.level}${monthBoundary}" style="--season-index:${index};--season-total:${totalMarks};--season-angle:${angle}deg;" aria-hidden="true"></span>`;
+      const flowClass = t <= 0.33 ? " is-flow-early" : t >= 0.66 ? " is-flow-late" : " is-flow-mid";
+      const boundaryStart = index === 0 ? " is-boundary-start" : "";
+      return `<span class="season-wheel__mark is-level-${d.level}${monthBoundary}${boundaryStart}${flowClass}" style="--season-index:${index};--season-total:${totalMarks};--season-angle:${angle}deg;" aria-hidden="true"></span>`;
     })
     .join("");
   const quiet = selectSeasonalQuietLine(runsCount, activeDays);
@@ -5646,13 +5733,33 @@ function bindPanelControlWiring() {
   });
 }
 
-bindPanelControlWiring();
-/* -----------------------------
-   boot
------------------------------ */
-
-if (WAYWORD_DEV_CALIBRATION_RESET_ENABLED) {
+function registerDevOnlyHelpers() {
+  if (!WAYWORD_DEV_CALIBRATION_RESET_ENABLED) return;
   window.waywordDevResetCalibration = waywordDevResetCalibrationForTesting;
+  window.waywordDevSeasonFixtures = {
+    availableFixtures: Object.freeze(["sparse", "moderate", "heavy", "clustered", "steady"]),
+    useFixture(name) {
+      const normalized = String(name || "").toLowerCase();
+      if (!fixtureCountMapByName(normalized)) {
+        console.warn("waywordDevSeasonFixtures: unknown fixture", name);
+        return false;
+      }
+      devSeasonFixtureName = normalized;
+      console.info(`waywordDevSeasonFixtures: using fixture \"${normalized}\"`);
+      renderCurrentSeasonPanel();
+      return true;
+    },
+    clearFixture() {
+      devSeasonFixtureName = null;
+      console.info("waywordDevSeasonFixtures: cleared fixture");
+      renderCurrentSeasonPanel();
+      return true;
+    },
+  };
+}
+
+function runDevOnlyBootActions() {
+  if (!WAYWORD_DEV_CALIBRATION_RESET_ENABLED) return;
   try {
     const params = new URLSearchParams(location.search);
     if (params.get("resetCalibration") === "1") {
@@ -5665,6 +5772,13 @@ if (WAYWORD_DEV_CALIBRATION_RESET_ENABLED) {
     /* ignore */
   }
 }
+
+registerDevOnlyHelpers();
+bindPanelControlWiring();
+/* -----------------------------
+   boot
+----------------------------- */
+runDevOnlyBootActions();
 
 function getAppBootRuntime() {
   const runtime = window.waywordAppBootRuntime;
