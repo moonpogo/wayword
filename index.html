@@ -580,13 +580,16 @@
 
       <section id="profileView" class="hidden">
         <div class="profile-stack">
-          <section class="profile-hero">
-            <div class="section-title card-section-title">Cross-run patterns</div>
+          <section class="profile-hero profile-rail-section">
             <div id="patternCallouts" class="profile-hero-copy"></div>
             <div id="profileHeroSummary" class="run-stats-inline profile-hero-strip"></div>
           </section>
 
-          <section class="profile-patterns-utility" aria-label="Repeated words and practice">
+          <section id="currentSeasonPanel" class="profile-current-season profile-rail-section" aria-label="Current season">
+            <div id="currentSeasonRoot"></div>
+          </section>
+
+          <section class="profile-patterns-utility profile-rail-section" aria-label="Repeated words and practice">
             <div id="patternsRepeatedChallengeRoot" class="patterns-repeated-challenge-card"></div>
           </section>
         </div>

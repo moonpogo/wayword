@@ -4149,18 +4149,7 @@ function computePatternUnlockProgress() {
 function renderProfileHeroSummary(unlockProgress) {
   const hero = $("profileHeroSummary");
   if (!hero) return;
-  const progress = unlockProgress && typeof unlockProgress === "object" ? unlockProgress : computePatternUnlockProgress();
-  const runs = Math.max(0, Number(progress.totalSavedRuns) || 0);
-  if (!runs) {
-    hero.textContent = "";
-    return;
-  }
-  const words = Math.max(0, Number(progress.totalWords) || 0);
-  const qualifying = Math.max(0, Number(progress.qualifyingPatternRunsCount) || 0);
-  hero.textContent =
-    Number.isFinite(qualifying)
-      ? `Runs ${runs} · Words ${words} · ${qualifying} qualifying ${qualifying === 1 ? "trace" : "traces"}`
-      : `Runs ${runs} · Words ${words}`;
+  hero.textContent = "";
 }
 
 function deriveCurrentPostSubmitPhase(options = {}) {
@@ -4760,6 +4749,169 @@ function aggregateProfile() {
   return agg;
 }
 
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function toDayKeyLocal(dateObj) {
+  return `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
+}
+
+function parseRunTimestampMsForSeason(run) {
+  const candidates = [
+    run?.timestamp,
+    run?.savedAt,
+    run?.createdAt,
+    run?.completedAt,
+    run?.date,
+    run?.ts,
+    run?.meta?.savedAt,
+    run?.meta?.timestamp,
+  ];
+  for (const raw of candidates) {
+    if (raw == null) continue;
+    if (raw instanceof Date && Number.isFinite(raw.getTime())) return raw.getTime();
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      if (raw > 1e12) return raw;
+      if (raw > 1e9) return raw * 1000;
+    }
+    if (typeof raw === "string") {
+      const asNum = Number(raw);
+      if (Number.isFinite(asNum)) {
+        if (asNum > 1e12) return asNum;
+        if (asNum > 1e9) return asNum * 1000;
+      }
+      const parsed = Date.parse(raw);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function seasonalRunsLast90DaysFromSavedRuns(runs) {
+  const all = Array.isArray(runs) ? runs : [];
+  const now = Date.now();
+  const windowMs = 90 * 24 * 60 * 60 * 1000;
+  const start = now - windowMs;
+  const seasonal = [];
+  for (const run of all) {
+    const ms = parseRunTimestampMsForSeason(run);
+    if (!Number.isFinite(ms)) continue;
+    if (ms < start || ms > now) continue;
+    seasonal.push({ run, timestampMs: ms });
+  }
+  return seasonal;
+}
+
+function buildSeasonDayBuckets(seasonalRows) {
+  const buckets = new Map();
+  for (const row of seasonalRows) {
+    const d = new Date(row.timestampMs);
+    const key = toDayKeyLocal(d);
+    const count = buckets.get(key) || 0;
+    buckets.set(key, count + 1);
+  }
+  return buckets;
+}
+
+function buildCurrentSeasonGridModel(dayBuckets) {
+  const now = new Date();
+  now.setHours(12, 0, 0, 0);
+  const days = [];
+  for (let i = 89; i >= 0; i -= 1) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const key = toDayKeyLocal(d);
+    const runCount = dayBuckets.get(key) || 0;
+    days.push({
+      key,
+      runCount,
+      level: runCount <= 0 ? 0 : runCount === 1 ? 1 : 2,
+      label: `${key}: ${runCount} ${runCount === 1 ? "run" : "runs"}`,
+    });
+  }
+  return days;
+}
+
+function seasonalWordsSaved(seasonalRows) {
+  return seasonalRows.reduce((sum, row) => {
+    const run = row?.run || {};
+    const words = Math.max(0, Number(run.wordCount ?? run.words) || 0);
+    return sum + words;
+  }, 0);
+}
+
+function selectSeasonalQuietLine(runsCount, activeDays) {
+  if (runsCount <= 2 || activeDays <= 2) return "A quiet season is forming.";
+  if (activeDays >= 18) return "This season has several active days.";
+  if (activeDays >= 10) return "A steady season is forming.";
+  return "The season is still sparse.";
+}
+
+function currentMeteorologicalSeasonLabel(dateObj = new Date()) {
+  const m = dateObj.getMonth() + 1;
+  if (m >= 3 && m <= 5) return "SPRING";
+  if (m >= 6 && m <= 8) return "SUMMER";
+  if (m >= 9 && m <= 11) return "AUTUMN";
+  return "WINTER";
+}
+
+function renderCurrentSeasonPanel() {
+  const root = $("currentSeasonRoot");
+  const wrap = $("currentSeasonPanel");
+  if (!root || !wrap) return;
+  const seasonLabel = currentMeteorologicalSeasonLabel(new Date());
+  const savedRuns = readSavedRunsChronological();
+  const seasonalRows = seasonalRunsLast90DaysFromSavedRuns(savedRuns);
+  const dayBuckets = buildSeasonDayBuckets(seasonalRows);
+  const runsCount = seasonalRows.length;
+  const activeDays = dayBuckets.size;
+
+  if (runsCount <= 0) {
+    root.innerHTML = `
+      <div class="current-season-card">
+        <div class="section-title card-section-title current-season-title">SEASON</div>
+        <p class="current-season-name">${seasonLabel}</p>
+        <p class="current-season-empty">Current season begins with saved runs.</p>
+      </div>
+    `;
+    wrap.classList.remove("hidden");
+    wrap.setAttribute("aria-hidden", "false");
+    return;
+  }
+
+  const grid = buildCurrentSeasonGridModel(dayBuckets);
+  const totalMarks = grid.length || 90;
+  const arcStartDeg = -135;
+  const arcSweepDeg = 270;
+  const gridHtml = grid
+    .map((d, index) => {
+      const t = totalMarks > 1 ? index / (totalMarks - 1) : 0;
+      const angle = arcStartDeg + t * arcSweepDeg;
+      const monthBoundary = index > 0 && index % 30 === 0 ? " is-month-boundary" : "";
+      return `<span class="season-wheel__mark is-level-${d.level}${monthBoundary}" style="--season-index:${index};--season-total:${totalMarks};--season-angle:${angle}deg;" aria-hidden="true"></span>`;
+    })
+    .join("");
+  const quiet = selectSeasonalQuietLine(runsCount, activeDays);
+
+  root.innerHTML = `
+    <div class="current-season-card">
+      <div class="section-title card-section-title current-season-title">SEASON</div>
+      <p class="current-season-name">${seasonLabel}</p>
+      <div class="season-wheel" aria-hidden="true">
+        <span class="season-wheel__ring season-wheel__ring--outer"></span>
+        <span class="season-wheel__ring season-wheel__ring--middle"></span>
+        <span class="season-wheel__ring season-wheel__ring--inner"></span>
+        <span class="season-wheel__hub"></span>
+        ${gridHtml}
+      </div>
+      <p class="current-season-note">${quiet}</p>
+    </div>
+  `;
+  wrap.classList.remove("hidden");
+  wrap.setAttribute("aria-hidden", "false");
+}
+
 function renderProfileLocked() {
   try {
     const unlockProgress = computePatternUnlockProgress();
@@ -4776,6 +4928,13 @@ function renderProfileLocked() {
     if (patternsUtilityWrap) {
       patternsUtilityWrap.classList.add("hidden");
       patternsUtilityWrap.setAttribute("aria-hidden", "true");
+    }
+    const seasonWrap = $("currentSeasonPanel");
+    const seasonRoot = $("currentSeasonRoot");
+    if (seasonRoot) seasonRoot.innerHTML = "";
+    if (seasonWrap) {
+      seasonWrap.classList.add("hidden");
+      seasonWrap.setAttribute("aria-hidden", "true");
     }
 
     renderProfileHeroSummary(unlockProgress);
@@ -4851,6 +5010,7 @@ function renderProfile() {
     patternsUtilityWrap.classList.remove("hidden");
     patternsUtilityWrap.setAttribute("aria-hidden", "false");
   }
+  renderCurrentSeasonPanel();
 
   const agg = aggregateProfile();
   const runs = Math.max(agg.totalRuns, 1);

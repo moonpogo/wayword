@@ -4097,15 +4097,10 @@ body.recent-drawer-open{
 .profile-hero-copy .profile-locked--pattern-formation{
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:7px;
 }
 .profile-hero-copy .profile-locked-title{
-  margin:0;
-  font-size:0.73rem;
-  line-height:1.3;
-  letter-spacing:0.09em;
-  font-weight:600;
-  color:color-mix(in srgb, var(--ink) 82%, var(--muted));
+  margin-bottom:2px;
 }
 .profile-hero-copy .profile-locked-copy{
   margin:0;
@@ -4125,7 +4120,7 @@ body.recent-drawer-open{
   color:color-mix(in srgb, var(--muted) 82%, transparent);
 }
 .profile-hero-copy .profile-locked-formation-visual{
-  margin:2px 0 0;
+  margin:0;
 }
 .profile-hero-copy .pattern-trace-formation{
   display:block;
@@ -4172,10 +4167,27 @@ body.recent-drawer-open{
   color:color-mix(in srgb, var(--muted) 88%, var(--ink));
 }
 
+.profile-hero .run-stats-inline:empty{
+  display:none;
+}
+
 .profile-stack{
   display:flex;
   flex-direction:column;
-  gap:16px;
+  gap:0;
+}
+
+.profile-rail-section{
+  margin:0;
+}
+
+.profile-stack > .profile-rail-section:not(:last-child){
+  padding-bottom:13px;
+  border-bottom:1px solid color-mix(in srgb, var(--line) 56%, transparent);
+}
+
+.profile-stack > .profile-rail-section + .profile-rail-section{
+  padding-top:13px;
 }
 
 .profile-patterns-footer{
@@ -4453,8 +4465,8 @@ body.clear-saved-runs-confirm-open .clear-saved-runs-modal{
 .profile-hero{
   background:rgba(0,0,0,0.035);
   border-radius:18px;
-  padding:18px 18px 16px;
-  border-bottom:1px solid color-mix(in srgb, var(--line) 52%, transparent);
+  padding:16px 16px 14px;
+  border-bottom:0;
 }
 
 html[data-theme="dark"] .profile-hero{
@@ -4462,7 +4474,168 @@ html[data-theme="dark"] .profile-hero{
 }
 
 .profile-patterns-utility{
-  margin-top:4px;
+  margin-top:0;
+}
+
+.profile-current-season{
+  margin-top:0;
+}
+
+.current-season-card{
+  border:1px solid color-mix(in srgb, var(--line) 34%, transparent);
+  border-radius:16px;
+  padding:15px 14px 14px;
+  background:color-mix(in srgb, var(--panel) 98%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--line) 14%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--line) 10%, transparent);
+}
+
+.current-season-title{
+  margin-bottom:2px;
+}
+
+.current-season-name{
+  margin:0 0 2px;
+  font-size:1.03rem;
+  line-height:1.15;
+  letter-spacing:0.06em;
+  color:color-mix(in srgb, var(--ink) 92%, var(--muted));
+}
+
+.season-wheel{
+  --wheel-size:186px;
+  --wheel-radius:79px;
+  position:relative;
+  width:var(--wheel-size);
+  height:var(--wheel-size);
+  margin:10px auto 13px;
+  max-width:100%;
+  border-radius:50%;
+  background:radial-gradient(circle at center, transparent 36%, color-mix(in srgb, var(--line) 8%, transparent) 100%);
+}
+
+.season-wheel::before,
+.season-wheel::after{
+  content:"";
+  position:absolute;
+  border-radius:50%;
+  pointer-events:none;
+}
+
+.season-wheel::before{
+  inset:14px;
+  border:1px solid color-mix(in srgb, var(--line) 21%, transparent);
+  opacity:0.78;
+}
+
+.season-wheel::after{
+  inset:33px;
+  border:1px dashed color-mix(in srgb, var(--line) 16%, transparent);
+  opacity:0.64;
+}
+
+.season-wheel__ring{
+  position:absolute;
+  left:50%;
+  top:50%;
+  border-radius:50%;
+  border:1px solid color-mix(in srgb, var(--line) 16%, transparent);
+  transform:translate(-50%, -50%);
+  pointer-events:none;
+}
+
+.season-wheel__ring--outer{
+  width:148px;
+  height:148px;
+}
+
+.season-wheel__ring--middle{
+  width:118px;
+  height:118px;
+  border-color:color-mix(in srgb, var(--line) 13%, transparent);
+}
+
+.season-wheel__ring--inner{
+  width:88px;
+  height:88px;
+  border-color:color-mix(in srgb, var(--line) 11%, transparent);
+}
+
+.season-wheel__hub{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  transform:translate(-50%, -50%);
+  border:1px solid color-mix(in srgb, var(--line) 17%, transparent);
+  background:color-mix(in srgb, var(--panel) 97%, transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 6%, transparent);
+  pointer-events:none;
+}
+
+.season-wheel__mark{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:1.4px;
+  height:7px;
+  margin:-3.5px 0 0 -0.7px;
+  border-radius:1px;
+  border:0;
+  background:color-mix(in srgb, var(--line) 44%, transparent);
+  opacity:0.32;
+  transform:
+    rotate(var(--season-angle))
+    translateY(calc(-1 * var(--wheel-radius)));
+  transform-origin:center center;
+  box-sizing:border-box;
+}
+
+.season-wheel__mark.is-level-1{
+  width:1.8px;
+  height:9px;
+  margin:-4.5px 0 0 -0.9px;
+  background:color-mix(in srgb, var(--muted) 48%, var(--line));
+  opacity:0.8;
+}
+
+.season-wheel__mark.is-level-2{
+  width:2.2px;
+  height:11px;
+  margin:-5.5px 0 0 -1.1px;
+  background:color-mix(in srgb, var(--ink) 56%, var(--line));
+  opacity:0.95;
+}
+
+.season-wheel__mark.is-month-boundary{
+  opacity:0.56;
+  height:10px;
+  margin-top:-5px;
+  background:color-mix(in srgb, var(--muted) 52%, var(--line));
+}
+
+.current-season-marginalia{
+  margin:3px 0 0;
+  font-size:0.79rem;
+  line-height:1.4;
+  color:color-mix(in srgb, var(--muted) 88%, var(--ink));
+}
+
+.current-season-note{
+  margin:6px 0 0;
+  font-size:0.82rem;
+  line-height:1.42;
+  color:var(--muted);
+}
+
+.current-season-empty{
+  margin:8px 0 0;
+  font-size:0.88rem;
+  line-height:1.46;
+  color:var(--muted);
 }
 
 .patterns-repeated-challenge-card{
@@ -5561,8 +5734,12 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     margin-top:0;
   }
 
+  .side-column.rail-mode-patterns #profileView .profile-current-season{
+    margin-top:0;
+  }
+
   .side-column.rail-mode-patterns #profileView .profile-stack{
-    gap:24px;
+    gap:0;
     /* Match first-line vertical rhythm of `.desktop-rail-panel-head` (title vertically centered in 40px row). */
     padding-top:max(0px, calc((var(--review-runs-rail-head-min-height) - 1lh) / 2));
   }
@@ -5571,6 +5748,7 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     border-radius:0;
     padding:0;
     background:transparent;
+    border-bottom:0;
   }
 
   .side-column.rail-mode-patterns #profileView .profile-hero-copy .history-item:first-child{
@@ -5584,12 +5762,47 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     padding:0;
   }
 
+  .side-column.rail-mode-patterns #profileView .current-season-card{
+    border:0;
+    border-radius:0;
+    background:transparent;
+    padding:0;
+  }
+
   .side-column.rail-mode-patterns #profileView .card-section-title{
-    margin-bottom:10px;
+    margin-bottom:8px;
   }
 
   .side-column.rail-mode-patterns #profileView .profile-hero-copy{
     margin-bottom:14px;
+  }
+}
+
+@media (min-width:861px){
+  .season-wheel{
+    --wheel-size:220px;
+    --wheel-radius:93px;
+    margin:14px auto 12px;
+  }
+
+  .season-wheel__ring--outer{
+    width:176px;
+    height:176px;
+  }
+
+  .season-wheel__ring--middle{
+    width:140px;
+    height:140px;
+  }
+
+  .season-wheel__ring--inner{
+    width:104px;
+    height:104px;
+  }
+
+  .season-wheel__hub{
+    width:48px;
+    height:48px;
   }
 }
 
