@@ -1,130 +1,98 @@
 # Wayword
 
-Current V1 product contract source of truth: docs/V1_PRODUCT_SPEC.md
+Wayword is a local-first writing practice for noticing language patterns across short, bounded runs.
 
-Most writing tools try to improve your writing.
+Live app: https://wayword.me/
 
-Wayword helps you notice how you write.
+Most writing tools try to improve your writing. Wayword helps you notice how you write.
 
-A minimal writing practice built around short runs, prompts, and restrained reflection.
+It is not a notes app, document editor, writing coach, diagnostic tool, or AI writing assistant. It is a browser-based space for observation: write from a prompt, submit the run, then review restrained reflections about visible patterns in the draft and across saved runs.
 
-Write.  
-Submit.  
-See what surfaces.  
-Begin again.
+## Core Loop
 
----
+1. Begin a run.
+2. Receive a prompt.
+3. Write without interruption.
+4. Submit the draft.
+5. Review Mirror observations.
+6. Return through Recent Runs and Patterns over time.
 
-## What Wayword is
+## Current Product
 
-Wayword is not a notes app.  
-It is not a document editor.  
-It is not an AI writing assistant.
+- Prompted writing runs designed for reflection.
+- Submit-time Mirror observations over the current draft.
+- Recent Runs for reviewing saved local history.
+- Patterns for cross-run signals when enough saved runs qualify.
+- Browser-local persistence through `localStorage`.
+- Desktop and mobile writing surfaces.
 
-It is a space for observation.
+Wayword keeps its visible feedback observational. It does not grade, diagnose, rewrite, infer identity, or tell the writer what to do next.
 
-Each writing run is brief, bounded, and intentionally simple.
+## Tech Stack
 
-After you submit, Wayword returns restrained observations about visible patterns in the draft. Not advice. Not diagnosis. Not correction.
+- HTML, CSS, and JavaScript for the browser app.
+- TypeScript for the deterministic Mirror and Patterns pipelines.
+- esbuild for the committed browser IIFE bundle.
+- Playwright and Node's built-in test runner for smoke and logic coverage.
+- No frontend framework and no backend service.
 
-The aim is not to optimize writing.
+## Architecture
 
-The aim is awareness through writing.
+Wayword is currently a static browser app with explicit script ordering in `index.html`. The main runtime still flows through `script.js`, with dense orchestration being extracted into smaller helpers under `src/app/` and feature modules under `src/features/`.
 
----
+The Mirror pipeline is deterministic TypeScript compiled into `mirror-engine.iife.js`, then consumed by browser runtime controllers. Submit-time analysis produces statement-only Mirror output for the current draft and stores digest data for later cross-run Patterns.
 
-## Core loop
+Saved runs are local-first. The app writes a canonical run-document store (`wayword-run-documents-v1`) while maintaining legacy history keys for compatibility and migration repair.
 
-1. Receive a prompt  
-2. Write without interruption  
-3. Submit the run  
-4. Notice what surfaces  
-5. Begin again
+Key docs:
 
-Small loops.  
-Repeated over time.
+- `docs/V1_PRODUCT_SPEC.md`
+- `docs/V1_ARCHITECTURE_SNAPSHOT.md`
+- `docs/SAVED_RUNS_PERSISTENCE.md`
+- `docs/QA_REGRESSION_CHECKLIST.md`
+- `src/app/README.md`
 
----
+## Run Locally
 
-## What it does
+```sh
+npm install
+npm run preview
+```
 
-- Prompted writing runs designed for reflection  
-- Submit-time Mirror observations  
-- Pattern signals across saved runs  
-- Recent Runs and Patterns views for longer-horizon noticing  
-- Local-first storage in the browser  
-- Keyboard-forward, lightweight interaction
+The preview server serves the static app locally. The production app is deployed at https://wayword.me/.
 
-Wayword does not tell you how to write better.
+## Verification
 
-It helps you notice what your writing is already doing.
+```sh
+npm test
+npm run test:smoke
+npm run verify:merge
+npm run test:regression
+```
 
----
+Additional evaluation commands:
 
-## Principles
+```sh
+npm run eval:mirror
+npm run eval:patterns
+```
 
-- Observation over judgment  
-- Restraint over analysis  
-- Feedback over instruction  
-- Simplicity over feature sprawl  
-- Behavior over abstraction
+Bundle and surface checks:
 
-Everything in the app serves the writing loop.
-
----
-
-## Philosophy
-
-Writing leaves traces.
-
-Repetition, hesitation, drift, rhythm, return.
-
-Often those patterns are hard to see while writing.
-
-Wayword is built around a simple premise:
-
-If you can notice patterns in your writing,  
-you may begin noticing patterns in attention itself.
-
----
-
-## Tech
-
-- HTML  
-- CSS  
-- JavaScript  
-- No frameworks  
-- Local-first by default
-
-Built for speed, durability, and restraint.
-
----
+```sh
+npm run build:mirror
+npm run verify:mirror-bundle
+npm run verify:patterns-surface
+```
 
 ## Status
 
-Active development.
+Wayword is in active V1 development. The current focus is preserving the core writing loop while reducing orchestration risk, keeping Mirror output restrained, and improving the reliability of local saved-run flows.
 
-The product evolves carefully.
+Known constraints are documented in `docs/V1_ARCHITECTURE_SNAPSHOT.md`, including the remaining `script.js` monolith, explicit load-order dependency, committed Mirror bundle, dual Recent Runs surfaces, and local persistence migration path.
 
-New features are added only when they deepen the core loop rather than distract from it.
+## AI-Assisted Development
 
----
+Wayword has been built with AI-assisted development in Cursor and Codex. The assistance is part of the working process: implementation support, refactoring, review, and documentation drafting. Product direction, taste, verification, and final responsibility remain human-owned.
 
-## Contributor docs
-
-For V1-sensitive changes, start here before touching code:
-
-- docs/V1_ARCHITECTURE_SNAPSHOT.md
-- docs/V1_CHANGE_GUARDRAILS.md
-- docs/QA_REGRESSION_CHECKLIST.md
-- src/app/README.md
-
----
-
-## Usage
-
-Open the app.
-
-Begin writing.
-
-Return tomorrow.
+The project is intentionally positioned as software built with AI assistance, not as an AI writing assistant for users.

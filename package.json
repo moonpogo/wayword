@@ -1,7 +1,7 @@
 {
   "name": "wayword",
   "version": "1.0.0",
-  "description": "Write. See what emerges.",
+  "description": "A local-first writing practice for noticing language patterns across short runs.",
   "main": "mirror-engine.iife.js",
   "devDependencies": {
     "esbuild": "^0.28.0",
@@ -32,5 +32,5 @@
   "bugs": {
     "url": "https://github.com/moonpogo/wayword/issues"
   },
-  "homepage": "https://github.com/moonpogo/wayword#readme"
+  "homepage": "https://wayword.me/"
 }
