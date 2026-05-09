@@ -33,6 +33,8 @@
       renderWritingState: input.renderWritingState,
       renderMeta: input.renderMeta,
       renderSidebar: input.renderSidebar,
+      resetLatentPromptNudge: input.resetLatentPromptNudge,
+      beginLatentPromptNudgeWatch: input.beginLatentPromptNudgeWatch,
       queueViewportSync: input.queueViewportSync,
       setExerciseWords: input.setExerciseWords,
       generatePrompt: input.generatePrompt,

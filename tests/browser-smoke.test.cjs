@@ -319,7 +319,8 @@ async function readDesktopWritingColumnLayoutSnapshot(session) {
     var pc = document.getElementById("promptCard");
     var pt = document.getElementById("promptText");
     var topline = document.getElementById("promptFamilyLabel");
-    var nudge = document.getElementById("promptNudge");
+    var nudge = document.getElementById("promptNudgeShell");
+    var nextPass = document.getElementById("mirrorNextPassSlot");
     function top(el) {
       return el ? Math.round(el.getBoundingClientRect().top) : null;
     }
@@ -339,7 +340,12 @@ async function readDesktopWritingColumnLayoutSnapshot(session) {
       promptCardTop: pct,
       promptTextTop: top(pt),
       promptFamilyTop: top(topline),
-      promptNudgeTop: nudge && !nudge.classList.contains("hidden") ? top(nudge) : null,
+      promptNudgeTop: nudge && !nudge.classList.contains("prompt-nudge-shell--hidden") ? top(nudge) : null,
+      mirrorNextPassVisible: Boolean(nextPass && !nextPass.classList.contains("hidden")),
+      mirrorNextPassHeight:
+        nextPass && !nextPass.classList.contains("hidden")
+          ? Math.round(nextPass.getBoundingClientRect().height)
+          : 0,
       gapPromptCardBelowHeader: hb != null && pct != null ? Math.round(pct - hb) : null,
       gapPromptFamilyBelowHeader:
         hb != null && topline ? Math.round(top(topline) - hb) : null
@@ -504,9 +510,13 @@ async function verifyDesktopReflectionPostSubmit(session, layoutBefore, expectSe
     layoutBefore.editorPillBandBottom != null && layoutAfter.editorPillBandBottom != null,
     "expected editor pill band geometry for invariance checks"
   );
+  const continuationShiftAllowance =
+    layoutAfter.mirrorNextPassVisible && layoutBefore.promptNudgeTop == null
+      ? layoutAfter.mirrorNextPassHeight + 14
+      : 3;
   assert.ok(
-    Math.abs(layoutAfter.editorPillBandBottom - layoutBefore.editorPillBandBottom) <= 3,
-    `expected editor pill / annotation band not to shift vertically (before=${layoutBefore.editorPillBandBottom}, after=${layoutAfter.editorPillBandBottom})`
+    Math.abs(layoutAfter.editorPillBandBottom - layoutBefore.editorPillBandBottom) <= continuationShiftAllowance,
+    `expected editor pill / annotation band shift to stay within continuation-lane bounds (before=${layoutBefore.editorPillBandBottom}, after=${layoutAfter.editorPillBandBottom}, allowance=${continuationShiftAllowance})`
   );
 
   const reflectionGap = await readReflectionGapBelowPillMetaRow(session);
@@ -578,12 +588,14 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
       var write = document.getElementById("writeView");
       var editor = document.getElementById("editorInput");
       var prompt = document.getElementById("promptText");
+      var nudge = document.getElementById("promptNudgeShell");
       return {
         appHidden: app?.getAttribute("aria-hidden") === "true",
         writeHidden: write?.classList.contains("hidden"),
         editorEditable: editor?.getAttribute("contenteditable") === "true",
         promptLen: String(prompt?.textContent || "").trim().length,
-        promptId: String(window.waywordAppState?.state?.promptId || "")
+        promptId: String(window.waywordAppState?.state?.promptId || ""),
+        promptNudgeVisible: Boolean(nudge && !nudge.classList.contains("prompt-nudge-shell--hidden"))
       };
     `);
 
@@ -595,6 +607,7 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
       /^cal_/.test(writingSnapshot.promptId),
       "expected first-run prompt id to come from calibration pool"
     );
+    assert.equal(writingSnapshot.promptNudgeVisible, false, "expected prompt nudge hidden on fresh load");
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);

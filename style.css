@@ -1104,12 +1104,19 @@ html[data-theme="dark"] .theme-moon{
 }
 
 /* Shared guidance lane under the prompt: subtle wash, quiet secondary voice (not a card/CTA). */
-.prompt-nudge,
+.prompt-nudge-shell,
 .mirror-next-pass-nudge{
   display:block;
   width:100%;
   margin:clamp(10px, 1.75vw, 14px) 0 0;
   margin-inline:0;
+}
+
+.prompt-nudge,
+.mirror-next-pass-nudge{
+  display:block;
+  width:100%;
+  margin:clamp(10px, 1.75vw, 14px) 0 0;
   padding-block:9px 11px;
   /* Same horizontal source as `.editor-input` (`--wayword-editor-pad-inline`); −4px aligns text with the writing lane. */
   padding-inline:calc(var(--wayword-editor-pad-inline) - 4px);
@@ -1127,20 +1134,80 @@ html[data-theme="dark"] .theme-moon{
   appearance:none;
 }
 
-.prompt-nudge{
-  font-style:italic;
-  font-weight:400;
-  color:color-mix(in srgb, var(--ink) 3%, var(--muted));
-  background:color-mix(in srgb, var(--muted) 10%, var(--panel));
+.prompt-nudge-shell{
+  overflow:hidden;
+  max-height:86px;
+  clip-path:inset(0 0 0 0);
+  transition:
+    max-height 1040ms cubic-bezier(.18, .62, .18, 1),
+    margin-top 1040ms cubic-bezier(.18, .62, .18, 1),
+    clip-path 980ms cubic-bezier(.18, .62, .18, 1);
 }
 
-.prompt-nudge.hidden{
+.prompt-nudge-shell--hidden{
+  max-height:0;
+  margin-top:0;
+  clip-path:inset(0 0 100% 0);
+  pointer-events:none;
+}
+
+.prompt-main:not(.prompt-main--latent-nudge) .prompt-nudge-shell--hidden{
   display:none;
 }
 
+.prompt-nudge{
+  position:relative;
+  margin:0;
+  font-style:italic;
+  font-weight:400;
+  color:color-mix(in srgb, var(--ink) 3%, var(--muted));
+  background:transparent;
+  transform:translateY(0);
+  transition:transform 1020ms cubic-bezier(.16, .72, .18, 1);
+}
+
+.prompt-nudge::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:2px;
+  background:color-mix(in srgb, var(--muted) 10%, var(--panel));
+  opacity:1;
+  transition:opacity 840ms cubic-bezier(.22, .08, .18, 1) 160ms;
+}
+
+.prompt-nudge-text{
+  position:relative;
+  z-index:1;
+  opacity:1;
+  transition:opacity 760ms cubic-bezier(.22, .08, .18, 1) 280ms;
+}
+
+.prompt-nudge-shell--hidden .prompt-nudge{
+  transform:translateY(5px);
+}
+
+.prompt-nudge-shell--hidden .prompt-nudge::before,
+.prompt-nudge-shell--hidden .prompt-nudge-text{
+  opacity:0;
+  transition-delay:0ms;
+}
+
 html[data-theme="dark"] .prompt-nudge{
-  background:color-mix(in srgb, var(--ink) 9%, var(--panel));
   color:color-mix(in srgb, var(--ink) 4%, var(--muted));
+}
+
+html[data-theme="dark"] .prompt-nudge::before{
+  background:color-mix(in srgb, var(--ink) 9%, var(--panel));
+}
+
+@media (prefers-reduced-motion: reduce){
+  .prompt-nudge-shell,
+  .prompt-nudge::before,
+  .prompt-nudge-text,
+  .prompt-nudge{
+    transition:none;
+  }
 }
 
 /* Post-submit note shares the same lane, slightly stronger for resting-state contrast. */
@@ -6190,11 +6257,17 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     margin:0 0 2px;
   }
 
-  body.keyboard-open .prompt-nudge,
+  body.keyboard-open .prompt-nudge-shell,
   body.keyboard-open .mirror-next-pass-nudge{
     font-size:clamp(12px, 3.4vw, 14px);
     line-height:1.32;
     margin-top:clamp(8px, 1.4vw, 11px);
+  }
+
+  body.keyboard-open .prompt-nudge,
+  body.keyboard-open .mirror-next-pass-nudge{
+    font-size:clamp(12px, 3.4vw, 14px);
+    line-height:1.32;
     padding-top:5px;
     padding-bottom:6px;
   }

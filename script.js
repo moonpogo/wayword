@@ -278,6 +278,59 @@ function getActivePromptNudgeLineForRender() {
   });
 }
 
+let latentPromptNudge = null;
+
+function createLatentPromptNudgeController() {
+  if (!window.waywordLatentNudgeController || typeof window.waywordLatentNudgeController.create !== "function") {
+    return null;
+  }
+  return window.waywordLatentNudgeController.create({
+    getEditorText,
+    isEligible() {
+      return Boolean(
+          state.active &&
+          !state.submitted &&
+          !(isMobileViewport() && document.body.classList.contains("keyboard-open"))
+      );
+    },
+    render() {
+      renderMeta();
+    }
+  });
+}
+
+function getLatentPromptNudgeController() {
+  if (!latentPromptNudge) {
+    latentPromptNudge = createLatentPromptNudgeController();
+  }
+  return latentPromptNudge;
+}
+
+function isPromptNudgeVisible() {
+  const controller = getLatentPromptNudgeController();
+  return Boolean(controller && controller.isVisible());
+}
+
+function resetLatentPromptNudge() {
+  getLatentPromptNudgeController()?.reset();
+}
+
+function beginLatentPromptNudgeWatch() {
+  getLatentPromptNudgeController()?.beginPrompt();
+}
+
+function notifyLatentPromptNudgeEditorFocus() {
+  getLatentPromptNudgeController()?.onEditorFocus();
+}
+
+function notifyLatentPromptNudgeEditorInput() {
+  getLatentPromptNudgeController()?.onEditorInput();
+}
+
+function notifyLatentPromptNudgePromptReroll() {
+  getLatentPromptNudgeController()?.onPromptReroll();
+}
+
 let editorSurfaceComposing = false;
 
 function normalizeExerciseWords(words) {
@@ -1849,6 +1902,7 @@ function resetCalibrationStateToFreshStart() {
 
   state.submitted = false;
   state.completedUiActive = false;
+  resetLatentPromptNudge();
 
   recomputeProgressionLevel({});
   applyProgressionToState();
@@ -2081,7 +2135,9 @@ function canRerollPrompt() {
 }
 
 function rerollPrompt() {
-  getPromptRuntime().rerollPrompt(buildPromptRuntimeInput());
+  const rerolled = getPromptRuntime().rerollPrompt(buildPromptRuntimeInput());
+  if (rerolled) notifyLatentPromptNudgePromptReroll();
+  return rerolled;
 }
 
 /** Reprompt control only — never field toggle (explicit target + propagation guard). */
@@ -3573,7 +3629,8 @@ function renderMeta() {
     window.waywordWritingPromptCardPresentation.renderPromptCard({
       $,
       state,
-      getActivePromptNudgeLineForRender
+      getActivePromptNudgeLineForRender,
+      isPromptNudgeVisible
     });
   } else {
     const promptCard = $("promptCard");
@@ -3584,17 +3641,25 @@ function renderMeta() {
     if (promptText) promptText.textContent = state.prompt || "";
     if (promptFamily) promptFamily.textContent = state.promptFamily || "Prompt";
 
+    const promptNudgeShell = $("promptNudgeShell");
     const promptNudge = $("promptNudge");
+    const promptNudgeText = $("promptNudgeText") || promptNudge;
     const promptMain = promptCard?.querySelector(".prompt-main") ?? null;
-    const nudgeRowVisible = Boolean(state.active && !state.submitted);
-    if (promptNudge) {
+    const nudgeRowVisible = Boolean(state.active && !state.submitted && isPromptNudgeVisible());
+    if (promptNudgeText) {
       const nudge = nudgeRowVisible ? getActivePromptNudgeLineForRender() : "";
-      promptNudge.textContent = nudge;
-      promptNudge.classList.toggle("hidden", !nudgeRowVisible);
+      promptNudgeText.textContent = nudge;
+    }
+    if (promptNudgeShell) {
+      promptNudgeShell.classList.toggle("prompt-nudge-shell--hidden", !nudgeRowVisible);
+      promptNudgeShell.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
+    }
+    if (promptNudge) {
       promptNudge.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
     }
     if (promptMain) {
       promptMain.classList.toggle("prompt-main--with-nudge", nudgeRowVisible);
+      promptMain.classList.toggle("prompt-main--latent-nudge", Boolean(state.active && !state.submitted));
     }
   }
 
@@ -5404,6 +5469,8 @@ function buildRunControllerRegistrationInput() {
     renderWritingState,
     renderMeta,
     renderSidebar,
+    resetLatentPromptNudge,
+    beginLatentPromptNudgeWatch,
     queueViewportSync,
     setExerciseWords,
     generatePrompt,
@@ -5545,7 +5612,9 @@ function bindEditorInputEvents() {
     runPostSubmitAutoNewRunNow,
     getEditorText,
     submitWriting,
-    renderMeta
+    renderMeta,
+    onEditorFocusForLatentNudge: notifyLatentPromptNudgeEditorFocus,
+    onEditorInputForLatentNudge: notifyLatentPromptNudgeEditorInput
   });
 }
 
@@ -5596,6 +5665,7 @@ function bindCalibrationHandoffControls() {
     viewPatternsBtn.addEventListener("click", () => {
       ackCalibrationHandoffAcknowledged();
       state.calibrationHandoffVisible = false;
+      resetLatentPromptNudge();
       if (
         window.waywordPanelCoordination &&
         typeof window.waywordPanelCoordination.armMobilePatternsToggleGuard === "function"

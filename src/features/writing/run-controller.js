@@ -111,6 +111,7 @@
     d.state.calibrationPostRun = null;
     d.state.calibrationHandoffVisible = false;
     d.state.lastSubmitCalibrationShortMirror = false;
+    d.resetLatentPromptNudge?.();
     d.waywordPostRunRenderer.renderReflectionLine("");
 
     d.stopTimer();
@@ -124,6 +125,7 @@
     d.renderHighlight();
     d.renderSidebar();
     d.updateEnterButtonVisibility();
+    d.beginLatentPromptNudgeWatch?.();
 
     if (!keepOptionsPanelOpen) {
       requestAnimationFrame(() => {
@@ -172,6 +174,7 @@
     d.state.calibrationPostRun = null;
     d.state.calibrationHandoffVisible = false;
     d.state.lastSubmitCalibrationShortMirror = false;
+    d.resetLatentPromptNudge?.();
     d.waywordPostRunRenderer.renderReflectionLine("");
 
     window.waywordPanelCoordination.closePanelsForFreshRun({
@@ -186,6 +189,7 @@
     d.renderSidebar();
     d.syncEditorBottomChromeForCalibrationOverlay();
     d.updateEnterButtonVisibility();
+    d.beginLatentPromptNudgeWatch?.();
 
     if (!deferEditorFocus) {
       d.scheduleDeferredEditorFocus(focusCaret);
@@ -246,6 +250,7 @@
     if (d.editorInput && !d.getEditorSurfaceComposing()) {
       d.flushEditorSurfaceIntoWriteDocOnce();
     }
+    d.resetLatentPromptNudge?.();
 
     const currentText = d.getEditorText();
     const analysis = d.analyze(currentText);

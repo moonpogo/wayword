@@ -67,6 +67,20 @@ function loadAppEventsRuntimeContext(overrides = {}) {
   });
 }
 
+function loadLatentNudgeControllerContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/writing/latent-nudge-controller.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
+function loadPromptCardPresentationContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/writing/writing-prompt-card-presentation.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
 function loadEditorShellInteractionsContext(overrides = {}) {
   return loadBrowserScripts(["src/features/writing/editor-shell-interactions.js"], {
     console: silentConsole(),
@@ -712,6 +726,12 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
     renderMeta() {
       calls.push("renderMeta");
     },
+    onEditorFocusForLatentNudge() {
+      calls.push("latentFocus");
+    },
+    onEditorInputForLatentNudge() {
+      calls.push("latentInput");
+    },
     scheduleSemanticPickerFromSelection() {
       calls.push("picker");
     },
@@ -758,6 +778,218 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   calls.length = 0;
   listeners.get("input")();
   assert.ok(calls.includes("renderMeta"), "expected editor input to refresh meta (including prompt reroll affordance)");
+  assert.ok(calls.includes("latentInput"), "expected editor input to cancel latent prompt nudge");
+
+  calls.length = 0;
+  listeners.get("focus")();
+  assert.ok(calls.includes("latentFocus"), "expected editor focus to arm latent prompt nudge");
+});
+
+test("latent nudge controller stays hidden by default and appears after idle", () => {
+  const context = loadLatentNudgeControllerContext();
+  const scheduled = [];
+  let editorText = "";
+  const calls = [];
+  const controller = context.waywordLatentNudgeController.create({
+    idleDelayMs: 30000,
+    focusDelayMs: 5000,
+    getEditorText() {
+      return editorText;
+    },
+    isEligible() {
+      return true;
+    },
+    render() {
+      calls.push("render");
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  controller.beginPrompt();
+
+  assert.equal(controller.isVisible(), false);
+  assert.equal(scheduled[0].ms, 30000);
+  scheduled[0].fn();
+  assert.equal(controller.isVisible(), true);
+  assert.deepEqual(calls, ["render"]);
+
+  editorText = "hello";
+  controller.onEditorInput();
+  assert.equal(controller.isVisible(), false);
+});
+
+test("latent nudge controller appears after two empty rerolls", () => {
+  const context = loadLatentNudgeControllerContext();
+  const calls = [];
+  const controller = context.waywordLatentNudgeController.create({
+    getEditorText() {
+      return "";
+    },
+    isEligible() {
+      return true;
+    },
+    render() {
+      calls.push("render");
+    },
+    timers: {
+      setTimeout() {
+        return 1;
+      },
+      clearTimeout() {},
+    },
+  });
+
+  controller.beginPrompt();
+  assert.equal(controller.onPromptReroll(), false);
+  assert.equal(controller.isVisible(), false);
+  assert.equal(controller.getEmptyRerollCount(), 1);
+
+  assert.equal(controller.onPromptReroll(), true);
+  assert.equal(controller.isVisible(), true);
+  assert.equal(controller.getEmptyRerollCount(), 2);
+  assert.deepEqual(calls, ["render"]);
+});
+
+test("latent nudge controller appears after empty editor focus delay", () => {
+  const context = loadLatentNudgeControllerContext();
+  const scheduled = [];
+  const calls = [];
+  const controller = context.waywordLatentNudgeController.create({
+    focusDelayMs: 5500,
+    getEditorText() {
+      return "";
+    },
+    isEligible() {
+      return true;
+    },
+    render() {
+      calls.push("render");
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  controller.onEditorFocus();
+
+  assert.equal(controller.isVisible(), false);
+  assert.equal(scheduled[0].ms, 5500);
+  scheduled[0].fn();
+  assert.equal(controller.isVisible(), true);
+  assert.deepEqual(calls, ["render"]);
+});
+
+test("latent nudge controller typing prevents scheduled nudge reveal", () => {
+  const context = loadLatentNudgeControllerContext();
+  const scheduled = [];
+  let editorText = "";
+  const controller = context.waywordLatentNudgeController.create({
+    getEditorText() {
+      return editorText;
+    },
+    isEligible() {
+      return true;
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  controller.beginPrompt();
+  editorText = "first words";
+  controller.onEditorInput();
+  scheduled[0].fn();
+
+  assert.equal(scheduled[0].cleared, true);
+  assert.equal(controller.isVisible(), false);
+});
+
+test("prompt card presentation hides nudge by default and shows it when controller allows", () => {
+  const context = loadPromptCardPresentationContext();
+  const promptMain = { classList: createClassList() };
+  const nodes = new Map();
+  const promptNudgeShell = {
+    classList: createClassList(["prompt-nudge-shell--hidden"]),
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const promptNudge = {
+    textContent: "",
+    attrs: {},
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    },
+  };
+  const promptNudgeText = { textContent: "" };
+  nodes.set("promptCard", {
+    classList: createClassList(),
+    querySelector(selector) {
+      return selector === ".prompt-main" ? promptMain : null;
+    },
+  });
+  nodes.set("promptText", { textContent: "" });
+  nodes.set("promptFamilyLabel", { textContent: "" });
+  nodes.set("promptNudgeShell", promptNudgeShell);
+  nodes.set("promptNudge", promptNudge);
+  nodes.set("promptNudgeText", promptNudgeText);
+
+  context.waywordWritingPromptCardPresentation.renderPromptCard({
+    $(id) {
+      return nodes.get(id) || null;
+    },
+    state: { active: true, submitted: false, prompt: "Prompt", promptFamily: "Scene" },
+    getActivePromptNudgeLineForRender() {
+      return "Stay near the first image.";
+    },
+    isPromptNudgeVisible() {
+      return false;
+    },
+  });
+
+  assert.equal(promptNudgeText.textContent, "");
+  assert.equal(promptNudgeShell.classList.contains("prompt-nudge-shell--hidden"), true);
+  assert.equal(promptMain.classList.contains("prompt-main--with-nudge"), false);
+
+  context.waywordWritingPromptCardPresentation.renderPromptCard({
+    $(id) {
+      return nodes.get(id) || null;
+    },
+    state: { active: true, submitted: false, prompt: "Prompt", promptFamily: "Scene" },
+    getActivePromptNudgeLineForRender() {
+      return "Stay near the first image.";
+    },
+    isPromptNudgeVisible() {
+      return true;
+    },
+  });
+
+  assert.equal(promptNudgeText.textContent, "Stay near the first image.");
+  assert.equal(promptNudgeShell.classList.contains("prompt-nudge-shell--hidden"), false);
+  assert.equal(promptNudgeShell.attrs["aria-hidden"], "false");
+  assert.equal(promptNudge.attrs["aria-hidden"], "false");
+  assert.equal(promptMain.classList.contains("prompt-main--with-nudge"), true);
 });
 
 test("app events runtime binds document, primary controls, and panel controls once", () => {

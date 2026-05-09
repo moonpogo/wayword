@@ -286,7 +286,11 @@
                   aria-live="polite"
                   aria-hidden="true"
                 ></div>
-                <p id="promptNudge" class="prompt-nudge hidden" aria-hidden="true"></p>
+                <div id="promptNudgeShell" class="prompt-nudge-shell prompt-nudge-shell--hidden" aria-hidden="true">
+                  <p id="promptNudge" class="prompt-nudge" aria-hidden="true">
+                    <span id="promptNudgeText" class="prompt-nudge-text"></span>
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -695,6 +699,7 @@
   <script src="/src/features/writing/writing-exercise-words-coordinator.js"></script>
   <script src="/src/features/writing/writing-exercise-banner-presentation.js"></script>
   <script src="/src/features/writing/writing-meta-surface-coordinator.js"></script>
+  <script src="/src/features/writing/latent-nudge-controller.js"></script>
   <script src="/src/features/writing/writing-prompt-card-presentation.js"></script>
   <script src="/src/features/writing/writing-prompt-reroll-presentation.js"></script>
   <script src="/src/features/writing/writing-target-label-presentation.js"></script>

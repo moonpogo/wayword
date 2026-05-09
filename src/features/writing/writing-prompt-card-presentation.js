@@ -8,17 +8,27 @@
     if (promptText) promptText.textContent = input.state.prompt || "";
     if (promptFamily) promptFamily.textContent = input.state.promptFamily || "Prompt";
 
+    var promptNudgeShell = input.$("promptNudgeShell");
     var promptNudge = input.$("promptNudge");
+    var promptNudgeText = input.$("promptNudgeText") || promptNudge;
     var promptMain = promptCard ? promptCard.querySelector(".prompt-main") : null;
-    var nudgeRowVisible = Boolean(input.state.active && !input.state.submitted);
-    if (promptNudge) {
+    var nudgeVisible =
+      typeof input.isPromptNudgeVisible === "function" ? input.isPromptNudgeVisible() : false;
+    var nudgeRowVisible = Boolean(input.state.active && !input.state.submitted && nudgeVisible);
+    if (promptNudgeText) {
       var nudge = nudgeRowVisible ? input.getActivePromptNudgeLineForRender() : "";
-      promptNudge.textContent = nudge;
-      promptNudge.classList.toggle("hidden", !nudgeRowVisible);
+      promptNudgeText.textContent = nudge;
+    }
+    if (promptNudgeShell) {
+      promptNudgeShell.classList.toggle("prompt-nudge-shell--hidden", !nudgeRowVisible);
+      promptNudgeShell.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
+    }
+    if (promptNudge) {
       promptNudge.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
     }
     if (promptMain) {
       promptMain.classList.toggle("prompt-main--with-nudge", nudgeRowVisible);
+      promptMain.classList.toggle("prompt-main--latent-nudge", Boolean(input.state.active && !input.state.submitted));
     }
   }
 

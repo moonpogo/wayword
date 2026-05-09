@@ -6,6 +6,9 @@
 
     editorInput.addEventListener("focus", function () {
       input.setFocusMode(true);
+      if (typeof input.onEditorFocusForLatentNudge === "function") {
+        input.onEditorFocusForLatentNudge();
+      }
     });
 
     editorInput.addEventListener("blur", function (e) {
@@ -38,6 +41,9 @@
       input.setEditorSurfaceComposing(false);
       if (!input.isActiveAndEditable()) return;
       input.flushEditorSurfaceIntoWriteDocOnce();
+      if (typeof input.onEditorInputForLatentNudge === "function") {
+        input.onEditorInputForLatentNudge();
+      }
       input.tryStartTimerOnFirstMeaningfulInput();
       input.pulseWordmark();
       input.renderHighlight();
@@ -68,6 +74,9 @@
         return;
       }
       input.flushEditorSurfaceIntoWriteDocOnce();
+      if (typeof input.onEditorInputForLatentNudge === "function") {
+        input.onEditorInputForLatentNudge();
+      }
       input.tryStartTimerOnFirstMeaningfulInput();
       input.pulseWordmark();
       input.renderHighlight();
