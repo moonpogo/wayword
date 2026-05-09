@@ -26,6 +26,9 @@
     if (promptNudge) {
       promptNudge.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
     }
+    if (nudgeRowVisible && typeof input.onPromptNudgeVisible === "function") {
+      input.onPromptNudgeVisible();
+    }
     if (promptMain) {
       promptMain.classList.toggle("prompt-main--with-nudge", nudgeRowVisible);
       promptMain.classList.toggle("prompt-main--latent-nudge", Boolean(input.state.active && !input.state.submitted));

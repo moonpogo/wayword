@@ -331,6 +331,63 @@ function notifyLatentPromptNudgePromptReroll() {
   getLatentPromptNudgeController()?.onPromptReroll();
 }
 
+let editorPermissionController = null;
+
+function createEditorPermissionController() {
+  if (
+    !window.waywordEditorPermissionController ||
+    typeof window.waywordEditorPermissionController.create !== "function"
+  ) {
+    return null;
+  }
+  return window.waywordEditorPermissionController.create({
+    getEditorText,
+    isEligible() {
+      return Boolean(state.active && !state.submitted);
+    },
+    render() {
+      renderEditorPermissionPhrase();
+    }
+  });
+}
+
+function getEditorPermissionController() {
+  if (!editorPermissionController) {
+    editorPermissionController = createEditorPermissionController();
+  }
+  return editorPermissionController;
+}
+
+function renderEditorPermissionPhrase() {
+  const el = $("editorPermissionPhrase");
+  if (!el) return;
+  const controller = getEditorPermissionController();
+  const visible = Boolean(controller && controller.isVisible());
+  el.replaceChildren();
+  if (visible) {
+    const text = document.createElement("span");
+    text.className = "editor-permission-phrase__text";
+    text.textContent = controller.getPhrase();
+    el.append(text);
+  }
+  el.classList.toggle("editor-permission-phrase--hidden", !visible);
+  el.setAttribute("aria-hidden", "true");
+  editorInput?.classList.toggle("editor-input--permission-visible", visible);
+}
+
+function notifyEditorPermissionNudgeVisible() {
+  getEditorPermissionController()?.onNudgeVisible();
+}
+
+function notifyEditorPermissionUserEdit() {
+  getEditorPermissionController()?.onUserEdit();
+}
+
+function resetEditorPermissionPhrase() {
+  getEditorPermissionController()?.reset();
+  renderEditorPermissionPhrase();
+}
+
 let editorSurfaceComposing = false;
 
 function normalizeExerciseWords(words) {
@@ -1903,6 +1960,7 @@ function resetCalibrationStateToFreshStart() {
   state.submitted = false;
   state.completedUiActive = false;
   resetLatentPromptNudge();
+  resetEditorPermissionPhrase();
 
   recomputeProgressionLevel({});
   applyProgressionToState();
@@ -2136,7 +2194,10 @@ function canRerollPrompt() {
 
 function rerollPrompt() {
   const rerolled = getPromptRuntime().rerollPrompt(buildPromptRuntimeInput());
-  if (rerolled) notifyLatentPromptNudgePromptReroll();
+  if (rerolled) {
+    resetEditorPermissionPhrase();
+    notifyLatentPromptNudgePromptReroll();
+  }
   return rerolled;
 }
 
@@ -3630,7 +3691,8 @@ function renderMeta() {
       $,
       state,
       getActivePromptNudgeLineForRender,
-      isPromptNudgeVisible
+      isPromptNudgeVisible,
+      onPromptNudgeVisible: notifyEditorPermissionNudgeVisible
     });
   } else {
     const promptCard = $("promptCard");
@@ -3657,6 +3719,7 @@ function renderMeta() {
     if (promptNudge) {
       promptNudge.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
     }
+    if (nudgeRowVisible) notifyEditorPermissionNudgeVisible();
     if (promptMain) {
       promptMain.classList.toggle("prompt-main--with-nudge", nudgeRowVisible);
       promptMain.classList.toggle("prompt-main--latent-nudge", Boolean(state.active && !state.submitted));
@@ -5471,6 +5534,7 @@ function buildRunControllerRegistrationInput() {
     renderSidebar,
     resetLatentPromptNudge,
     beginLatentPromptNudgeWatch,
+    resetEditorPermissionPhrase,
     queueViewportSync,
     setExerciseWords,
     generatePrompt,
@@ -5614,7 +5678,8 @@ function bindEditorInputEvents() {
     submitWriting,
     renderMeta,
     onEditorFocusForLatentNudge: notifyLatentPromptNudgeEditorFocus,
-    onEditorInputForLatentNudge: notifyLatentPromptNudgeEditorInput
+    onEditorInputForLatentNudge: notifyLatentPromptNudgeEditorInput,
+    onEditorPermissionUserEdit: notifyEditorPermissionUserEdit
   });
 }
 
@@ -5666,6 +5731,7 @@ function bindCalibrationHandoffControls() {
       ackCalibrationHandoffAcknowledged();
       state.calibrationHandoffVisible = false;
       resetLatentPromptNudge();
+      resetEditorPermissionPhrase();
       if (
         window.waywordPanelCoordination &&
         typeof window.waywordPanelCoordination.armMobilePatternsToggleGuard === "function"

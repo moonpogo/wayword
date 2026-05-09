@@ -35,6 +35,7 @@
       renderSidebar: input.renderSidebar,
       resetLatentPromptNudge: input.resetLatentPromptNudge,
       beginLatentPromptNudgeWatch: input.beginLatentPromptNudgeWatch,
+      resetEditorPermissionPhrase: input.resetEditorPermissionPhrase,
       queueViewportSync: input.queueViewportSync,
       setExerciseWords: input.setExerciseWords,
       generatePrompt: input.generatePrompt,

@@ -11,6 +11,13 @@
       }
     });
 
+    editorInput.addEventListener("pointerdown", function () {
+      if (!input.isActiveAndEditable()) return;
+      if (typeof input.onEditorPermissionUserEdit === "function") {
+        input.onEditorPermissionUserEdit();
+      }
+    });
+
     editorInput.addEventListener("blur", function (e) {
       if (
         !input.mobileEditorFocusGuard ||
@@ -35,6 +42,9 @@
 
     editorInput.addEventListener("compositionstart", function () {
       input.setEditorSurfaceComposing(true);
+      if (typeof input.onEditorPermissionUserEdit === "function") {
+        input.onEditorPermissionUserEdit();
+      }
     });
 
     editorInput.addEventListener("compositionend", function () {
@@ -43,6 +53,9 @@
       input.flushEditorSurfaceIntoWriteDocOnce();
       if (typeof input.onEditorInputForLatentNudge === "function") {
         input.onEditorInputForLatentNudge();
+      }
+      if (typeof input.onEditorPermissionUserEdit === "function") {
+        input.onEditorPermissionUserEdit();
       }
       input.tryStartTimerOnFirstMeaningfulInput();
       input.pulseWordmark();
@@ -77,6 +90,9 @@
       if (typeof input.onEditorInputForLatentNudge === "function") {
         input.onEditorInputForLatentNudge();
       }
+      if (typeof input.onEditorPermissionUserEdit === "function") {
+        input.onEditorPermissionUserEdit();
+      }
       input.tryStartTimerOnFirstMeaningfulInput();
       input.pulseWordmark();
       input.renderHighlight();
@@ -92,6 +108,13 @@
         typeof window.waywordMobileEditorCaretReveal.schedule === "function"
       ) {
         window.waywordMobileEditorCaretReveal.schedule(editorInput);
+      }
+    });
+
+    editorInput.addEventListener("paste", function () {
+      if (!input.isActiveAndEditable()) return;
+      if (typeof input.onEditorPermissionUserEdit === "function") {
+        input.onEditorPermissionUserEdit();
       }
     });
 

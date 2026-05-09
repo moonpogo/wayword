@@ -112,6 +112,7 @@
     d.state.calibrationHandoffVisible = false;
     d.state.lastSubmitCalibrationShortMirror = false;
     d.resetLatentPromptNudge?.();
+    d.resetEditorPermissionPhrase?.();
     d.waywordPostRunRenderer.renderReflectionLine("");
 
     d.stopTimer();
@@ -175,6 +176,7 @@
     d.state.calibrationHandoffVisible = false;
     d.state.lastSubmitCalibrationShortMirror = false;
     d.resetLatentPromptNudge?.();
+    d.resetEditorPermissionPhrase?.();
     d.waywordPostRunRenderer.renderReflectionLine("");
 
     window.waywordPanelCoordination.closePanelsForFreshRun({
@@ -251,6 +253,7 @@
       d.flushEditorSurfaceIntoWriteDocOnce();
     }
     d.resetLatentPromptNudge?.();
+    d.resetEditorPermissionPhrase?.();
 
     const currentText = d.getEditorText();
     const analysis = d.analyze(currentText);

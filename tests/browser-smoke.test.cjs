@@ -589,13 +589,17 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
       var editor = document.getElementById("editorInput");
       var prompt = document.getElementById("promptText");
       var nudge = document.getElementById("promptNudgeShell");
+      var permission = document.getElementById("editorPermissionPhrase");
       return {
         appHidden: app?.getAttribute("aria-hidden") === "true",
         writeHidden: write?.classList.contains("hidden"),
         editorEditable: editor?.getAttribute("contenteditable") === "true",
         promptLen: String(prompt?.textContent || "").trim().length,
         promptId: String(window.waywordAppState?.state?.promptId || ""),
-        promptNudgeVisible: Boolean(nudge && !nudge.classList.contains("prompt-nudge-shell--hidden"))
+        promptNudgeVisible: Boolean(nudge && !nudge.classList.contains("prompt-nudge-shell--hidden")),
+        permissionVisible: Boolean(
+          permission && !permission.classList.contains("editor-permission-phrase--hidden")
+        )
       };
     `);
 
@@ -608,6 +612,86 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
       "expected first-run prompt id to come from calibration pool"
     );
     assert.equal(writingSnapshot.promptNudgeVisible, false, "expected prompt nudge hidden on fresh load");
+    assert.equal(writingSnapshot.permissionVisible, false, "expected permission phrase hidden on fresh load");
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: permission overlay stays inside editor chrome and suppresses native caret", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await loadFreshApp(session);
+    await waitForLandingGateVisible(session);
+    await beginRun(session);
+
+    const snapshot = await session.execute(`
+      function measure() {
+        var doc = document.documentElement;
+        var editor = document.getElementById("editorInput");
+        var port = document.getElementById("editorInputScrollport");
+        var permission = document.getElementById("editorPermissionPhrase");
+        var chrome = document.querySelector(".editor-bottom-chrome");
+        var rect = chrome ? chrome.getBoundingClientRect() : null;
+        var editorStyle = editor ? getComputedStyle(editor) : null;
+        var permissionStyle = permission ? getComputedStyle(permission) : null;
+        return {
+          documentClientWidth: doc.clientWidth,
+          documentScrollWidth: doc.scrollWidth,
+          portClientWidth: port ? port.clientWidth : 0,
+          portScrollWidth: port ? port.scrollWidth : 0,
+          chromeTop: rect ? rect.top : 0,
+          chromeLeft: rect ? rect.left : 0,
+          nativeCaret: editorStyle ? editorStyle.caretColor : "",
+          editorFontSize: editorStyle ? editorStyle.fontSize : "",
+          editorLineHeight: editorStyle ? editorStyle.lineHeight : "",
+          permissionFontSize: permissionStyle ? permissionStyle.fontSize : "",
+          permissionLineHeight: permissionStyle ? permissionStyle.lineHeight : "",
+          permissionPointerEvents: permissionStyle ? permissionStyle.pointerEvents : "",
+          fakeCaretCount: permission
+            ? permission.querySelectorAll(".editor-permission-phrase__caret, [data-permission-caret]").length
+            : 0
+        };
+      }
+
+      var editor = document.getElementById("editorInput");
+      var permission = document.getElementById("editorPermissionPhrase");
+      var before = measure();
+
+      var text = document.createElement("span");
+      text.className = "editor-permission-phrase__text";
+      text.textContent = "Begin anywhere.";
+      permission.replaceChildren(text);
+      permission.classList.remove("editor-permission-phrase--hidden");
+      editor.classList.add("editor-input--permission-visible");
+
+      var visible = measure();
+
+      permission.classList.add("editor-permission-phrase--hidden");
+      permission.replaceChildren();
+      editor.classList.remove("editor-input--permission-visible");
+
+      var hidden = measure();
+      return { before: before, visible: visible, hidden: hidden };
+    `);
+
+    assert.ok(
+      snapshot.visible.documentScrollWidth <= snapshot.visible.documentClientWidth + 1,
+      "permission overlay should not create document horizontal overflow"
+    );
+    assert.ok(
+      snapshot.visible.portScrollWidth <= snapshot.visible.portClientWidth + 1,
+      "permission overlay should not create editor scrollport horizontal overflow"
+    );
+    assert.equal(snapshot.visible.fakeCaretCount, 0, "expected no faux permission caret while visible");
+    assert.match(snapshot.visible.nativeCaret, /rgba\(0, 0, 0, 0\)|transparent/i);
+    assert.equal(snapshot.visible.permissionPointerEvents, "none");
+    assert.equal(snapshot.visible.permissionFontSize, snapshot.visible.editorFontSize);
+    assert.equal(snapshot.visible.permissionLineHeight, snapshot.visible.editorLineHeight);
+    assert.equal(snapshot.hidden.fakeCaretCount, 0, "expected no faux permission caret after hide");
+    assert.notEqual(snapshot.hidden.nativeCaret, snapshot.visible.nativeCaret);
+    assert.ok(Math.abs(snapshot.visible.chromeTop - snapshot.before.chromeTop) <= 0.5);
+    assert.ok(Math.abs(snapshot.hidden.chromeTop - snapshot.before.chromeTop) <= 0.5);
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);

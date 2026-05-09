@@ -74,6 +74,13 @@ function loadLatentNudgeControllerContext(overrides = {}) {
   });
 }
 
+function loadEditorPermissionControllerContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/writing/editor-permission-controller.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
 function loadPromptCardPresentationContext(overrides = {}) {
   return loadBrowserScripts(["src/features/writing/writing-prompt-card-presentation.js"], {
     console: silentConsole(),
@@ -732,6 +739,9 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
     onEditorInputForLatentNudge() {
       calls.push("latentInput");
     },
+    onEditorPermissionUserEdit() {
+      calls.push("permissionEdit");
+    },
     scheduleSemanticPickerFromSelection() {
       calls.push("picker");
     },
@@ -758,6 +768,7 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
 
   assert.equal(editorInput.dataset.appEventsBound, "1");
   assert.equal(listeners.has("keydown"), true);
+  assert.equal(listeners.has("pointerdown"), true);
 
   listeners.get("focus")();
   listeners.get("scroll")();
@@ -776,9 +787,22 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
 
   calls.length = 0;
+  listeners.get("pointerdown")();
+  assert.ok(calls.includes("permissionEdit"), "expected editor pointer engagement to hide permission phrase");
+
+  calls.length = 0;
   listeners.get("input")();
   assert.ok(calls.includes("renderMeta"), "expected editor input to refresh meta (including prompt reroll affordance)");
   assert.ok(calls.includes("latentInput"), "expected editor input to cancel latent prompt nudge");
+  assert.ok(calls.includes("permissionEdit"), "expected editor input to hide permission phrase");
+
+  calls.length = 0;
+  listeners.get("paste")();
+  assert.ok(calls.includes("permissionEdit"), "expected paste to hide permission phrase before insertion");
+
+  calls.length = 0;
+  listeners.get("compositionstart")();
+  assert.ok(calls.includes("permissionEdit"), "expected composition start to hide permission phrase");
 
   calls.length = 0;
   listeners.get("focus")();
@@ -990,6 +1014,128 @@ test("prompt card presentation hides nudge by default and shows it when controll
   assert.equal(promptNudgeShell.attrs["aria-hidden"], "false");
   assert.equal(promptNudge.attrs["aria-hidden"], "false");
   assert.equal(promptMain.classList.contains("prompt-main--with-nudge"), true);
+});
+
+test("editor permission controller waits for nudge exposure and empty-editor delay", () => {
+  const context = loadEditorPermissionControllerContext();
+  const scheduled = [];
+  const calls = [];
+  const controller = context.waywordEditorPermissionController.create({
+    delayMs: 12000,
+    phrases: ["Begin anywhere."],
+    getEditorText() {
+      return "";
+    },
+    isEligible() {
+      return true;
+    },
+    render() {
+      calls.push("render");
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  assert.equal(controller.isVisible(), false);
+  assert.equal(controller.getPhrase(), "");
+  assert.equal(scheduled.length, 0, "permission should not arm before nudge exposure");
+
+  controller.onNudgeVisible();
+  assert.equal(controller.isVisible(), false);
+  assert.equal(scheduled[0].ms, 12000);
+
+  scheduled[0].fn();
+  assert.equal(controller.isVisible(), true);
+  assert.equal(controller.getPhrase(), "Begin anywhere.");
+  assert.deepEqual(calls, ["render"]);
+});
+
+test("editor permission controller cancels on edit and ignores non-empty restored text", () => {
+  const context = loadEditorPermissionControllerContext();
+  const scheduled = [];
+  let text = "";
+  const controller = context.waywordEditorPermissionController.create({
+    delayMs: 12000,
+    phrases: ["One line will do."],
+    getEditorText() {
+      return text;
+    },
+    isEligible() {
+      return true;
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  text = "restored draft";
+  controller.onNudgeVisible();
+  assert.equal(scheduled.length, 0);
+  assert.equal(controller.isVisible(), false);
+
+  text = "";
+  controller.reset();
+  controller.onNudgeVisible();
+  assert.equal(scheduled.length, 1);
+  controller.onUserEdit();
+  scheduled[0].fn();
+  assert.equal(scheduled[0].cleared, true);
+  assert.equal(controller.isVisible(), false);
+  assert.equal(controller.getPhrase(), "");
+});
+
+test("editor permission controller reset clears visible permission and waits for a new nudge", () => {
+  const context = loadEditorPermissionControllerContext();
+  const scheduled = [];
+  const renders = [];
+  const controller = context.waywordEditorPermissionController.create({
+    delayMs: 12000,
+    phrases: ["A fragment is enough."],
+    getEditorText() {
+      return "";
+    },
+    isEligible() {
+      return true;
+    },
+    render() {
+      renders.push("render");
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  controller.onNudgeVisible();
+  scheduled[0].fn();
+  assert.equal(controller.isVisible(), true);
+
+  controller.reset();
+  assert.equal(controller.isVisible(), false);
+  assert.equal(controller.getPhrase(), "");
+  assert.deepEqual(renders, ["render", "render"]);
+
+  const before = scheduled.length;
+  scheduled[0].fn();
+  assert.equal(scheduled.length, before, "reset should not re-arm without another nudge exposure");
 });
 
 test("app events runtime binds document, primary controls, and panel controls once", () => {
