@@ -5,7 +5,7 @@ This pass adds Prompt System V1 scaffold data only.
 
 Included now:
 - a V1 layered prompt data module
-- the approved Layer 1 foundation set encoded as structured prompt entries
+- all three foundation prompt layers encoded as structured prompt entries
 - integrity tests for schema and counts
 
 Not included now:
@@ -13,8 +13,7 @@ Not included now:
 - calibration behavior changes
 - reroll behavior changes
 - UI changes
-- Layer 2 / Torsion implementation
-- Layer 3 / Resonance implementation
+- adaptive layer routing
 
 ## Runtime Status
 V0 prompt runtime remains active in production paths.
@@ -27,12 +26,20 @@ Local/dev testing for V1 Entry can be enabled only in local contexts (`localhost
 
 Default remains V0 when no local override is present.
 
+The local/dev V1 flag is still the only activation path. Production/default runtime remains V0.
+
 ## Layer Roadmap
-Layer 1 is scaffolded in data form.
+Prompt System V1 scaffold now contains all three foundation layers:
 
-V1 runtime currently means Entry/Layer 1 only.
+- Entry: 30 prompts
+- Torsion: 25 prompts
+- Resonance: 25 prompts
 
-Layer 2 and Layer 3 are intentionally deferred. The next conceptual specification pass should define Resonance before Torsion, then stage implementation sequencing after validation.
+V1 runtime currently means Entry/Layer 1 only. Torsion and Resonance are data-scaffolded but not routed.
+
+There is no adaptive layer routing yet.
+
+The next phase is primitive movement logic / strata design.
 
 ## Integration Strategy
 Future runtime integration should be introduced behind a safe switch or development flag before replacing V0 behavior.

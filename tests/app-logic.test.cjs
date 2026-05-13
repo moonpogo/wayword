@@ -438,18 +438,25 @@ test("prompt system docs list the runtime prompt families", () => {
   assert.match(doc, /src\/features\/prompts\/calibration-prompts\.js/);
 });
 
-test("layered prompts v1 scaffold has required entry prompt integrity", () => {
+test("layered prompts v1 scaffold has required foundation prompt integrity", () => {
   const context = loadLayeredPromptDataContext();
   const layered = context.waywordLayeredPrompts;
   const prompts = layered.LAYERED_PROMPTS_V1;
+  const validLayers = new Set([
+    layered.PROMPT_LAYERS.ENTRY,
+    layered.PROMPT_LAYERS.TORSION,
+    layered.PROMPT_LAYERS.RESONANCE,
+  ]);
 
-  assert.equal(prompts.length, 30);
+  assert.equal(prompts.length, 80);
   assert.equal(layered.getEntryPromptsV1().length, 30);
   assert.equal(layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.ENTRY).length, 30);
+  assert.equal(layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.TORSION).length, 25);
+  assert.equal(layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.RESONANCE).length, 25);
   const counts = layered.getPromptLayerCounts();
   assert.equal(counts.entry, 30);
-  assert.equal(counts.torsion, 0);
-  assert.equal(counts.resonance, 0);
+  assert.equal(counts.torsion, 25);
+  assert.equal(counts.resonance, 25);
 
   const ids = new Set();
   const texts = new Set();
@@ -460,7 +467,7 @@ test("layered prompts v1 scaffold has required entry prompt integrity", () => {
     assert.equal(typeof prompt.status, "string");
     assert.notEqual(prompt.id.trim(), "");
     assert.notEqual(prompt.text.trim(), "");
-    assert.equal(prompt.layer, layered.PROMPT_LAYERS.ENTRY);
+    assert.equal(validLayers.has(prompt.layer), true);
     assert.equal(prompt.status, "foundation");
     assert.equal(prompt.text.includes("—"), false);
 
@@ -468,8 +475,8 @@ test("layered prompts v1 scaffold has required entry prompt integrity", () => {
     texts.add(prompt.text);
   }
 
-  assert.equal(ids.size, 30);
-  assert.equal(texts.size, 30);
+  assert.equal(ids.size, 80);
+  assert.equal(texts.size, 80);
 });
 
 test("prompt system mode defaults to v0 and allows v1 only on local dev contexts", () => {
