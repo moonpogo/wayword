@@ -46,6 +46,12 @@ function loadPromptDataContext() {
   );
 }
 
+function loadLayeredPromptDataContext() {
+  return loadBrowserScripts(["src/features/prompts/layered-prompts.js"], {
+    console: silentConsole(),
+  });
+}
+
 function loadRunControllerRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/run-controller-runtime.js"], {
     console: silentConsole(),
@@ -423,6 +429,40 @@ test("prompt system docs list the runtime prompt families", () => {
   assert.deepEqual(documentedFamilies, familyOrder.concat([calibrationFamily]));
   assert.match(doc, /src\/features\/prompts\/prompt-library\.js/);
   assert.match(doc, /src\/features\/prompts\/calibration-prompts\.js/);
+});
+
+test("layered prompts v1 scaffold has required entry prompt integrity", () => {
+  const context = loadLayeredPromptDataContext();
+  const layered = context.waywordLayeredPrompts;
+  const prompts = layered.LAYERED_PROMPTS_V1;
+
+  assert.equal(prompts.length, 30);
+  assert.equal(layered.getEntryPromptsV1().length, 30);
+  assert.equal(layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.ENTRY).length, 30);
+  const counts = layered.getPromptLayerCounts();
+  assert.equal(counts.entry, 30);
+  assert.equal(counts.torsion, 0);
+  assert.equal(counts.resonance, 0);
+
+  const ids = new Set();
+  const texts = new Set();
+  for (const prompt of prompts) {
+    assert.equal(typeof prompt.id, "string");
+    assert.equal(typeof prompt.layer, "string");
+    assert.equal(typeof prompt.text, "string");
+    assert.equal(typeof prompt.status, "string");
+    assert.notEqual(prompt.id.trim(), "");
+    assert.notEqual(prompt.text.trim(), "");
+    assert.equal(prompt.layer, layered.PROMPT_LAYERS.ENTRY);
+    assert.equal(prompt.status, "foundation");
+    assert.equal(prompt.text.includes("—"), false);
+
+    ids.add(prompt.id);
+    texts.add(prompt.text);
+  }
+
+  assert.equal(ids.size, 30);
+  assert.equal(texts.size, 30);
 });
 
 test("reroll gating stays tied to active, unsubmitted, empty-editor state", () => {
