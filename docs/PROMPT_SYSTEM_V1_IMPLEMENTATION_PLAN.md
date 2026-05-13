@@ -21,8 +21,16 @@ V0 prompt runtime remains active in production paths.
 
 This pass does not change live prompt selection, family weighting, calibration routing, reroll logic, or render behavior.
 
+Local/dev testing for V1 Entry can be enabled only in local contexts (`localhost`, `127.0.0.1`, or `file:`) using either:
+- URL query: `?promptSystem=v1`
+- localStorage: `waywordPromptSystem = v1`
+
+Default remains V0 when no local override is present.
+
 ## Layer Roadmap
 Layer 1 is scaffolded in data form.
+
+V1 runtime currently means Entry/Layer 1 only.
 
 Layer 2 and Layer 3 are intentionally deferred. The next conceptual specification pass should define Resonance before Torsion, then stage implementation sequencing after validation.
 
@@ -34,6 +42,8 @@ Recommended integration stages:
 2. add non-default gated selection path for V1
 3. run integrity and regression checks against both paths
 4. switch default only after behavior and quality signoff
+
+There is no public UI toggle for prompt-system mode at this stage.
 
 ## Canonical Doctrine
 `docs/PROMPT_ARCHITECTURE_V1.md` is the canonical doctrine for Prompt System V1.

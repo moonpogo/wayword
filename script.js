@@ -12,6 +12,38 @@ for (const fam of PROMPT_FAMILIES_ORDER) {
   }
 }
 
+const PROMPT_SYSTEM_MODES = window.waywordPromptSystemMode?.PROMPT_SYSTEM_MODES || { V0: "v0", V1: "v1" };
+const V1_ENTRY_FAMILY = window.waywordPromptSystemMode?.V1_ENTRY_FAMILY || "Entry";
+let v1EntryPromptCatalogCache = null;
+
+function resolvePromptSystemModeForRuntime() {
+  const helper = window.waywordPromptSystemMode;
+  if (!helper || typeof helper.resolvePromptSystemMode !== "function") {
+    return PROMPT_SYSTEM_MODES.V0;
+  }
+  return helper.resolvePromptSystemMode({
+    location: window.location,
+    localStorage: window.localStorage
+  });
+}
+
+function getV1EntryPromptCatalogForRuntime() {
+  if (v1EntryPromptCatalogCache) return v1EntryPromptCatalogCache;
+  const modeHelper = window.waywordPromptSystemMode;
+  const layered = window.waywordLayeredPrompts;
+  if (
+    !modeHelper ||
+    typeof modeHelper.buildV1EntryPromptCatalog !== "function" ||
+    !layered ||
+    typeof layered.getEntryPromptsV1 !== "function"
+  ) {
+    return null;
+  }
+  const entryPrompts = layered.getEntryPromptsV1();
+  v1EntryPromptCatalogCache = modeHelper.buildV1EntryPromptCatalog(entryPrompts);
+  return v1EntryPromptCatalogCache;
+}
+
 /** Ritual Loop V1: internal family tags only (not shown in UI). */
 function biasTagsForPromptFamily(familyKey) {
   const key = String(familyKey || "").trim();
@@ -2128,12 +2160,16 @@ function countPunctuation(text) {
  * @returns {string} prompt text (also sets state.promptId, promptFamily, lastPromptKey, history).
  */
 function buildPromptRuntimeInput() {
+  const promptSystemMode = resolvePromptSystemModeForRuntime();
+  const v1Catalog =
+    promptSystemMode === PROMPT_SYSTEM_MODES.V1 ? getV1EntryPromptCatalogForRuntime() : null;
+
   return {
     state,
     promptSelection: window.waywordPromptSelection,
-    promptFamiliesOrder: PROMPT_FAMILIES_ORDER,
-    promptLibrary,
-    promptEntryById,
+    promptFamiliesOrder: v1Catalog ? v1Catalog.promptFamiliesOrder : PROMPT_FAMILIES_ORDER,
+    promptLibrary: v1Catalog ? v1Catalog.promptLibrary : promptLibrary,
+    promptEntryById: v1Catalog ? v1Catalog.promptEntryById : promptEntryById,
     promptRecentIdWindow: PROMPT_RECENT_ID_WINDOW,
     promptNearDuplicateWindow: PROMPT_NEAR_DUPLICATE_WINDOW,
     promptRecentFamilyWindow: PROMPT_RECENT_FAMILY_WINDOW,
@@ -2141,7 +2177,12 @@ function buildPromptRuntimeInput() {
     calibrationThreshold: CALIBRATION_THRESHOLD,
     getCompletedRunCount: completedRuns,
     pickCalibrationPrompt: pickCalibrationPromptForRuntime,
-    biasTagsForPromptFamily,
+    biasTagsForPromptFamily: v1Catalog
+      ? function (familyKey) {
+          const key = familyKey === V1_ENTRY_FAMILY ? "entry" : familyKey;
+          return biasTagsForPromptFamily(key);
+        }
+      : biasTagsForPromptFamily,
     getEditorText,
     renderMeta
   };

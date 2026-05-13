@@ -52,6 +52,13 @@ function loadLayeredPromptDataContext() {
   });
 }
 
+function loadPromptSystemModeContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/prompts/prompt-system-mode.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
 function loadRunControllerRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/run-controller-runtime.js"], {
     console: silentConsole(),
@@ -463,6 +470,175 @@ test("layered prompts v1 scaffold has required entry prompt integrity", () => {
 
   assert.equal(ids.size, 30);
   assert.equal(texts.size, 30);
+});
+
+test("prompt system mode defaults to v0 and allows v1 only on local dev contexts", () => {
+  const context = loadPromptSystemModeContext();
+  const helper = context.waywordPromptSystemMode;
+
+  assert.equal(
+    helper.resolvePromptSystemMode({
+      location: { protocol: "https:", hostname: "wayword.me", search: "" },
+      localStorage: createMemoryStorage(),
+    }),
+    "v0"
+  );
+
+  assert.equal(
+    helper.resolvePromptSystemMode({
+      location: { protocol: "https:", hostname: "localhost", search: "?promptSystem=v1" },
+      localStorage: createMemoryStorage(),
+    }),
+    "v1"
+  );
+
+  const storage = createMemoryStorage();
+  storage.setItem("waywordPromptSystem", "v1");
+  assert.equal(
+    helper.resolvePromptSystemMode({
+      location: { protocol: "http:", hostname: "127.0.0.1", search: "" },
+      localStorage: storage,
+    }),
+    "v1"
+  );
+
+  const nonDevStorage = createMemoryStorage();
+  nonDevStorage.setItem("waywordPromptSystem", "v1");
+  assert.equal(
+    helper.resolvePromptSystemMode({
+      location: { protocol: "https:", hostname: "wayword.me", search: "" },
+      localStorage: nonDevStorage,
+    }),
+    "v0"
+  );
+});
+
+test("v1 entry catalog exposes only the 30 entry prompts", () => {
+  const context = loadBrowserScripts(
+    ["src/features/prompts/layered-prompts.js", "src/features/prompts/prompt-system-mode.js"],
+    {
+      console: silentConsole(),
+    }
+  );
+  const entryPrompts = context.waywordLayeredPrompts.getEntryPromptsV1();
+  const catalog = context.waywordPromptSystemMode.buildV1EntryPromptCatalog(entryPrompts);
+
+  assert.equal(Array.isArray(catalog.promptFamiliesOrder), true);
+  assert.equal(catalog.promptFamiliesOrder.length, 1);
+  assert.equal(catalog.promptFamiliesOrder[0], "Entry");
+  assert.equal((catalog.promptLibrary.Entry || []).length, 30);
+  assert.equal(catalog.promptEntryById.size, 30);
+  for (const row of catalog.promptLibrary.Entry) {
+    assert.equal(typeof row.id, "string");
+    assert.equal(typeof row.text, "string");
+    assert.equal(row.active, true);
+    assert.equal(row.structure, "entry");
+  }
+});
+
+test("prompt runtime can select from v1 entry catalog without changing selection core", () => {
+  const selection = loadPromptSelectionContext().waywordPromptSelection;
+  const context = loadBrowserScripts(
+    [
+      "src/features/prompts/layered-prompts.js",
+      "src/features/prompts/prompt-system-mode.js",
+      "src/app/prompt-runtime.js",
+    ],
+    { console: silentConsole() }
+  );
+  const entryPrompts = context.waywordLayeredPrompts.getEntryPromptsV1();
+  const catalog = context.waywordPromptSystemMode.buildV1EntryPromptCatalog(entryPrompts);
+
+  const state = {
+    active: true,
+    submitted: false,
+    promptRerollsUsed: 0,
+    recentPromptIds: [],
+    recentFamilyKeys: [],
+    recentCalibrationPromptIds: [],
+  };
+
+  const generated = context.waywordPromptRuntime.generatePrompt({
+    state,
+    promptSelection: selection,
+    promptFamiliesOrder: catalog.promptFamiliesOrder,
+    promptLibrary: catalog.promptLibrary,
+    promptEntryById: catalog.promptEntryById,
+    promptRecentIdWindow: 8,
+    promptNearDuplicateWindow: 3,
+    promptRecentFamilyWindow: 4,
+    promptRerollLimit: 2,
+    calibrationThreshold: 0,
+    getCompletedRunCount() {
+      return 10;
+    },
+    pickCalibrationPrompt() {
+      throw new Error("unexpected calibration path");
+    },
+    biasTagsForPromptFamily(family) {
+      return [String(family)];
+    },
+    getEditorText() {
+      return "";
+    },
+    renderMeta() {},
+  });
+
+  assert.equal(typeof generated, "string");
+  assert.equal(catalog.promptLibrary.Entry.some((row) => row.id === state.promptId), true);
+  assert.equal(catalog.promptLibrary.Entry.some((row) => row.text === state.prompt), true);
+  assert.equal(state.promptFamily, "Entry");
+});
+
+test("calibration prompt path remains unchanged when calibration is active", () => {
+  const selection = loadPromptSelectionContext().waywordPromptSelection;
+  const context = loadPromptRuntimeContext();
+  let calibrationCalls = 0;
+
+  const state = {
+    active: true,
+    submitted: false,
+    promptRerollsUsed: 0,
+    recentPromptIds: [],
+    recentFamilyKeys: [],
+    recentCalibrationPromptIds: [],
+  };
+
+  const generated = context.waywordPromptRuntime.generatePrompt({
+    state,
+    promptSelection: selection,
+    promptFamiliesOrder: ["Scene"],
+    promptLibrary: {
+      Scene: [{ id: "scene-1", text: "Scene Prompt", nearDuplicateGroup: "g1", active: true }],
+    },
+    promptEntryById: new Map([["scene-1", { id: "scene-1", nearDuplicateGroup: "g1", family: "Scene" }]]),
+    promptRecentIdWindow: 8,
+    promptNearDuplicateWindow: 3,
+    promptRecentFamilyWindow: 4,
+    promptRerollLimit: 2,
+    calibrationThreshold: 5,
+    getCompletedRunCount() {
+      return 0;
+    },
+    pickCalibrationPrompt() {
+      calibrationCalls += 1;
+      state.promptId = "cal-1";
+      state.prompt = "Calibration Prompt";
+      state.promptFamily = "Calibration";
+      return state.prompt;
+    },
+    biasTagsForPromptFamily(family) {
+      return [String(family)];
+    },
+    getEditorText() {
+      return "";
+    },
+    renderMeta() {},
+  });
+
+  assert.equal(calibrationCalls, 1);
+  assert.equal(generated, "Calibration Prompt");
+  assert.equal(state.promptFamily, "Calibration");
 });
 
 test("reroll gating stays tied to active, unsubmitted, empty-editor state", () => {
