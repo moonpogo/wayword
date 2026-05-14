@@ -59,6 +59,17 @@ function loadPromptSystemModeContext(overrides = {}) {
   });
 }
 
+function loadStrataEngineContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/prompts/strata-engine.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
+function toPlainJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function loadRunControllerRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/run-controller-runtime.js"], {
     console: silentConsole(),
@@ -541,6 +552,207 @@ test("v1 entry catalog exposes only the 30 entry prompts", () => {
     assert.equal(row.active, true);
     assert.equal(row.structure, "entry");
   }
+});
+
+test("strata engine exports behavioral signal helpers and storage key", () => {
+  const context = loadStrataEngineContext();
+  const strata = context.waywordStrataEngine;
+
+  assert.equal(strata.STRATA_ENGINE_STORAGE_KEY, "waywordStrataEngineV1");
+  assert.equal(typeof strata.createStrataRunSummary, "function");
+  assert.equal(typeof strata.countWords, "function");
+  assert.equal(typeof strata.countSentences, "function");
+  assert.equal(typeof strata.normalizeStrataState, "function");
+});
+
+test("strata engine counts words and sentences defensively", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+
+  assert.equal(strata.countWords(""), 0);
+  assert.equal(strata.countWords(null), 0);
+  assert.equal(strata.countWords("One small thing, then another."), 5);
+  assert.equal(strata.countWords("Don't over-think entry 1."), 4);
+
+  assert.equal(strata.countSentences(""), 0);
+  assert.equal(strata.countSentences("No punctuation yet"), 1);
+  assert.equal(strata.countSentences("First. Second? Third!"), 3);
+  assert.equal(strata.countSentences("Line one\nLine two"), 2);
+});
+
+test("strata engine creates run summaries from text without semantic analysis", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const summary = strata.createStrataRunSummary({
+    id: "run-1",
+    completedAt: 1234,
+    promptLayer: "Entry",
+    promptId: "entry-001",
+    text: "The cup is blue. It waits near the window.",
+    timeToFirstTokenMs: 1800,
+    postStartPauseCount: 1,
+    longestPostStartPauseMs: 5000,
+    typingContinuity: 0.8,
+    rerollsUsedBeforeRun: 1,
+    completed: true,
+  });
+
+  assert.deepEqual(toPlainJson(summary), {
+    id: "run-1",
+    completedAt: 1234,
+    promptLayer: "entry",
+    promptId: "entry-001",
+    wordsWritten: 9,
+    sentenceCount: 2,
+    timeToFirstTokenMs: 1800,
+    postStartPauseCount: 1,
+    longestPostStartPauseMs: 5000,
+    typingContinuity: 0.8,
+    rerollsUsedBeforeRun: 1,
+    abandoned: false,
+    completed: true,
+  });
+});
+
+test("strata engine summarizes abandoned empty runs safely", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const summary = strata.createStrataRunSummary({
+    id: "run-empty",
+    promptLayer: "entry",
+    promptId: "entry-002",
+    text: "",
+    timeToFirstTokenMs: -20,
+    typingContinuity: 3,
+    rerollsUsedBeforeRun: Number.NaN,
+    abandoned: true,
+    completed: false,
+  });
+
+  assert.equal(summary.wordsWritten, 0);
+  assert.equal(summary.sentenceCount, 0);
+  assert.equal(summary.timeToFirstTokenMs, 0);
+  assert.equal(summary.typingContinuity, 1);
+  assert.equal(summary.rerollsUsedBeforeRun, 0);
+  assert.equal(summary.abandoned, true);
+  assert.equal(summary.completed, false);
+});
+
+test("strata engine normalizes corrupt or missing state safely", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const empty = strata.normalizeStrataState(null);
+
+  assert.deepEqual(toPlainJson(empty.recentRuns), []);
+  assert.deepEqual(toPlainJson(empty.completedCountsByLayer), {
+    entry: 0,
+    torsion: 0,
+    resonance: 0,
+  });
+  assert.deepEqual(toPlainJson(empty.seenPromptIds), { entry: [], torsion: [], resonance: [] });
+  assert.equal(empty.currentStratum, "entry_only");
+
+  const normalized = strata.normalizeStrataState({
+    recentRuns: [
+      {
+        id: "run-1",
+        promptLayer: "entry",
+        promptId: "entry-001",
+        wordsWritten: "12",
+        completed: true,
+      },
+      {
+        id: "run-2",
+        promptLayer: "torsion",
+        promptId: "torsion-001",
+        wordsWritten: "nope",
+        completed: false,
+      },
+    ],
+    completedCountsByLayer: null,
+    seenPromptIds: { entry: ["entry-old", "entry-old"] },
+    recentLatencyStats: "bad",
+  });
+
+  assert.equal(normalized.recentRuns.length, 2);
+  assert.equal(normalized.completedCountsByLayer.entry, 1);
+  assert.equal(normalized.completedCountsByLayer.torsion, 0);
+  assert.deepEqual(toPlainJson(normalized.seenPromptIds.entry), ["entry-old", "entry-001"]);
+  assert.deepEqual(toPlainJson(normalized.seenPromptIds.torsion), ["torsion-001"]);
+  assert.equal(normalized.recentLatencyStats.medianTimeToFirstTokenMs, null);
+});
+
+test("strata engine append caps recent runs and updates layer memory", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  let state = strata.createInitialStrataState();
+
+  state = strata.appendStrataRunSummary(
+    state,
+    {
+      id: "run-1",
+      completedAt: 1,
+      promptLayer: "entry",
+      promptId: "entry-001",
+      text: "One.",
+      completed: true,
+    },
+    { recentRunLimit: 2 }
+  );
+  state = strata.appendStrataRunSummary(
+    state,
+    {
+      id: "run-2",
+      completedAt: 2,
+      promptLayer: "torsion",
+      promptId: "torsion-001",
+      text: "Two.",
+      completed: true,
+    },
+    { recentRunLimit: 2 }
+  );
+  state = strata.appendStrataRunSummary(
+    state,
+    {
+      id: "run-3",
+      completedAt: 3,
+      promptLayer: "torsion",
+      promptId: "torsion-002",
+      text: "Three.",
+      completed: false,
+    },
+    { recentRunLimit: 2 }
+  );
+
+  assert.deepEqual(toPlainJson(state.recentRuns.map((run) => run.id)), ["run-2", "run-3"]);
+  assert.equal(state.completedCountsByLayer.entry, 1);
+  assert.equal(state.completedCountsByLayer.torsion, 1);
+  assert.deepEqual(toPlainJson(state.seenPromptIds.entry), ["entry-001"]);
+  assert.deepEqual(toPlainJson(state.seenPromptIds.torsion), ["torsion-001", "torsion-002"]);
+  assert.deepEqual(strata.getStrataLayerCounts(state), state.completedCountsByLayer);
+});
+
+test("strata engine tolerates unknown prompt layers", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const state = strata.appendStrataRunSummary(
+    null,
+    {
+      id: "run-unknown",
+      promptLayer: "Weather",
+      promptId: "weather-001",
+      text: "Rain arrives.",
+      completed: true,
+    },
+    { recentRunLimit: 5 }
+  );
+
+  assert.equal(state.recentRuns[0].promptLayer, "weather");
+  assert.equal(state.completedCountsByLayer.weather, 1);
+  assert.deepEqual(toPlainJson(state.seenPromptIds.weather), ["weather-001"]);
+});
+
+test("strata engine phase 1 does not change prompt routing surfaces", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const html = fs.readFileSync("index.html", "utf8");
+
+  assert.equal(script.includes("waywordStrataEngine"), false);
+  assert.equal(script.includes("strata-engine.js"), false);
+  assert.equal(html.includes("src/features/prompts/strata-engine.js"), false);
 });
 
 test("prompt runtime can select from v1 entry catalog without changing selection core", () => {
