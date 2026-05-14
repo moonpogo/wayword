@@ -4,8 +4,16 @@
   var STRATA_ENGINE_STORAGE_KEY = "waywordStrataEngineV1";
   var DEFAULT_RECENT_RUN_LIMIT = 30;
   var DEFAULT_LAST_SERVED_LAYER_LIMIT = 12;
+  var READINESS_SIGNAL_WINDOW = 20;
+  var READINESS_COMPLETED_WINDOW = 16;
   var DEFAULT_STRATUM = "entry_only";
   var KNOWN_LAYERS = Object.freeze(["entry", "torsion", "resonance"]);
+  var STRATA_READINESS_BANDS = Object.freeze([
+    "entry_support",
+    "entry_stable",
+    "torsion_ready",
+    "resonance_candidate",
+  ]);
 
   function isPlainObject(value) {
     return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -296,6 +304,170 @@
     return normalizeStrataState(state).completedCountsByLayer;
   }
 
+  function medianNonNegative(values) {
+    var list = Array.isArray(values)
+      ? values.filter(function keep(v) {
+          return Number.isFinite(v) && v >= 0;
+        })
+      : [];
+    if (!list.length) return null;
+    list.sort(function (a, b) {
+      return a - b;
+    });
+    var mid = Math.floor(list.length / 2);
+    if (list.length % 2) return list[mid];
+    return Math.round((list[mid - 1] + list[mid]) / 2);
+  }
+
+  function averageNonNegative(values) {
+    var list = Array.isArray(values)
+      ? values.filter(function keep(v) {
+          return Number.isFinite(v) && v >= 0;
+        })
+      : [];
+    if (!list.length) return 0;
+    var total = 0;
+    for (var i = 0; i < list.length; i++) total += list[i];
+    return total / list.length;
+  }
+
+  function tail(arr, limit) {
+    var n = nonNegativeInteger(limit, 0);
+    if (!Array.isArray(arr) || !arr.length || n <= 0) return [];
+    return arr.slice(Math.max(0, arr.length - n));
+  }
+
+  function getRecentCompletedRuns(state) {
+    var normalized = normalizeStrataState(state);
+    return tail(normalized.recentRuns, READINESS_COMPLETED_WINDOW).filter(function (run) {
+      return Boolean(run && run.completed && !run.abandoned);
+    });
+  }
+
+  function calculateStrataSignals(state) {
+    var normalized = normalizeStrataState(state);
+    var recentRuns = tail(normalized.recentRuns, READINESS_SIGNAL_WINDOW);
+    var completedRuns = recentRuns.filter(function (run) {
+      return Boolean(run && run.completed && !run.abandoned);
+    });
+    var abandonedRuns = recentRuns.filter(function (run) {
+      return Boolean(run && run.abandoned);
+    });
+    var completionRate = recentRuns.length ? completedRuns.length / recentRuns.length : 0;
+    var abandonmentRate = recentRuns.length ? abandonedRuns.length / recentRuns.length : 0;
+
+    var successfulCompletions = completedRuns.filter(function (run) {
+      return run.wordsWritten >= 8 && run.sentenceCount >= 1;
+    }).length;
+    var hesitationCount = completedRuns.filter(function (run) {
+      return run.timeToFirstTokenMs > 12000;
+    }).length;
+    var hesitationRate = completedRuns.length ? hesitationCount / completedRuns.length : 0;
+    var consistencyWindow = tail(recentRuns, 5);
+    var consistencyCompleted = consistencyWindow.filter(function (run) {
+      return Boolean(run && run.completed && !run.abandoned);
+    }).length;
+    var consistencyRate = consistencyWindow.length
+      ? consistencyCompleted / consistencyWindow.length
+      : 0;
+
+    var entryBreadth = uniqueStrings(normalized.seenPromptIds.entry).length;
+    var words = completedRuns.map(function (run) {
+      return run.wordsWritten;
+    });
+    var sentences = completedRuns.map(function (run) {
+      return run.sentenceCount;
+    });
+    var durations = completedRuns.map(function (run) {
+      return run.totalSessionDurationMs;
+    });
+    var pauses = completedRuns.map(function (run) {
+      return run.postStartPauseCount;
+    });
+    var ttfTokens = completedRuns
+      .map(function (run) {
+        return run.timeToFirstTokenMs;
+      })
+      .filter(function (value) {
+        return Number.isFinite(value) && value > 0;
+      });
+    var midpoint = Math.floor(ttfTokens.length / 2);
+    var earlier = midpoint > 0 ? medianNonNegative(ttfTokens.slice(0, midpoint)) : null;
+    var later = midpoint > 0 ? medianNonNegative(ttfTokens.slice(midpoint)) : null;
+    var hesitationTrend = "unknown";
+    if (earlier != null && later != null) {
+      hesitationTrend = later <= earlier ? "improving_or_stable" : "worsening";
+    }
+
+    return {
+      recentRunCount: recentRuns.length,
+      completedRunCount: completedRuns.length,
+      completionRate: completionRate,
+      abandonmentRate: abandonmentRate,
+      successfulCompletions: successfulCompletions,
+      hesitationRate: hesitationRate,
+      hesitationTrend: hesitationTrend,
+      entryPromptBreadth: entryBreadth,
+      consistencyStreak: consistencyCompleted,
+      consistencyRate: consistencyRate,
+      medianTimeToFirstTokenMs: medianNonNegative(ttfTokens),
+      averageWordsWritten: averageNonNegative(words),
+      averageSentenceCount: averageNonNegative(sentences),
+      averageSessionDurationMs: averageNonNegative(durations),
+      averagePauseCount: averageNonNegative(pauses),
+    };
+  }
+
+  function calculateStrataReadinessBand(state) {
+    var signals = calculateStrataSignals(state);
+    if (!signals.completedRunCount) return "entry_support";
+
+    if (
+      signals.completionRate < 0.45 ||
+      signals.abandonmentRate > 0.45 ||
+      (signals.hesitationRate > 0.5 && signals.completionRate < 0.7)
+    ) {
+      return "entry_support";
+    }
+
+    if (
+      signals.completedRunCount >= 16 &&
+      signals.completionRate >= 0.88 &&
+      signals.abandonmentRate <= 0.12 &&
+      signals.successfulCompletions >= 12 &&
+      signals.entryPromptBreadth >= 14 &&
+      signals.hesitationRate <= 0.2 &&
+      signals.consistencyRate >= 0.7 &&
+      signals.averageSessionDurationMs >= 45000 &&
+      signals.averageSentenceCount >= 2
+    ) {
+      return "resonance_candidate";
+    }
+
+    if (
+      signals.completedRunCount >= 8 &&
+      signals.completionRate >= 0.72 &&
+      signals.abandonmentRate <= 0.25 &&
+      signals.successfulCompletions >= 5 &&
+      signals.entryPromptBreadth >= 7 &&
+      signals.hesitationRate <= 0.35 &&
+      signals.consistencyRate >= 0.45
+    ) {
+      return "torsion_ready";
+    }
+
+    if (
+      signals.completedRunCount >= 4 &&
+      signals.completionRate >= 0.58 &&
+      signals.abandonmentRate <= 0.4 &&
+      signals.successfulCompletions >= 2
+    ) {
+      return "entry_stable";
+    }
+
+    return "entry_support";
+  }
+
   function loadStrataState(storageLike) {
     var storage = getStorageRef(storageLike);
     if (!storage) return createInitialStrataState();
@@ -350,6 +522,7 @@
   global.waywordStrataEngine = {
     STRATA_ENGINE_STORAGE_KEY: STRATA_ENGINE_STORAGE_KEY,
     KNOWN_LAYERS: KNOWN_LAYERS,
+    STRATA_READINESS_BANDS: STRATA_READINESS_BANDS,
     createStrataRunSummary: createStrataRunSummary,
     countWords: countWords,
     countSentences: countSentences,
@@ -362,5 +535,8 @@
     saveStrataState: saveStrataState,
     clearStrataState: clearStrataState,
     persistStrataRunSummary: persistStrataRunSummary,
+    getRecentCompletedRuns: getRecentCompletedRuns,
+    calculateStrataSignals: calculateStrataSignals,
+    calculateStrataReadinessBand: calculateStrataReadinessBand,
   };
 })(typeof globalThis !== "undefined" ? globalThis : window);

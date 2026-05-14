@@ -877,6 +877,223 @@ test("strata engine does not persist raw text in saved summaries", () => {
   assert.equal(storage.getItem("waywordStrataEngineV1").includes("this should never be stored"), false);
 });
 
+test("strata engine readiness defaults to entry_support for empty state", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const emptyState = strata.createInitialStrataState();
+  const signals = strata.calculateStrataSignals(emptyState);
+  const band = strata.calculateStrataReadinessBand(emptyState);
+
+  assert.equal(signals.completedRunCount, 0);
+  assert.equal(signals.completionRate, 0);
+  assert.equal(band, "entry_support");
+});
+
+test("strata engine readiness stays entry_support for hesitation-heavy recent runs", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const state = strata.normalizeStrataState({
+    recentRuns: [
+      { id: "r1", completedAt: 1, promptLayer: "entry", promptId: "entry-001", wordsWritten: 6, sentenceCount: 1, timeToFirstTokenMs: 18000, totalSessionDurationMs: 20000, postStartPauseCount: 3, completed: false, abandoned: true },
+      { id: "r2", completedAt: 2, promptLayer: "entry", promptId: "entry-002", wordsWritten: 8, sentenceCount: 1, timeToFirstTokenMs: 16000, totalSessionDurationMs: 22000, postStartPauseCount: 2, completed: true, abandoned: false },
+      { id: "r3", completedAt: 3, promptLayer: "entry", promptId: "entry-003", wordsWritten: 5, sentenceCount: 1, timeToFirstTokenMs: 22000, totalSessionDurationMs: 18000, postStartPauseCount: 3, completed: false, abandoned: true },
+      { id: "r4", completedAt: 4, promptLayer: "entry", promptId: "entry-004", wordsWritten: 7, sentenceCount: 1, timeToFirstTokenMs: 17000, totalSessionDurationMs: 17000, postStartPauseCount: 2, completed: true, abandoned: false },
+      { id: "r5", completedAt: 5, promptLayer: "entry", promptId: "entry-005", wordsWritten: 4, sentenceCount: 1, timeToFirstTokenMs: 21000, totalSessionDurationMs: 14000, postStartPauseCount: 2, completed: false, abandoned: true },
+      { id: "r6", completedAt: 6, promptLayer: "entry", promptId: "entry-006", wordsWritten: 9, sentenceCount: 1, timeToFirstTokenMs: 15000, totalSessionDurationMs: 25000, postStartPauseCount: 2, completed: true, abandoned: false },
+    ],
+  });
+
+  assert.equal(strata.calculateStrataReadinessBand(state), "entry_support");
+});
+
+test("strata engine readiness reaches entry_stable for modest consistent completions", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const state = strata.normalizeStrataState({
+    recentRuns: [
+      { id: "s1", completedAt: 1, promptLayer: "entry", promptId: "entry-001", wordsWritten: 9, sentenceCount: 1, timeToFirstTokenMs: 9000, totalSessionDurationMs: 30000, postStartPauseCount: 1, completed: true, abandoned: false },
+      { id: "s2", completedAt: 2, promptLayer: "entry", promptId: "entry-002", wordsWritten: 11, sentenceCount: 2, timeToFirstTokenMs: 8000, totalSessionDurationMs: 34000, postStartPauseCount: 1, completed: true, abandoned: false },
+      { id: "s3", completedAt: 3, promptLayer: "entry", promptId: "entry-003", wordsWritten: 10, sentenceCount: 1, timeToFirstTokenMs: 8500, totalSessionDurationMs: 33000, postStartPauseCount: 1, completed: true, abandoned: false },
+      { id: "s4", completedAt: 4, promptLayer: "entry", promptId: "entry-004", wordsWritten: 6, sentenceCount: 1, timeToFirstTokenMs: 7000, totalSessionDurationMs: 22000, postStartPauseCount: 1, completed: false, abandoned: true },
+      { id: "s5", completedAt: 5, promptLayer: "entry", promptId: "entry-005", wordsWritten: 12, sentenceCount: 2, timeToFirstTokenMs: 7600, totalSessionDurationMs: 36000, postStartPauseCount: 1, completed: true, abandoned: false },
+    ],
+  });
+
+  assert.equal(strata.calculateStrataReadinessBand(state), "entry_stable");
+});
+
+test("strata engine readiness reaches torsion_ready with broad consistent entry completion", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const runs = [];
+  for (let i = 1; i <= 10; i += 1) {
+    runs.push({
+      id: `t${i}`,
+      completedAt: i,
+      promptLayer: "entry",
+      promptId: `entry-${String(i).padStart(3, "0")}`,
+      wordsWritten: 12 + (i % 3),
+      sentenceCount: 2,
+      timeToFirstTokenMs: 7000 + (i % 2) * 400,
+      totalSessionDurationMs: 42000 + i * 250,
+      postStartPauseCount: 1,
+      completed: true,
+      abandoned: false,
+    });
+  }
+  runs.push({
+    id: "t11",
+    completedAt: 11,
+    promptLayer: "entry",
+    promptId: "entry-011",
+    wordsWritten: 7,
+    sentenceCount: 1,
+    timeToFirstTokenMs: 6500,
+    totalSessionDurationMs: 22000,
+    postStartPauseCount: 1,
+    completed: false,
+    abandoned: true,
+  });
+  const state = strata.normalizeStrataState({ recentRuns: runs });
+  assert.equal(strata.calculateStrataReadinessBand(state), "torsion_ready");
+});
+
+test("strata engine readiness reaches resonance_candidate only under conservative sustained signals", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const runs = [];
+  for (let i = 1; i <= 18; i += 1) {
+    runs.push({
+      id: `r${i}`,
+      completedAt: i,
+      promptLayer: "entry",
+      promptId: `entry-${String(i).padStart(3, "0")}`,
+      wordsWritten: 14 + (i % 4),
+      sentenceCount: 2 + (i % 2),
+      timeToFirstTokenMs: 5200 + (i % 3) * 300,
+      totalSessionDurationMs: 52000 + i * 300,
+      postStartPauseCount: 1,
+      completed: true,
+      abandoned: false,
+    });
+  }
+  runs.push({
+    id: "r19",
+    completedAt: 19,
+    promptLayer: "entry",
+    promptId: "entry-019",
+    wordsWritten: 13,
+    sentenceCount: 2,
+    timeToFirstTokenMs: 5600,
+    totalSessionDurationMs: 54000,
+    postStartPauseCount: 1,
+    completed: false,
+    abandoned: true,
+  });
+  const state = strata.normalizeStrataState({ recentRuns: runs });
+  assert.equal(strata.calculateStrataReadinessBand(state), "resonance_candidate");
+});
+
+test("strata engine readiness regresses downward when recent abandonment rises", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  let state = strata.createInitialStrataState();
+  for (let i = 1; i <= 9; i += 1) {
+    state = strata.appendStrataRunSummary(state, {
+      id: `g${i}`,
+      completedAt: i,
+      promptLayer: "entry",
+      promptId: `entry-${String(i).padStart(3, "0")}`,
+      wordsWritten: 12,
+      sentenceCount: 2,
+      timeToFirstTokenMs: 7000,
+      totalSessionDurationMs: 45000,
+      postStartPauseCount: 1,
+      completed: true,
+      abandoned: false,
+    });
+  }
+  assert.equal(strata.calculateStrataReadinessBand(state), "torsion_ready");
+
+  state = strata.appendStrataRunSummary(state, {
+    id: "drop-1",
+    completedAt: 10,
+    promptLayer: "entry",
+    promptId: "entry-030",
+    wordsWritten: 4,
+    sentenceCount: 1,
+    timeToFirstTokenMs: 21000,
+    totalSessionDurationMs: 12000,
+    postStartPauseCount: 3,
+    completed: false,
+    abandoned: true,
+  });
+  state = strata.appendStrataRunSummary(state, {
+    id: "drop-2",
+    completedAt: 11,
+    promptLayer: "entry",
+    promptId: "entry-029",
+    wordsWritten: 5,
+    sentenceCount: 1,
+    timeToFirstTokenMs: 22000,
+    totalSessionDurationMs: 11000,
+    postStartPauseCount: 3,
+    completed: false,
+    abandoned: true,
+  });
+  state = strata.appendStrataRunSummary(state, {
+    id: "drop-3",
+    completedAt: 12,
+    promptLayer: "entry",
+    promptId: "entry-028",
+    wordsWritten: 6,
+    sentenceCount: 1,
+    timeToFirstTokenMs: 23000,
+    totalSessionDurationMs: 9000,
+    postStartPauseCount: 4,
+    completed: false,
+    abandoned: true,
+  });
+
+  assert.equal(strata.calculateStrataReadinessBand(state), "entry_stable");
+});
+
+test("strata readiness calculations are deterministic and normalize malformed state", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const malformed = {
+    recentRuns: [
+      { id: "x1", promptLayer: "Entry", promptId: "entry-001", wordsWritten: "12", completed: true, abandoned: false },
+      "bad-row",
+      { id: "x2", promptLayer: "Entry", promptId: "entry-002", wordsWritten: 0, completed: false, abandoned: true },
+    ],
+    seenPromptIds: "bad",
+  };
+  const s1 = strata.calculateStrataSignals(malformed);
+  const s2 = strata.calculateStrataSignals(malformed);
+  const b1 = strata.calculateStrataReadinessBand(malformed);
+  const b2 = strata.calculateStrataReadinessBand(malformed);
+
+  assert.deepEqual(toPlainJson(s1), toPlainJson(s2));
+  assert.equal(b1, b2);
+  assert.equal(Array.isArray(strata.getRecentCompletedRuns(malformed)), true);
+});
+
+test("strata readiness calculations do not depend on raw text content", () => {
+  const { waywordStrataEngine: strata } = loadStrataEngineContext();
+  const stateA = strata.normalizeStrataState({
+    recentRuns: [
+      { id: "txt-1", completedAt: 1, promptLayer: "entry", promptId: "entry-001", text: "completely different words", wordsWritten: 12, sentenceCount: 2, timeToFirstTokenMs: 7000, totalSessionDurationMs: 43000, postStartPauseCount: 1, completed: true, abandoned: false },
+      { id: "txt-2", completedAt: 2, promptLayer: "entry", promptId: "entry-002", text: "and more different text", wordsWritten: 11, sentenceCount: 2, timeToFirstTokenMs: 7600, totalSessionDurationMs: 41000, postStartPauseCount: 1, completed: true, abandoned: false },
+    ],
+  });
+  const stateB = strata.normalizeStrataState({
+    recentRuns: [
+      { id: "txt-1", completedAt: 1, promptLayer: "entry", promptId: "entry-001", text: "x", wordsWritten: 12, sentenceCount: 2, timeToFirstTokenMs: 7000, totalSessionDurationMs: 43000, postStartPauseCount: 1, completed: true, abandoned: false },
+      { id: "txt-2", completedAt: 2, promptLayer: "entry", promptId: "entry-002", text: "y", wordsWritten: 11, sentenceCount: 2, timeToFirstTokenMs: 7600, totalSessionDurationMs: 41000, postStartPauseCount: 1, completed: true, abandoned: false },
+    ],
+  });
+
+  assert.deepEqual(
+    toPlainJson(strata.calculateStrataSignals(stateA)),
+    toPlainJson(strata.calculateStrataSignals(stateB))
+  );
+  assert.equal(strata.calculateStrataReadinessBand(stateA), strata.calculateStrataReadinessBand(stateB));
+});
+
 test("successful submit coordinator persists strata summaries only for v1 local/dev", () => {
   const v0Context = loadSuccessfulSubmitCoordinatorContext({
     location: { protocol: "https:", hostname: "wayword.me", search: "" },

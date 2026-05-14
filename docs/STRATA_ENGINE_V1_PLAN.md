@@ -54,10 +54,54 @@ Privacy boundaries preserved:
 
 Intentionally deferred:
 
-- readiness band calculation
+- readiness-based routing decisions
 - strata-based layer weighting/routing
 - diagnostics UI
 - thresholds/tuning logic
+- calibration coupling
+
+### Phase 3 Status
+
+Phase 3 is complete for deterministic readiness-band calculation (local/dev V1 scope only).
+
+Implemented internal readiness bands:
+
+- `entry_support`
+- `entry_stable`
+- `torsion_ready`
+- `resonance_candidate`
+
+Implemented pure calculation helpers:
+
+- `getRecentCompletedRuns(state)`
+- `calculateStrataSignals(state)`
+- `calculateStrataReadinessBand(state)`
+
+Readiness philosophy implemented:
+
+- rewards repeated successful entry and sustained continuation
+- counts small successful sessions positively
+- emphasizes consistency and broad Entry prompt engagement over raw verbosity
+- allows natural downward movement when hesitation/abandonment rises
+
+Non-ranking philosophy preserved:
+
+- bands are operational internal states, not user levels
+- no badges, scores, achievements, or progression language are exposed
+- no personality, mood, or emotional inference
+
+Conservative threshold posture:
+
+- `resonance_candidate` remains intentionally difficult to reach
+- thresholds are reversible and degrade readiness on fresh hesitation/abandonment patterns
+- routing remains fully deferred
+
+Still deferred after Phase 3:
+
+- prompt-layer routing / weighted selection
+- automatic Torsion/Resonance serving
+- reroll weighting changes
+- diagnostics UI exposure
 - calibration coupling
 
 ## 2. Non-Goals
