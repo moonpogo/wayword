@@ -66,6 +66,22 @@ function loadStrataEngineContext(overrides = {}) {
   });
 }
 
+function loadSuccessfulSubmitCoordinatorContext(overrides = {}) {
+  return loadBrowserScripts(
+    [
+      "src/features/prompts/prompt-system-mode.js",
+      "src/features/prompts/strata-engine.js",
+      "src/features/writing/successful-submit-coordinator.js",
+    ],
+    {
+      console: silentConsole(),
+      localStorage: createMemoryStorage(),
+      location: { protocol: "https:", hostname: "wayword.me", search: "" },
+      ...overrides,
+    }
+  );
+}
+
 function toPlainJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -607,6 +623,7 @@ test("strata engine creates run summaries from text without semantic analysis", 
     longestPostStartPauseMs: 5000,
     typingContinuity: 0.8,
     rerollsUsedBeforeRun: 1,
+    totalSessionDurationMs: 0,
     abandoned: false,
     completed: true,
   });
@@ -746,13 +763,149 @@ test("strata engine tolerates unknown prompt layers", () => {
   assert.deepEqual(toPlainJson(state.seenPromptIds.weather), ["weather-001"]);
 });
 
-test("strata engine phase 1 does not change prompt routing surfaces", () => {
+test("strata engine integration remains non-routing only", () => {
   const script = fs.readFileSync("script.js", "utf8");
   const html = fs.readFileSync("index.html", "utf8");
 
   assert.equal(script.includes("waywordStrataEngine"), false);
   assert.equal(script.includes("strata-engine.js"), false);
-  assert.equal(html.includes("src/features/prompts/strata-engine.js"), false);
+  assert.equal(html.includes("src/features/prompts/strata-engine.js"), true);
+  assert.equal(script.includes("getLayeredPromptsByLayer"), false);
+  assert.equal(script.includes("currentStratum"), false);
+});
+
+test("strata engine persists run summaries with safe roundtrip", () => {
+  const storage = createMemoryStorage();
+  const { waywordStrataEngine: strata } = loadStrataEngineContext({ localStorage: storage });
+  const before = strata.loadStrataState(storage);
+  assert.equal(before.recentRuns.length, 0);
+
+  const after = strata.persistStrataRunSummary(
+    {
+      id: "run-1",
+      completedAt: 100,
+      promptLayer: "entry",
+      promptId: "entry-001",
+      text: "One sentence here.",
+      completed: true,
+      totalSessionDurationMs: 4000,
+    },
+    { storage, recentRunLimit: 30 }
+  );
+
+  assert.equal(after.recentRuns.length, 1);
+  assert.equal(after.recentRuns[0].promptId, "entry-001");
+  assert.equal(after.recentRuns[0].totalSessionDurationMs, 4000);
+  const reloaded = strata.loadStrataState(storage);
+  assert.equal(reloaded.recentRuns.length, 1);
+  assert.equal(reloaded.recentRuns[0].id, "run-1");
+});
+
+test("strata engine recovers from malformed localStorage", () => {
+  const storage = createMemoryStorage();
+  storage.setItem("waywordStrataEngineV1", "{not-json");
+  const { waywordStrataEngine: strata } = loadStrataEngineContext({ localStorage: storage });
+
+  const loaded = strata.loadStrataState(storage);
+  assert.equal(loaded.recentRuns.length, 0);
+  assert.deepEqual(toPlainJson(loaded.completedCountsByLayer), {
+    entry: 0,
+    torsion: 0,
+    resonance: 0,
+  });
+});
+
+test("strata engine persistence keeps deterministic capped ordering", () => {
+  const storage = createMemoryStorage();
+  const { waywordStrataEngine: strata } = loadStrataEngineContext({ localStorage: storage });
+
+  strata.persistStrataRunSummary(
+    { id: "run-1", completedAt: 1, promptLayer: "entry", promptId: "entry-001", completed: true },
+    { storage, recentRunLimit: 2 }
+  );
+  strata.persistStrataRunSummary(
+    { id: "run-2", completedAt: 2, promptLayer: "entry", promptId: "entry-002", completed: true },
+    { storage, recentRunLimit: 2 }
+  );
+  const finalState = strata.persistStrataRunSummary(
+    { id: "run-3", completedAt: 3, promptLayer: "entry", promptId: "entry-003", completed: true },
+    { storage, recentRunLimit: 2 }
+  );
+
+  assert.deepEqual(
+    toPlainJson(finalState.recentRuns.map((row) => row.id)),
+    ["run-2", "run-3"]
+  );
+});
+
+test("strata engine persistence no-ops on invalid inputs", () => {
+  const storage = createMemoryStorage();
+  const { waywordStrataEngine: strata } = loadStrataEngineContext({ localStorage: storage });
+
+  strata.persistStrataRunSummary(
+    { id: "ok", completedAt: 1, promptLayer: "entry", promptId: "entry-001", completed: true },
+    { storage }
+  );
+  const first = strata.loadStrataState(storage);
+  strata.persistStrataRunSummary({ id: "bad", completedAt: 2, promptLayer: "entry" }, { storage });
+  const second = strata.loadStrataState(storage);
+  strata.persistStrataRunSummary(null, { storage });
+  const third = strata.loadStrataState(storage);
+
+  assert.equal(first.recentRuns.length, 1);
+  assert.equal(second.recentRuns.length, 1);
+  assert.equal(third.recentRuns.length, 1);
+});
+
+test("strata engine does not persist raw text in saved summaries", () => {
+  const storage = createMemoryStorage();
+  const { waywordStrataEngine: strata } = loadStrataEngineContext({ localStorage: storage });
+
+  const state = strata.persistStrataRunSummary(
+    {
+      id: "run-no-text",
+      completedAt: 44,
+      promptLayer: "entry",
+      promptId: "entry-009",
+      text: "this should never be stored",
+      completed: true,
+    },
+    { storage }
+  );
+
+  assert.equal("text" in state.recentRuns[0], false);
+  assert.equal(storage.getItem("waywordStrataEngineV1").includes("this should never be stored"), false);
+});
+
+test("successful submit coordinator persists strata summaries only for v1 local/dev", () => {
+  const v0Context = loadSuccessfulSubmitCoordinatorContext({
+    location: { protocol: "https:", hostname: "wayword.me", search: "" },
+    localStorage: createMemoryStorage(),
+  });
+  const v0Result = v0Context.waywordSuccessfulSubmitCoordinator.persistStrataSummaryForSuccessfulRun({
+    state: { promptId: "entry-001", promptFamily: "Entry", runStartedAtMs: 1000 },
+    run: { runId: "run-v0", savedAt: 5000 },
+    currentText: "Alpha beta.",
+  });
+  assert.equal(v0Result, false);
+  assert.equal(v0Context.localStorage.getItem("waywordStrataEngineV1"), null);
+
+  const v1Storage = createMemoryStorage();
+  const v1Context = loadSuccessfulSubmitCoordinatorContext({
+    location: { protocol: "https:", hostname: "localhost", search: "?promptSystem=v1" },
+    localStorage: v1Storage,
+  });
+  const v1Result = v1Context.waywordSuccessfulSubmitCoordinator.persistStrataSummaryForSuccessfulRun({
+    state: { promptId: "entry-001", promptFamily: "Entry", runStartedAtMs: 1000 },
+    run: { runId: "run-v1", savedAt: 5000, wordCount: 2 },
+    currentText: "Alpha beta.",
+  });
+
+  assert.equal(v1Result, true);
+  const saved = JSON.parse(v1Storage.getItem("waywordStrataEngineV1"));
+  assert.equal(saved.recentRuns.length, 1);
+  assert.equal(saved.recentRuns[0].promptLayer, "entry");
+  assert.equal(saved.recentRuns[0].totalSessionDurationMs, 4000);
 });
 
 test("prompt runtime can select from v1 entry catalog without changing selection core", () => {

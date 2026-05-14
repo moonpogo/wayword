@@ -1,4 +1,62 @@
 (function () {
+  function resolvePromptLayerFromFamily(family) {
+    var value = String(family == null ? "" : family).trim().toLowerCase();
+    if (value === "entry" || value === "torsion" || value === "resonance") return value;
+    return "unknown";
+  }
+
+  function resolvePromptSystemMode() {
+    var helper = window.waywordPromptSystemMode;
+    if (!helper || typeof helper.resolvePromptSystemMode !== "function") return "v0";
+    try {
+      return helper.resolvePromptSystemMode({
+        location: window.location,
+        localStorage: window.localStorage,
+      });
+    } catch (_) {
+      return "v0";
+    }
+  }
+
+  function persistStrataSummaryForSuccessfulRun(input) {
+    var strata = window.waywordStrataEngine;
+    if (!strata || typeof strata.persistStrataRunSummary !== "function") return false;
+    if (resolvePromptSystemMode() !== "v1") return false;
+
+    var promptId = String(input.state && input.state.promptId ? input.state.promptId : "").trim();
+    var promptLayer = resolvePromptLayerFromFamily(input.state && input.state.promptFamily);
+    if (!promptId || promptLayer === "unknown") return false;
+
+    var run = input.run || {};
+    var completedAt =
+      typeof run.savedAt === "number" && Number.isFinite(run.savedAt) ? run.savedAt : Date.now();
+    var startedAt = Number(input.state && input.state.runStartedAtMs);
+    var duration =
+      Number.isFinite(startedAt) && startedAt > 0 ? Math.max(0, completedAt - startedAt) : 0;
+
+    var summary = strata.createStrataRunSummary({
+      id: run.runId,
+      completedAt: completedAt,
+      promptLayer: promptLayer,
+      promptId: promptId,
+      text: String(input.currentText || ""),
+      wordsWritten: Number(input.run && input.run.wordCount),
+      sentenceCount: strata.countSentences(input.currentText),
+      timeToFirstTokenMs: 0,
+      totalSessionDurationMs: duration,
+      postStartPauseCount: 0,
+      abandoned: false,
+      completed: true,
+    });
+
+    try {
+      strata.persistStrataRunSummary(summary, { storage: window.localStorage });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function computePendingNudgeLine(input) {
     var mirror = globalThis.WaywordMirror;
     var currentText = String(input.currentText || "");
@@ -130,6 +188,7 @@
     });
 
     var persistenceResult = persistSuccessfulSavedRun(input);
+    persistStrataSummaryForSuccessfulRun(input);
 
     input.state.pendingRecentDrawerExpand = true;
     input.renderHistory();
@@ -144,5 +203,6 @@
 
   window.waywordSuccessfulSubmitCoordinator = {
     coordinateSuccessfulSavedRunSubmit: coordinateSuccessfulSavedRunSubmit,
+    persistStrataSummaryForSuccessfulRun: persistStrataSummaryForSuccessfulRun,
   };
 })();

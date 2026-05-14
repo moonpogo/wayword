@@ -24,6 +24,42 @@ Phase 1 has added the signal helper module at `src/features/prompts/strata-engin
 
 This phase is pure helpers only. There is no runtime integration yet, no routing change, and no public UI. Production/default runtime remains V0. Local/dev V1 still serves Entry only.
 
+### Phase 2 Status
+
+Phase 2 is complete for local/dev V1 persistence.
+
+Now persisted (localStorage-only, deterministic, local-first):
+
+- normalized Strata state via `loadStrataState` and `saveStrataState`
+- safe reset utility via `clearStrataState` (dev utility)
+- submitted-run summary persistence via `persistStrataRunSummary`
+- operational run summary fields only:
+  - completion timestamp
+  - prompt id
+  - prompt layer
+  - words written
+  - sentence count
+  - time-to-first-token placeholder (`0` until dedicated capture exists)
+  - total session duration
+  - post-start pause count placeholder (`0` until dedicated capture exists)
+  - abandoned/completed flags
+
+Privacy boundaries preserved:
+
+- no raw text stored in Strata state
+- no reflection payloads or mirror outputs
+- no mood/personality/mental-state inference
+- no semantic content analysis for Strata memory
+- no analytics/network calls
+
+Intentionally deferred:
+
+- readiness band calculation
+- strata-based layer weighting/routing
+- diagnostics UI
+- thresholds/tuning logic
+- calibration coupling
+
 ## 2. Non-Goals
 
 Strata Engine V1 must not:

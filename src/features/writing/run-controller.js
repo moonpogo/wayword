@@ -93,6 +93,7 @@
 
     d.state.submitted = false;
     d.state.completedUiActive = false;
+    d.state.runStartedAtMs = Date.now();
     d.state.promptRerollsUsed = 0;
     if (!reuseCurrentPrompt) {
       d.state.prompt = d.generatePrompt();
@@ -151,6 +152,7 @@
     d.state.active = true;
     d.state.submitted = false;
     d.state.completedUiActive = false;
+    d.state.runStartedAtMs = Date.now();
     d.state.promptRerollsUsed = 0;
     d.state.pendingRecentDrawerExpand = false;
 

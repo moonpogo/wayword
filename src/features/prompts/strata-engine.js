@@ -11,6 +11,15 @@
     return Boolean(value && typeof value === "object" && !Array.isArray(value));
   }
 
+  function getStorageRef(storageLike) {
+    var ref = storageLike || global.localStorage;
+    if (!ref) return null;
+    if (typeof ref.getItem !== "function") return null;
+    if (typeof ref.setItem !== "function") return null;
+    if (typeof ref.removeItem !== "function") return null;
+    return ref;
+  }
+
   function normalizeString(value) {
     return String(value == null ? "" : value).trim();
   }
@@ -94,6 +103,7 @@
       longestPostStartPauseMs: nonNegativeInteger(input.longestPostStartPauseMs, 0),
       typingContinuity: finiteRatio(input.typingContinuity, 0),
       rerollsUsedBeforeRun: nonNegativeInteger(input.rerollsUsedBeforeRun, 0),
+      totalSessionDurationMs: nonNegativeInteger(input.totalSessionDurationMs, 0),
       abandoned: Boolean(input.abandoned),
       completed: Boolean(input.completed),
     };
@@ -286,6 +296,57 @@
     return normalizeStrataState(state).completedCountsByLayer;
   }
 
+  function loadStrataState(storageLike) {
+    var storage = getStorageRef(storageLike);
+    if (!storage) return createInitialStrataState();
+    try {
+      var raw = storage.getItem(STRATA_ENGINE_STORAGE_KEY);
+      if (!raw) return createInitialStrataState();
+      var parsed = JSON.parse(raw);
+      return normalizeStrataState(parsed);
+    } catch (_) {
+      return createInitialStrataState();
+    }
+  }
+
+  function saveStrataState(state, storageLike) {
+    var normalized = normalizeStrataState(state);
+    var storage = getStorageRef(storageLike);
+    if (!storage) return normalized;
+    try {
+      storage.setItem(STRATA_ENGINE_STORAGE_KEY, JSON.stringify(normalized));
+    } catch (_) {
+      /* no-op */
+    }
+    return normalized;
+  }
+
+  function clearStrataState(storageLike) {
+    var storage = getStorageRef(storageLike);
+    if (!storage) return false;
+    try {
+      storage.removeItem(STRATA_ENGINE_STORAGE_KEY);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function persistStrataRunSummary(summary, options) {
+    if (!isPlainObject(summary)) return loadStrataState(options && options.storage);
+    var normalizedSummary = normalizeStrataRunSummary(summary);
+    if (!normalizedSummary.promptId || !normalizedSummary.promptLayer) {
+      return loadStrataState(options && options.storage);
+    }
+    var opts = isPlainObject(options) ? options : {};
+    var current = loadStrataState(opts.storage);
+    var next = appendStrataRunSummary(current, normalizedSummary, {
+      recentRunLimit: opts.recentRunLimit,
+      lastServedLayerLimit: opts.lastServedLayerLimit,
+    });
+    return saveStrataState(next, opts.storage);
+  }
+
   global.waywordStrataEngine = {
     STRATA_ENGINE_STORAGE_KEY: STRATA_ENGINE_STORAGE_KEY,
     KNOWN_LAYERS: KNOWN_LAYERS,
@@ -297,5 +358,9 @@
     normalizeStrataState: normalizeStrataState,
     appendStrataRunSummary: appendStrataRunSummary,
     getStrataLayerCounts: getStrataLayerCounts,
+    loadStrataState: loadStrataState,
+    saveStrataState: saveStrataState,
+    clearStrataState: clearStrataState,
+    persistStrataRunSummary: persistStrataRunSummary,
   };
 })(typeof globalThis !== "undefined" ? globalThis : window);

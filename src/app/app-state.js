@@ -30,6 +30,8 @@
       pendingNudgeLine: "",
       /** Family-level bias only; set in `generatePrompt`. */
       promptBiasTags: [],
+      /** Internal run-start marker for deterministic local timing summaries (not user-facing). */
+      runStartedAtMs: 0,
       /** Seeds rotating mirror empty copy for the last submit’s panel. */
       mirrorEmptyFallbackSeed: "",
       theme: window.waywordStorage.loadTheme(),
