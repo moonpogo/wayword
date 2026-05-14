@@ -14,7 +14,6 @@ for (const fam of PROMPT_FAMILIES_ORDER) {
 
 const PROMPT_SYSTEM_MODES = window.waywordPromptSystemMode?.PROMPT_SYSTEM_MODES || { V0: "v0", V1: "v1" };
 const V1_ENTRY_FAMILY = window.waywordPromptSystemMode?.V1_ENTRY_FAMILY || "Entry";
-let v1EntryPromptCatalogCache = null;
 
 function resolvePromptSystemModeForRuntime() {
   const helper = window.waywordPromptSystemMode;
@@ -28,7 +27,6 @@ function resolvePromptSystemModeForRuntime() {
 }
 
 function getV1EntryPromptCatalogForRuntime() {
-  if (v1EntryPromptCatalogCache) return v1EntryPromptCatalogCache;
   const modeHelper = window.waywordPromptSystemMode;
   const layered = window.waywordLayeredPrompts;
   if (
@@ -40,8 +38,30 @@ function getV1EntryPromptCatalogForRuntime() {
     return null;
   }
   const entryPrompts = layered.getEntryPromptsV1();
-  v1EntryPromptCatalogCache = modeHelper.buildV1EntryPromptCatalog(entryPrompts);
-  return v1EntryPromptCatalogCache;
+  const canBuildWeighted =
+    typeof modeHelper.buildStrataWeightedPromptCatalog === "function" &&
+    typeof modeHelper.getLayerWeightsForReadinessBand === "function";
+  const canReadStrata =
+    window.waywordStrataEngine &&
+    typeof window.waywordStrataEngine.loadStrataState === "function" &&
+    typeof window.waywordStrataEngine.calculateStrataReadinessBand === "function";
+  const canReadTorsion =
+    typeof layered.getLayeredPromptsByLayer === "function" &&
+    layered.PROMPT_LAYERS &&
+    layered.PROMPT_LAYERS.TORSION;
+
+  if (canBuildWeighted && canReadStrata && canReadTorsion) {
+    const strataState = window.waywordStrataEngine.loadStrataState(window.localStorage);
+    const readinessBand = window.waywordStrataEngine.calculateStrataReadinessBand(strataState);
+    const torsionPrompts = layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.TORSION);
+    return modeHelper.buildStrataWeightedPromptCatalog({
+      readinessBand,
+      entryPrompts,
+      torsionPrompts,
+    });
+  }
+
+  return modeHelper.buildV1EntryPromptCatalog(entryPrompts);
 }
 
 /** Ritual Loop V1: internal family tags only (not shown in UI). */

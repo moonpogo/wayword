@@ -570,6 +570,73 @@ test("v1 entry catalog exposes only the 30 entry prompts", () => {
   }
 });
 
+test("strata weighted catalog keeps conservative readiness-to-layer mapping", () => {
+  const context = loadBrowserScripts(
+    ["src/features/prompts/layered-prompts.js", "src/features/prompts/prompt-system-mode.js"],
+    { console: silentConsole() }
+  );
+  const layered = context.waywordLayeredPrompts;
+  const mode = context.waywordPromptSystemMode;
+  const entryPrompts = layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.ENTRY);
+  const torsionPrompts = layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.TORSION);
+
+  const support = mode.buildStrataWeightedPromptCatalog({
+    readinessBand: "entry_support",
+    entryPrompts,
+    torsionPrompts,
+  });
+  const stable = mode.buildStrataWeightedPromptCatalog({
+    readinessBand: "entry_stable",
+    entryPrompts,
+    torsionPrompts,
+  });
+  const torsionReady = mode.buildStrataWeightedPromptCatalog({
+    readinessBand: "torsion_ready",
+    entryPrompts,
+    torsionPrompts,
+  });
+  const resonanceCandidate = mode.buildStrataWeightedPromptCatalog({
+    readinessBand: "resonance_candidate",
+    entryPrompts,
+    torsionPrompts,
+  });
+
+  assert.deepEqual(toPlainJson(support.promptFamiliesOrder), ["Entry"]);
+  assert.deepEqual(toPlainJson(stable.promptFamiliesOrder), ["Entry"]);
+  assert.equal(torsionReady.promptFamiliesOrder.includes("Torsion"), true);
+  assert.equal(resonanceCandidate.promptFamiliesOrder.includes("Torsion"), true);
+  assert.equal(resonanceCandidate.promptFamiliesOrder.includes("Resonance"), false);
+  assert.equal(torsionReady.layerWeights.entry, 90);
+  assert.equal(torsionReady.layerWeights.torsion, 10);
+  assert.equal(resonanceCandidate.layerWeights.entry, 70);
+  assert.equal(resonanceCandidate.layerWeights.torsion, 30);
+});
+
+test("strata weighted catalog selection is deterministic and falls back safely", () => {
+  const context = loadBrowserScripts(
+    ["src/features/prompts/layered-prompts.js", "src/features/prompts/prompt-system-mode.js"],
+    { console: silentConsole() }
+  );
+  const layered = context.waywordLayeredPrompts;
+  const mode = context.waywordPromptSystemMode;
+  const entryPrompts = layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.ENTRY);
+  const torsionPrompts = layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.TORSION);
+
+  const unknownBand = mode.buildStrataWeightedPromptCatalog({
+    readinessBand: "mystery-band",
+    entryPrompts,
+    torsionPrompts,
+  });
+  assert.deepEqual(toPlainJson(unknownBand.promptFamiliesOrder), ["Entry"]);
+
+  const onlyEntry = mode.buildStrataWeightedPromptCatalog({
+    readinessBand: "resonance_candidate",
+    entryPrompts,
+    torsionPrompts: [],
+  });
+  assert.deepEqual(toPlainJson(onlyEntry.promptFamiliesOrder), ["Entry"]);
+});
+
 test("strata engine exports behavioral signal helpers and storage key", () => {
   const context = loadStrataEngineContext();
   const strata = context.waywordStrataEngine;
@@ -763,15 +830,103 @@ test("strata engine tolerates unknown prompt layers", () => {
   assert.deepEqual(toPlainJson(state.seenPromptIds.weather), ["weather-001"]);
 });
 
-test("strata engine integration remains non-routing only", () => {
+test("strata engine routing path remains v1-local and excludes resonance", () => {
   const script = fs.readFileSync("script.js", "utf8");
   const html = fs.readFileSync("index.html", "utf8");
 
-  assert.equal(script.includes("waywordStrataEngine"), false);
+  assert.equal(script.includes("waywordStrataEngine"), true);
   assert.equal(script.includes("strata-engine.js"), false);
   assert.equal(html.includes("src/features/prompts/strata-engine.js"), true);
-  assert.equal(script.includes("getLayeredPromptsByLayer"), false);
-  assert.equal(script.includes("currentStratum"), false);
+  assert.equal(script.includes("promptSystemMode === PROMPT_SYSTEM_MODES.V1"), true);
+  assert.equal(script.includes("PROMPT_LAYERS.TORSION"), true);
+  assert.equal(script.includes("PROMPT_LAYERS.RESONANCE"), false);
+  assert.equal(script.includes("buildStrataWeightedPromptCatalog"), true);
+});
+
+test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
+  const selection = loadPromptSelectionContext().waywordPromptSelection;
+  const context = loadBrowserScripts(
+    [
+      "src/features/prompts/layered-prompts.js",
+      "src/features/prompts/prompt-system-mode.js",
+      "src/app/prompt-runtime.js",
+    ],
+    { console: silentConsole() }
+  );
+  const layered = context.waywordLayeredPrompts;
+  const mode = context.waywordPromptSystemMode;
+  const catalog = mode.buildStrataWeightedPromptCatalog({
+    readinessBand: "torsion_ready",
+    entryPrompts: layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.ENTRY),
+    torsionPrompts: layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.TORSION),
+  });
+
+  const state = {
+    active: true,
+    submitted: false,
+    promptRerollsUsed: 0,
+    recentPromptIds: [],
+    recentFamilyKeys: [],
+    recentCalibrationPromptIds: [],
+  };
+
+  const first = context.waywordPromptRuntime.generatePrompt({
+    state,
+    promptSelection: selection,
+    promptFamiliesOrder: catalog.promptFamiliesOrder,
+    promptLibrary: catalog.promptLibrary,
+    promptEntryById: catalog.promptEntryById,
+    promptRecentIdWindow: 8,
+    promptNearDuplicateWindow: 3,
+    promptRecentFamilyWindow: 4,
+    promptRerollLimit: 2,
+    calibrationThreshold: 0,
+    getCompletedRunCount() {
+      return 8;
+    },
+    pickCalibrationPrompt() {
+      throw new Error("unexpected calibration path");
+    },
+    biasTagsForPromptFamily(family) {
+      return [String(family)];
+    },
+    getEditorText() {
+      return "";
+    },
+    renderMeta() {},
+  });
+  assert.equal(typeof first, "string");
+  const firstPromptId = state.promptId;
+  assert.equal(Boolean(firstPromptId), true);
+
+  state.promptRerollsUsed = 0;
+  const rerolled = context.waywordPromptRuntime.rerollPrompt({
+    state,
+    promptSelection: selection,
+    promptFamiliesOrder: catalog.promptFamiliesOrder,
+    promptLibrary: catalog.promptLibrary,
+    promptEntryById: catalog.promptEntryById,
+    promptRecentIdWindow: 8,
+    promptNearDuplicateWindow: 3,
+    promptRecentFamilyWindow: 4,
+    promptRerollLimit: 2,
+    calibrationThreshold: 0,
+    getCompletedRunCount() {
+      return 8;
+    },
+    pickCalibrationPrompt() {
+      throw new Error("unexpected calibration path");
+    },
+    biasTagsForPromptFamily(family) {
+      return [String(family)];
+    },
+    getEditorText() {
+      return "";
+    },
+    renderMeta() {},
+  });
+  assert.equal(rerolled, true);
+  assert.notEqual(state.promptId, firstPromptId);
 });
 
 test("strata engine persists run summaries with safe roundtrip", () => {

@@ -104,6 +104,36 @@ Still deferred after Phase 3:
 - diagnostics UI exposure
 - calibration coupling
 
+### Phase 4 Status
+
+Phase 4 is complete for local/dev V1 weighted prompt-catalog routing with conservative Torsion percolation.
+
+Ambient progression philosophy now implemented:
+
+- Entry remains foundational and dominant
+- Torsion is percolated, not unlocked
+- pressure increases quietly through weighted family exposure
+- progression remains internal and non-gamified
+
+Current readiness-to-layer behavior:
+
+- `entry_support` -> Entry-only
+- `entry_stable` -> Entry-only
+- `torsion_ready` -> Entry 90 / Torsion 10
+- `resonance_candidate` -> Entry 70 / Torsion 30
+
+Resonance routing remains deferred in Phase 4:
+
+- no Resonance family in weighted V1 runtime catalogs
+- no Resonance prompt serving path is enabled
+
+Boundaries preserved:
+
+- production/default remains V0
+- local/dev V1-only path
+- no public scores/levels/diagnostics
+- calibration unchanged
+
 ## 2. Non-Goals
 
 Strata Engine V1 must not:
