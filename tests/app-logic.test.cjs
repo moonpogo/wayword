@@ -1980,8 +1980,10 @@ test("editor permission controller waits for nudge exposure and empty-editor del
   const context = loadEditorPermissionControllerContext();
   const scheduled = [];
   const calls = [];
+  let nowMs = 1000;
   const controller = context.waywordEditorPermissionController.create({
     delayMs: 12000,
+    stallDelayMs: 30000,
     phrases: ["Begin anywhere."],
     getEditorText() {
       return "";
@@ -2001,6 +2003,9 @@ test("editor permission controller waits for nudge exposure and empty-editor del
         if (scheduled[id]) scheduled[id].cleared = true;
       },
     },
+    now() {
+      return nowMs;
+    },
   });
 
   assert.equal(controller.isVisible(), false);
@@ -2014,15 +2019,18 @@ test("editor permission controller waits for nudge exposure and empty-editor del
   scheduled[0].fn();
   assert.equal(controller.isVisible(), true);
   assert.equal(controller.getPhrase(), "Begin anywhere.");
+  assert.equal(controller.shouldShowEditorPermissionNudge(nowMs), true);
   assert.deepEqual(calls, ["render"]);
 });
 
-test("editor permission controller cancels on edit and ignores non-empty restored text", () => {
+test("editor permission controller ignores non-empty restored text and suppresses while typing", () => {
   const context = loadEditorPermissionControllerContext();
   const scheduled = [];
   let text = "";
+  let nowMs = 1000;
   const controller = context.waywordEditorPermissionController.create({
     delayMs: 12000,
+    stallDelayMs: 30000,
     phrases: ["One line will do."],
     getEditorText() {
       return text;
@@ -2039,6 +2047,9 @@ test("editor permission controller cancels on edit and ignores non-empty restore
         if (scheduled[id]) scheduled[id].cleared = true;
       },
     },
+    now() {
+      return nowMs;
+    },
   });
 
   text = "restored draft";
@@ -2050,11 +2061,66 @@ test("editor permission controller cancels on edit and ignores non-empty restore
   controller.reset();
   controller.onNudgeVisible();
   assert.equal(scheduled.length, 1);
+  nowMs += 3000;
   controller.onUserEdit();
+  assert.equal(controller.hasEditorStarted(), true);
+  assert.equal(scheduled[0].cleared, true);
+  assert.equal(controller.shouldShowEditorPermissionNudge(nowMs), false);
+  assert.equal(scheduled[1].ms, 30000, "stall timer should arm from latest input");
+  nowMs += 5000;
+  controller.onUserEdit();
+  assert.equal(scheduled[1].cleared, true);
+  assert.equal(scheduled[2].ms, 30000, "new input resets pending stall timer");
   scheduled[0].fn();
+  scheduled[1].fn();
   assert.equal(scheduled[0].cleared, true);
   assert.equal(controller.isVisible(), false);
   assert.equal(controller.getPhrase(), "");
+});
+
+test("editor permission controller shows again after clear post-start stall", () => {
+  const context = loadEditorPermissionControllerContext();
+  const scheduled = [];
+  let nowMs = 1000;
+  let text = "";
+  const controller = context.waywordEditorPermissionController.create({
+    delayMs: 12000,
+    stallDelayMs: 30000,
+    phrases: ["A fragment is enough."],
+    getEditorText() {
+      return text;
+    },
+    isEligible() {
+      return true;
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+    now() {
+      return nowMs;
+    },
+  });
+
+  controller.onNudgeVisible();
+  nowMs += 500;
+  text = "started";
+  controller.onUserEdit();
+  assert.equal(scheduled[0].cleared, true, "pre-start delay should cancel once typing starts");
+  assert.equal(controller.isVisible(), false);
+  assert.equal(scheduled[1].ms, 30000);
+  nowMs += 30000;
+  scheduled[1].fn();
+  assert.equal(controller.isVisible(), true, "permission may appear after a sustained post-start stall");
+  nowMs += 50;
+  controller.onUserEdit();
+  assert.equal(controller.isVisible(), false);
+  assert.equal(scheduled[2].ms, 30000, "typing should reset stall timer after hide");
 });
 
 test("editor permission controller reset clears visible permission and waits for a new nudge", () => {

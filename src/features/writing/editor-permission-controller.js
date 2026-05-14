@@ -13,6 +13,7 @@
 
   function createEditorPermissionController(input) {
     const delayMs = Number(input.delayMs) || DEFAULT_DELAY_MS;
+    const stallDelayMs = Number(input.stallDelayMs) > 0 ? Number(input.stallDelayMs) : 30000;
     const getEditorText =
       typeof input.getEditorText === "function" ? input.getEditorText : function () { return ""; };
     const isEligible =
@@ -20,10 +21,12 @@
     const render =
       typeof input.render === "function" ? input.render : function () {};
     const timers = input.timers || window;
+    const now = typeof input.now === "function" ? input.now : Date.now;
     const phrases = Array.isArray(input.phrases) && input.phrases.length ? input.phrases : PHRASES;
     let visible = false;
     let nudgeSeen = false;
-    let userEdited = false;
+    let hasEditorStarted = false;
+    let lastInputAtMs = 0;
     let phraseIndex = 0;
     let activePhrase = "";
     let timer = null;
@@ -38,8 +41,19 @@
       return String(getEditorText() || "").trim().length === 0;
     }
 
-    function canReveal() {
-      return Boolean(nudgeSeen && !userEdited && isEligible() && editorIsEmpty());
+    function getMsSinceLastInput(nowMs) {
+      if (!hasEditorStarted || !Number.isFinite(lastInputAtMs) || lastInputAtMs <= 0) return Infinity;
+      return Math.max(0, nowMs - lastInputAtMs);
+    }
+
+    function shouldShowEditorPermissionNudge(nowMs) {
+      if (!nudgeSeen || !isEligible()) return false;
+      if (!hasEditorStarted) return editorIsEmpty();
+      return getMsSinceLastInput(nowMs) >= stallDelayMs;
+    }
+
+    function canReveal(nowMs) {
+      return Boolean(shouldShowEditorPermissionNudge(nowMs));
     }
 
     function nextPhrase() {
@@ -50,7 +64,7 @@
 
     function reveal() {
       clearTimer();
-      if (!canReveal()) return false;
+      if (!canReveal(now())) return false;
       activePhrase = activePhrase || nextPhrase();
       if (!activePhrase) return false;
       if (visible) return true;
@@ -64,7 +78,8 @@
       clearTimer();
       if (resetExposure) {
         nudgeSeen = false;
-        userEdited = false;
+        hasEditorStarted = false;
+        lastInputAtMs = 0;
         activePhrase = "";
       }
       if (!visible) return;
@@ -74,11 +89,21 @@
 
     function armAfterNudge() {
       clearTimer();
-      if (!canReveal()) return;
+      if (!canReveal(now())) return;
       timer = timers.setTimeout(function () {
         timer = null;
         reveal();
       }, delayMs);
+    }
+
+    function armAfterStall(nowMs) {
+      clearTimer();
+      if (!hasEditorStarted || !nudgeSeen || !isEligible()) return;
+      const waitMs = Math.max(0, stallDelayMs - getMsSinceLastInput(nowMs));
+      timer = timers.setTimeout(function () {
+        timer = null;
+        reveal();
+      }, waitMs);
     }
 
     return {
@@ -91,15 +116,35 @@
       getDelayMs: function () {
         return delayMs;
       },
+      getStallDelayMs: function () {
+        return stallDelayMs;
+      },
+      hasEditorStarted: function () {
+        return hasEditorStarted;
+      },
+      getMsSinceLastInput: function (atMs) {
+        const value = Number.isFinite(atMs) ? atMs : now();
+        return getMsSinceLastInput(value);
+      },
+      shouldShowEditorPermissionNudge: function (atMs) {
+        const value = Number.isFinite(atMs) ? atMs : now();
+        return shouldShowEditorPermissionNudge(value);
+      },
       onNudgeVisible: function () {
-        if (nudgeSeen || userEdited || !editorIsEmpty()) return;
+        if (nudgeSeen || !editorIsEmpty()) return;
         nudgeSeen = true;
         activePhrase = nextPhrase();
+        if (hasEditorStarted) {
+          armAfterStall(now());
+          return;
+        }
         armAfterNudge();
       },
       onUserEdit: function () {
-        userEdited = true;
+        hasEditorStarted = true;
+        lastInputAtMs = now();
         hide({ resetExposure: false });
+        armAfterStall(lastInputAtMs);
       },
       reset: function () {
         hide({ resetExposure: true });
