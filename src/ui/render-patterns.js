@@ -1,4 +1,8 @@
 (function () {
+  function escapeHtmlAttribute(value) {
+    return escapeHtml(value).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   function patternsMirrorHeroEmptyHtml() {
     return (
       '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
@@ -182,10 +186,14 @@
   }
 
   function buildPatternCalloutsLegacySectionHtml(calloutsWithStarters) {
+    const safe = calloutsWithStarters && typeof calloutsWithStarters === "object" ? calloutsWithStarters : {};
+    const headline = escapeHtml(safe.headline || "");
+    const support = escapeHtml(safe.support || "");
+    const direction = String(safe.direction || "").trim();
     return `
-      <div class="history-item"><strong>${calloutsWithStarters.headline}</strong></div>
-      <div class="history-item">${calloutsWithStarters.support}</div>
-      ${calloutsWithStarters.direction ? `<div class="history-item">${calloutsWithStarters.direction}</div>` : ""}
+      <div class="history-item"><strong>${headline}</strong></div>
+      <div class="history-item">${support}</div>
+      ${direction ? `<div class="history-item">${escapeHtml(direction)}</div>` : ""}
     `;
   }
 
@@ -218,7 +226,7 @@
             <button
               type="button"
               class="patterns-word-chip ${sel ? "is-selected" : ""}"
-              data-challenge-word="${escapeHtml(w)}"
+              data-challenge-word="${escapeHtmlAttribute(w)}"
               aria-pressed="${sel ? "true" : "false"}"
               style="font-size:${fs}px"
             >${escapeHtml(w)}</button>`;
