@@ -1847,6 +1847,39 @@ test("patterns repeated-word challenge rendering preserves selection and begin g
   assert.match(emptyHtml, /No strong repeat targets yet/);
 });
 
+test("patterns renderer escapes user-derived repeated words in attributes and legacy HTML", () => {
+  const textOnlyEscapeHtml = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  const context = loadPatternsRendererContext({ escapeHtml: textOnlyEscapeHtml });
+  const renderer = context.waywordPatternsRenderer;
+  const quotedWord = 'repeat"onclick="alert(1)';
+
+  const challengeHtml = renderer.buildPatternsRepeatedChallengeRootInnerHtml({
+    topWords: [[quotedWord, 6]],
+    selectedChallengeSet: new Set([quotedWord]),
+    draftChallengeWords: [quotedWord],
+  });
+
+  assert.match(challengeHtml, /data-challenge-word="repeat&quot;onclick=&quot;alert\(1\)"/);
+  assert.doesNotMatch(challengeHtml, /data-challenge-word="repeat"onclick="alert\(1\)"/);
+
+  const callouts = renderer.buildPatternCallouts(
+    { totalRuns: 3 },
+    0.5,
+    0,
+    [['repeat<img src=x onerror="alert(1)">', 4]],
+    [],
+    new Set()
+  );
+  const legacyHtml = renderer.buildPatternCalloutsLegacySectionHtml(callouts);
+
+  assert.doesNotMatch(legacyHtml, /<img/);
+  assert.match(legacyHtml, /&lt;img src=x onerror="alert\(1\)"&gt;/);
+});
+
 test("post-submit phase derivation names current run/post-submit scenarios", () => {
   const context = loadPostSubmitPhaseContext();
   const derive = context.waywordPostSubmitPhase.derivePostSubmitPhase;
