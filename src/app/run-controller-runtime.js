@@ -6,6 +6,7 @@
       editorInput: input.editorInput,
       getEditorSurfaceComposing: input.getEditorSurfaceComposing,
       flushEditorSurfaceIntoWriteDocOnce: input.flushEditorSurfaceIntoWriteDocOnce,
+      captureEditorSurfaceIntoWriteDocForSubmit: input.captureEditorSurfaceIntoWriteDocForSubmit,
       getEditorText: input.getEditorText,
       analyze: input.analyze,
       getRecentEntries: input.getRecentEntries,

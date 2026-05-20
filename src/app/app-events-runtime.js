@@ -129,6 +129,7 @@
       }
 
       if (e.key === "Enter" && !e.shiftKey) {
+        if (e.isComposing || input.getEditorSurfaceComposing()) return;
         e.preventDefault();
         if (input.state.submitted) {
           if (input.state.completedUiActive && !input.state.optionsOpen) {
