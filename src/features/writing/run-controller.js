@@ -36,7 +36,7 @@
     });
   }
 
-  function handleRunCompleted(text, priorEntries, runWasSaved, insufficientCalibration = false) {
+  function handleRunCompleted(text, priorEntries, runWasSaved) {
     const d = D();
     if (
       window.waywordCompletionAftermathHelper &&
@@ -47,41 +47,19 @@
         text,
         priorEntries,
         runWasSaved,
-        insufficientCalibration,
-        calibrationThreshold: d.CALIBRATION_THRESHOLD,
-        calibrationInsufficientCopy: d.CALIBRATION_INSUFFICIENT_COPY,
-        selectCalibrationObservation: d.selectCalibrationObservation,
+        insufficientFirstSessionEntry: false,
       });
       return;
     }
 
     console.error("wayword: completion aftermath helper missing; falling back to inline completion aftermath");
     try {
-      if (insufficientCalibration) {
-        const step = Math.min(priorEntries.length + 1, d.CALIBRATION_THRESHOLD);
-        d.state.calibrationPostRun = {
-          step,
-          observation: d.CALIBRATION_INSUFFICIENT_COPY,
-          insufficient: true
-        };
-        d.state.lastRunFeedback = "";
-        return;
-      }
       if (!runWasSaved) return;
-      const step = priorEntries.length + 1;
-      const observation = String(
-        d.selectCalibrationObservation(text, priorEntries, step <= d.CALIBRATION_THRESHOLD) || ""
-      ).trim();
-      if (step <= d.CALIBRATION_THRESHOLD) {
-        d.state.calibrationPostRun = { step, observation, insufficient: false };
-        d.state.lastRunFeedback = "";
-      } else {
-        d.state.calibrationPostRun = null;
-        d.state.lastRunFeedback = observation;
-      }
+      d.state.lastRunFeedback = "";
+      d.state.lastRunFeedback = "";
     } catch (e) {
       d.state.lastRunFeedback = "";
-      d.state.calibrationPostRun = null;
+      d.state.lastRunFeedback = "";
     }
   }
 
@@ -102,18 +80,15 @@
 
     const fb = d.$("feedbackBox");
     if (fb) {
-      fb.dataset.calibrationRenderKey = "";
+      fb.dataset.postRunRenderKey = "";
       fb.className = "result-card empty";
       fb.innerHTML = "";
     }
     d.state.lastRunFeedback = "";
     d.state.lastMirrorPipelineResult = null;
     d.state.lastMirrorLoadFailed = false;
-    d.state.calibrationPostRun = null;
-    d.state.calibrationHandoffVisible = false;
-    d.state.lastSubmitCalibrationShortMirror = false;
-    d.resetLatentPromptNudge?.();
-    d.resetEditorPermissionPhrase?.();
+    d.state.lastSubmitFirstSessionEntryShortMirror = false;
+    d.resetEntryDelayHint?.();
     d.waywordPostRunRenderer.renderReflectionLine("");
 
     d.stopTimer();
@@ -127,7 +102,7 @@
     d.renderHighlight();
     d.renderSidebar();
     d.updateEnterButtonVisibility();
-    d.beginLatentPromptNudgeWatch?.();
+    d.beginEntryDelayHintWatch?.();
 
     if (!keepOptionsPanelOpen) {
       requestAnimationFrame(() => {
@@ -157,28 +132,28 @@
     d.state.pendingRecentDrawerExpand = false;
 
     d.$("editorOverlay")?.classList.add("hidden");
-    d.$("editorOverlayCard")?.classList.remove("editor-overlay-card--calibration-dismiss");
+    d.$("editorOverlayCard")?.classList.remove("editor-overlay-card--firstSessionEntry-dismiss");
 
     d.applyProgressionToState();
     d.state.timerWaitingForFirstInput = Boolean(d.state.timerSeconds);
     d.state.prompt = d.generatePrompt();
+    if (typeof d.startTelemetryRun === "function") {
+      d.startTelemetryRun();
+    }
     d.setEditorText("");
     d.state.mirrorEmptyFallbackSeed = "";
 
     const fb = d.$("feedbackBox");
     if (fb) {
-      fb.dataset.calibrationRenderKey = "";
+      fb.dataset.postRunRenderKey = "";
       fb.className = "result-card empty";
       fb.innerHTML = "";
     }
     d.state.lastRunFeedback = "";
     d.state.lastMirrorPipelineResult = null;
     d.state.lastMirrorLoadFailed = false;
-    d.state.calibrationPostRun = null;
-    d.state.calibrationHandoffVisible = false;
-    d.state.lastSubmitCalibrationShortMirror = false;
-    d.resetLatentPromptNudge?.();
-    d.resetEditorPermissionPhrase?.();
+    d.state.lastSubmitFirstSessionEntryShortMirror = false;
+    d.resetEntryDelayHint?.();
     d.waywordPostRunRenderer.renderReflectionLine("");
 
     window.waywordPanelCoordination.closePanelsForFreshRun({
@@ -191,9 +166,9 @@
     d.renderWritingState();
     d.renderHighlight();
     d.renderSidebar();
-    d.syncEditorBottomChromeForCalibrationOverlay();
+    d.syncEditorBottomChromeForFirstSessionEntryOverlay();
     d.updateEnterButtonVisibility();
-    d.beginLatentPromptNudgeWatch?.();
+    d.beginEntryDelayHintWatch?.();
 
     if (!deferEditorFocus) {
       d.scheduleDeferredEditorFocus(focusCaret);
@@ -254,24 +229,23 @@
     if (d.editorInput && !d.getEditorSurfaceComposing()) {
       d.flushEditorSurfaceIntoWriteDocOnce();
     }
-    d.resetLatentPromptNudge?.();
-    d.resetEditorPermissionPhrase?.();
+    d.resetEntryDelayHint?.();
 
     const currentText = d.getEditorText();
     const analysis = d.analyze(currentText);
 
     if (analysis.totalWords === 0) {
       const priorLen = d.getRecentEntries().length;
-      const inCalibrationComposing = priorLen < d.CALIBRATION_THRESHOLD;
-      const trimmed = String(currentText || "").trim();
-      const allowCalibrationNonEmpty =
-        inCalibrationComposing && trimmed.length > 0 && /[A-Za-z0-9]/.test(trimmed);
-      if (!allowCalibrationNonEmpty) {
-        if (fromTimer) {
-          finalizeTimedRunExpiredWithNoText();
-        }
-        return;
+      if (fromTimer) {
+        finalizeTimedRunExpiredWithNoText();
       }
+      return;
+    }
+    if (typeof d.submitTelemetryRun === "function") {
+      d.submitTelemetryRun({
+        text: currentText,
+        wordCount: analysis.totalWords,
+      });
     }
 
     let timeRemainingSnapshot;
@@ -375,12 +349,7 @@
       });
     }
 
-    const priorLenForCalibration = d.getRecentEntries().length;
-    d.state.lastSubmitCalibrationShortMirror =
-      priorLenForCalibration < d.CALIBRATION_THRESHOLD &&
-      d.waywordPostRunRenderer &&
-      typeof d.waywordPostRunRenderer.isLowSignalMirrorSubmission === "function" &&
-      d.waywordPostRunRenderer.isLowSignalMirrorSubmission(currentText);
+    d.state.lastSubmitFirstSessionEntryShortMirror = false;
 
     if (
       window.waywordCompletionDecisionCoordinator &&
@@ -388,18 +357,11 @@
     ) {
       window.waywordCompletionDecisionCoordinator.coordinateSubmitCompletion({
         getRecentEntries: d.getRecentEntries,
-        calibrationThreshold: d.CALIBRATION_THRESHOLD,
-        calibrationSubmissionHasMinimumSignal: d.calibrationSubmissionHasMinimumSignal,
         savedRunIds: d.state.savedRunIds,
         runId: run.runId,
         currentText: currentText,
         analysis: analysis,
         handleRunCompleted: handleRunCompleted,
-        syncCalibrationHandoffIntentAfterDecision(decision) {
-          if (typeof d.syncCalibrationHandoffIntentAfterDecision === "function") {
-            d.syncCalibrationHandoffIntentAfterDecision(decision);
-          }
-        },
         computeMirrorForSubmit() {
           computeMirrorForSubmit(currentText, run);
         },
@@ -413,8 +375,6 @@
               run: run,
               currentText: currentText,
               completionDecision: decision,
-              calibrationThreshold: d.CALIBRATION_THRESHOLD,
-              readCalibrationHandoffAcknowledged: d.readCalibrationHandoffAcknowledged,
               canonicalSaveInput: {
                 runId: run.runId,
                 savedAt: run.savedAt,
@@ -448,7 +408,6 @@
             });
           } else {
             console.error("wayword: successful submit coordinator missing; falling back to inline submit success flow");
-            d.state.pendingNudgeLine = "What stands out on the page in this draft?";
             window.waywordRunModel.attachMirrorSnapshotToRun(
               run,
               d.state.lastMirrorPipelineResult,
@@ -476,27 +435,14 @@
     } else {
       console.error("wayword: completion decision coordinator missing; falling back to inline completion routing");
       const priorEntries = d.getRecentEntries();
-      const nextCalibrationStep = priorEntries.length + 1;
-      const inCalibrationWindow = nextCalibrationStep <= d.CALIBRATION_THRESHOLD;
-      const signalOkForCalibration =
-        !inCalibrationWindow || d.calibrationSubmissionHasMinimumSignal(currentText, analysis);
 
       let runWasSaved = false;
-      let insufficientCalibration = false;
 
       if (!d.state.savedRunIds.has(run.runId)) {
-        if (inCalibrationWindow && !signalOkForCalibration) {
-          insufficientCalibration = true;
-        } else {
-          runWasSaved = true;
-        }
+        runWasSaved = true;
       }
 
-      handleRunCompleted(currentText, priorEntries, runWasSaved, insufficientCalibration);
-      const fallbackDecision = { priorEntries, runWasSaved, insufficientCalibration };
-      if (typeof d.syncCalibrationHandoffIntentAfterDecision === "function") {
-        d.syncCalibrationHandoffIntentAfterDecision(fallbackDecision);
-      }
+      handleRunCompleted(currentText, priorEntries, runWasSaved);
       computeMirrorForSubmit(currentText, run);
 
       if (runWasSaved) {
@@ -511,10 +457,7 @@
             completionDecision: {
               priorEntries: priorEntries,
               runWasSaved: runWasSaved,
-              insufficientCalibration: insufficientCalibration,
             },
-            calibrationThreshold: d.CALIBRATION_THRESHOLD,
-            readCalibrationHandoffAcknowledged: d.readCalibrationHandoffAcknowledged,
             canonicalSaveInput: {
               runId: run.runId,
               savedAt: run.savedAt,
@@ -548,7 +491,6 @@
           });
         } else {
           console.error("wayword: successful submit coordinator missing; falling back to inline submit success flow");
-          d.state.pendingNudgeLine = "What stands out on the page in this draft?";
           window.waywordRunModel.attachMirrorSnapshotToRun(
             run,
             d.state.lastMirrorPipelineResult,

@@ -15,9 +15,9 @@ export interface MirrorSessionInput {
   startedAt?: number;
   endedAt?: number;
   /**
-   * When true, user has not finished calibration runs — disables thin-refusal experiment only.
+   * When true, user has not finished firstSessionEntry runs — disables thin-refusal experiment only.
    */
-  calibrationIncomplete?: boolean;
+  firstSessionEntryIncomplete?: boolean;
   /**
    * Main-line reflection family keys from prior completed runs, most recent first.
    * Used to down-rank near-duplicate “families” across the review loop.

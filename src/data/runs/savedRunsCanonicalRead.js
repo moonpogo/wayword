@@ -36,7 +36,7 @@
   }
 
   /**
-   * Oldest → newest (chronological). Use for progression, digests walk order, calibration baselines, aggregates.
+   * Oldest → newest (chronological). Use for progression, digests walk order, firstSessionEntry baselines, aggregates.
    * @returns {Record<string, unknown>[]}
    */
   function listSavedRunsChronological() {

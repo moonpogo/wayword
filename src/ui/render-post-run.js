@@ -63,10 +63,6 @@
     );
   }
 
-  var CALIBRATION_MICRO_REFLECTION_BODY_HTML =
-    '<div class="mirror-reflection-eyebrow">Reflection</div>' +
-    '<p class="mirror-empty mirror-empty--low-signal">Baseline stays short here; fuller signal comes after more language.</p>';
-
   function mirrorPostRunHasSubstantiveMain(result) {
     const r = result;
     if (!r || typeof r !== "object") return false;
@@ -131,16 +127,11 @@
    *   sessionDigestsForTrends: unknown[];
    *   submittedRunText?: string;
    *   promptFamily?: string;
-   *   calibrationSubmitShortMirror?: boolean;
-   *   calibrationBaselinePostSubmit?: boolean;
+   *   firstSessionEntrySubmitShortMirror?: boolean;
    * }} input
    */
   function computeMirrorPostRunPanelParts(input) {
     if (!input.submitted || !input.completedUiActive) {
-      return { v1Body: "", recentBody: "", nextPassHtml: "" };
-    }
-    /* Baseline overlay (runs 1–4) or handoff (run 5) owns post-submit reflection; no below-editor Mirror card. */
-    if (input.calibrationHandoffVisible || input.calibrationBaselinePostSubmit) {
       return { v1Body: "", recentBody: "", nextPassHtml: "" };
     }
     let v1Body = globalThis.WaywordMirrorDom.buildMirrorPanelBodyHtml({
@@ -169,83 +160,19 @@
       isLowSignalMirrorSubmission(textForSignal) &&
       (!hasCards || !substantiveMain);
     if (useLowSignalReflection && v1Body) {
-      v1Body = input.calibrationSubmitShortMirror
-        ? CALIBRATION_MICRO_REFLECTION_BODY_HTML
-        : lowSignalReflectionBodyHtml();
+      v1Body = lowSignalReflectionBodyHtml();
     }
 
-    let nextPassHtml = "";
-    if (v1Body) {
-      const mirror = globalThis.WaywordMirror;
-      const fallbackLine =
-        mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
-          ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
-          : "What stands out on the page in this draft?";
-      const submissionWordCount =
-        mirror && typeof mirror.tokenizeText === "function"
-          ? mirror.tokenizeText(String(textForSignal || "")).length
-          : String(textForSignal || "")
-              .trim()
-              .split(/\s+/)
-              .filter(Boolean).length;
-      const line =
-        mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function"
-          ? mirror.nextPassInstructionFromMirrorPipelineResult(
-              input.lastMirrorPipelineResult,
-              input.lastMirrorLoadFailed,
-              {
-                promptFamily: input.promptFamily,
-                lowSignal: attentionalLowSignal,
-                seed: input.mirrorEmptyFallbackSeed,
-                submissionWordCount
-              }
-            )
-          : fallbackLine;
-      const esc = escapeHtml(String(line || "").trim() || fallbackLine);
-      nextPassHtml = `<button type="button" class="mirror-next-pass-nudge" data-mirror-next-pass="1" aria-label="Begin a new writing run">${esc}</button>`;
-      if (experimentalTheCutProbe()) {
-        nextPassHtml +=
-          '<p class="mirror-the-cut-hint" data-the-cut-hint="1">' +
-          '<span class="mirror-the-cut-copy">Remove one sentence. Keep the stronger piece.</span> ' +
-          '<button type="button" class="mirror-the-cut-skip linkish" data-the-cut-skip="1">Skip</button>' +
-          "</p>";
-      }
-    }
+    const nextPassHtml = "";
 
     return { v1Body, recentBody, nextPassHtml };
   }
 
-  /**
-   * Calibration card markup for the in-editor post-submit overlay (runs 1–5).
-   * @param {{ step: number; observation: string; insufficient: boolean }} opts
-   */
-  function buildCalibrationPostRunOverlayCardHtml(opts) {
-    const calibrationThreshold = Number(window.waywordConfig.CALIBRATION_THRESHOLD) || 5;
-    const step = Number(opts.step) || 0;
-    const observation = String(opts.observation || "");
-    const insufficient = Boolean(opts.insufficient);
-    const pct = Math.min(100, Math.round((step / calibrationThreshold) * 100));
-    const mod = insufficient ? " editor-overlay-calibration--insufficient" : "";
-    return `
-      <div class="editor-overlay-calibration${mod}" role="dialog" aria-labelledby="editorCalibProgress">
-        <div class="editor-overlay-calibration-head">
-          <span class="editor-overlay-calibration-label">Collecting baseline</span>
-          <span id="editorCalibProgress" class="editor-overlay-calibration-progress">${step} of ${calibrationThreshold}</span>
-        </div>
-        <div class="editor-overlay-calibration-meter-wrap">
-          <div class="editor-overlay-calibration-meter" role="presentation">
-            <div class="editor-overlay-calibration-meter-fill" style="width:${pct}%"></div>
-          </div>
-        </div>
-        <p class="editor-overlay-calibration-observation" aria-live="polite">${escapeHtml(observation)}</p>
-      </div>`;
-  }
-
-  /** #feedbackBox: kept empty; post-run calibration uses the in-editor overlay. */
+  /** #feedbackBox reset helper. */
   function resetPostRunFeedbackBox() {
     const fb = $id("feedbackBox");
     if (!fb) return;
-    fb.dataset.calibrationRenderKey = "";
+    fb.dataset.firstSessionEntryRenderKey = "";
     fb.className = "result-card empty";
     fb.innerHTML = "";
   }
@@ -336,25 +263,13 @@
    * }} opts
    */
   function updateMirrorNextPassSlot(opts) {
-    const slot = $id("mirrorNextPassSlot");
-    if (!slot) return;
-    const html = String(opts.nextPassHtml || "").trim();
-    if (!opts.submitted || !opts.completedUiActive || !html) {
-      slot.innerHTML = "";
-      slot.classList.add("hidden");
-      slot.setAttribute("aria-hidden", "true");
-      return;
-    }
-    slot.innerHTML = html;
-    slot.classList.remove("hidden");
-    slot.setAttribute("aria-hidden", "false");
+    void opts;
   }
 
   window.waywordPostRunRenderer = {
     buildMirrorRecentTrendsBlockHtml,
     computeMirrorAttentionalNudgeLowSignal,
     computeMirrorPostRunPanelParts,
-    buildCalibrationPostRunOverlayCardHtml,
     resetPostRunFeedbackBox,
     renderReflectionLine,
     updateMirrorReflectionSection,

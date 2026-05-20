@@ -6,15 +6,8 @@
 
     editorInput.addEventListener("focus", function () {
       input.setFocusMode(true);
-      if (typeof input.onEditorFocusForLatentNudge === "function") {
-        input.onEditorFocusForLatentNudge();
-      }
-    });
-
-    editorInput.addEventListener("pointerdown", function () {
-      if (!input.isActiveAndEditable()) return;
-      if (typeof input.onEditorPermissionUserEdit === "function") {
-        input.onEditorPermissionUserEdit();
+      if (typeof input.onEditorFocusForEntryDelayHint === "function") {
+        input.onEditorFocusForEntryDelayHint();
       }
     });
 
@@ -42,20 +35,17 @@
 
     editorInput.addEventListener("compositionstart", function () {
       input.setEditorSurfaceComposing(true);
-      if (typeof input.onEditorPermissionUserEdit === "function") {
-        input.onEditorPermissionUserEdit();
-      }
     });
 
     editorInput.addEventListener("compositionend", function () {
       input.setEditorSurfaceComposing(false);
       if (!input.isActiveAndEditable()) return;
       input.flushEditorSurfaceIntoWriteDocOnce();
-      if (typeof input.onEditorInputForLatentNudge === "function") {
-        input.onEditorInputForLatentNudge();
+      if (typeof input.onEditorInputForEntryDelayHint === "function") {
+        input.onEditorInputForEntryDelayHint();
       }
-      if (typeof input.onEditorPermissionUserEdit === "function") {
-        input.onEditorPermissionUserEdit();
+      if (typeof input.onEditorInputForTelemetry === "function") {
+        input.onEditorInputForTelemetry();
       }
       input.tryStartTimerOnFirstMeaningfulInput();
       input.pulseWordmark();
@@ -87,11 +77,11 @@
         return;
       }
       input.flushEditorSurfaceIntoWriteDocOnce();
-      if (typeof input.onEditorInputForLatentNudge === "function") {
-        input.onEditorInputForLatentNudge();
+      if (typeof input.onEditorInputForEntryDelayHint === "function") {
+        input.onEditorInputForEntryDelayHint();
       }
-      if (typeof input.onEditorPermissionUserEdit === "function") {
-        input.onEditorPermissionUserEdit();
+      if (typeof input.onEditorInputForTelemetry === "function") {
+        input.onEditorInputForTelemetry();
       }
       input.tryStartTimerOnFirstMeaningfulInput();
       input.pulseWordmark();
@@ -111,12 +101,7 @@
       }
     });
 
-    editorInput.addEventListener("paste", function () {
-      if (!input.isActiveAndEditable()) return;
-      if (typeof input.onEditorPermissionUserEdit === "function") {
-        input.onEditorPermissionUserEdit();
-      }
-    });
+    editorInput.addEventListener("paste", function () {});
 
     var editorScrollSurface = input.editorInputScrollport || editorInput;
     editorScrollSurface.addEventListener(
@@ -222,9 +207,6 @@
         }
         return;
       }
-      if (!origin || !origin.closest("[data-mirror-next-pass]")) return;
-      e.preventDefault();
-      input.runPostSubmitAutoNewRunNow();
     });
   }
 

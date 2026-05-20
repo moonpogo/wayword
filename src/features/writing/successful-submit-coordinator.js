@@ -5,23 +5,9 @@
     return "unknown";
   }
 
-  function resolvePromptSystemMode() {
-    var helper = window.waywordPromptSystemMode;
-    if (!helper || typeof helper.resolvePromptSystemMode !== "function") return "v0";
-    try {
-      return helper.resolvePromptSystemMode({
-        location: window.location,
-        localStorage: window.localStorage,
-      });
-    } catch (_) {
-      return "v0";
-    }
-  }
-
   function persistStrataSummaryForSuccessfulRun(input) {
     var strata = window.waywordStrataEngine;
     if (!strata || typeof strata.persistStrataRunSummary !== "function") return false;
-    if (resolvePromptSystemMode() !== "v1") return false;
 
     var promptId = String(input.state && input.state.promptId ? input.state.promptId : "").trim();
     var promptLayer = resolvePromptLayerFromFamily(input.state && input.state.promptFamily);
@@ -55,46 +41,6 @@
     } catch (_) {
       return false;
     }
-  }
-
-  function computePendingNudgeLine(input) {
-    var mirror = globalThis.WaywordMirror;
-    var currentText = String(input.currentText || "");
-    var fallbackLine =
-      mirror && mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION != null
-        ? String(mirror.MIRROR_NEXT_PASS_FALLBACK_INSTRUCTION)
-        : "What stands out on the page in this draft?";
-    var nudgeLowSig =
-      typeof window.waywordPostRunRenderer?.computeMirrorAttentionalNudgeLowSignal === "function"
-        ? window.waywordPostRunRenderer.computeMirrorAttentionalNudgeLowSignal(
-            currentText,
-            input.lastMirrorPipelineResult,
-            input.lastMirrorLoadFailed
-          )
-        : false;
-    var submissionWordCount =
-      mirror && typeof mirror.tokenizeText === "function"
-        ? mirror.tokenizeText(currentText).length
-        : currentText
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean).length;
-
-    if (mirror && typeof mirror.nextPassInstructionFromMirrorPipelineResult === "function") {
-      var line = mirror.nextPassInstructionFromMirrorPipelineResult(
-        input.lastMirrorPipelineResult,
-        input.lastMirrorLoadFailed,
-        {
-          promptFamily: input.promptFamily,
-          lowSignal: nudgeLowSig,
-          seed: input.runId,
-          submissionWordCount: submissionWordCount,
-        }
-      );
-      return String(line || "").trim() || fallbackLine;
-    }
-
-    return fallbackLine;
   }
 
   function attachMirrorArtifactsToRun(input) {
@@ -155,30 +101,7 @@
 
   function coordinateSuccessfulSavedRunSubmit(input) {
     var decision = input.completionDecision;
-    var threshold = Number(input.calibrationThreshold) || 0;
-    var priorLen =
-      decision && Array.isArray(decision.priorEntries) ? decision.priorEntries.length : 0;
-    var acked =
-      typeof input.readCalibrationHandoffAcknowledged === "function"
-        ? input.readCalibrationHandoffAcknowledged()
-        : true;
-    var showHandoff =
-      Boolean(decision && decision.runWasSaved) &&
-      threshold > 0 &&
-      priorLen + 1 === threshold &&
-      !acked;
-
-    if (showHandoff) {
-      input.state.pendingNudgeLine = "";
-    } else {
-      input.state.pendingNudgeLine = computePendingNudgeLine({
-        currentText: input.currentText,
-        lastMirrorPipelineResult: input.state.lastMirrorPipelineResult,
-        lastMirrorLoadFailed: input.state.lastMirrorLoadFailed,
-        promptFamily: input.state.promptFamily,
-        runId: input.run.runId,
-      });
-    }
+    var showHandoff = false;
 
     attachMirrorArtifactsToRun({
       run: input.run,

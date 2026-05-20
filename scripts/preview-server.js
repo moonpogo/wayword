@@ -31,7 +31,12 @@ function resolveRequestPath(urlPathname) {
 }
 
 function sendResponse(res, statusCode, body, contentType = "text/plain; charset=utf-8") {
-  res.writeHead(statusCode, { "Content-Type": contentType });
+  res.writeHead(statusCode, {
+    "Content-Type": contentType,
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    Pragma: "no-cache",
+    Expires: "0",
+  });
   res.end(body);
 }
 

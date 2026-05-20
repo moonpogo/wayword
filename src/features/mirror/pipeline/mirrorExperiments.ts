@@ -9,14 +9,14 @@ import type { MirrorPipelineResult, MirrorSessionInput, MirrorSelectedReflection
 
 /**
  * ~2% of eligible soft-fallback primaries: only the thin-signal line, no supporting, no stack.
- * Never when calibration is still completing. Off unless `__WAYWORD_MIRROR_REFUSAL_EXPERIMENT__`.
+ * Never when firstSessionEntry is still completing. Off unless `__WAYWORD_MIRROR_REFUSAL_EXPERIMENT__`.
  */
 export function applyThinRefusalExperiment(
   input: MirrorSessionInput,
   result: MirrorPipelineResult
 ): MirrorPipelineResult {
   if (!mirrorThinRefusalExperimentActive()) return result;
-  if (input.calibrationIncomplete) return result;
+  if (input.firstSessionEntryIncomplete) return result;
   const main = result.main;
   if (!main) return result;
   if (main.category === "low_signal") return result;

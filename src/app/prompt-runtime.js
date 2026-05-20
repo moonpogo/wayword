@@ -5,19 +5,14 @@
     var opts = options && typeof options === "object" ? options : {};
     var completedRunCount =
       typeof input.getCompletedRunCount === "function" ? Number(input.getCompletedRunCount()) || 0 : 0;
-    var threshold = Number(input.calibrationThreshold) || 0;
-    if (
-      threshold > 0 &&
-      completedRunCount < threshold &&
-      typeof input.pickCalibrationPrompt === "function"
-    ) {
-      return input.pickCalibrationPrompt(input);
-    }
 
     var forced =
       typeof opts.familyKey === "string" && input.promptFamiliesOrder.includes(opts.familyKey)
         ? opts.familyKey
         : null;
+    if (completedRunCount <= 0 && input.promptFamiliesOrder.includes("Entry")) {
+      forced = "Entry";
+    }
 
     var chosen = input.promptSelection.choosePromptFamilyAndEntry({
       forcedFamilyKey: forced,
@@ -44,13 +39,6 @@
     input.state.recentFamilyKeys = input.state.recentFamilyKeys
       .concat([family])
       .slice(-input.promptRecentFamilyWindow);
-    if (
-      completedRunCount >= threshold &&
-      Array.isArray(input.state.recentCalibrationPromptIds) &&
-      input.state.recentCalibrationPromptIds.length
-    ) {
-      input.state.recentCalibrationPromptIds = [];
-    }
     return entry.text;
   }
 

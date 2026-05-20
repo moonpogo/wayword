@@ -12,56 +12,40 @@ for (const fam of PROMPT_FAMILIES_ORDER) {
   }
 }
 
-const PROMPT_SYSTEM_MODES = window.waywordPromptSystemMode?.PROMPT_SYSTEM_MODES || { V0: "v0", V1: "v1" };
 const V1_ENTRY_FAMILY = window.waywordPromptSystemMode?.V1_ENTRY_FAMILY || "Entry";
-
-function resolvePromptSystemModeForRuntime() {
-  const helper = window.waywordPromptSystemMode;
-  if (!helper || typeof helper.resolvePromptSystemMode !== "function") {
-    return PROMPT_SYSTEM_MODES.V0;
-  }
-  return helper.resolvePromptSystemMode({
-    location: window.location,
-    localStorage: window.localStorage
-  });
-}
 
 function getV1EntryPromptCatalogForRuntime() {
   const modeHelper = window.waywordPromptSystemMode;
   const layered = window.waywordLayeredPrompts;
   if (
     !modeHelper ||
-    typeof modeHelper.buildV1EntryPromptCatalog !== "function" ||
+    typeof modeHelper.buildStrataWeightedPromptCatalog !== "function" ||
     !layered ||
-    typeof layered.getEntryPromptsV1 !== "function"
+    typeof layered.getEntryPromptsV1 !== "function" ||
+    typeof layered.getLayeredPromptsByLayer !== "function" ||
+    !layered.PROMPT_LAYERS ||
+    !layered.PROMPT_LAYERS.TORSION
   ) {
     return null;
   }
   const entryPrompts = layered.getEntryPromptsV1();
-  const canBuildWeighted =
-    typeof modeHelper.buildStrataWeightedPromptCatalog === "function" &&
-    typeof modeHelper.getLayerWeightsForReadinessBand === "function";
   const canReadStrata =
     window.waywordStrataEngine &&
     typeof window.waywordStrataEngine.loadStrataState === "function" &&
     typeof window.waywordStrataEngine.calculateStrataReadinessBand === "function";
-  const canReadTorsion =
-    typeof layered.getLayeredPromptsByLayer === "function" &&
-    layered.PROMPT_LAYERS &&
-    layered.PROMPT_LAYERS.TORSION;
-
-  if (canBuildWeighted && canReadStrata && canReadTorsion) {
+  let readinessBand = "entry_support";
+  const isFirstSession = completedRuns() <= 0;
+  if (canReadStrata) {
     const strataState = window.waywordStrataEngine.loadStrataState(window.localStorage);
-    const readinessBand = window.waywordStrataEngine.calculateStrataReadinessBand(strataState);
-    const torsionPrompts = layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.TORSION);
-    return modeHelper.buildStrataWeightedPromptCatalog({
-      readinessBand,
-      entryPrompts,
-      torsionPrompts,
-    });
+    readinessBand = window.waywordStrataEngine.calculateStrataReadinessBand(strataState);
   }
-
-  return modeHelper.buildV1EntryPromptCatalog(entryPrompts);
+  const torsionPrompts = layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.TORSION);
+  return modeHelper.buildStrataWeightedPromptCatalog({
+    readinessBand,
+    isFirstSession,
+    entryPrompts,
+    torsionPrompts,
+  });
 }
 
 /** Ritual Loop V1: internal family tags only (not shown in UI). */
@@ -78,120 +62,6 @@ function ritualPickIndex(seed, modulus) {
     h = Math.imul(h, 16777619) >>> 0;
   }
   return modulus <= 0 ? 0 : h % modulus;
-}
-
-const RITUAL_NO_MAIN_NUDGE_BY_FAMILY = Object.freeze({
-  Scene: [
-    "Keep this in one place.",
-    "Stay with one moment.",
-    "Use only what can be seen.",
-    "Pick one detail and stay with it."
-  ],
-  Relation: [
-    "Use spoken lines only. Let the silence live underneath them.",
-    "Two people. One exchange.",
-    "No naming the feeling. Let what is said carry it.",
-    "Keep it to one room and one moment."
-  ],
-  Pressure: [
-    "Stop before it blows up.",
-    "Keep one worry present. Don't solve it.",
-    "Let someone almost say the hard thing.",
-    "Keep the near-miss concrete."
-  ],
-  Constraint: [
-    "Don't name the feeling yet.",
-    "Show what happened. Don't name the feeling.",
-    "Leave the obvious label out.",
-    "Leave the main feeling unnamed."
-  ]
-});
-
-const RITUAL_NUDGE_BLOCKLIST_BY_PROMPT_STRUCTURE = Object.freeze({
-  interpersonal_gap: ["spoken lines", "one exchange", "what is said"],
-});
-
-const RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY = Object.freeze({
-  repetition: [
-    "Use the same word twice, but change what it does.",
-    "Repeat one word once, then move on.",
-    "Swap a repeated word for a plainer one.",
-    "Repeat one word once, then leave it."
-  ],
-  abstraction_concrete: [
-    "Keep this in what can be seen.",
-    "Three sentences on one thing someone can touch.",
-    "Add one line that shows only action.",
-    "Trade one vague line for one clear image."
-  ],
-  cadence: [
-    "Keep the sentences short.",
-    "Write one long sentence, then two short ones.",
-    "Make the first sentence short. Let the next one open up.",
-    "Let the sentences change length as you go."
-  ],
-  opening: [
-    "Let the first beat land before the lens widens.",
-    "Hold the opening image one beat longer.",
-    "Start with one clear motion, then widen.",
-    "Keep the first paragraph to one room of attention."
-  ],
-  shift: [
-    "Let one turn stay sharp before the next move.",
-    "After one pivot, stay with the new angle a while.",
-    "Hold the lane change long enough to read.",
-    "One swerve, then commit to the new line."
-  ],
-  hesitation_qualification: [
-    "Say it plainly.",
-    "Say it without hedging.",
-    "Open with one plain sentence.",
-    "One straight fact. No cushion."
-  ],
-  fallback: [
-    "Keep this in one place.",
-    "Stay with one moment.",
-    "Don't explain anything.",
-    "Let the ending stay open."
-  ],
-  low_signal: [
-    "Signal is thin. Add surface.",
-    "Write more sentences; look again.",
-    "Give the page more room.",
-    "Stay with the draft longer."
-  ]
-});
-
-function filterRitualNudgePoolForPrompt(pool, promptStructure) {
-  const structure = String(promptStructure || "").trim();
-  const blocked = RITUAL_NUDGE_BLOCKLIST_BY_PROMPT_STRUCTURE[structure];
-  if (!blocked || !blocked.length) return pool;
-  const filtered = pool.filter((line) => {
-    const text = String(line || "").toLowerCase();
-    return !blocked.some((phrase) => text.includes(phrase));
-  });
-  return filtered.length ? filtered : pool;
-}
-
-/**
- * Ritual nudge for the run after this one. Deterministic; never quotes mirror text.
- * @param {{ priorPromptFamily: string, promptStructure?: string, hadMainReflection: boolean, mainCategory: string | null, seed: string }} input
- */
-
-function buildRitualNudgeV1({ priorPromptFamily, promptStructure, hadMainReflection, mainCategory, seed }) {
-  const family = String(priorPromptFamily || "").trim() || "Scene";
-  const s = seed != null ? String(seed) : "";
-  if (!hadMainReflection) {
-    const basePool = RITUAL_NO_MAIN_NUDGE_BY_FAMILY[family] || RITUAL_NO_MAIN_NUDGE_BY_FAMILY.Scene;
-    const pool = filterRitualNudgePoolForPrompt(basePool, promptStructure);
-    const idx = ritualPickIndex(`${s}|no-main|${family}`, pool.length);
-    return pool[idx];
-  }
-  let cat = mainCategory != null ? String(mainCategory) : "fallback";
-  if (!RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY[cat]) cat = "fallback";
-  const pool = RITUAL_WITH_MAIN_NUDGE_BY_CATEGORY[cat];
-  const idx = ritualPickIndex(`${s}|with-main|${cat}|${family}`, pool.length);
-  return pool[idx];
 }
 
 const bannedSets = [
@@ -223,8 +93,8 @@ const punctuationMarks = {
 };
 
 const {
-  CALIBRATION_THRESHOLD,
-  CALIBRATION_INSUFFICIENT_COPY,
+  FIRST_SESSION_ENTRY_THRESHOLD,
+  FIRST_SESSION_ENTRY_INSUFFICIENT_COPY,
   ZEN_GARDEN_OPENABLE,
   PROMPT_REROLL_LIMIT,
   PROMPT_RECENT_ID_WINDOW,
@@ -242,7 +112,7 @@ const {
   BANNED_PANEL_DEBOUNCE_MS,
   EDITOR_SEMANTIC_DOT_PX,
   EDITOR_SEMANTIC_DOT_GAP_PX,
-  BOTTOM_CHROME_CALIBRATION_HIDE_MS,
+  BOTTOM_CHROME_FIRST_SESSION_ENTRY_HIDE_MS,
   REVIEW_RUN_REFLECTION_MAX,
   REVIEW_RUN_MIN_WORDS,
   REVIEW_RUN_DULL_REPEATS,
@@ -252,12 +122,12 @@ const {
 } = window.waywordConfig;
 
 /**
- * DEV-ONLY — search `WAYWORD_DEV_CALIBRATION_RESET` to remove this entire block.
- * When true: `window.waywordDevResetCalibration()` clears run history + calibration state.
+ * DEV-ONLY — search `WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET` to remove this entire block.
+ * When true: `window.waywordDevResetFirstSessionEntry()` clears run history + firstSessionEntry state.
  * Enabled only for local / file URLs (not deployed previews or production).
- * One-shot URL (runs before first paint of calibration UI): append `?resetCalibration=1` (strip self).
+ * One-shot URL (runs before first paint of firstSessionEntry UI): append `?resetFirstSessionEntry=1` (strip self).
  */
-const WAYWORD_DEV_CALIBRATION_RESET_ENABLED =
+const WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED =
   typeof location !== "undefined" &&
   ((location.hostname || "") === "localhost" ||
     (location.hostname || "") === "127.0.0.1" ||
@@ -287,157 +157,67 @@ function getCategoryAccentColor(key) {
 
 const state = window.waywordAppState.initState(bannedSets[0]);
 
-/** Active drafting session still inside the calibration window (saved runs below threshold). */
-function isCalibrationComposingMode() {
-  return Boolean(state.active && !state.submitted && completedRuns() < CALIBRATION_THRESHOLD);
+/** Active drafting session still inside the firstSessionEntry window (saved runs below threshold). */
+function isFirstSessionEntryComposingMode() {
+  return Boolean(state.active && !state.submitted && completedRuns() < FIRST_SESSION_ENTRY_THRESHOLD);
 }
 
-/** Sentence-length guidance for the nudge lane only; prompt text unchanged. */
-function getCalibrationProgressNudgeLine() {
-  const n = completedRuns();
-  if (n <= 1) return "Keep it short.";
-  if (n === 2) return "One or two lines.";
-  return "Two or three lines.";
-}
-
-function syncCalibrationWritingModeClass() {
+function syncFirstSessionEntryWritingModeClass() {
   try {
-    document.body.classList.toggle("calibration-writing-mode", isCalibrationComposingMode());
+    document.body.classList.toggle("firstSessionEntry-writing-mode", isFirstSessionEntryComposingMode());
   } catch (_) {
     /* ignore */
   }
 }
 
-/** Ritual line under the prompt for the current run: carryover after submit, else cold-start pool for this prompt. */
-function getActivePromptNudgeLineForRender() {
-  const carried = String(state.pendingNudgeLine || "").trim();
-  if (carried) return carried;
-  if (isCalibrationComposingMode()) {
-    return getCalibrationProgressNudgeLine();
-  }
-  const family = String(state.promptFamily || "").trim() || "Scene";
-  const promptEntry = promptEntryById.get(String(state.promptId || ""));
-  const seed =
-    String(state.lastPromptKey || "").trim() ||
-    String(state.prompt || "").trim() ||
-    "wayword";
-  return buildRitualNudgeV1({
-    priorPromptFamily: family,
-    promptStructure: promptEntry?.structure,
-    hadMainReflection: false,
-    mainCategory: null,
-    seed
+function resetEntryDelayHint() {}
+function beginEntryDelayHintWatch() {}
+function notifyEntryDelayHintEditorFocus() {}
+function notifyEntryDelayHintEditorInput() {}
+
+function getBehavioralTelemetry() {
+  const telemetry = window.waywordBehavioralTelemetry;
+  if (!telemetry || typeof telemetry.startRun !== "function") return null;
+  return telemetry;
+}
+
+function resolvePromptLayerFromFamily(family) {
+  const value = String(family || "").trim().toLowerCase();
+  if (value === "torsion") return "torsion";
+  if (value === "resonance") return "resonance";
+  return "entry";
+}
+
+function startTelemetryRun() {
+  const telemetry = getBehavioralTelemetry();
+  if (!telemetry) return;
+  const v1Catalog = getV1EntryPromptCatalogForRuntime();
+  telemetry.startRun({
+    now: Date.now(),
+    promptId: state.promptId,
+    readinessBand: v1Catalog?.readinessBand || "entry_support",
+    layerWeightDistributionSnapshot: v1Catalog?.layerWeights || { entry: 100, torsion: 0, resonance: 0 },
+    promptLayer: resolvePromptLayerFromFamily(state.promptFamily),
   });
 }
 
-let latentPromptNudge = null;
-
-function createLatentPromptNudgeController() {
-  if (!window.waywordLatentNudgeController || typeof window.waywordLatentNudgeController.create !== "function") {
-    return null;
-  }
-  return window.waywordLatentNudgeController.create({
-    getEditorText,
-    isEligible() {
-      return Boolean(
-          state.active &&
-          !state.submitted &&
-          !(isMobileViewport() && document.body.classList.contains("keyboard-open"))
-      );
-    },
-    render() {
-      renderMeta();
-    }
+function submitTelemetryRun(runSnapshot) {
+  const telemetry = getBehavioralTelemetry();
+  if (!telemetry || !runSnapshot) return;
+  telemetry.submitRun({
+    now: Date.now(),
+    text: runSnapshot.text,
+    wordCount: runSnapshot.wordCount,
   });
 }
 
-function getLatentPromptNudgeController() {
-  if (!latentPromptNudge) {
-    latentPromptNudge = createLatentPromptNudgeController();
-  }
-  return latentPromptNudge;
-}
-
-function isPromptNudgeVisible() {
-  const controller = getLatentPromptNudgeController();
-  return Boolean(controller && controller.isVisible());
-}
-
-function resetLatentPromptNudge() {
-  getLatentPromptNudgeController()?.reset();
-}
-
-function beginLatentPromptNudgeWatch() {
-  getLatentPromptNudgeController()?.beginPrompt();
-}
-
-function notifyLatentPromptNudgeEditorFocus() {
-  getLatentPromptNudgeController()?.onEditorFocus();
-}
-
-function notifyLatentPromptNudgeEditorInput() {
-  getLatentPromptNudgeController()?.onEditorInput();
-}
-
-function notifyLatentPromptNudgePromptReroll() {
-  getLatentPromptNudgeController()?.onPromptReroll();
-}
-
-let editorPermissionController = null;
-
-function createEditorPermissionController() {
-  if (
-    !window.waywordEditorPermissionController ||
-    typeof window.waywordEditorPermissionController.create !== "function"
-  ) {
-    return null;
-  }
-  return window.waywordEditorPermissionController.create({
-    getEditorText,
-    isEligible() {
-      return Boolean(state.active && !state.submitted);
-    },
-    render() {
-      renderEditorPermissionPhrase();
-    }
+function noteTelemetryEditorInput() {
+  const telemetry = getBehavioralTelemetry();
+  if (!telemetry) return;
+  telemetry.noteInput({
+    now: Date.now(),
+    hasText: getEditorText().trim().length > 0,
   });
-}
-
-function getEditorPermissionController() {
-  if (!editorPermissionController) {
-    editorPermissionController = createEditorPermissionController();
-  }
-  return editorPermissionController;
-}
-
-function renderEditorPermissionPhrase() {
-  const el = $("editorPermissionPhrase");
-  if (!el) return;
-  const controller = getEditorPermissionController();
-  const visible = Boolean(controller && controller.isVisible());
-  el.replaceChildren();
-  if (visible) {
-    const text = document.createElement("span");
-    text.className = "editor-permission-phrase__text";
-    text.textContent = controller.getPhrase();
-    el.append(text);
-  }
-  el.classList.toggle("editor-permission-phrase--hidden", !visible);
-  el.setAttribute("aria-hidden", "true");
-  editorInput?.classList.toggle("editor-input--permission-visible", visible);
-}
-
-function notifyEditorPermissionNudgeVisible() {
-  getEditorPermissionController()?.onNudgeVisible();
-}
-
-function notifyEditorPermissionUserEdit() {
-  getEditorPermissionController()?.onUserEdit();
-}
-
-function resetEditorPermissionPhrase() {
-  getEditorPermissionController()?.reset();
-  renderEditorPermissionPhrase();
 }
 
 let editorSurfaceComposing = false;
@@ -867,11 +647,11 @@ function syncEditorShellChamferEdge() {
 }
 
 /** Same chamfer + quadratic fillets as the writing shell (`closedRoundPolygonPathD`), scaled to the overlay box. */
-function syncEditorCalibrationOverlayClip() {
+function syncEditorFirstSessionEntryOverlayClip() {
   const overlay = $("editorOverlay");
   if (!overlay) return;
   const isCalib =
-    overlay.classList.contains("editor-overlay--calibration") &&
+    overlay.classList.contains("editor-overlay--firstSessionEntry") &&
     !overlay.classList.contains("hidden");
   if (!isCalib || !EDITOR_SHELL_CLIP_PATH_FROM_PATH_SUPPORTED) {
     overlay.style.removeProperty("clip-path");
@@ -901,10 +681,10 @@ function syncEditorCalibrationOverlayClip() {
   overlay.style.clipPath = quoted;
 }
 
-function scheduleCalibrationOverlayGeometrySync() {
+function scheduleFirstSessionEntryOverlayGeometrySync() {
   requestAnimationFrame(() => {
-    syncEditorCalibrationOverlayClip();
-    requestAnimationFrame(() => syncEditorCalibrationOverlayClip());
+    syncEditorFirstSessionEntryOverlayClip();
+    requestAnimationFrame(() => syncEditorFirstSessionEntryOverlayClip());
   });
 }
 
@@ -939,7 +719,7 @@ function queueViewportSync() {
       syncViewportHeightVar,
       syncKeyboardOpenClass,
       syncEditorShellChamferEdge,
-      syncEditorCalibrationOverlayClip,
+      syncEditorFirstSessionEntryOverlayClip,
       isMobileViewport,
       isDesktopPatternsViewport,
       isProfileVisible() {
@@ -972,7 +752,7 @@ function queueViewportSync() {
       syncViewportHeightVar();
       syncKeyboardOpenClass();
       syncEditorShellChamferEdge();
-      syncEditorCalibrationOverlayClip();
+      syncEditorFirstSessionEntryOverlayClip();
       if (!isMobileViewport()) setFocusMode(false);
       if (lastDesktopPatternsViewport === null) {
         lastDesktopPatternsViewport = desktopPatternsViewport;
@@ -1877,121 +1657,23 @@ function completedRuns() {
   return readSavedRunsChronological().length;
 }
 
-const CALIBRATION_HANDOFF_ACK_STORAGE_KEY = "wayword-calibration-handoff-ack";
-
-if (!window.waywordCalibrationPrompts) {
-  throw new Error("wayword: calibration prompts are required before script.js calibration setup");
-}
-
-const CALIBRATION_PROMPT_FAMILY = window.waywordCalibrationPrompts.CALIBRATION_PROMPT_FAMILY;
-const CALIBRATION_PROMPT_RECENT_WINDOW =
-  window.waywordCalibrationPrompts.CALIBRATION_PROMPT_RECENT_WINDOW;
-const CALIBRATION_PROMPT_ENTRIES = window.waywordCalibrationPrompts.CALIBRATION_PROMPT_ENTRIES;
-
-function readCalibrationHandoffAcknowledged() {
-  try {
-    return window.localStorage.getItem(CALIBRATION_HANDOFF_ACK_STORAGE_KEY) === "1";
-  } catch (_) {
-    return false;
-  }
-}
-
-function ackCalibrationHandoffAcknowledged() {
-  try {
-    window.localStorage.setItem(CALIBRATION_HANDOFF_ACK_STORAGE_KEY, "1");
-  } catch (_) {
-    /* ignore */
-  }
-}
-
-function pickCalibrationPromptForRuntime(input) {
-  const pool = CALIBRATION_PROMPT_ENTRIES;
-  if (!pool.length) {
-    throw new Error("wayword: calibration prompt pool is empty");
-  }
-  if (!Array.isArray(input.state.recentCalibrationPromptIds)) {
-    input.state.recentCalibrationPromptIds = [];
-  }
-  const windowSize = Math.min(CALIBRATION_PROMPT_RECENT_WINDOW, pool.length);
-  const recent = input.state.recentCalibrationPromptIds;
-  const blocked = new Set(recent.slice(-windowSize));
-  let candidates = pool.filter((e) => e && e.active !== false && !blocked.has(e.id));
-  if (!candidates.length) {
-    candidates = pool.filter((e) => e && e.active !== false);
-  }
-  const idx = ritualPickIndex(
-    `${Date.now()}|${recent.length}|cal-pick`,
-    candidates.length
-  );
-  const pick = candidates[idx] || candidates[0];
-  input.state.promptId = pick.id;
-  input.state.prompt = pick.text;
-  input.state.promptFamily = CALIBRATION_PROMPT_FAMILY;
-  input.state.lastPromptKey = `${CALIBRATION_PROMPT_FAMILY}::${pick.id}`;
-  input.state.promptBiasTags = input.biasTagsForPromptFamily(CALIBRATION_PROMPT_FAMILY);
-  input.state.recentCalibrationPromptIds = recent.concat([pick.id]).slice(-CALIBRATION_PROMPT_RECENT_WINDOW);
-  if (!Array.isArray(input.state.recentFamilyKeys)) input.state.recentFamilyKeys = [];
-  input.state.recentFamilyKeys = input.state.recentFamilyKeys
-    .concat([CALIBRATION_PROMPT_FAMILY])
-    .slice(-PROMPT_RECENT_FAMILY_WINDOW);
-  return pick.text;
-}
-
-function syncCalibrationHandoffIntentAfterDecision(decision) {
-  const priorEntries = Array.isArray(decision?.priorEntries) ? decision.priorEntries : [];
-  const priorLen = priorEntries.length;
-  const crosses =
-    Boolean(decision?.runWasSaved) &&
-    priorLen + 1 === CALIBRATION_THRESHOLD &&
-    !readCalibrationHandoffAcknowledged();
-  state.calibrationHandoffVisible = Boolean(crosses);
-}
-
-function syncCalibrationHandoffSurface() {
-  const section = $("calibrationHandoffSection");
-  if (!section) return;
-  const show =
-    deriveCurrentPostSubmitPhase() ===
-    window.waywordPostSubmitPhase.PHASES.SUBMITTED_CALIBRATION_HANDOFF;
-  section.classList.toggle("hidden", !show);
-  section.setAttribute("aria-hidden", show ? "false" : "true");
-}
-
-/** True when submission has enough text for calibration observation / step advance. */
-function calibrationSubmissionHasMinimumSignal(text, analysis) {
-  const words = Math.max(0, Number(analysis?.totalWords) || 0);
-  if (words >= 1) return true;
-  const trimmed = String(text || "").trim();
-  return trimmed.length > 0 && /\b\w+\b/.test(trimmed);
-}
-
 function hasProfileSignal() {
-  return completedRuns() >= CALIBRATION_THRESHOLD;
+  return completedRuns() >= FIRST_SESSION_ENTRY_THRESHOLD;
 }
 
-/** Canonical calibration reset (fresh local state, used by dev hook and Clear Saved Runs). */
-function resetCalibrationStateToFreshStart() {
+/** Canonical firstSessionEntry reset (fresh local state, used by dev hook and Clear Saved Runs). */
+function resetFirstSessionEntryStateToFreshStart() {
   state.history = [];
   state.savedRunIds = new Set();
-  state.calibrationPostRun = null;
   state.lastRunFeedback = "";
   state.lastMirrorPipelineResult = null;
   state.lastMirrorLoadFailed = false;
   state.pendingRecentDrawerExpand = false;
-  state.pendingNudgeLine = "";
   state.promptBiasTags = [];
   state.recentPromptIds = [];
-  state.recentCalibrationPromptIds = [];
   state.recentFamilyKeys = [];
   state.promptId = "";
   state.mirrorEmptyFallbackSeed = "";
-  state.calibrationHandoffVisible = false;
-  state.lastSubmitCalibrationShortMirror = false;
-  try {
-    window.localStorage.removeItem(CALIBRATION_HANDOFF_ACK_STORAGE_KEY);
-  } catch (_) {
-    /* ignore */
-  }
   window.waywordStorage.removeInactivityEaseRun(INACTIVITY_EASE_RUN_KEY);
 
   state.progressionLevel = 1;
@@ -2003,7 +1685,7 @@ function resetCalibrationStateToFreshStart() {
 
   const fb = $("feedbackBox");
   if (fb) {
-    fb.dataset.calibrationRenderKey = "";
+    fb.dataset.postRunRenderKey = "";
     fb.className = "result-card empty";
     fb.innerHTML = "";
   }
@@ -2011,8 +1693,7 @@ function resetCalibrationStateToFreshStart() {
 
   state.submitted = false;
   state.completedUiActive = false;
-  resetLatentPromptNudge();
-  resetEditorPermissionPhrase();
+  resetEntryDelayHint();
 
   recomputeProgressionLevel({});
   applyProgressionToState();
@@ -2033,15 +1714,14 @@ function resetCalibrationStateToFreshStart() {
   }
 
   renderHistory();
-  renderCalibration();
+  renderFirstSessionEntry();
   renderProfileSummaryStrip();
   renderProfile();
   queueViewportSync();
 }
 
-/** WAYWORD_DEV_CALIBRATION_RESET — local/testing convenience wrapper. */
-function waywordDevResetCalibrationForTesting() {
-  resetCalibrationStateToFreshStart();
+function waywordDevResetFirstSessionEntryForTesting() {
+  resetFirstSessionEntryStateToFreshStart();
 }
 
 function persist() {
@@ -2180,9 +1860,7 @@ function countPunctuation(text) {
  * @returns {string} prompt text (also sets state.promptId, promptFamily, lastPromptKey, history).
  */
 function buildPromptRuntimeInput() {
-  const promptSystemMode = resolvePromptSystemModeForRuntime();
-  const v1Catalog =
-    promptSystemMode === PROMPT_SYSTEM_MODES.V1 ? getV1EntryPromptCatalogForRuntime() : null;
+  const v1Catalog = getV1EntryPromptCatalogForRuntime();
 
   return {
     state,
@@ -2194,9 +1872,7 @@ function buildPromptRuntimeInput() {
     promptNearDuplicateWindow: PROMPT_NEAR_DUPLICATE_WINDOW,
     promptRecentFamilyWindow: PROMPT_RECENT_FAMILY_WINDOW,
     promptRerollLimit: PROMPT_REROLL_LIMIT,
-    calibrationThreshold: CALIBRATION_THRESHOLD,
     getCompletedRunCount: completedRuns,
-    pickCalibrationPrompt: pickCalibrationPromptForRuntime,
     biasTagsForPromptFamily: v1Catalog
       ? function (familyKey) {
           const key = familyKey === V1_ENTRY_FAMILY ? "entry" : familyKey;
@@ -2255,10 +1931,7 @@ function canRerollPrompt() {
 
 function rerollPrompt() {
   const rerolled = getPromptRuntime().rerollPrompt(buildPromptRuntimeInput());
-  if (rerolled) {
-    resetEditorPermissionPhrase();
-    notifyLatentPromptNudgePromptReroll();
-  }
+  if (rerolled) resetEntryDelayHint();
   return rerolled;
 }
 
@@ -2274,8 +1947,14 @@ function onPromptRerollControlClick(e) {
 }
 
 function onPromptClusterControlPointerDownFallback(e) {
+  armPromptControlFocusExitGuard();
   e.preventDefault();
   e.stopPropagation();
+}
+
+function armPromptControlFocusExitGuard() {
+  if (!isMobileViewport()) return;
+  suppressFocusExitUntil = performance.now() + 420;
 }
 
 function normalizeCanonicalLayoutStateBeforeFoldToggle() {
@@ -2336,6 +2015,7 @@ function bindPromptClusterControlsOnce() {
   ) {
     window.waywordPromptInteractions.bindPromptClusterControls({
       $,
+      armPromptControlFocusExitGuard,
       onPromptRerollControlClick,
       onFieldExpandedControlClick
     });
@@ -2358,56 +2038,160 @@ function bindPromptClusterControlsOnce() {
   }
 }
 
-/** Keep reroll DOM minimal: icon in button, count via `data-rerolls` pseudo-element. */
-function normalizePromptRerollButtonIfNeeded() {
-  const btn = $("promptRerollBtn");
-  if (!btn) return;
-  const targetLeftGroup =
-    btn.closest(".prompt-meta-left") ||
-    document.querySelector("#promptCard .prompt-meta-left");
-  if (targetLeftGroup) {
-    const slot = $("promptRerollSlot");
-    if (slot && btn.parentElement === slot) {
-      targetLeftGroup.appendChild(btn);
-      slot.remove();
-    }
-    if (btn.parentElement !== targetLeftGroup) {
-      targetLeftGroup.appendChild(btn);
-    }
-  }
+function buildFieldExpandedToggleButton() {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = "fieldExpandedToggle";
+  btn.className = "field-expand-toggle";
+  btn.setAttribute("aria-label", "Show surrounding context");
+  btn.setAttribute("aria-pressed", "false");
+  btn.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="2.75" y="2.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"></rect>
+      <rect x="10.75" y="2.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"></rect>
+      <rect x="2.75" y="10.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"></rect>
+      <rect x="10.75" y="10.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"></rect>
+    </svg>`;
+  return btn;
+}
 
-  if (!btn.querySelector(".prompt-reroll-icon")) {
-    btn.innerHTML = `<span class="prompt-reroll-icon" aria-hidden="true">✎</span>`;
+function detachNodeIfAttached(node) {
+  if (!node || !node.parentElement) return;
+  node.parentElement.removeChild(node);
+}
+
+let controlSpineMutationInProgress = false;
+let controlSpineOwnershipObserverInstalled = false;
+let controlSpineOwnershipObserver = null;
+
+const CONTROL_SPINE_IDS = new Set(["promptRerollBtn", "fieldExpandedToggle"]);
+
+function warnControlSpineViolation(controlId, contextLabel, node) {
+  const parentId = node?.parentElement?.id || node?.parentElement?.className || "unknown-parent";
+  const stack = new Error(`[wayword-control-spine-violation:${contextLabel}] ${controlId} found under ${parentId}`).stack;
+  console.warn(stack);
+}
+
+function enforceSingleControlNodeById(id, preferredParent) {
+  const all = Array.from(document.querySelectorAll(`#${id}`));
+  if (!all.length) return null;
+  const preferred =
+    (preferredParent && all.find((node) => node.parentElement === preferredParent)) || all[0];
+  for (const node of all) {
+    if (node === preferred) continue;
+    detachNodeIfAttached(node);
   }
-  if (!btn.dataset.rerolls) btn.dataset.rerolls = String(PROMPT_REROLL_LIMIT);
+  return preferred;
+}
+
+function getControlNodesById(id) {
+  return Array.from(document.querySelectorAll(`#${id}`));
+}
+
+function mountControlIntoRightSpine(spine, control, beforeNode = null) {
+  if (!spine || !control) return;
+  controlSpineMutationInProgress = true;
+  try {
+    if (control.parentElement !== spine) {
+      if (control.parentElement) {
+        warnControlSpineViolation(control.id || "unknown-control", "mount", control);
+      }
+      detachNodeIfAttached(control);
+      if (beforeNode && beforeNode.parentElement === spine) {
+        spine.insertBefore(control, beforeNode);
+      } else {
+        spine.appendChild(control);
+      }
+    } else if (beforeNode && control.nextElementSibling !== beforeNode) {
+      spine.insertBefore(control, beforeNode);
+    }
+  } finally {
+    controlSpineMutationInProgress = false;
+  }
+}
+
+/** Keep controls in the fixed right header spine; prompt card must not host control nodes. */
+function normalizePromptRerollButtonIfNeeded() {
+  const spine = $("rightControlSpine");
+  if (!spine) return;
+  let rerollBtn = enforceSingleControlNodeById("promptRerollBtn", spine) || spine.querySelector("#promptRerollBtn");
+  if (!rerollBtn) {
+    rerollBtn = document.createElement("button");
+    rerollBtn.type = "button";
+    rerollBtn.id = "promptRerollBtn";
+    rerollBtn.className = "prompt-reroll-btn";
+    rerollBtn.setAttribute("aria-label", "Get a different prompt");
+    rerollBtn.dataset.rerolls = String(PROMPT_REROLL_LIMIT);
+  }
+  if (!rerollBtn.querySelector(".prompt-reroll-icon")) {
+    rerollBtn.innerHTML = `<span class="prompt-reroll-icon" aria-hidden="true">✎</span>`;
+  }
+  if (!rerollBtn.dataset.rerolls) rerollBtn.dataset.rerolls = String(PROMPT_REROLL_LIMIT);
+
+  let fieldToggle = enforceSingleControlNodeById("fieldExpandedToggle", spine) || spine.querySelector("#fieldExpandedToggle");
+  if (!fieldToggle) fieldToggle = buildFieldExpandedToggleButton();
+
+  mountControlIntoRightSpine(spine, fieldToggle, spine.firstChild || null);
+  mountControlIntoRightSpine(spine, rerollBtn, fieldToggle.nextSibling || null);
 }
 
 function ensurePromptRerollButton() {
-  const promptCard = $("promptCard");
-  let btn = $("promptRerollBtn");
+  if (!$("rightControlSpine")) return;
+  normalizePromptRerollButtonIfNeeded();
+  bindPromptClusterControlsOnce();
+}
 
-  if (!promptCard) return;
+function enforceRightControlSpineOwnership(contextLabel = "unspecified") {
+  const spine = $("rightControlSpine");
+  if (!spine) return;
+  const rerolls = getControlNodesById("promptRerollBtn");
+  const fields = getControlNodesById("fieldExpandedToggle");
 
-  promptCard.classList.add("has-reroll");
-
-  if (!btn) {
-    btn = document.createElement("button");
-    btn.type = "button";
-    btn.id = "promptRerollBtn";
-    btn.className = "prompt-reroll-btn";
-    btn.setAttribute("aria-label", "Get a different prompt");
-    btn.dataset.rerolls = String(PROMPT_REROLL_LIMIT);
-    btn.innerHTML = `<span class="prompt-reroll-icon" aria-hidden="true">✎</span>`;
-    const leftGroup = promptCard.querySelector(".prompt-meta-left");
-    if (leftGroup) {
-      leftGroup.appendChild(btn);
-    } else {
-      promptCard.appendChild(btn);
+  for (const reroll of rerolls) {
+    if (reroll.parentElement !== spine) {
+      warnControlSpineViolation("promptRerollBtn", contextLabel, reroll);
+    }
+  }
+  for (const field of fields) {
+    if (field.parentElement !== spine) {
+      warnControlSpineViolation("fieldExpandedToggle", contextLabel, field);
     }
   }
 
   normalizePromptRerollButtonIfNeeded();
   bindPromptClusterControlsOnce();
+}
+
+function installRightControlSpineOwnershipObserver() {
+  if (controlSpineOwnershipObserverInstalled) return;
+  if (typeof MutationObserver === "undefined") return;
+  if (!document.body) return;
+  controlSpineOwnershipObserverInstalled = true;
+  controlSpineOwnershipObserver = new MutationObserver(() => {
+    if (controlSpineMutationInProgress) return;
+    const spine = $("rightControlSpine");
+    if (!spine) return;
+    const rerolls = getControlNodesById("promptRerollBtn");
+    const fields = getControlNodesById("fieldExpandedToggle");
+    const rerollViolation = rerolls.length !== 1 || rerolls.some((node) => node.parentElement !== spine);
+    const fieldViolation = fields.length !== 1 || fields.some((node) => node.parentElement !== spine);
+    const violation = rerollViolation || fieldViolation;
+    if (!violation) return;
+    enforceRightControlSpineOwnership("observer");
+  });
+  controlSpineOwnershipObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+function startRightControlSpineStabilizer(durationMs = 5000) {
+  const startedAt = now();
+  function tick() {
+    enforceRightControlSpineOwnership("raf-stabilizer");
+    if (now() - startedAt < durationMs) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
 
 /* -----------------------------
@@ -3375,54 +3159,54 @@ function showEditorOverlay(message = "Submitted", persist = false) {
   }
 }
 
-let bottomChromeCalibrationSettleTimer = null;
+let bottomChromeFirstSessionEntrySettleTimer = null;
 
-function clearBottomChromeCalibrationSettleTimer() {
-  if (bottomChromeCalibrationSettleTimer != null) {
-    window.clearTimeout(bottomChromeCalibrationSettleTimer);
-    bottomChromeCalibrationSettleTimer = null;
+function clearBottomChromeFirstSessionEntrySettleTimer() {
+  if (bottomChromeFirstSessionEntrySettleTimer != null) {
+    window.clearTimeout(bottomChromeFirstSessionEntrySettleTimer);
+    bottomChromeFirstSessionEntrySettleTimer = null;
   }
 }
 
-/** Fade + slight drift for gear + progress when calibration overlay is up (not display:none). */
-function syncEditorBottomChromeForCalibrationOverlay() {
+/** Fade + slight drift for gear + progress when firstSessionEntry overlay is up (not display:none). */
+function syncEditorBottomChromeForFirstSessionEntryOverlay() {
   const overlay = $("editorOverlay");
   const gear = $("optionsTrigger");
   const progress = document.querySelector(".editor-bottom-chrome-center .editor-progress");
   if (!overlay || !gear || !progress) return;
 
   const hide =
-    !overlay.classList.contains("hidden") && overlay.classList.contains("editor-overlay--calibration");
+    !overlay.classList.contains("hidden") && overlay.classList.contains("editor-overlay--firstSessionEntry");
 
   if (hide) {
-    clearBottomChromeCalibrationSettleTimer();
+    clearBottomChromeFirstSessionEntrySettleTimer();
     gear.classList.remove("ui-hidden--settled");
     progress.classList.remove("ui-hidden--settled");
     gear.style.removeProperty("display");
     progress.style.removeProperty("display");
     gear.classList.add("ui-hidden");
     progress.classList.add("ui-hidden");
-    bottomChromeCalibrationSettleTimer = window.setTimeout(() => {
-      bottomChromeCalibrationSettleTimer = null;
+    bottomChromeFirstSessionEntrySettleTimer = window.setTimeout(() => {
+      bottomChromeFirstSessionEntrySettleTimer = null;
       if (
         !overlay.classList.contains("hidden") &&
-        overlay.classList.contains("editor-overlay--calibration")
+        overlay.classList.contains("editor-overlay--firstSessionEntry")
       ) {
         gear.classList.add("ui-hidden--settled");
         progress.classList.add("ui-hidden--settled");
       }
-    }, BOTTOM_CHROME_CALIBRATION_HIDE_MS);
+    }, BOTTOM_CHROME_FIRST_SESSION_ENTRY_HIDE_MS);
     return;
   }
 
-  clearBottomChromeCalibrationSettleTimer();
+  clearBottomChromeFirstSessionEntrySettleTimer();
   gear.classList.remove("ui-hidden--settled", "ui-hidden");
   progress.classList.remove("ui-hidden--settled", "ui-hidden");
   gear.style.removeProperty("display");
   progress.style.removeProperty("display");
 }
 
-/** Post-submit overlay: calibration (runs 1–5) inside editor shell, or “Begin again”. */
+/** Post-submit overlay sync. */
 function syncEditorPostRunOverlay() {
   try {
     const overlay = $("editorOverlay");
@@ -3433,52 +3217,29 @@ function syncEditorPostRunOverlay() {
 
     if (!state.active || !state.submitted || !state.completedUiActive) {
       overlay.classList.add("hidden");
-      overlay.classList.remove("editor-overlay--calibration");
+      overlay.classList.remove("editor-overlay--firstSessionEntry");
       card.className = "editor-overlay-card";
       card.textContent = "";
       card.innerHTML = "";
-      card.removeAttribute("data-calibration-overlay-key");
+      card.removeAttribute("data-firstSessionEntry-overlay-key");
       overlay.style.removeProperty("clip-path");
       overlay.style.removeProperty("-webkit-clip-path");
-      scheduleCalibrationOverlayGeometrySync();
+      scheduleFirstSessionEntryOverlayGeometrySync();
       return;
     }
 
-    /* Threshold handoff owns the 5th saved run; skip legacy in-editor calibration card when both are active. */
-    if (state.calibrationPostRun && !state.calibrationHandoffVisible) {
-      const { step, observation, insufficient } = state.calibrationPostRun;
-      const ins = insufficient ? "1" : "0";
-      const key = `${step}|${ins}|${observation}`;
-      if (card.dataset.calibrationOverlayKey === key) {
-        overlay.classList.remove("hidden");
-        scheduleCalibrationOverlayGeometrySync();
-        return;
-      }
-      card.dataset.calibrationOverlayKey = key;
-      overlay.classList.add("editor-overlay--calibration");
-      overlay.classList.remove("hidden");
-      card.className = "editor-overlay-card editor-overlay-card--calibration";
-      card.innerHTML = window.waywordPostRunRenderer.buildCalibrationPostRunOverlayCardHtml({
-        step,
-        observation,
-        insufficient
-      });
-      scheduleCalibrationOverlayGeometrySync();
-      return;
-    }
-
-    card.removeAttribute("data-calibration-overlay-key");
-    overlay.classList.remove("editor-overlay--calibration");
+    card.removeAttribute("data-firstSessionEntry-overlay-key");
+    overlay.classList.remove("editor-overlay--firstSessionEntry");
     card.className = "editor-overlay-card";
     card.innerHTML = "";
     card.textContent = "";
     overlay.classList.add("hidden");
     overlay.style.removeProperty("clip-path");
     overlay.style.removeProperty("-webkit-clip-path");
-    scheduleCalibrationOverlayGeometrySync();
+    scheduleFirstSessionEntryOverlayGeometrySync();
   } finally {
     renderProfileSummaryStrip();
-    syncEditorBottomChromeForCalibrationOverlay();
+    syncEditorBottomChromeForFirstSessionEntryOverlay();
   }
 }
 
@@ -3750,42 +3511,18 @@ function renderMeta() {
   ) {
     window.waywordWritingPromptCardPresentation.renderPromptCard({
       $,
-      state,
-      getActivePromptNudgeLineForRender,
-      isPromptNudgeVisible,
-      onPromptNudgeVisible: notifyEditorPermissionNudgeVisible
+      state
     });
   } else {
     const promptCard = $("promptCard");
     const promptText = $("promptText");
-    const promptFamily = $("promptFamilyLabel");
 
     if (promptCard) promptCard.classList.toggle("hidden", !state.active);
     if (promptText) promptText.textContent = state.prompt || "";
-    if (promptFamily) promptFamily.textContent = state.promptFamily || "Prompt";
-
-    const promptNudgeShell = $("promptNudgeShell");
-    const promptNudge = $("promptNudge");
-    const promptNudgeText = $("promptNudgeText") || promptNudge;
-    const promptMain = promptCard?.querySelector(".prompt-main") ?? null;
-    const nudgeRowVisible = Boolean(state.active && !state.submitted && isPromptNudgeVisible());
-    if (promptNudgeText) {
-      const nudge = nudgeRowVisible ? getActivePromptNudgeLineForRender() : "";
-      promptNudgeText.textContent = nudge;
-    }
-    if (promptNudgeShell) {
-      promptNudgeShell.classList.toggle("prompt-nudge-shell--hidden", !nudgeRowVisible);
-      promptNudgeShell.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
-    }
-    if (promptNudge) {
-      promptNudge.setAttribute("aria-hidden", nudgeRowVisible ? "false" : "true");
-    }
-    if (nudgeRowVisible) notifyEditorPermissionNudgeVisible();
-    if (promptMain) {
-      promptMain.classList.toggle("prompt-main--with-nudge", nudgeRowVisible);
-      promptMain.classList.toggle("prompt-main--latent-nudge", Boolean(state.active && !state.submitted));
-    }
   }
+
+  ensurePromptRerollButton();
+  bindPromptClusterControlsOnce();
 
   if (
     window.waywordWritingBannedPanelPresentation &&
@@ -3871,11 +3608,12 @@ function renderMeta() {
     }
   }
 
-  syncCalibrationWritingModeClass();
+  syncFirstSessionEntryWritingModeClass();
+  enforceRightControlSpineOwnership("renderMeta:final");
 }
 
-/** Calibration progress lives in the in-editor overlay only; this keeps header chrome in sync. */
-function renderCalibration() {
+/** FirstSessionEntry progress lives in the in-editor overlay only; this keeps header chrome in sync. */
+function renderFirstSessionEntry() {
   const runs = completedRuns();
   const profileBtn = $("profileBtn");
   if (profileBtn) {
@@ -3884,7 +3622,7 @@ function renderCalibration() {
 
   const styleTab = $("styleTab");
   if (styleTab) {
-    styleTab.classList.toggle("hidden", runs < CALIBRATION_THRESHOLD);
+    styleTab.classList.toggle("hidden", runs < FIRST_SESSION_ENTRY_THRESHOLD);
   }
 }
 
@@ -3924,11 +3662,10 @@ function renderWritingState(options = {}) {
   window.waywordPostRunRenderer.renderReflectionLine(getPostRunReflectionLineText(mirrorPostRunParts));
   window.waywordPostRunRenderer.resetPostRunFeedbackBox();
   renderMirrorReflectionPanel(mirrorPostRunParts);
-  syncCalibrationHandoffSurface();
   if (!deferPostRunOverlaySync) {
     syncEditorPostRunOverlay();
   }
-  renderCalibration();
+  renderFirstSessionEntry();
   renderProfileSummaryStrip();
 
   const shell = document.querySelector(".editor-shell");
@@ -3946,7 +3683,7 @@ function renderWritingState(options = {}) {
   syncSubmittedAnnotatedEditorSurfaces();
   scheduleEditorDotOverlaySync();
   requestAnimationFrame(() => scheduleEditorDotOverlaySync());
-  syncCalibrationWritingModeClass();
+  syncFirstSessionEntryWritingModeClass();
 }
 
 function setSemanticLegendPillState(pillEl, count) {
@@ -4008,7 +3745,7 @@ function getRecentEntries() {
  * 4+ letter tokens in MIRROR_STOPWORDS (src/features/mirror/constants/stopwords.ts).
  * Repetition scoring uses \\b\\w{4,}\\b, so shorter stopwords never enter the repetition bucket.
  */
-const CALIBRATION_REPETITION_LOW_SIGNAL_WORDS = new Set([
+const FIRST_SESSION_ENTRY_REPETITION_LOW_SIGNAL_WORDS = new Set([
   "about",
   "above",
   "across",
@@ -4111,7 +3848,7 @@ function analyzeDraftStats(text) {
   const repetitionWords = raw.toLowerCase().match(/\b\w{4,}\b/g) || [];
   for (const word of repetitionWords) {
     repetitions[word] = (repetitions[word] || 0) + 1;
-    if (!CALIBRATION_REPETITION_LOW_SIGNAL_WORDS.has(word)) {
+    if (!FIRST_SESSION_ENTRY_REPETITION_LOW_SIGNAL_WORDS.has(word)) {
       repetitionsContent[word] = (repetitionsContent[word] || 0) + 1;
     }
   }
@@ -4169,42 +3906,42 @@ function buildBaseline(entries) {
   };
 }
 
-const CALIBRATION_OBS_REPETITION = [
+const FIRST_SESSION_ENTRY_OBS_REPETITION = [
   "Certain words recur.",
   "One word returns across short spans.",
   "The same word surfaces again."
 ];
-const CALIBRATION_OBS_OPENINGS = [
+const FIRST_SESSION_ENTRY_OBS_OPENINGS = [
   "Sentence openings repeat.",
   "Opening phrases echo.",
   "The same line start recurs."
 ];
-const CALIBRATION_OBS_FRAGMENTATION = [
+const FIRST_SESSION_ENTRY_OBS_FRAGMENTATION = [
   "Lines run short.",
   "Thought fragments across many short units."
 ];
-const CALIBRATION_OBS_LONG = [
+const FIRST_SESSION_ENTRY_OBS_LONG = [
   "Average sentence length sits above your recent baseline.",
   "Sentences run longer than in your last few saved runs."
 ];
-const CALIBRATION_OBS_FALLBACK = [
+const FIRST_SESSION_ENTRY_OBS_FALLBACK = [
   "A baseline is still forming.",
   "This pass stays close to the prompt.",
   "The signal is still light.",
   "A pattern is not clear yet."
 ];
 
-function pickCalibrationObservationPhrase(phrases, seed) {
+function pickFirstSessionEntryObservationPhrase(phrases, seed) {
   if (!phrases.length) return "";
   const i = Math.abs(Math.floor(seed)) % phrases.length;
   return phrases[i];
 }
 
 /**
- * Calibration observation: one plain line, dominant signal only (repetition → openings → fragmentation → long sentences → fallback).
- * @param {boolean} [ensureBaselineCardNonEmpty] When true (runs 1–threshold on the baseline overlay), never return an empty string; uses CALIBRATION_OBS_FALLBACK deterministically. Post-threshold runs pass false so lastRunFeedback stays unchanged when no line matches.
+ * FirstSessionEntry observation: one plain line, dominant signal only (repetition → openings → fragmentation → long sentences → fallback).
+ * @param {boolean} [ensureBaselineCardNonEmpty] When true (runs 1–threshold on the baseline overlay), never return an empty string; uses FIRST_SESSION_ENTRY_OBS_FALLBACK deterministically. Post-threshold runs pass false so lastRunFeedback stays unchanged when no line matches.
  */
-function selectCalibrationObservation(text, priorEntries, ensureBaselineCardNonEmpty) {
+function selectFirstSessionEntryObservation(text, priorEntries, ensureBaselineCardNonEmpty) {
   const raw = String(text || "").trim();
   const t = analyzeDraftStats(raw);
   const baseline = buildBaseline(priorEntries);
@@ -4232,8 +3969,8 @@ function selectCalibrationObservation(text, priorEntries, ensureBaselineCardNonE
     if (rc === 1 && mr >= 5) return "One word returns across short spans.";
     if (rc >= 3 || mr >= 6) return "Certain words recur.";
     if (rc === 1) return "The same word surfaces again.";
-    if (rc === 2) return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
-    return pickCalibrationObservationPhrase(CALIBRATION_OBS_REPETITION, seed);
+    if (rc === 2) return pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_REPETITION, seed);
+    return pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_REPETITION, seed);
   }
 
   const openingsApplies =
@@ -4242,7 +3979,7 @@ function selectCalibrationObservation(text, priorEntries, ensureBaselineCardNonE
     openingIncidents >= 1;
 
   if (openingsApplies) {
-    return pickCalibrationObservationPhrase(CALIBRATION_OBS_OPENINGS, seed);
+    return pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_OPENINGS, seed);
   }
 
   const baselineOk = baseline && baseline.sampleSize >= 2;
@@ -4254,7 +3991,7 @@ function selectCalibrationObservation(text, priorEntries, ensureBaselineCardNonE
       t.fragmentCount > baseline.fragmentCount * 1.22);
 
   if (fragmentationApplies) {
-    return pickCalibrationObservationPhrase(CALIBRATION_OBS_FRAGMENTATION, seed);
+    return pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_FRAGMENTATION, seed);
   }
 
   const longApplies =
@@ -4266,11 +4003,11 @@ function selectCalibrationObservation(text, priorEntries, ensureBaselineCardNonE
   if (longApplies) {
     return baselineOk && t.avgSentenceLength > baseline.avgSentenceLength * 1.28
       ? "Average sentence length sits above your recent baseline."
-      : pickCalibrationObservationPhrase(CALIBRATION_OBS_LONG, seed);
+      : pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_LONG, seed);
   }
 
   if (ensureBaselineCardNonEmpty) {
-    return pickCalibrationObservationPhrase(CALIBRATION_OBS_FALLBACK, seed);
+    return pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_FALLBACK, seed);
   }
   return "";
 }
@@ -4361,9 +4098,7 @@ function postRunMirrorPanelInputs() {
     submittedRunText: getEditorText(),
     promptFamily: state.promptFamily,
     postSubmitPhase: phase,
-    calibrationHandoffVisible: phaseRenderFlags.calibrationHandoffVisible,
-    calibrationSubmitShortMirror: Boolean(state.lastSubmitCalibrationShortMirror),
-    calibrationBaselinePostSubmit: phaseRenderFlags.calibrationBaselinePostSubmit
+    firstSessionEntrySubmitShortMirror: Boolean(state.lastSubmitFirstSessionEntryShortMirror),
   };
 }
 
@@ -4401,7 +4136,7 @@ function computeAndStoreMirrorPipelineResult(text, run) {
     text,
     run,
     recentKeys,
-    completedRuns() < CALIBRATION_THRESHOLD
+    completedRuns() < FIRST_SESSION_ENTRY_THRESHOLD
   );
   state.lastMirrorPipelineResult = out.result;
   state.lastMirrorLoadFailed = out.loadFailed;
@@ -4424,11 +4159,11 @@ function countMirrorReflectionCards(result) {
 }
 
 /**
- * One-line calibration read for #reflection-line / mobile post-run slot.
+ * One-line firstSessionEntry read for #reflection-line / mobile post-run slot.
  * Suppressed when the Mirror block would be visible (including empty-state copy).
  */
 function getPostRunReflectionLineText(precomputedParts) {
-  if (!state.submitted || state.calibrationPostRun) {
+  if (!state.submitted) {
     return "";
   }
   const parts =
@@ -4735,7 +4470,7 @@ function closeClearSavedRunsConfirmModal() {
 
 function clearAllSavedRunsFromStorageAndState() {
   if (completedRuns() === 0) return;
-  resetCalibrationStateToFreshStart();
+  resetFirstSessionEntryStateToFreshStart();
   const profileView = $("profileView");
   const patternsNowAvailable = hasProfileSignal();
   const patternsVisible = Boolean(profileView && !profileView.classList.contains("hidden"));
@@ -5132,7 +4867,7 @@ function renderCurrentSeasonPanel() {
   const wrap = $("currentSeasonPanel");
   if (!root || !wrap) return;
   const seasonLabel = currentMeteorologicalSeasonLabel(new Date());
-  const fixtureVm = WAYWORD_DEV_CALIBRATION_RESET_ENABLED
+  const fixtureVm = WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED
     ? buildDevSeasonFixtureViewModel(devSeasonFixtureName)
     : null;
   const savedRuns = readSavedRunsChronological();
@@ -5234,19 +4969,11 @@ function buildRepeatedWordChallengeSuggestion(topWords) {
 }
 
 function shouldHideRunsWordsStrip() {
-  /* Hide Runs/Words strip for the whole calibration window; nudge + overlay + handoff carry onboarding. */
-  if (completedRuns() < CALIBRATION_THRESHOLD) return true;
+  /* Hide Runs/Words strip for the whole first-session entry window. */
+  if (completedRuns() < FIRST_SESSION_ENTRY_THRESHOLD) return true;
   /* Main writing column: strip is desktop-only (matches @media min-width 981px layout). */
   if (!isDesktopPatternsViewport()) return true;
   if (document.body.classList.contains("focus-mode")) return true;
-  if (
-    state.calibrationPostRun &&
-    state.active &&
-    state.submitted &&
-    state.completedUiActive
-  ) {
-    return true;
-  }
   return false;
 }
 
@@ -5571,11 +5298,7 @@ function buildRunControllerRegistrationInput() {
     getRecentEntries,
     makeRunId,
     persist,
-    CALIBRATION_THRESHOLD,
-    CALIBRATION_INSUFFICIENT_COPY,
     INACTIVITY_EASE_RUN_KEY,
-    selectCalibrationObservation,
-    calibrationSubmissionHasMinimumSignal,
     clearExerciseIfCompleted,
     applyWriteDocSemanticFlagsFromAnalysisCore,
     updateEnterButtonVisibility,
@@ -5593,9 +5316,8 @@ function buildRunControllerRegistrationInput() {
     renderWritingState,
     renderMeta,
     renderSidebar,
-    resetLatentPromptNudge,
-    beginLatentPromptNudgeWatch,
-    resetEditorPermissionPhrase,
+    resetEntryDelayHint,
+    beginEntryDelayHintWatch,
     queueViewportSync,
     setExerciseWords,
     generatePrompt,
@@ -5605,13 +5327,13 @@ function buildRunControllerRegistrationInput() {
     showProfile,
     scheduleDeferredEditorFocus,
     scheduleEditorDotOverlaySync,
-    syncEditorBottomChromeForCalibrationOverlay,
+    syncEditorBottomChromeForFirstSessionEntryOverlay,
     focusEditorToStart,
     updateTimeFill,
     waywordPostRunRenderer: window.waywordPostRunRenderer,
     requestMirrorReflectionAttentionSettle,
-    syncCalibrationHandoffIntentAfterDecision,
-    readCalibrationHandoffAcknowledged
+    startTelemetryRun,
+    submitTelemetryRun
   };
 }
 
@@ -5633,6 +5355,10 @@ function registerRunControllerDeps() {
 }
 
 registerRunControllerDeps();
+
+window.addEventListener("pagehide", () => {
+  getBehavioralTelemetry()?.endSession({ now: Date.now() });
+});
 
 function showProfile(show = true) {
   if (
@@ -5738,9 +5464,9 @@ function bindEditorInputEvents() {
     getEditorText,
     submitWriting,
     renderMeta,
-    onEditorFocusForLatentNudge: notifyLatentPromptNudgeEditorFocus,
-    onEditorInputForLatentNudge: notifyLatentPromptNudgeEditorInput,
-    onEditorPermissionUserEdit: notifyEditorPermissionUserEdit
+    onEditorFocusForEntryDelayHint: notifyEntryDelayHintEditorFocus,
+    onEditorInputForEntryDelayHint: notifyEntryDelayHintEditorInput,
+    onEditorInputForTelemetry: noteTelemetryEditorInput
   });
 }
 
@@ -5783,46 +5509,7 @@ getEditorShellInteractions().bindEditorShellInteractions({
   focusEditorToEnd
 });
 
-function bindCalibrationHandoffControls() {
-  const viewPatternsBtn = $("calibrationHandoffViewPatternsBtn");
-  const continueBtn = $("calibrationHandoffContinueBtn");
-  if (viewPatternsBtn && viewPatternsBtn.dataset.calibrationHandoffBound !== "1") {
-    viewPatternsBtn.dataset.calibrationHandoffBound = "1";
-    viewPatternsBtn.addEventListener("click", () => {
-      ackCalibrationHandoffAcknowledged();
-      state.calibrationHandoffVisible = false;
-      resetLatentPromptNudge();
-      resetEditorPermissionPhrase();
-      if (
-        window.waywordPanelCoordination &&
-        typeof window.waywordPanelCoordination.armMobilePatternsToggleGuard === "function"
-      ) {
-        window.waywordPanelCoordination.armMobilePatternsToggleGuard({
-          isMobileViewport,
-          setSuppressFocusExitUntil(value) {
-            suppressFocusExitUntil = value;
-          },
-          now: () => performance.now(),
-          durationMs: 320
-        });
-      }
-      showProfile(true);
-      syncCalibrationHandoffSurface();
-      renderWritingState({ deferPostRunOverlaySync: false });
-      renderMeta();
-      queueViewportSync();
-    });
-  }
-  if (continueBtn && continueBtn.dataset.calibrationHandoffBound !== "1") {
-    continueBtn.dataset.calibrationHandoffBound = "1";
-    continueBtn.addEventListener("click", () => {
-      ackCalibrationHandoffAcknowledged();
-      state.calibrationHandoffVisible = false;
-      syncCalibrationHandoffSurface();
-      startWriting({ focusCaret: "start" });
-    });
-  }
-}
+function bindFirstSessionEntryHandoffControls() {}
 
 function bindPrimaryEventControls() {
   const runtime = getAppEventsRuntime();
@@ -5868,7 +5555,7 @@ function bindPrimaryEventControls() {
 
 bindPrimaryEventControls();
 syncWaywordResearchFormLinks();
-bindCalibrationHandoffControls();
+bindFirstSessionEntryHandoffControls();
 optionsUi.bindOptionsSurfaceEventGuards();
 optionsUi.bindOptionsOpenCloseControls();
 
@@ -5931,8 +5618,8 @@ function bindPanelControlWiring() {
 }
 
 function registerDevOnlyHelpers() {
-  if (!WAYWORD_DEV_CALIBRATION_RESET_ENABLED) return;
-  window.waywordDevResetCalibration = waywordDevResetCalibrationForTesting;
+  if (!WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED) return;
+  window.waywordDevResetFirstSessionEntry = waywordDevResetFirstSessionEntryForTesting;
   window.waywordDevSeasonFixtures = {
     availableFixtures: Object.freeze(["sparse", "moderate", "heavy", "clustered", "steady"]),
     useFixture(name) {
@@ -5956,12 +5643,12 @@ function registerDevOnlyHelpers() {
 }
 
 function runDevOnlyBootActions() {
-  if (!WAYWORD_DEV_CALIBRATION_RESET_ENABLED) return;
+  if (!WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED) return;
   try {
     const params = new URLSearchParams(location.search);
-    if (params.get("resetCalibration") === "1") {
-      waywordDevResetCalibrationForTesting();
-      params.delete("resetCalibration");
+    if (params.get("resetFirstSessionEntry") === "1") {
+      waywordDevResetFirstSessionEntryForTesting();
+      params.delete("resetFirstSessionEntry");
       const q = params.toString();
       history.replaceState(null, "", location.pathname + (q ? `?${q}` : "") + location.hash);
     }
@@ -5997,10 +5684,10 @@ function bindBootObservers() {
     ResizeObserver: typeof ResizeObserver === "undefined" ? undefined : ResizeObserver,
     queueViewportSync
   });
-  runtime.bindEditorCalibrationOverlayResizeObserver({
+  runtime.bindEditorFirstSessionEntryOverlayResizeObserver({
     $,
     ResizeObserver: typeof ResizeObserver === "undefined" ? undefined : ResizeObserver,
-    syncEditorCalibrationOverlayClip
+    syncEditorFirstSessionEntryOverlayClip
   });
 }
 
@@ -6023,7 +5710,7 @@ function runInitialBootRender() {
     renderHistory,
     renderProfile,
     syncPatternsLayoutMode: window.waywordViewController.syncPatternsLayoutMode,
-    renderCalibration,
+    renderFirstSessionEntry,
     renderProfileSummaryStrip,
     updateEnterButtonVisibility
   });
@@ -6031,6 +5718,9 @@ function runInitialBootRender() {
 
 bindBootObservers();
 runInitialBootRender();
+installRightControlSpineOwnershipObserver();
+enforceRightControlSpineOwnership("boot:post-initial-render");
+startRightControlSpineStabilizer(8000);
 
 try {
   if (new URLSearchParams(location.search).get("writeDocMapping") === "1") {

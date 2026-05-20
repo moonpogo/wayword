@@ -11,11 +11,7 @@
       getRecentEntries: input.getRecentEntries,
       makeRunId: input.makeRunId,
       persist: input.persist,
-      CALIBRATION_THRESHOLD: input.CALIBRATION_THRESHOLD,
-      CALIBRATION_INSUFFICIENT_COPY: input.CALIBRATION_INSUFFICIENT_COPY,
       INACTIVITY_EASE_RUN_KEY: input.INACTIVITY_EASE_RUN_KEY,
-      selectCalibrationObservation: input.selectCalibrationObservation,
-      calibrationSubmissionHasMinimumSignal: input.calibrationSubmissionHasMinimumSignal,
       clearExerciseIfCompleted: input.clearExerciseIfCompleted,
       applyWriteDocSemanticFlagsFromAnalysisCore: input.applyWriteDocSemanticFlagsFromAnalysisCore,
       updateEnterButtonVisibility: input.updateEnterButtonVisibility,
@@ -33,9 +29,8 @@
       renderWritingState: input.renderWritingState,
       renderMeta: input.renderMeta,
       renderSidebar: input.renderSidebar,
-      resetLatentPromptNudge: input.resetLatentPromptNudge,
-      beginLatentPromptNudgeWatch: input.beginLatentPromptNudgeWatch,
-      resetEditorPermissionPhrase: input.resetEditorPermissionPhrase,
+      resetEntryDelayHint: input.resetEntryDelayHint,
+      beginEntryDelayHintWatch: input.beginEntryDelayHintWatch,
       queueViewportSync: input.queueViewportSync,
       setExerciseWords: input.setExerciseWords,
       generatePrompt: input.generatePrompt,
@@ -45,13 +40,13 @@
       showProfile: input.showProfile,
       scheduleDeferredEditorFocus: input.scheduleDeferredEditorFocus,
       scheduleEditorDotOverlaySync: input.scheduleEditorDotOverlaySync,
-      syncEditorBottomChromeForCalibrationOverlay: input.syncEditorBottomChromeForCalibrationOverlay,
+      syncEditorBottomChromeForFirstSessionEntryOverlay: input.syncEditorBottomChromeForFirstSessionEntryOverlay,
       focusEditorToStart: input.focusEditorToStart,
       updateTimeFill: input.updateTimeFill,
       waywordPostRunRenderer: input.waywordPostRunRenderer,
       requestMirrorReflectionAttentionSettle: input.requestMirrorReflectionAttentionSettle,
-      syncCalibrationHandoffIntentAfterDecision: input.syncCalibrationHandoffIntentAfterDecision,
-      readCalibrationHandoffAcknowledged: input.readCalibrationHandoffAcknowledged
+      startTelemetryRun: input.startTelemetryRun,
+      submitTelemetryRun: input.submitTelemetryRun
     };
   }
 

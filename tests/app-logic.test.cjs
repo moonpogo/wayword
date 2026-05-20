@@ -37,7 +37,6 @@ function loadPromptDataContext() {
   return loadBrowserScripts(
     [
       "src/features/prompts/prompt-library.js",
-      "src/features/prompts/calibration-prompts.js",
       "src/features/writing/prompt-selection.js",
     ],
     {
@@ -107,15 +106,24 @@ function loadAppEventsRuntimeContext(overrides = {}) {
   });
 }
 
-function loadLatentNudgeControllerContext(overrides = {}) {
-  return loadBrowserScripts(["src/features/writing/latent-nudge-controller.js"], {
+function loadBehavioralTelemetryRuntimeContext(overrides = {}) {
+  return loadBrowserScripts(["src/app/behavioral-telemetry-runtime.js"], {
     console: silentConsole(),
+    localStorage: createMemoryStorage(),
     ...overrides,
   });
 }
 
-function loadEditorPermissionControllerContext(overrides = {}) {
-  return loadBrowserScripts(["src/features/writing/editor-permission-controller.js"], {
+function loadBehavioralInterpretationRuntimeContext(overrides = {}) {
+  return loadBrowserScripts(["src/app/behavioral-interpretation-runtime.js"], {
+    console: silentConsole(),
+    localStorage: createMemoryStorage(),
+    ...overrides,
+  });
+}
+
+function loadEntryDelayHintControllerContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/writing/entry-delay-hint-controller.js"], {
     console: silentConsole(),
     ...overrides,
   });
@@ -183,7 +191,7 @@ function loadPatternsRendererContext(overrides = {}) {
       mirrorReflectionCardHtml(card) {
         return `<article class="mirror-card"><p>${String(card?.statement || "")}</p></article>`;
       },
-      waywordConfig: { CALIBRATION_THRESHOLD: 5 },
+      waywordConfig: { FIRST_SESSION_ENTRY_THRESHOLD: 5 },
       waywordMirrorController: {
         mirrorPatternsProfileAvailable() {
           return false;
@@ -387,7 +395,6 @@ test("prompt selection falls across families when the forced family is exhausted
 test("extracted prompt data preserves family names, counts, and deterministic selection", () => {
   const context = loadPromptDataContext();
   const promptData = context.waywordPromptLibrary;
-  const calibrationData = context.waywordCalibrationPrompts;
   const promptSelection = context.waywordPromptSelection;
 
   const familyOrder = Array.from(promptData.PROMPT_FAMILIES_ORDER);
@@ -413,19 +420,6 @@ test("extracted prompt data preserves family names, counts, and deterministic se
     ),
     23
   );
-  assert.equal(calibrationData.CALIBRATION_PROMPT_FAMILY, "Calibration");
-  assert.equal(calibrationData.CALIBRATION_PROMPT_RECENT_WINDOW, 5);
-  assert.deepEqual(
-    Array.from(calibrationData.CALIBRATION_PROMPT_ENTRIES, (entry) => entry.id),
-    [
-      "cal_room_after",
-      "cal_small_object",
-      "cal_returning_thought",
-      "cal_visible_room",
-      "cal_almost_missed",
-    ]
-  );
-
   const promptEntryById = new Map();
   for (const family of familyOrder) {
     for (const entry of promptData.promptLibrary[family] || []) {
@@ -452,7 +446,6 @@ test("extracted prompt data preserves family names, counts, and deterministic se
 test("prompt system docs list the runtime prompt families", () => {
   const context = loadPromptDataContext();
   const familyOrder = Array.from(context.waywordPromptLibrary.PROMPT_FAMILIES_ORDER);
-  const calibrationFamily = context.waywordCalibrationPrompts.CALIBRATION_PROMPT_FAMILY;
   const doc = fs.readFileSync("docs/PROMPT_SYSTEM_V1_1.md", "utf8");
   const documentedFamilies = doc
     .split(/\r?\n/)
@@ -460,9 +453,8 @@ test("prompt system docs list the runtime prompt families", () => {
     .filter(Boolean)
     .map((match) => match[1]);
 
-  assert.deepEqual(documentedFamilies, familyOrder.concat([calibrationFamily]));
+  assert.deepEqual(documentedFamilies.slice(0, familyOrder.length), familyOrder);
   assert.match(doc, /src\/features\/prompts\/prompt-library\.js/);
-  assert.match(doc, /src\/features\/prompts\/calibration-prompts\.js/);
 });
 
 test("layered prompts v1 scaffold has required foundation prompt integrity", () => {
@@ -506,48 +498,7 @@ test("layered prompts v1 scaffold has required foundation prompt integrity", () 
   assert.equal(texts.size, 80);
 });
 
-test("prompt system mode defaults to v0 and allows v1 only on local dev contexts", () => {
-  const context = loadPromptSystemModeContext();
-  const helper = context.waywordPromptSystemMode;
-
-  assert.equal(
-    helper.resolvePromptSystemMode({
-      location: { protocol: "https:", hostname: "wayword.me", search: "" },
-      localStorage: createMemoryStorage(),
-    }),
-    "v0"
-  );
-
-  assert.equal(
-    helper.resolvePromptSystemMode({
-      location: { protocol: "https:", hostname: "localhost", search: "?promptSystem=v1" },
-      localStorage: createMemoryStorage(),
-    }),
-    "v1"
-  );
-
-  const storage = createMemoryStorage();
-  storage.setItem("waywordPromptSystem", "v1");
-  assert.equal(
-    helper.resolvePromptSystemMode({
-      location: { protocol: "http:", hostname: "127.0.0.1", search: "" },
-      localStorage: storage,
-    }),
-    "v1"
-  );
-
-  const nonDevStorage = createMemoryStorage();
-  nonDevStorage.setItem("waywordPromptSystem", "v1");
-  assert.equal(
-    helper.resolvePromptSystemMode({
-      location: { protocol: "https:", hostname: "wayword.me", search: "" },
-      localStorage: nonDevStorage,
-    }),
-    "v0"
-  );
-});
-
-test("v1 entry catalog exposes only the 30 entry prompts", () => {
+test("strata weighted catalog entry_support exposes only entry prompts", () => {
   const context = loadBrowserScripts(
     ["src/features/prompts/layered-prompts.js", "src/features/prompts/prompt-system-mode.js"],
     {
@@ -555,7 +506,11 @@ test("v1 entry catalog exposes only the 30 entry prompts", () => {
     }
   );
   const entryPrompts = context.waywordLayeredPrompts.getEntryPromptsV1();
-  const catalog = context.waywordPromptSystemMode.buildV1EntryPromptCatalog(entryPrompts);
+  const catalog = context.waywordPromptSystemMode.buildStrataWeightedPromptCatalog({
+    readinessBand: "entry_support",
+    entryPrompts,
+    torsionPrompts: [],
+  });
 
   assert.equal(Array.isArray(catalog.promptFamiliesOrder), true);
   assert.equal(catalog.promptFamiliesOrder.length, 1);
@@ -837,7 +792,8 @@ test("strata engine routing path remains v1-local and excludes resonance", () =>
   assert.equal(script.includes("waywordStrataEngine"), true);
   assert.equal(script.includes("strata-engine.js"), false);
   assert.equal(html.includes("src/features/prompts/strata-engine.js"), true);
-  assert.equal(script.includes("promptSystemMode === PROMPT_SYSTEM_MODES.V1"), true);
+  assert.equal(script.includes("PROMPT_SYSTEM_MODES"), false);
+  assert.equal(script.includes("resolvePromptSystemModeForRuntime"), false);
   assert.equal(script.includes("PROMPT_LAYERS.TORSION"), true);
   assert.equal(script.includes("PROMPT_LAYERS.RESONANCE"), false);
   assert.equal(script.includes("buildStrataWeightedPromptCatalog"), true);
@@ -867,7 +823,7 @@ test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
     promptRerollsUsed: 0,
     recentPromptIds: [],
     recentFamilyKeys: [],
-    recentCalibrationPromptIds: [],
+    recentFirstSessionEntryPromptIds: [],
   };
 
   const first = context.waywordPromptRuntime.generatePrompt({
@@ -880,12 +836,12 @@ test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
     promptNearDuplicateWindow: 3,
     promptRecentFamilyWindow: 4,
     promptRerollLimit: 2,
-    calibrationThreshold: 0,
+    firstSessionEntryThreshold: 0,
     getCompletedRunCount() {
       return 8;
     },
-    pickCalibrationPrompt() {
-      throw new Error("unexpected calibration path");
+    pickFirstSessionEntryPrompt() {
+      throw new Error("unexpected firstSessionEntry path");
     },
     biasTagsForPromptFamily(family) {
       return [String(family)];
@@ -910,12 +866,12 @@ test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
     promptNearDuplicateWindow: 3,
     promptRecentFamilyWindow: 4,
     promptRerollLimit: 2,
-    calibrationThreshold: 0,
+    firstSessionEntryThreshold: 0,
     getCompletedRunCount() {
       return 8;
     },
-    pickCalibrationPrompt() {
-      throw new Error("unexpected calibration path");
+    pickFirstSessionEntryPrompt() {
+      throw new Error("unexpected firstSessionEntry path");
     },
     biasTagsForPromptFamily(family) {
       return [String(family)];
@@ -1249,32 +1205,18 @@ test("strata readiness calculations do not depend on raw text content", () => {
   assert.equal(strata.calculateStrataReadinessBand(stateA), strata.calculateStrataReadinessBand(stateB));
 });
 
-test("successful submit coordinator persists strata summaries only for v1 local/dev", () => {
-  const v0Context = loadSuccessfulSubmitCoordinatorContext({
+test("successful submit coordinator persists strata summaries without prompt mode gating", () => {
+  const context = loadSuccessfulSubmitCoordinatorContext({
     location: { protocol: "https:", hostname: "wayword.me", search: "" },
     localStorage: createMemoryStorage(),
   });
-  const v0Result = v0Context.waywordSuccessfulSubmitCoordinator.persistStrataSummaryForSuccessfulRun({
+  const result = context.waywordSuccessfulSubmitCoordinator.persistStrataSummaryForSuccessfulRun({
     state: { promptId: "entry-001", promptFamily: "Entry", runStartedAtMs: 1000 },
-    run: { runId: "run-v0", savedAt: 5000 },
+    run: { runId: "run-any", savedAt: 5000, wordCount: 2 },
     currentText: "Alpha beta.",
   });
-  assert.equal(v0Result, false);
-  assert.equal(v0Context.localStorage.getItem("waywordStrataEngineV1"), null);
-
-  const v1Storage = createMemoryStorage();
-  const v1Context = loadSuccessfulSubmitCoordinatorContext({
-    location: { protocol: "https:", hostname: "localhost", search: "?promptSystem=v1" },
-    localStorage: v1Storage,
-  });
-  const v1Result = v1Context.waywordSuccessfulSubmitCoordinator.persistStrataSummaryForSuccessfulRun({
-    state: { promptId: "entry-001", promptFamily: "Entry", runStartedAtMs: 1000 },
-    run: { runId: "run-v1", savedAt: 5000, wordCount: 2 },
-    currentText: "Alpha beta.",
-  });
-
-  assert.equal(v1Result, true);
-  const saved = JSON.parse(v1Storage.getItem("waywordStrataEngineV1"));
+  assert.equal(result, true);
+  const saved = JSON.parse(context.localStorage.getItem("waywordStrataEngineV1"));
   assert.equal(saved.recentRuns.length, 1);
   assert.equal(saved.recentRuns[0].promptLayer, "entry");
   assert.equal(saved.recentRuns[0].totalSessionDurationMs, 4000);
@@ -1291,7 +1233,11 @@ test("prompt runtime can select from v1 entry catalog without changing selection
     { console: silentConsole() }
   );
   const entryPrompts = context.waywordLayeredPrompts.getEntryPromptsV1();
-  const catalog = context.waywordPromptSystemMode.buildV1EntryPromptCatalog(entryPrompts);
+  const catalog = context.waywordPromptSystemMode.buildStrataWeightedPromptCatalog({
+    readinessBand: "entry_support",
+    entryPrompts,
+    torsionPrompts: [],
+  });
 
   const state = {
     active: true,
@@ -1299,7 +1245,7 @@ test("prompt runtime can select from v1 entry catalog without changing selection
     promptRerollsUsed: 0,
     recentPromptIds: [],
     recentFamilyKeys: [],
-    recentCalibrationPromptIds: [],
+    recentFirstSessionEntryPromptIds: [],
   };
 
   const generated = context.waywordPromptRuntime.generatePrompt({
@@ -1312,12 +1258,12 @@ test("prompt runtime can select from v1 entry catalog without changing selection
     promptNearDuplicateWindow: 3,
     promptRecentFamilyWindow: 4,
     promptRerollLimit: 2,
-    calibrationThreshold: 0,
+    firstSessionEntryThreshold: 0,
     getCompletedRunCount() {
       return 10;
     },
-    pickCalibrationPrompt() {
-      throw new Error("unexpected calibration path");
+    pickFirstSessionEntryPrompt() {
+      throw new Error("unexpected firstSessionEntry path");
     },
     biasTagsForPromptFamily(family) {
       return [String(family)];
@@ -1334,10 +1280,9 @@ test("prompt runtime can select from v1 entry catalog without changing selection
   assert.equal(state.promptFamily, "Entry");
 });
 
-test("calibration prompt path remains unchanged when calibration is active", () => {
+test("first session is constrained to Entry prompts", () => {
   const selection = loadPromptSelectionContext().waywordPromptSelection;
   const context = loadPromptRuntimeContext();
-  let calibrationCalls = 0;
 
   const state = {
     active: true,
@@ -1345,31 +1290,26 @@ test("calibration prompt path remains unchanged when calibration is active", () 
     promptRerollsUsed: 0,
     recentPromptIds: [],
     recentFamilyKeys: [],
-    recentCalibrationPromptIds: [],
   };
 
   const generated = context.waywordPromptRuntime.generatePrompt({
     state,
     promptSelection: selection,
-    promptFamiliesOrder: ["Scene"],
+    promptFamiliesOrder: ["Entry", "Torsion"],
     promptLibrary: {
-      Scene: [{ id: "scene-1", text: "Scene Prompt", nearDuplicateGroup: "g1", active: true }],
+      Entry: [{ id: "entry-001", text: "Entry Prompt", nearDuplicateGroup: "e1", active: true }],
+      Torsion: [{ id: "torsion-001", text: "Torsion Prompt", nearDuplicateGroup: "t1", active: true }],
     },
-    promptEntryById: new Map([["scene-1", { id: "scene-1", nearDuplicateGroup: "g1", family: "Scene" }]]),
+    promptEntryById: new Map([
+      ["entry-001", { id: "entry-001", nearDuplicateGroup: "e1", family: "Entry" }],
+      ["torsion-001", { id: "torsion-001", nearDuplicateGroup: "t1", family: "Torsion" }],
+    ]),
     promptRecentIdWindow: 8,
     promptNearDuplicateWindow: 3,
     promptRecentFamilyWindow: 4,
     promptRerollLimit: 2,
-    calibrationThreshold: 5,
     getCompletedRunCount() {
       return 0;
-    },
-    pickCalibrationPrompt() {
-      calibrationCalls += 1;
-      state.promptId = "cal-1";
-      state.prompt = "Calibration Prompt";
-      state.promptFamily = "Calibration";
-      return state.prompt;
     },
     biasTagsForPromptFamily(family) {
       return [String(family)];
@@ -1380,9 +1320,8 @@ test("calibration prompt path remains unchanged when calibration is active", () 
     renderMeta() {},
   });
 
-  assert.equal(calibrationCalls, 1);
-  assert.equal(generated, "Calibration Prompt");
-  assert.equal(state.promptFamily, "Calibration");
+  assert.equal(generated, "Entry Prompt");
+  assert.equal(state.promptFamily, "Entry");
 });
 
 test("reroll gating stays tied to active, unsubmitted, empty-editor state", () => {
@@ -1440,15 +1379,7 @@ test("run controller runtime registers built deps and keeps input callable surfa
       return "run-1";
     },
     persist() {},
-    CALIBRATION_THRESHOLD: 4,
-    CALIBRATION_INSUFFICIENT_COPY: "keep going",
     INACTIVITY_EASE_RUN_KEY: "ease",
-    selectCalibrationObservation() {
-      return "observe";
-    },
-    calibrationSubmissionHasMinimumSignal() {
-      return true;
-    },
     clearExerciseIfCompleted() {},
     applyWriteDocSemanticFlagsFromAnalysisCore() {},
     updateEnterButtonVisibility() {},
@@ -1481,14 +1412,11 @@ test("run controller runtime registers built deps and keeps input callable surfa
     showProfile() {},
     scheduleDeferredEditorFocus() {},
     scheduleEditorDotOverlaySync() {},
-    syncEditorBottomChromeForCalibrationOverlay() {},
+    syncEditorBottomChromeForFirstSessionEntryOverlay() {},
     focusEditorToStart() {},
     updateTimeFill() {},
     waywordPostRunRenderer: { renderReflectionLine() {} },
-    syncCalibrationHandoffIntentAfterDecision() {},
-    readCalibrationHandoffAcknowledged() {
-      return false;
-    },
+    requestMirrorReflectionAttentionSettle() {},
   };
 
   const deps = context.waywordRunControllerRuntime.registerRunControllerDeps(controller, input);
@@ -1497,9 +1425,7 @@ test("run controller runtime registers built deps and keeps input callable surfa
   assert.equal(deps.state, input.state);
   assert.equal(deps.getEditorSurfaceComposing(), true);
   assert.equal(deps.getEditorText(), "draft");
-  assert.equal(deps.CALIBRATION_THRESHOLD, 4);
-  assert.equal(typeof deps.syncCalibrationHandoffIntentAfterDecision, "function");
-  assert.equal(typeof deps.readCalibrationHandoffAcknowledged, "function");
+  assert.equal(typeof deps.requestMirrorReflectionAttentionSettle, "function");
 });
 
 test("app boot runtime binds viewport listeners and initial render sequence", () => {
@@ -1579,8 +1505,8 @@ test("app boot runtime binds viewport listeners and initial render sequence", ()
     syncPatternsLayoutMode() {
       calls.push("syncPatternsLayoutMode");
     },
-    renderCalibration() {
-      calls.push("renderCalibration");
+    renderFirstSessionEntry() {
+      calls.push("renderFirstSessionEntry");
     },
     renderProfileSummaryStrip() {
       calls.push("renderProfileSummaryStrip");
@@ -1621,12 +1547,12 @@ test("app boot runtime resize observers stay inert when targets are missing", ()
     ResizeObserver: ResizeObserverStub,
     queueViewportSync() {},
   });
-  const overlayResult = context.waywordAppBootRuntime.bindEditorCalibrationOverlayResizeObserver({
+  const overlayResult = context.waywordAppBootRuntime.bindEditorFirstSessionEntryOverlayResizeObserver({
     $() {
       return null;
     },
     ResizeObserver: ResizeObserverStub,
-    syncEditorCalibrationOverlayClip() {},
+    syncEditorFirstSessionEntryOverlayClip() {},
   });
 
   assert.equal(shellResult, null);
@@ -1693,14 +1619,14 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
     renderMeta() {
       calls.push("renderMeta");
     },
-    onEditorFocusForLatentNudge() {
-      calls.push("latentFocus");
+    onEditorFocusForEntryDelayHint() {
+      calls.push("entryDelayFocus");
     },
-    onEditorInputForLatentNudge() {
-      calls.push("latentInput");
+    onEditorInputForEntryDelayHint() {
+      calls.push("entryDelayInput");
     },
-    onEditorPermissionUserEdit() {
-      calls.push("permissionEdit");
+    onEditorInputForTelemetry() {
+      calls.push("telemetryInput");
     },
     scheduleSemanticPickerFromSelection() {
       calls.push("picker");
@@ -1728,7 +1654,6 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
 
   assert.equal(editorInput.dataset.appEventsBound, "1");
   assert.equal(listeners.has("keydown"), true);
-  assert.equal(listeners.has("pointerdown"), true);
 
   listeners.get("focus")();
   listeners.get("scroll")();
@@ -1747,391 +1672,157 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
 
   calls.length = 0;
-  listeners.get("pointerdown")();
-  assert.ok(calls.includes("permissionEdit"), "expected editor pointer engagement to hide permission phrase");
-
-  calls.length = 0;
   listeners.get("input")();
   assert.ok(calls.includes("renderMeta"), "expected editor input to refresh meta (including prompt reroll affordance)");
-  assert.ok(calls.includes("latentInput"), "expected editor input to cancel latent prompt nudge");
-  assert.ok(calls.includes("permissionEdit"), "expected editor input to hide permission phrase");
+  assert.ok(calls.includes("entryDelayInput"), "expected editor input to deactivate pre-entry hint");
+  assert.ok(calls.includes("telemetryInput"), "expected editor input to notify telemetry");
 
   calls.length = 0;
   listeners.get("paste")();
-  assert.ok(calls.includes("permissionEdit"), "expected paste to hide permission phrase before insertion");
+  assert.deepEqual(calls, []);
 
   calls.length = 0;
   listeners.get("compositionstart")();
-  assert.ok(calls.includes("permissionEdit"), "expected composition start to hide permission phrase");
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "setEditorSurfaceComposing"), "expected composition start to mark composition state");
 
   calls.length = 0;
   listeners.get("focus")();
-  assert.ok(calls.includes("latentFocus"), "expected editor focus to arm latent prompt nudge");
+  assert.ok(calls.includes("entryDelayFocus"), "expected editor focus to arm pre-entry hint timer");
 });
 
-test("latent nudge controller stays hidden by default and appears after idle", () => {
-  const context = loadLatentNudgeControllerContext();
-  const scheduled = [];
-  let editorText = "";
-  const calls = [];
-  const controller = context.waywordLatentNudgeController.create({
-    idleDelayMs: 30000,
-    focusDelayMs: 5000,
-    getEditorText() {
-      return editorText;
-    },
-    isEligible() {
-      return true;
-    },
-    render() {
-      calls.push("render");
-    },
-    timers: {
-      setTimeout(fn, ms) {
-        scheduled.push({ fn, ms, cleared: false });
-        return scheduled.length - 1;
-      },
-      clearTimeout(id) {
-        if (scheduled[id]) scheduled[id].cleared = true;
-      },
-    },
+test("behavioral telemetry logs pre-entry and writing events locally only", () => {
+  const context = loadBehavioralTelemetryRuntimeContext();
+  const telemetry = context.waywordBehavioralTelemetry;
+  telemetry.clearEvents();
+
+  telemetry.startRun({
+    now: 1000,
+    promptId: "entry-001",
+    readinessBand: "entry_support",
+    layerWeightDistributionSnapshot: { entry: 100, torsion: 0, resonance: 0 },
+    promptLayer: "entry",
   });
+  telemetry.noteInput({ now: 1400, hasText: true });
+  telemetry.noteInput({ now: 1700, hasText: true });
+  telemetry.submitRun({ now: 5200, text: "One line. Two line.", wordCount: 4 });
+  telemetry.endSession({ now: 5400 });
 
-  controller.beginPrompt();
-
-  assert.equal(controller.isVisible(), false);
-  assert.equal(scheduled[0].ms, 30000);
-  scheduled[0].fn();
-  assert.equal(controller.isVisible(), true);
-  assert.deepEqual(calls, ["render"]);
-
-  editorText = "hello";
-  controller.onEditorInput();
-  assert.equal(controller.isVisible(), false);
+  const events = telemetry.getEvents();
+  const names = events.map((event) => event.event);
+  assert.ok(names.includes("session_start"));
+  assert.ok(names.includes("session_end"));
+  assert.ok(names.includes("prompt_id_shown_at_start"));
+  assert.ok(names.includes("readiness_band_at_start"));
+  assert.ok(names.includes("layer_weight_distribution_snapshot"));
+  assert.ok(names.includes("prompt_layer_used"));
+  assert.ok(names.includes("first_token_time_ms"));
+  assert.ok(names.includes("time_to_first_token_ms"));
+  assert.ok(names.includes("pause_duration_ms"));
+  assert.ok(names.includes("run_word_count"));
+  assert.ok(names.includes("run_sentence_count"));
+  assert.ok(names.includes("time_spent_writing_ms"));
+  assert.ok(names.includes("number_of_runs_in_session"));
+  assert.ok(names.includes("session_reentry_count"));
 });
 
-test("latent nudge controller appears after two empty rerolls", () => {
-  const context = loadLatentNudgeControllerContext();
-  const calls = [];
-  const controller = context.waywordLatentNudgeController.create({
-    getEditorText() {
-      return "";
-    },
-    isEligible() {
-      return true;
-    },
-    render() {
-      calls.push("render");
-    },
-    timers: {
-      setTimeout() {
-        return 1;
-      },
-      clearTimeout() {},
-    },
+test("behavioral telemetry does not record first token after writing already started", () => {
+  const context = loadBehavioralTelemetryRuntimeContext();
+  const telemetry = context.waywordBehavioralTelemetry;
+  telemetry.clearEvents();
+
+  telemetry.startRun({
+    now: 100,
+    promptId: "entry-002",
+    readinessBand: "entry_support",
+    layerWeightDistributionSnapshot: { entry: 100, torsion: 0, resonance: 0 },
+    promptLayer: "entry",
   });
+  telemetry.noteInput({ now: 160, hasText: false });
+  telemetry.noteInput({ now: 260, hasText: true });
+  telemetry.noteInput({ now: 360, hasText: true });
 
-  controller.beginPrompt();
-  assert.equal(controller.onPromptReroll(), false);
-  assert.equal(controller.isVisible(), false);
-  assert.equal(controller.getEmptyRerollCount(), 1);
-
-  assert.equal(controller.onPromptReroll(), true);
-  assert.equal(controller.isVisible(), true);
-  assert.equal(controller.getEmptyRerollCount(), 2);
-  assert.deepEqual(calls, ["render"]);
+  const firstTokenEvents = telemetry
+    .getEvents()
+    .filter((event) => event.event === "first_token_time_ms" || event.event === "time_to_first_token_ms");
+  assert.equal(firstTokenEvents.length, 2);
 });
 
-test("latent nudge controller appears after empty editor focus delay", () => {
-  const context = loadLatentNudgeControllerContext();
-  const scheduled = [];
-  const calls = [];
-  const controller = context.waywordLatentNudgeController.create({
-    focusDelayMs: 5500,
-    getEditorText() {
-      return "";
+test("behavioral interpretation runtime builds deterministic structural summaries from telemetry events", () => {
+  const context = loadBehavioralInterpretationRuntimeContext();
+  const api = context.waywordBehavioralInterpretation;
+  const events = [
+    { event: "session_start", value: 1, sessionId: "sess-a", timestamp: 1000, runIndex: 1 },
+    { event: "prompt_id_shown_at_start", value: "entry-001", sessionId: "sess-a", timestamp: 1001, runIndex: 1 },
+    { event: "readiness_band_at_start", value: "entry_support", sessionId: "sess-a", timestamp: 1001, runIndex: 1 },
+    {
+      event: "layer_weight_distribution_snapshot",
+      value: { entry: 100, torsion: 0, resonance: 0 },
+      sessionId: "sess-a",
+      timestamp: 1001,
+      runIndex: 1,
     },
-    isEligible() {
-      return true;
-    },
-    render() {
-      calls.push("render");
-    },
-    timers: {
-      setTimeout(fn, ms) {
-        scheduled.push({ fn, ms, cleared: false });
-        return scheduled.length - 1;
-      },
-      clearTimeout(id) {
-        if (scheduled[id]) scheduled[id].cleared = true;
-      },
-    },
-  });
+    { event: "prompt_layer_used", value: "entry", sessionId: "sess-a", timestamp: 1001, runIndex: 1 },
+    { event: "time_to_first_token_ms", value: 1200, sessionId: "sess-a", timestamp: 2200, runIndex: 1 },
+    { event: "pause_duration_ms", value: 300, sessionId: "sess-a", timestamp: 2500, runIndex: 1 },
+    { event: "run_word_count", value: 42, sessionId: "sess-a", timestamp: 5300, runIndex: 1 },
+    { event: "run_sentence_count", value: 3, sessionId: "sess-a", timestamp: 5300, runIndex: 1 },
+    { event: "time_spent_writing_ms", value: 4200, sessionId: "sess-a", timestamp: 5300, runIndex: 1 },
+    { event: "number_of_runs_in_session", value: 1, sessionId: "sess-a", timestamp: 5300, runIndex: 1 },
+    { event: "session_reentry_count", value: 0, sessionId: "sess-a", timestamp: 5300, runIndex: 1 },
+    { event: "session_end", value: 1, sessionId: "sess-a", timestamp: 5400, runIndex: 1 },
+  ];
 
-  controller.onEditorFocus();
-
-  assert.equal(controller.isVisible(), false);
-  assert.equal(scheduled[0].ms, 5500);
-  scheduled[0].fn();
-  assert.equal(controller.isVisible(), true);
-  assert.deepEqual(calls, ["render"]);
+  const result = api.interpretTelemetryEvents(events, { nowMs: 6000 });
+  assert.equal(result.sessionCount, 1);
+  assert.equal(result.sourceEventCount, events.length);
+  assert.equal(result.generatedAt, new Date(6000).toISOString());
+  assert.equal(result.sessions[0].sessionId, "sess-a");
+  assert.equal(result.sessions[0].entryBehaviorSummary.firstTokenLatencyMs.median, 1200);
+  assert.equal(result.sessions[0].writingFlowSummary.runDurationMs.median, 4200);
+  assert.equal(result.sessions[0].strataDistributionSummary.promptLayerExposure.entry, 1);
+  assert.equal(result.sessions[0].continuitySignals.numberOfRunsInSession, 1);
 });
 
-test("latent nudge controller typing prevents scheduled nudge reveal", () => {
-  const context = loadLatentNudgeControllerContext();
-  const scheduled = [];
-  let editorText = "";
-  const controller = context.waywordLatentNudgeController.create({
-    getEditorText() {
-      return editorText;
-    },
-    isEligible() {
-      return true;
-    },
-    timers: {
-      setTimeout(fn, ms) {
-        scheduled.push({ fn, ms, cleared: false });
-        return scheduled.length - 1;
-      },
-      clearTimeout(id) {
-        if (scheduled[id]) scheduled[id].cleared = true;
-      },
-    },
-  });
+test("behavioral interpretation identifies structural friction and exposure skew without recommendations", () => {
+  const context = loadBehavioralInterpretationRuntimeContext();
+  const api = context.waywordBehavioralInterpretation;
+  const events = [
+    { event: "session_start", value: 1, sessionId: "sess-b", timestamp: 1000, runIndex: 1 },
+    { event: "prompt_layer_used", value: "entry", sessionId: "sess-b", timestamp: 1010, runIndex: 1 },
+    { event: "number_of_runs_in_session", value: 6, sessionId: "sess-b", timestamp: 9000, runIndex: 6 },
+    { event: "prompt_layer_used", value: "entry", sessionId: "sess-b", timestamp: 2010, runIndex: 2 },
+    { event: "prompt_layer_used", value: "entry", sessionId: "sess-b", timestamp: 3010, runIndex: 3 },
+    { event: "prompt_layer_used", value: "entry", sessionId: "sess-b", timestamp: 4010, runIndex: 4 },
+    { event: "prompt_layer_used", value: "entry", sessionId: "sess-b", timestamp: 5010, runIndex: 5 },
+    { event: "prompt_layer_used", value: "entry", sessionId: "sess-b", timestamp: 6010, runIndex: 6 },
+    { event: "time_to_first_token_ms", value: 14000, sessionId: "sess-b", timestamp: 15000, runIndex: 3 },
+    { event: "time_to_first_token_ms", value: 13000, sessionId: "sess-b", timestamp: 26000, runIndex: 4 },
+    { event: "time_to_first_token_ms", value: 15000, sessionId: "sess-b", timestamp: 41000, runIndex: 5 },
+    { event: "time_spent_writing_ms", value: 3000, sessionId: "sess-b", timestamp: 45000, runIndex: 5 },
+    { event: "time_spent_writing_ms", value: 4000, sessionId: "sess-b", timestamp: 47000, runIndex: 6 },
+    { event: "session_end", value: 1, sessionId: "sess-b", timestamp: 48000, runIndex: 6 },
+  ];
 
-  controller.beginPrompt();
-  editorText = "first words";
-  controller.onEditorInput();
-  scheduled[0].fn();
-
-  assert.equal(scheduled[0].cleared, true);
-  assert.equal(controller.isVisible(), false);
+  const result = api.interpretTelemetryEvents(events, { nowMs: 50000 });
+  const summary = result.sessions[0];
+  assert.equal(summary.frictionSignals.zeroTokenRuns, 3);
+  assert.equal(summary.frictionSignals.repeatedEarlyAbandonmentPattern, true);
+  assert.equal(summary.systemHealthSignals.overuseEntryOnlyPrompts, true);
+  assert.equal(summary.systemHealthSignals.underexposureToTorsionLayer, true);
+  assert.equal(summary.systemHealthSignals.stalledSessionCluster, true);
+  assert.equal(summary.systemHealthSignals.abnormalPromptSelectionSkew, true);
 });
 
-test("prompt card presentation hides nudge by default and shows it when controller allows", () => {
-  const context = loadPromptCardPresentationContext();
-  const promptMain = { classList: createClassList() };
-  const nodes = new Map();
-  const promptNudgeShell = {
-    classList: createClassList(["prompt-nudge-shell--hidden"]),
-    attrs: {},
-    setAttribute(name, value) {
-      this.attrs[name] = value;
-    },
-  };
-  const promptNudge = {
-    textContent: "",
-    attrs: {},
-    setAttribute(name, value) {
-      this.attrs[name] = value;
-    },
-  };
-  const promptNudgeText = { textContent: "" };
-  nodes.set("promptCard", {
-    classList: createClassList(),
-    querySelector(selector) {
-      return selector === ".prompt-main" ? promptMain : null;
-    },
-  });
-  nodes.set("promptText", { textContent: "" });
-  nodes.set("promptFamilyLabel", { textContent: "" });
-  nodes.set("promptNudgeShell", promptNudgeShell);
-  nodes.set("promptNudge", promptNudge);
-  nodes.set("promptNudgeText", promptNudgeText);
-
-  context.waywordWritingPromptCardPresentation.renderPromptCard({
-    $(id) {
-      return nodes.get(id) || null;
-    },
-    state: { active: true, submitted: false, prompt: "Prompt", promptFamily: "Scene" },
-    getActivePromptNudgeLineForRender() {
-      return "Stay near the first image.";
-    },
-    isPromptNudgeVisible() {
-      return false;
-    },
-  });
-
-  assert.equal(promptNudgeText.textContent, "");
-  assert.equal(promptNudgeShell.classList.contains("prompt-nudge-shell--hidden"), true);
-  assert.equal(promptMain.classList.contains("prompt-main--with-nudge"), false);
-
-  context.waywordWritingPromptCardPresentation.renderPromptCard({
-    $(id) {
-      return nodes.get(id) || null;
-    },
-    state: { active: true, submitted: false, prompt: "Prompt", promptFamily: "Scene" },
-    getActivePromptNudgeLineForRender() {
-      return "Stay near the first image.";
-    },
-    isPromptNudgeVisible() {
-      return true;
-    },
-  });
-
-  assert.equal(promptNudgeText.textContent, "Stay near the first image.");
-  assert.equal(promptNudgeShell.classList.contains("prompt-nudge-shell--hidden"), false);
-  assert.equal(promptNudgeShell.attrs["aria-hidden"], "false");
-  assert.equal(promptNudge.attrs["aria-hidden"], "false");
-  assert.equal(promptMain.classList.contains("prompt-main--with-nudge"), true);
-});
-
-test("editor permission controller waits for nudge exposure and empty-editor delay", () => {
-  const context = loadEditorPermissionControllerContext();
-  const scheduled = [];
-  const calls = [];
-  let nowMs = 1000;
-  const controller = context.waywordEditorPermissionController.create({
-    delayMs: 12000,
-    stallDelayMs: 30000,
-    phrases: ["Begin anywhere."],
-    getEditorText() {
-      return "";
-    },
-    isEligible() {
-      return true;
-    },
-    render() {
-      calls.push("render");
-    },
-    timers: {
-      setTimeout(fn, ms) {
-        scheduled.push({ fn, ms, cleared: false });
-        return scheduled.length - 1;
-      },
-      clearTimeout(id) {
-        if (scheduled[id]) scheduled[id].cleared = true;
-      },
-    },
-    now() {
-      return nowMs;
-    },
-  });
-
-  assert.equal(controller.isVisible(), false);
-  assert.equal(controller.getPhrase(), "");
-  assert.equal(scheduled.length, 0, "permission should not arm before nudge exposure");
-
-  controller.onNudgeVisible();
-  assert.equal(controller.isVisible(), false);
-  assert.equal(scheduled[0].ms, 12000);
-
-  scheduled[0].fn();
-  assert.equal(controller.isVisible(), true);
-  assert.equal(controller.getPhrase(), "Begin anywhere.");
-  assert.equal(controller.shouldShowEditorPermissionNudge(nowMs), true);
-  assert.deepEqual(calls, ["render"]);
-});
-
-test("editor permission controller ignores non-empty restored text and suppresses while typing", () => {
-  const context = loadEditorPermissionControllerContext();
-  const scheduled = [];
-  let text = "";
-  let nowMs = 1000;
-  const controller = context.waywordEditorPermissionController.create({
-    delayMs: 12000,
-    stallDelayMs: 30000,
-    phrases: ["One line will do."],
-    getEditorText() {
-      return text;
-    },
-    isEligible() {
-      return true;
-    },
-    timers: {
-      setTimeout(fn, ms) {
-        scheduled.push({ fn, ms, cleared: false });
-        return scheduled.length - 1;
-      },
-      clearTimeout(id) {
-        if (scheduled[id]) scheduled[id].cleared = true;
-      },
-    },
-    now() {
-      return nowMs;
-    },
-  });
-
-  text = "restored draft";
-  controller.onNudgeVisible();
-  assert.equal(scheduled.length, 0);
-  assert.equal(controller.isVisible(), false);
-
-  text = "";
-  controller.reset();
-  controller.onNudgeVisible();
-  assert.equal(scheduled.length, 1);
-  nowMs += 3000;
-  controller.onUserEdit();
-  assert.equal(controller.hasEditorStarted(), true);
-  assert.equal(scheduled[0].cleared, true);
-  assert.equal(controller.shouldShowEditorPermissionNudge(nowMs), false);
-  assert.equal(scheduled[1].ms, 30000, "stall timer should arm from latest input");
-  nowMs += 5000;
-  controller.onUserEdit();
-  assert.equal(scheduled[1].cleared, true);
-  assert.equal(scheduled[2].ms, 30000, "new input resets pending stall timer");
-  scheduled[0].fn();
-  scheduled[1].fn();
-  assert.equal(scheduled[0].cleared, true);
-  assert.equal(controller.isVisible(), false);
-  assert.equal(controller.getPhrase(), "");
-});
-
-test("editor permission controller shows again after clear post-start stall", () => {
-  const context = loadEditorPermissionControllerContext();
-  const scheduled = [];
-  let nowMs = 1000;
-  let text = "";
-  const controller = context.waywordEditorPermissionController.create({
-    delayMs: 12000,
-    stallDelayMs: 30000,
-    phrases: ["A fragment is enough."],
-    getEditorText() {
-      return text;
-    },
-    isEligible() {
-      return true;
-    },
-    timers: {
-      setTimeout(fn, ms) {
-        scheduled.push({ fn, ms, cleared: false });
-        return scheduled.length - 1;
-      },
-      clearTimeout(id) {
-        if (scheduled[id]) scheduled[id].cleared = true;
-      },
-    },
-    now() {
-      return nowMs;
-    },
-  });
-
-  controller.onNudgeVisible();
-  nowMs += 500;
-  text = "started";
-  controller.onUserEdit();
-  assert.equal(scheduled[0].cleared, true, "pre-start delay should cancel once typing starts");
-  assert.equal(controller.isVisible(), false);
-  assert.equal(scheduled[1].ms, 30000);
-  nowMs += 30000;
-  scheduled[1].fn();
-  assert.equal(controller.isVisible(), true, "permission may appear after a sustained post-start stall");
-  nowMs += 50;
-  controller.onUserEdit();
-  assert.equal(controller.isVisible(), false);
-  assert.equal(scheduled[2].ms, 30000, "typing should reset stall timer after hide");
-});
-
-test("editor permission controller reset clears visible permission and waits for a new nudge", () => {
-  const context = loadEditorPermissionControllerContext();
+test("entry delay hint appears only after pre-entry delay", () => {
+  const context = loadEntryDelayHintControllerContext();
   const scheduled = [];
   const renders = [];
-  const controller = context.waywordEditorPermissionController.create({
-    delayMs: 12000,
-    phrases: ["A fragment is enough."],
+  const hydrations = [];
+  let editorText = "";
+  const controller = context.waywordEntryDelayHintController.create({
+    minDelayFloorMs: 6000,
     getEditorText() {
-      return "";
+      return editorText;
     },
     isEligible() {
       return true;
@@ -2139,6 +1830,9 @@ test("editor permission controller reset clears visible permission and waits for
     render() {
       renders.push("render");
     },
+    hydrate() {
+      hydrations.push("hydrate");
+    },
     timers: {
       setTimeout(fn, ms) {
         scheduled.push({ fn, ms, cleared: false });
@@ -2150,19 +1844,129 @@ test("editor permission controller reset clears visible permission and waits for
     },
   });
 
-  controller.onNudgeVisible();
+  controller.beginSession(120);
+  assert.equal(controller.isVisible(), false);
+  assert.equal(scheduled[0].ms, 24000);
   scheduled[0].fn();
   assert.equal(controller.isVisible(), true);
-
-  controller.reset();
-  assert.equal(controller.isVisible(), false);
-  assert.equal(controller.getPhrase(), "");
-  assert.deepEqual(renders, ["render", "render"]);
-
-  const before = scheduled.length;
-  scheduled[0].fn();
-  assert.equal(scheduled.length, before, "reset should not re-arm without another nudge exposure");
+  assert.ok(renders.length >= 2, "expected begin + reveal renders");
+  assert.ok(hydrations.length >= 2, "expected begin + reveal hydration");
 });
+
+test("first token disables entry delay hint permanently for the session", () => {
+  const context = loadEntryDelayHintControllerContext();
+  const scheduled = [];
+  let editorText = "";
+  const controller = context.waywordEntryDelayHintController.create({
+    getEditorText() {
+      return editorText;
+    },
+    isEligible() {
+      return true;
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  controller.beginSession(120);
+  editorText = "a";
+  controller.onEditorInput();
+  scheduled[0].fn();
+  assert.equal(controller.isVisible(), false);
+  assert.equal(scheduled[0].cleared, true);
+});
+
+test("entry delay hint never appears once typing has started", () => {
+  const context = loadEntryDelayHintControllerContext();
+  const scheduled = [];
+  let editorText = "";
+  const controller = context.waywordEntryDelayHintController.create({
+    getEditorText() {
+      return editorText;
+    },
+    isEligible() {
+      return true;
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  controller.beginSession(120);
+  editorText = "started";
+  controller.onEditorInput();
+  controller.onEditorFocus();
+  assert.equal(controller.isVisible(), false);
+  assert.equal(scheduled.length >= 1, true);
+});
+
+test("entry delay hint re-arms correctly on a new session", () => {
+  const context = loadEntryDelayHintControllerContext();
+  const scheduled = [];
+  let editorText = "";
+  const controller = context.waywordEntryDelayHintController.create({
+    getEditorText() {
+      return editorText;
+    },
+    isEligible() {
+      return true;
+    },
+    timers: {
+      setTimeout(fn, ms) {
+        scheduled.push({ fn, ms, cleared: false });
+        return scheduled.length - 1;
+      },
+      clearTimeout(id) {
+        if (scheduled[id]) scheduled[id].cleared = true;
+      },
+    },
+  });
+
+  controller.beginSession(120);
+  editorText = "first run typed";
+  controller.onEditorInput();
+
+  editorText = "";
+  controller.beginSession(120);
+  scheduled[1].fn();
+  assert.equal(controller.isVisible(), true);
+});
+
+test("prompt card presentation renders prompt text without intervention surfaces", () => {
+  const context = loadPromptCardPresentationContext();
+  const nodes = new Map();
+  nodes.set("promptCard", {
+    classList: createClassList(),
+    querySelector() {
+      return null;
+    },
+  });
+  nodes.set("promptText", { textContent: "" });
+
+  context.waywordWritingPromptCardPresentation.renderPromptCard({
+    $(id) {
+      return nodes.get(id) || null;
+    },
+    state: { active: true, submitted: false, prompt: "Prompt", promptFamily: "Scene" },
+  });
+
+  assert.equal(nodes.get("promptText").textContent, "Prompt");
+  assert.equal(nodes.get("promptCard").classList.contains("hidden"), false);
+});
+
 
 test("app events runtime binds document, primary controls, and panel controls once", () => {
   const documentListeners = new Map();
@@ -2398,12 +2202,10 @@ test("app events runtime binds document, primary controls, and panel controls on
   });
   documentListeners.get("pointerdown")({ type: "pointerdown" });
   nodes.get("promptCard").click({
-    preventDefault() {
-      calls.push("preventPromptDefault");
-    },
+    preventDefault() {},
     target: {
-      closest(selector) {
-        return selector === "[data-mirror-next-pass]" ? this : null;
+      closest() {
+        return null;
       },
     },
   });
@@ -2419,8 +2221,6 @@ test("app events runtime binds document, primary controls, and panel controls on
 
   assert.ok(calls.includes("optionsEscape"));
   assert.ok(calls.includes("preventEscapeDefault"));
-  assert.ok(calls.includes("preventPromptDefault"));
-  assert.ok(calls.includes("runPostSubmitAutoNewRunNow"));
   assert.ok(
     calls.some(
       (entry) =>
@@ -3272,40 +3072,6 @@ test("post-submit phase derivation names current run/post-submit scenarios", () 
         active: true,
         submitted: true,
         completedUiActive: true,
-        calibrationPostRun: { step: 1, observation: "Baseline", insufficient: false },
-      },
-    }),
-    P.SUBMITTED_CALIBRATION_BASELINE
-  );
-  assert.equal(
-    derive({
-      state: {
-        active: true,
-        submitted: true,
-        completedUiActive: true,
-        calibrationPostRun: { step: 1, observation: "Add enough writing.", insufficient: true },
-      },
-    }),
-    P.SUBMITTED_CALIBRATION_INSUFFICIENT
-  );
-  assert.equal(
-    derive({
-      state: {
-        active: true,
-        submitted: true,
-        completedUiActive: true,
-        calibrationHandoffVisible: true,
-        calibrationPostRun: { step: 5, observation: "Baseline", insufficient: false },
-      },
-    }),
-    P.SUBMITTED_CALIBRATION_HANDOFF
-  );
-  assert.equal(
-    derive({
-      state: {
-        active: true,
-        submitted: true,
-        completedUiActive: true,
         lastMirrorPipelineResult: {
           main: { category: "repetition", statement: "One word keeps returning." },
         },
@@ -3352,21 +3118,9 @@ test("post-submit phase derivation names current run/post-submit scenarios", () 
     P.SUBMITTED_MIRROR_UNAVAILABLE
   );
 
-  const handoffFlags = renderFlags(P.SUBMITTED_CALIBRATION_HANDOFF);
-  assert.equal(handoffFlags.calibrationHandoffVisible, true);
-  assert.equal(handoffFlags.calibrationBaselinePostSubmit, false);
-
-  const baselineFlags = renderFlags(P.SUBMITTED_CALIBRATION_BASELINE);
-  assert.equal(baselineFlags.calibrationHandoffVisible, false);
-  assert.equal(baselineFlags.calibrationBaselinePostSubmit, true);
-
-  const insufficientFlags = renderFlags(P.SUBMITTED_CALIBRATION_INSUFFICIENT);
-  assert.equal(insufficientFlags.calibrationHandoffVisible, false);
-  assert.equal(insufficientFlags.calibrationBaselinePostSubmit, true);
-
   const lowSignalFlags = renderFlags(P.SUBMITTED_MIRROR_LOW_SIGNAL);
-  assert.equal(lowSignalFlags.calibrationHandoffVisible, false);
-  assert.equal(lowSignalFlags.calibrationBaselinePostSubmit, false);
+  assert.equal(lowSignalFlags.firstSessionEntryHandoffVisible, false);
+  assert.equal(lowSignalFlags.firstSessionEntryBaselinePostSubmit, false);
 });
 
 test("completed restart routing uses post-submit phase gating", () => {
@@ -3381,13 +3135,6 @@ test("completed restart routing uses post-submit phase gating", () => {
     lastMirrorPipelineResult: {
       main: { category: "repetition", statement: "One word keeps returning." },
     },
-  };
-  const handoffState = {
-    active: true,
-    submitted: true,
-    completedUiActive: true,
-    optionsOpen: false,
-    calibrationHandoffVisible: true,
   };
   const inactiveCompletedState = {
     active: false,
@@ -3420,36 +3167,12 @@ test("completed restart routing uses post-submit phase gating", () => {
 
   calls.length = 0;
   assert.equal(
-    interactions.handleEditorCompletedRestartKeydown(inputFor(handoffState), normalEvent),
-    false
-  );
-  assert.deepEqual(calls, []);
-
-  calls.length = 0;
-  assert.equal(
     interactions.handleEditorSurfaceCompletedRestart(inputFor(normalState), {
       target: { closest: (selector) => (selector === "#editorInput" ? true : null) },
     }),
     true
   );
   assert.deepEqual(calls, ["restart"]);
-
-  calls.length = 0;
-  assert.equal(
-    interactions.handleDocumentCompletedRestartKeydown(inputFor(handoffState), {
-      key: "Enter",
-      shiftKey: false,
-      metaKey: false,
-      ctrlKey: false,
-      altKey: false,
-      target: {},
-      preventDefault() {
-        calls.push("preventDefault");
-      },
-    }),
-    false
-  );
-  assert.deepEqual(calls, []);
 
   calls.length = 0;
   assert.equal(

@@ -2,9 +2,6 @@
   var PHASES = Object.freeze({
     IDLE: "idle",
     DRAFTING: "drafting",
-    SUBMITTED_CALIBRATION_BASELINE: "submitted_calibration_baseline",
-    SUBMITTED_CALIBRATION_INSUFFICIENT: "submitted_calibration_insufficient",
-    SUBMITTED_CALIBRATION_HANDOFF: "submitted_calibration_handoff",
     SUBMITTED_MIRROR_LOW_SIGNAL: "submitted_mirror_low_signal",
     SUBMITTED_MIRROR_READY: "submitted_mirror_ready",
     SUBMITTED_MIRROR_UNAVAILABLE: "submitted_mirror_unavailable",
@@ -22,9 +19,6 @@
 
   function isSubmittedPhase(phase) {
     return (
-      phase === PHASES.SUBMITTED_CALIBRATION_BASELINE ||
-      phase === PHASES.SUBMITTED_CALIBRATION_INSUFFICIENT ||
-      phase === PHASES.SUBMITTED_CALIBRATION_HANDOFF ||
       phase === PHASES.SUBMITTED_MIRROR_LOW_SIGNAL ||
       phase === PHASES.SUBMITTED_MIRROR_READY ||
       phase === PHASES.SUBMITTED_MIRROR_UNAVAILABLE
@@ -32,7 +26,7 @@
   }
 
   function phaseBlocksCompletedRestart(phase) {
-    return phase === PHASES.SUBMITTED_CALIBRATION_HANDOFF;
+    return false;
   }
 
   function phaseAllowsCompletedRestart(phase) {
@@ -41,10 +35,8 @@
 
   function postRunRenderFlagsFromPhase(phase) {
     return {
-      calibrationHandoffVisible: phase === PHASES.SUBMITTED_CALIBRATION_HANDOFF,
-      calibrationBaselinePostSubmit:
-        phase === PHASES.SUBMITTED_CALIBRATION_BASELINE ||
-        phase === PHASES.SUBMITTED_CALIBRATION_INSUFFICIENT,
+      firstSessionEntryHandoffVisible: false,
+      firstSessionEntryBaselinePostSubmit: false,
     };
   }
 
@@ -57,8 +49,6 @@
    *     active?: boolean,
    *     submitted?: boolean,
    *     completedUiActive?: boolean,
-   *     calibrationPostRun?: { insufficient?: boolean } | null,
-   *     calibrationHandoffVisible?: boolean,
    *     lastMirrorLoadFailed?: boolean,
    *     lastMirrorPipelineResult?: unknown
    *   },
@@ -71,16 +61,6 @@
 
     if (!state.active) return PHASES.IDLE;
     if (!state.submitted || !state.completedUiActive) return PHASES.DRAFTING;
-
-    if (state.calibrationHandoffVisible) {
-      return PHASES.SUBMITTED_CALIBRATION_HANDOFF;
-    }
-
-    if (state.calibrationPostRun) {
-      return state.calibrationPostRun.insufficient
-        ? PHASES.SUBMITTED_CALIBRATION_INSUFFICIENT
-        : PHASES.SUBMITTED_CALIBRATION_BASELINE;
-    }
 
     if (state.lastMirrorLoadFailed) {
       return PHASES.SUBMITTED_MIRROR_UNAVAILABLE;

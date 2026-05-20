@@ -1,5 +1,5 @@
 (function () {
-  /** Mirror Keeper Redaction v1 - production families. Calibration is a separate mode. */
+  /** Mirror Keeper Redaction v1 - production families. FirstSessionEntry is a separate mode. */
   const PROMPT_FAMILIES_ORDER = ["Scene", "Relation", "Pressure", "Constraint"];
 
   /**

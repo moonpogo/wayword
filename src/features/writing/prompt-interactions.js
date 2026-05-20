@@ -1,13 +1,21 @@
 (function () {
   function onPromptClusterControlPointerDown(e) {
+    if (inputRef && typeof inputRef.armPromptControlFocusExitGuard === "function") {
+      inputRef.armPromptControlFocusExitGuard();
+    }
     e.preventDefault();
     e.stopPropagation();
   }
 
+  var inputRef = null;
+
   function bindPromptClusterControls(input) {
     if (!input || typeof input.$ !== "function") return;
+    inputRef = input;
+    var spine = input.$("rightControlSpine");
+    if (!spine) return;
 
-    var reroll = input.$("promptRerollBtn");
+    var reroll = spine.querySelector("#promptRerollBtn");
     if (reroll) {
       reroll.removeEventListener("pointerdown", onPromptClusterControlPointerDown);
       reroll.addEventListener("pointerdown", onPromptClusterControlPointerDown);
@@ -15,7 +23,7 @@
       reroll.addEventListener("click", input.onPromptRerollControlClick);
     }
 
-    var field = input.$("fieldExpandedToggle");
+    var field = spine.querySelector("#fieldExpandedToggle");
     if (field) {
       field.removeEventListener("pointerdown", onPromptClusterControlPointerDown);
       field.addEventListener("pointerdown", onPromptClusterControlPointerDown);

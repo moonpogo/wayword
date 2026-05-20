@@ -60,7 +60,7 @@ async function waitForAppBoot(session) {
         return Boolean(
           document.getElementById("beginBtn") &&
           document.getElementById("editorInput") &&
-          typeof window.waywordDevResetCalibration === "function"
+          typeof window.waywordDevResetFirstSessionEntry === "function"
         );
       `),
     { timeoutMs: 15000 }
@@ -100,8 +100,8 @@ async function loadFreshApp(session) {
       localStorage.clear();
     } catch (_) {}
     try {
-      if (typeof window.waywordDevResetCalibration === "function") {
-        window.waywordDevResetCalibration();
+      if (typeof window.waywordDevResetFirstSessionEntry === "function") {
+        window.waywordDevResetFirstSessionEntry();
       }
     } catch (_) {}
     return true;
@@ -181,15 +181,15 @@ async function submitCurrentRun(session) {
   await session.click("#enterSubmitBtn");
 
   await session.waitFor(
-    "Post-submit surface (calibration overlay, handoff, or Mirror)",
+    "Post-submit surface (firstSessionEntry overlay, handoff, or Mirror)",
     async () =>
       await session.execute(`
         var overlay = document.getElementById("editorOverlay");
         var calOverlay =
           overlay &&
           !overlay.classList.contains("hidden") &&
-          overlay.classList.contains("editor-overlay--calibration");
-        var handoff = document.getElementById("calibrationHandoffSection");
+          overlay.classList.contains("editor-overlay--firstSessionEntry");
+        var handoff = document.getElementById("firstSessionEntryHandoffSection");
         var handoffVisible = handoff && !handoff.classList.contains("hidden");
         var section = document.getElementById("mirrorReflectionSection");
         var root = document.getElementById("mirrorReflectionRoot");
@@ -215,9 +215,9 @@ async function submitCurrentRun(session) {
 
 async function restartIntoNextRun(session) {
   const restarted = await session.execute(`
-    var handoff = document.getElementById("calibrationHandoffSection");
+    var handoff = document.getElementById("firstSessionEntryHandoffSection");
     if (handoff && !handoff.classList.contains("hidden")) {
-      var cont = document.getElementById("calibrationHandoffContinueBtn");
+      var cont = document.getElementById("firstSessionEntryHandoffContinueBtn");
       if (cont) {
         cont.click();
         return true;
@@ -255,7 +255,7 @@ async function restartIntoNextRun(session) {
   );
 }
 
-async function completeCalibrationThroughHandoffContinue(session) {
+async function completeFirstSessionEntryThroughHandoffContinue(session) {
   await beginRun(session);
 
   for (let index = 0; index < SMOKE_RUN_TEXTS.length; index += 1) {
@@ -267,15 +267,15 @@ async function completeCalibrationThroughHandoffContinue(session) {
   }
 
   await session.execute(`
-    var sec = document.getElementById("calibrationHandoffSection");
+    var sec = document.getElementById("firstSessionEntryHandoffSection");
     if (sec && !sec.classList.contains("hidden")) {
-      var cont = document.getElementById("calibrationHandoffContinueBtn");
+      var cont = document.getElementById("firstSessionEntryHandoffContinueBtn");
       if (cont) cont.click();
     }
   `);
 
   await session.waitFor(
-    "editor writable after optional calibration handoff",
+    "editor writable after optional firstSessionEntry handoff",
     async () =>
       await session.execute(`
         var editor = document.getElementById("editorInput");
@@ -290,7 +290,7 @@ async function completeCalibrationThroughHandoffContinue(session) {
 }
 
 async function unlockPatternsTab(session) {
-  await completeCalibrationThroughHandoffContinue(session);
+  await completeFirstSessionEntryThroughHandoffContinue(session);
 
   await session.waitFor(
     "Patterns tab to unlock",
@@ -318,8 +318,7 @@ async function readDesktopWritingColumnLayoutSnapshot(session) {
     var editor = document.querySelector(".editor-shell");
     var pc = document.getElementById("promptCard");
     var pt = document.getElementById("promptText");
-    var topline = document.getElementById("promptFamilyLabel");
-    var nudge = document.getElementById("promptNudgeShell");
+    var nudge = document.getElementById("entryDelayHintShell");
     var nextPass = document.getElementById("mirrorNextPassSlot");
     function top(el) {
       return el ? Math.round(el.getBoundingClientRect().top) : null;
@@ -339,16 +338,14 @@ async function readDesktopWritingColumnLayoutSnapshot(session) {
       editorShellTop: top(editor),
       promptCardTop: pct,
       promptTextTop: top(pt),
-      promptFamilyTop: top(topline),
-      promptNudgeTop: nudge && !nudge.classList.contains("prompt-nudge-shell--hidden") ? top(nudge) : null,
+      entryDelayHintTop: nudge && !nudge.classList.contains("entry-delay-hint-shell--hidden") ? top(nudge) : null,
       mirrorNextPassVisible: Boolean(nextPass && !nextPass.classList.contains("hidden")),
       mirrorNextPassHeight:
         nextPass && !nextPass.classList.contains("hidden")
           ? Math.round(nextPass.getBoundingClientRect().height)
           : 0,
       gapPromptCardBelowHeader: hb != null && pct != null ? Math.round(pct - hb) : null,
-      gapPromptFamilyBelowHeader:
-        hb != null && topline ? Math.round(top(topline) - hb) : null
+      gapPromptFamilyBelowHeader: null
     };
   `);
 }
@@ -495,9 +492,8 @@ async function verifyDesktopReflectionPostSubmit(session, layoutBefore, expectSe
   assertLayoutTopDidNotShiftUp(".editor-shell top", layoutBefore.editorShellTop, layoutAfter.editorShellTop, tolPx);
   assertLayoutTopDidNotShiftUp("#promptCard top", layoutBefore.promptCardTop, layoutAfter.promptCardTop, tolPx);
   assertLayoutTopDidNotShiftUp("#promptText top", layoutBefore.promptTextTop, layoutAfter.promptTextTop, tolPx);
-  assertLayoutTopDidNotShiftUp("#promptFamilyLabel top", layoutBefore.promptFamilyTop, layoutAfter.promptFamilyTop, tolPx);
-  if (layoutBefore.promptNudgeTop != null && layoutAfter.promptNudgeTop != null) {
-    assertLayoutTopDidNotShiftUp("#promptNudge top", layoutBefore.promptNudgeTop, layoutAfter.promptNudgeTop, tolPx);
+  if (layoutBefore.entryDelayHintTop != null && layoutAfter.entryDelayHintTop != null) {
+    assertLayoutTopDidNotShiftUp("#entryDelayHint top", layoutBefore.entryDelayHintTop, layoutAfter.entryDelayHintTop, tolPx);
   }
   assertLayoutTopDidNotShiftUp("header bottom rule", layoutBefore.headerBottom, layoutAfter.headerBottom, tolPx);
   assert.equal(
@@ -511,7 +507,7 @@ async function verifyDesktopReflectionPostSubmit(session, layoutBefore, expectSe
     "expected editor pill band geometry for invariance checks"
   );
   const continuationShiftAllowance =
-    layoutAfter.mirrorNextPassVisible && layoutBefore.promptNudgeTop == null
+    layoutAfter.mirrorNextPassVisible && layoutBefore.entryDelayHintTop == null
       ? layoutAfter.mirrorNextPassHeight + 14
       : 3;
   assert.ok(
@@ -588,7 +584,7 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
       var write = document.getElementById("writeView");
       var editor = document.getElementById("editorInput");
       var prompt = document.getElementById("promptText");
-      var nudge = document.getElementById("promptNudgeShell");
+      var nudge = document.getElementById("entryDelayHintShell");
       var permission = document.getElementById("editorPermissionPhrase");
       return {
         appHidden: app?.getAttribute("aria-hidden") === "true",
@@ -596,7 +592,7 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
         editorEditable: editor?.getAttribute("contenteditable") === "true",
         promptLen: String(prompt?.textContent || "").trim().length,
         promptId: String(window.waywordAppState?.state?.promptId || ""),
-        promptNudgeVisible: Boolean(nudge && !nudge.classList.contains("prompt-nudge-shell--hidden")),
+        entryDelayHintVisible: Boolean(nudge && !nudge.classList.contains("entry-delay-hint-shell--hidden")),
         permissionVisible: Boolean(
           permission && !permission.classList.contains("editor-permission-phrase--hidden")
         )
@@ -609,9 +605,9 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
     assert.ok(writingSnapshot.promptLen > 0, "expected a prompt to render on the writing surface");
     assert.ok(
       /^cal_/.test(writingSnapshot.promptId),
-      "expected first-run prompt id to come from calibration pool"
+      "expected first-run prompt id to come from firstSessionEntry pool"
     );
-    assert.equal(writingSnapshot.promptNudgeVisible, false, "expected prompt nudge hidden on fresh load");
+    assert.equal(writingSnapshot.entryDelayHintVisible, false, "expected prompt nudge hidden on fresh load");
     assert.equal(writingSnapshot.permissionVisible, false, "expected permission phrase hidden on fresh load");
 
     const errors = await readSmokeErrors(session);
@@ -708,16 +704,16 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
     const snapshot = await session.execute(`
       var bar = document.getElementById("editorSemanticStatusBar");
       var overlay = document.getElementById("editorOverlay");
-      var calibrationOverlay =
+      var firstSessionEntryOverlay =
         overlay &&
         !overlay.classList.contains("hidden") &&
-        overlay.classList.contains("editor-overlay--calibration");
+        overlay.classList.contains("editor-overlay--firstSessionEntry");
       return {
         evidenceControlCount: document.querySelectorAll(
           "#mirrorReflectionRoot .mirror-card__evidence-toggle, #mirrorReflectionRoot [data-mirror-evidence], #mirrorReflectionRoot [aria-controls*='evidence']"
         ).length,
         mirrorCardCount: document.querySelectorAll("#mirrorReflectionRoot .mirror-card").length,
-        calibrationOverlay,
+        firstSessionEntryOverlay,
         recentRailCount: document.querySelectorAll("#recentRailList .recent-entry").length,
         semanticBarHidden: bar ? bar.classList.contains("hidden") : true,
         semanticBarPostRunMuted: bar ? bar.classList.contains("semantic-status-bar--post-run-muted") : false
@@ -725,8 +721,8 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
     `);
 
     assert.ok(
-      snapshot.mirrorCardCount >= 1 || snapshot.calibrationOverlay,
-      "expected Mirror card after post-calibration submit, or calibration baseline overlay on first-run submit"
+      snapshot.mirrorCardCount >= 1 || snapshot.firstSessionEntryOverlay,
+      "expected Mirror card after post-firstSessionEntry submit, or firstSessionEntry baseline overlay on first-run submit"
     );
     assert.equal(snapshot.evidenceControlCount, 0, "V1 Mirror cards should not render visible evidence controls");
     assert.ok(snapshot.recentRailCount >= 1, "expected the saved run to appear in Recent Runs");
@@ -749,11 +745,11 @@ test("browser smoke: mobile focus exit with Mirror visible does not introduce do
   await withSmokeSession(t, async (session) => {
     await session.setWindowRect({ height: 852, width: 393, x: 0, y: 0 });
     await loadFreshApp(session);
-    await completeCalibrationThroughHandoffContinue(session);
+    await completeFirstSessionEntryThroughHandoffContinue(session);
 
     await session.click("#editorInput");
     await session.waitFor(
-      "mobile focus mode active before post-calibration submit",
+      "mobile focus mode active before post-firstSessionEntry submit",
       async () =>
         await session.execute(`
           return document.body.classList.contains("focus-mode");
@@ -777,7 +773,7 @@ test("browser smoke: mobile focus exit with Mirror visible does not introduce do
 
     assert.ok(
       mirrorSnapshot.mirrorSectionVisible,
-      "expected Mirror reflection section with cards after post-calibration submit"
+      "expected Mirror reflection section with cards after post-firstSessionEntry submit"
     );
     assert.equal(
       mirrorSnapshot.focusModeBeforeFold,
@@ -888,7 +884,7 @@ test("browser smoke: prompt reroll works with empty editor and locks once the ed
     `);
     assert.ok(
       /^cal_/.test(promptIdAfterReroll),
-      "expected calibration reroll to keep prompt ids in the calibration pool"
+      "expected firstSessionEntry reroll to keep prompt ids in the firstSessionEntry pool"
     );
 
     await fillEditor(session, "smoke reroll guard draft");
@@ -933,7 +929,7 @@ test("browser smoke: desktop Reflection readable when semantic pill row is hidde
   await withSmokeSession(t, async (session) => {
     await session.setWindowRect({ height: 900, width: 1600, x: 0, y: 0 });
     await loadFreshApp(session);
-    await completeCalibrationThroughHandoffContinue(session);
+    await completeFirstSessionEntryThroughHandoffContinue(session);
     await fillEditor(session, DESKTOP_REFLECTION_NO_SEM_PILL_TEXT);
 
     const layoutBefore = await readDesktopWritingColumnLayoutSnapshot(session);
@@ -956,7 +952,7 @@ test("browser smoke: desktop Reflection readable when semantic pill row is visib
   await withSmokeSession(t, async (session) => {
     await session.setWindowRect({ height: 900, width: 1600, x: 0, y: 0 });
     await loadFreshApp(session);
-    await completeCalibrationThroughHandoffContinue(session);
+    await completeFirstSessionEntryThroughHandoffContinue(session);
     await fillEditor(session, DESKTOP_REFLECTION_STRESS_TEXT);
 
     const layoutBefore = await readDesktopWritingColumnLayoutSnapshot(session);
@@ -1312,7 +1308,7 @@ test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (
         writeViewVisible: Boolean(writeView && !writeView.classList.contains("hidden"))
       };
     `);
-    assert.equal(patternsLockedAfterClear.styleTabHidden, true, "Patterns tab hides below calibration threshold after clear");
+    assert.equal(patternsLockedAfterClear.styleTabHidden, true, "Patterns tab hides below firstSessionEntry threshold after clear");
     assert.equal(patternsLockedAfterClear.profileHidden, true, "Patterns panel closes immediately after clear");
     assert.equal(patternsLockedAfterClear.writeViewVisible, true, "writing surface remains visible after clear");
 
@@ -1331,7 +1327,7 @@ test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (
     const postClearPromptSnapshot = await session.execute(`
       return {
         promptId: String(window.waywordAppState?.state?.promptId || ""),
-        handoffAck: String(window.localStorage.getItem("wayword-calibration-handoff-ack") || ""),
+        handoffAck: String(window.localStorage.getItem("wayword-firstSessionEntry-handoff-ack") || ""),
         runCount:
           window.waywordSavedRunsRead &&
           typeof window.waywordSavedRunsRead.listSavedRunsChronological === "function"
@@ -1341,9 +1337,9 @@ test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (
     `);
     assert.ok(
       /^cal_/.test(postClearPromptSnapshot.promptId),
-      "expected prompt selection to reset to calibration pool after clear"
+      "expected prompt selection to reset to firstSessionEntry pool after clear"
     );
-    assert.equal(postClearPromptSnapshot.handoffAck, "", "expected calibration handoff acknowledgment to reset");
+    assert.equal(postClearPromptSnapshot.handoffAck, "", "expected firstSessionEntry handoff acknowledgment to reset");
     assert.equal(postClearPromptSnapshot.runCount, 0, "expected saved run count to be zero after clear");
 
     for (let index = 0; index < SMOKE_RUN_TEXTS.length; index += 1) {
@@ -1355,12 +1351,12 @@ test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (
     }
 
     await session.waitFor(
-      "post-clear calibration handoff appears on threshold run",
+      "post-clear firstSessionEntry handoff appears on threshold run",
       async () =>
         await session.execute(`
-          var sec = document.getElementById("calibrationHandoffSection");
-          var continueBtn = document.getElementById("calibrationHandoffContinueBtn");
-          var viewPatternsBtn = document.getElementById("calibrationHandoffViewPatternsBtn");
+          var sec = document.getElementById("firstSessionEntryHandoffSection");
+          var continueBtn = document.getElementById("firstSessionEntryHandoffContinueBtn");
+          var viewPatternsBtn = document.getElementById("firstSessionEntryHandoffViewPatternsBtn");
           return Boolean(
             sec &&
             !sec.classList.contains("hidden") &&

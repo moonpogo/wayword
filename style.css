@@ -39,8 +39,8 @@
   --editor-shell-outer-1:0 1px 0 rgba(0, 0, 0, 0.04);
   --editor-shell-outer-2:0 6px 18px rgba(0, 0, 0, 0.06);
 
-  /* In-editor calibration: restrained central band (~40–55% of shell width, capped in rem) */
-  --editor-calibration-overlay-width:min(52%, 25rem);
+  /* In-editor firstSessionEntry: restrained central band (~40–55% of shell width, capped in rem) */
+  --editor-firstSessionEntry-overlay-width:min(52%, 25rem);
   --meta-gap:1px;
 
   /* Review Runs rail / drawer: one top inset under the write deck + matched heading row height */
@@ -720,17 +720,25 @@ button,input,textarea{
 .header-actions{
   grid-area:actions;
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:flex-end;
   gap:10px;
-  align-self:center;
+  align-self:start;
   flex-wrap:nowrap;
+}
+
+.right-control-spine{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  gap:6px;
+  min-width:40px;
 }
 
 .control-label,
 .section-title,
-.mini-label,
-.prompt-topline{
+.mini-label{
   font-size:11px;
   letter-spacing:.08em;
   text-transform:uppercase;
@@ -738,12 +746,11 @@ button,input,textarea{
 }
 
 .style-tab{
-  grid-area:actions;
   position:relative;
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  align-self:end;
+  align-self:flex-end;
   white-space:nowrap;
   /* Sit on the header bottom rule: overlap padding + border, but pull up a few px so the tab
      mounts to the upper rule instead of sitting deep in the gap above the prompt border. */
@@ -801,7 +808,6 @@ button,input,textarea{
   display:none !important;
 }
 
-.prompt-topline{letter-spacing:.1em;margin-bottom:4px}
 .card-section-title{margin-bottom:14px}
 
 .wordmark{
@@ -1041,202 +1047,80 @@ html[data-theme="dark"] .theme-moon{
 /* prompt */
 
 .prompt-card{
+  --prompt-row-inset-y:10px;
+  --prompt-control-grid-size:28px;
+  --prompt-control-reroll-size:30px;
+  --prompt-control-gap:2px;
+  --prompt-control-stack-h:calc(var(--prompt-control-grid-size) + var(--prompt-control-reroll-size) + var(--prompt-control-gap));
   border-top:2px solid var(--ink);
   border-bottom:1px solid var(--line);
-  padding:8px 0 10px;
-  margin-bottom:10px;
+  padding:var(--prompt-row-inset-y) 0;
+  margin-bottom:8px;
+  position:relative;
+  min-height:calc(var(--prompt-control-stack-h) + (var(--prompt-row-inset-y) * 2));
 }
 
 .prompt-main{
-  min-width:0;
-}
-
-.prompt-meta-row{
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:4px;
-}
-
-.prompt-meta-left{
-  display:inline-flex;
-  align-items:center;
-  gap:var(--meta-gap);
   min-width:0;
-  flex:0 1 auto;
+  min-height:var(--prompt-control-stack-h);
+  padding-right:42px;
 }
 
-.prompt-meta-row .prompt-topline{
-  min-width:0;
-  flex:0 0 auto;
-  margin-bottom:0;
-}
-
-.prompt-meta-actions{
-  /* Right utility cluster: fold aligns to the row/rule right endpoint. */
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-  flex:0 0 auto;
-  margin:0 0 0 auto;
-  padding:0;
-  min-height:36px;
-  position:relative;
-  isolation:isolate;
-  pointer-events:none;
+.prompt-control-spine{
+  position:absolute;
+  top:var(--prompt-row-inset-y);
+  right:0;
+  z-index:2;
+  display:grid;
+  grid-template-rows:var(--prompt-control-grid-size) var(--prompt-control-reroll-size);
+  row-gap:var(--prompt-control-gap);
+  align-items:start;
+  justify-items:center;
+  align-content:start;
+  width:30px;
+  min-width:30px;
+  height:var(--prompt-control-stack-h);
+  min-height:var(--prompt-control-stack-h);
+  margin:0;
 }
 
 .prompt-reroll-btn::after,
-.prompt-meta-actions .field-expand-toggle svg,
-.prompt-meta-actions .field-expand-toggle svg *{
+.right-control-spine .field-expand-toggle svg,
+.right-control-spine .field-expand-toggle svg *{
   pointer-events:none;
 }
 
 .prompt-text{
-  font-size:25px;
-  line-height:1.22;
-  margin:0 0 2px;
-}
-
-/* When the ritual nudge is visible, let the nudge own vertical rhythm below the prompt (class toggled in renderMeta; avoid :has for WebKit + fixed landing hit-testing). */
-.prompt-main--with-nudge .prompt-text{
-  margin-bottom:0;
-}
-
-/* Shared guidance lane under the prompt: subtle wash, quiet secondary voice (not a card/CTA). */
-.prompt-nudge-shell,
-.mirror-next-pass-nudge{
-  display:block;
-  width:100%;
-  margin:clamp(10px, 1.75vw, 14px) 0 0;
-  margin-inline:0;
-}
-
-.prompt-nudge,
-.mirror-next-pass-nudge{
-  display:block;
-  width:100%;
-  margin:clamp(10px, 1.75vw, 14px) 0 0;
-  padding-block:9px 11px;
-  /* Same horizontal source as `.editor-input` (`--wayword-editor-pad-inline`); −4px aligns text with the writing lane. */
-  padding-inline:calc(var(--wayword-editor-pad-inline) - 4px);
-  border:none;
-  border-radius:2px;
-  font-size:12px;
-  line-height:1.42;
-  letter-spacing:0.01em;
-  text-align:left;
-  max-width:100%;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  -webkit-appearance:none;
-  appearance:none;
-}
-
-.prompt-nudge-shell{
-  overflow:hidden;
-  max-height:86px;
-  clip-path:inset(0 0 0 0);
-  transition:
-    max-height 1040ms cubic-bezier(.18, .62, .18, 1),
-    margin-top 1040ms cubic-bezier(.18, .62, .18, 1),
-    clip-path 980ms cubic-bezier(.18, .62, .18, 1);
-}
-
-.prompt-nudge-shell--hidden{
-  max-height:0;
-  margin-top:0;
-  clip-path:inset(0 0 100% 0);
-  pointer-events:none;
-}
-
-.prompt-main:not(.prompt-main--latent-nudge) .prompt-nudge-shell--hidden{
-  display:none;
-}
-
-.prompt-nudge{
-  position:relative;
+  font-size:28px;
+  line-height:1.18;
   margin:0;
-  font-style:italic;
-  font-weight:400;
-  color:color-mix(in srgb, var(--ink) 3%, var(--muted));
-  background:transparent;
-  transform:translateY(0);
-  transition:transform 1020ms cubic-bezier(.16, .72, .18, 1);
 }
 
-.prompt-nudge::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  border-radius:2px;
-  background:color-mix(in srgb, var(--muted) 10%, var(--panel));
-  opacity:1;
-  transition:opacity 840ms cubic-bezier(.22, .08, .18, 1) 160ms;
+.prompt-control-spine #fieldExpandedToggle{
+  grid-row:1;
+  width:var(--prompt-control-grid-size);
+  height:var(--prompt-control-grid-size);
+  min-width:var(--prompt-control-grid-size);
+  min-height:var(--prompt-control-grid-size);
+  margin:0;
+  padding:0;
+  align-self:start;
+  justify-self:center;
 }
 
-.prompt-nudge-text{
-  position:relative;
-  z-index:1;
-  opacity:1;
-  transition:opacity 760ms cubic-bezier(.22, .08, .18, 1) 280ms;
-}
-
-.prompt-nudge-shell--hidden .prompt-nudge{
-  transform:translateY(5px);
-}
-
-.prompt-nudge-shell--hidden .prompt-nudge::before,
-.prompt-nudge-shell--hidden .prompt-nudge-text{
-  opacity:0;
-  transition-delay:0ms;
-}
-
-html[data-theme="dark"] .prompt-nudge{
-  color:color-mix(in srgb, var(--ink) 4%, var(--muted));
-}
-
-html[data-theme="dark"] .prompt-nudge::before{
-  background:color-mix(in srgb, var(--ink) 9%, var(--panel));
-}
-
-@media (prefers-reduced-motion: reduce){
-  .prompt-nudge-shell,
-  .prompt-nudge::before,
-  .prompt-nudge-text,
-  .prompt-nudge{
-    transition:none;
-  }
-}
-
-/* Post-submit note shares the same lane, slightly stronger for resting-state contrast. */
-.mirror-next-pass-nudge{
-  background:color-mix(in srgb, var(--muted) 12%, var(--panel));
-  color:color-mix(in srgb, var(--ink) 14%, var(--muted));
-  font-style:italic;
-  font-weight:450;
-  cursor:default;
-}
-
-.mirror-next-pass-nudge:hover{
-  color:color-mix(in srgb, var(--ink) 14%, var(--muted));
-  text-decoration:none;
-}
-
-html[data-theme="dark"] .mirror-next-pass-nudge{
-  background:color-mix(in srgb, var(--ink) 11%, var(--panel));
-  color:color-mix(in srgb, var(--ink) 11%, var(--muted));
-}
-
-/* Post-run guidance under the prompt (not inside the reflection stack). */
-.mirror-next-pass-slot{
-  min-width:0;
-}
-
-.mirror-next-pass-slot.hidden{
-  display:none;
+.prompt-control-spine #promptRerollBtn{
+  grid-row:2;
+  width:var(--prompt-control-reroll-size);
+  height:var(--prompt-control-reroll-size);
+  min-width:var(--prompt-control-reroll-size);
+  min-height:var(--prompt-control-reroll-size);
+  margin:0;
+  padding:0;
+  align-self:start;
+  justify-self:center;
+  transform:none !important;
 }
 
 .mirror-the-cut-hint{
@@ -1298,7 +1182,7 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
   justify-content:center;
   overflow:visible;
   line-height:0;
-  margin-left:-10px;
+  margin-left:0;
 }
 
 /* Hover only for real pointers — touch Safari keeps :hover after tap and the badge reads as “selected.” */
@@ -1445,14 +1329,14 @@ html[data-theme="dark"] .mirror-next-pass-nudge{
   }
 }
 
-/* Timer gradient reads as a “wash” when calibration is a compact island — hide while overlay is up */
-.editor-shell:has(#editorOverlay:not(.hidden).editor-overlay--calibration) .editor-time-fill{
+/* Timer gradient reads as a “wash” when firstSessionEntry is a compact island — hide while overlay is up */
+.editor-shell:has(#editorOverlay:not(.hidden).editor-overlay--firstSessionEntry) .editor-time-fill{
   opacity:0;
   visibility:hidden;
   transition:none;
 }
 
-/* Post-run calibration: gear + progress fade out via JS (.ui-hidden); avoid snapping the whole chrome strip */
+/* Post-run firstSessionEntry: gear + progress fade out via JS (.ui-hidden); avoid snapping the whole chrome strip */
 
 .highlight-layer,
 .editor-input{
@@ -1769,13 +1653,13 @@ html[data-theme="dark"] .editor-permission-phrase{
   box-shadow:0 10px 30px rgba(0,0,0,0.14);
 }
 
-.editor-overlay.editor-overlay--calibration{
+.editor-overlay.editor-overlay--firstSessionEntry{
   inset:auto;
   left:50%;
   top:50%;
   bottom:auto;
   right:auto;
-  width:var(--editor-calibration-overlay-width);
+  width:var(--editor-firstSessionEntry-overlay-width);
   max-width:100%;
   max-height:min(88vh, calc(100% - 48px));
   height:auto;
@@ -1798,7 +1682,7 @@ html[data-theme="dark"] .editor-permission-phrase{
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
-html[data-theme="dark"] .editor-overlay.editor-overlay--calibration{
+html[data-theme="dark"] .editor-overlay.editor-overlay--firstSessionEntry{
   background:color-mix(in srgb, var(--panel) 55%, rgba(0, 0, 0, 0.2) 45%);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.06),
@@ -1806,13 +1690,13 @@ html[data-theme="dark"] .editor-overlay.editor-overlay--calibration{
 }
 
 @media (prefers-reduced-motion:reduce){
-  .editor-overlay.editor-overlay--calibration{
+  .editor-overlay.editor-overlay--firstSessionEntry{
     -webkit-backdrop-filter:none;
     backdrop-filter:none;
   }
 }
 
-.editor-overlay-card--calibration{
+.editor-overlay-card--firstSessionEntry{
   --calib-emerge-y:clamp(-0.85rem, -3.5vh, -1.75rem);
   flex:0 0 auto;
   align-self:stretch;
@@ -1837,16 +1721,16 @@ html[data-theme="dark"] .editor-overlay.editor-overlay--calibration{
   gap:0;
   pointer-events:auto;
   cursor:pointer;
-  animation:editor-calibration-emerge var(--motion-duration-panel) var(--motion-ease-out) both;
+  animation:editor-firstSessionEntry-emerge var(--motion-duration-panel) var(--motion-ease-out) both;
 }
 
-.editor-overlay-calibration{
+.editor-overlay-firstSessionEntry{
   max-width:100%;
   width:100%;
   margin:0;
 }
 
-@keyframes editor-calibration-emerge{
+@keyframes editor-firstSessionEntry-emerge{
   from{
     opacity:0.88;
     transform:translateY(calc(var(--calib-emerge-y) + var(--motion-shift-tight)));
@@ -1859,11 +1743,11 @@ html[data-theme="dark"] .editor-overlay.editor-overlay--calibration{
   }
 }
 
-.editor-overlay-card--calibration.editor-overlay-card--calibration-dismiss{
-  animation:editor-calibration-dismiss var(--motion-duration-base) var(--motion-ease-out) forwards;
+.editor-overlay-card--firstSessionEntry.editor-overlay-card--firstSessionEntry-dismiss{
+  animation:editor-firstSessionEntry-dismiss var(--motion-duration-base) var(--motion-ease-out) forwards;
 }
 
-@keyframes editor-calibration-dismiss{
+@keyframes editor-firstSessionEntry-dismiss{
   from{
     opacity:1;
     transform:translateY(var(--calib-emerge-y));
@@ -1877,7 +1761,7 @@ html[data-theme="dark"] .editor-overlay.editor-overlay--calibration{
 }
 
 @media (prefers-reduced-motion:reduce){
-  .editor-overlay-card--calibration{
+  .editor-overlay-card--firstSessionEntry{
     animation:none;
     opacity:1;
     box-shadow:none;
@@ -1885,7 +1769,7 @@ html[data-theme="dark"] .editor-overlay.editor-overlay--calibration{
   }
 }
 
-.editor-overlay-calibration-head{
+.editor-overlay-firstSessionEntry-head{
   display:flex;
   align-items:baseline;
   justify-content:space-between;
@@ -1894,7 +1778,7 @@ html[data-theme="dark"] .editor-overlay.editor-overlay--calibration{
   margin-bottom:14px;
 }
 
-.editor-overlay-calibration-label{
+.editor-overlay-firstSessionEntry-label{
   font-size:7.5px;
   font-weight:300;
   letter-spacing:0.26em;
@@ -1903,39 +1787,39 @@ html[data-theme="dark"] .editor-overlay.editor-overlay--calibration{
   opacity:0.82;
 }
 
-.editor-overlay-calibration-progress{
+.editor-overlay-firstSessionEntry-progress{
   font-size:11.5px;
   font-weight:400;
   letter-spacing:0.025em;
   color:color-mix(in srgb, var(--muted) 68%, var(--ink) 32%);
 }
 
-.editor-overlay-calibration-meter-wrap{
+.editor-overlay-firstSessionEntry-meter-wrap{
   width:56%;
   max-width:11.5rem;
   align-self:flex-start;
   margin:0 0 30px;
 }
 
-.editor-overlay-calibration-meter{
+.editor-overlay-firstSessionEntry-meter{
   height:5px;
   border-radius:999px;
   background:color-mix(in srgb, var(--soft) 88%, var(--line) 12%);
   overflow:hidden;
 }
 
-.editor-overlay-calibration-meter-fill{
+.editor-overlay-firstSessionEntry-meter-fill{
   height:100%;
   border-radius:inherit;
   background:color-mix(in srgb, var(--ink) 32%, var(--muted) 68%);
   transition:width 0.42s cubic-bezier(0.22, 1, 0.32, 1);
 }
 
-html[data-theme="dark"] .editor-overlay-calibration-meter-fill{
+html[data-theme="dark"] .editor-overlay-firstSessionEntry-meter-fill{
   background:color-mix(in srgb, var(--ink) 42%, var(--muted) 58%);
 }
 
-.editor-overlay-calibration-observation{
+.editor-overlay-firstSessionEntry-observation{
   margin:0 0 26px;
   font-size:15px;
   line-height:1.58;
@@ -1943,7 +1827,7 @@ html[data-theme="dark"] .editor-overlay-calibration-meter-fill{
   font-weight:400;
 }
 
-.editor-overlay-calibration--insufficient .editor-overlay-calibration-observation{
+.editor-overlay-firstSessionEntry--insufficient .editor-overlay-firstSessionEntry-observation{
   color:color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
 }
 
@@ -2017,7 +1901,7 @@ html[data-theme="dark"] .editor-overlay-calibration-meter-fill{
   transform:rotate(40deg) scale(0.95);
 }
 
-/* Subtle settle-away (calibration overlay); not display:none — layout stays stable */
+/* Subtle settle-away (firstSessionEntry overlay); not display:none — layout stays stable */
 .ui-hidden{
   opacity:0;
   transform:translateY(4px);
@@ -2072,13 +1956,13 @@ html[data-theme="dark"] .editor-time-fill{
   visibility:hidden;
 }
 
-.editor-shell:has(#editorOverlay:not(.hidden).editor-overlay--calibration) .editor-post-run-line{
+.editor-shell:has(#editorOverlay:not(.hidden).editor-overlay--firstSessionEntry) .editor-post-run-line{
   opacity:0;
   visibility:hidden;
 }
 
 .field-expand-toggle{
-  display:none;
+  display:inline-flex;
   box-sizing:border-box;
   flex:0 0 auto;
   align-items:center;
@@ -2140,7 +2024,7 @@ html[data-theme="dark"] .editor-time-fill{
   --fold-square-shift:-0.22px;
 }
 
-.prompt-meta-actions .field-expand-toggle{
+.right-control-spine .field-expand-toggle{
   position:relative;
   z-index:2;
   justify-content:center;
@@ -2158,49 +2042,25 @@ html[data-theme="dark"] .editor-time-fill{
 }
 
 @media (max-width:720px){
-  /* Mobile header logic:
-     - Left cluster: category + subtle cycle utility
-     - Right cluster: fold utility anchored to the row/rule right edge */
-  .prompt-meta-row{
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
+  .right-control-spine:not(.prompt-control-spine){
+    gap:5px;
   }
 
-  .prompt-meta-left{
-    min-width:0;
-    flex:0 1 auto;
-  }
-
-  .prompt-meta-actions{
-    margin-left:auto;
-    min-height:36px;
-    flex:0 0 36px;
-    width:36px;
-    justify-content:flex-end;
-  }
-
-  /* Cycle remains secondary on mobile via opacity only; spacing/size stay system-consistent. */
+  /* Pencil remains secondary on mobile via opacity only; spacing/size stay system-consistent. */
   .prompt-reroll-btn{
     opacity:0.42;
   }
 
-  /* Right utility visually terminates at the right endpoint of the top rule. */
-  .prompt-meta-actions .field-expand-toggle{
+  .right-control-spine .field-expand-toggle{
     width:36px;
     height:36px;
-    justify-content:flex-end;
+    justify-content:center;
     padding-left:0;
     padding-right:0;
   }
 
-  .prompt-meta-actions .field-expand-toggle svg{
+  .right-control-spine .field-expand-toggle svg{
     transform:none;
-  }
-
-  /* Field grid: same slot in focused and expanded field; visible whenever write view is up. */
-  #appView:not([aria-hidden="true"]) #writeView:not(.hidden) .field-expand-toggle{
-    display:inline-flex;
   }
 
   body.focus-mode .editor-post-run-line{
@@ -2225,12 +2085,12 @@ html[data-theme="dark"] .editor-time-fill{
   }
 }
 
-/* Calibration composing: hide word target / count chrome so it does not compete with sentence nudges. */
-body.calibration-writing-mode .editor-bottom-chrome-center .editor-progress,
-body.calibration-writing-mode #wordTargetLabelPanel,
-body.calibration-writing-mode #wordModesPanel,
-body.calibration-writing-mode #wordTargetLabelSetup,
-body.calibration-writing-mode #wordModes{
+/* FirstSessionEntry composing: hide word target / count chrome so it does not compete with sentence nudges. */
+body.firstSessionEntry-writing-mode .editor-bottom-chrome-center .editor-progress,
+body.firstSessionEntry-writing-mode #wordTargetLabelPanel,
+body.firstSessionEntry-writing-mode #wordModesPanel,
+body.firstSessionEntry-writing-mode #wordTargetLabelSetup,
+body.firstSessionEntry-writing-mode #wordModes{
   display:none !important;
 }
 
@@ -2440,7 +2300,7 @@ html[data-theme="dark"] .editor-progress:not([data-phase="done"]) .editor-progre
 }
 
 body.focus-mode #profileSummarySection,
-#writeView:has(#editorOverlay:not(.hidden).editor-overlay--calibration) #profileSummarySection{
+#writeView:has(#editorOverlay:not(.hidden).editor-overlay--firstSessionEntry) #profileSummarySection{
   display:none !important;
 }
 
@@ -2571,16 +2431,6 @@ body.focus-mode #profileSummarySection,
     max-width:100%;
   }
 
-  /* Nudge: same lane as editor text below 981px; allow wrapping (base `white-space:nowrap` only matched ≤720 before). */
-  .prompt-main .prompt-nudge,
-  .prompt-main .mirror-next-pass-nudge,
-  .prompt-main .mirror-next-pass-slot .mirror-next-pass-nudge{
-    white-space:normal;
-    overflow-wrap:anywhere;
-    word-wrap:break-word;
-    overflow:visible;
-    text-overflow:clip;
-  }
 }
 
 @media (min-width:981px){
@@ -6265,10 +6115,6 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     padding:6px 0 8px;
   }
 
-  .prompt-meta-row{
-    margin-bottom:2px;
-  }
-
   .prompt-text{
     margin:0 0 3px;
   }
@@ -6311,29 +6157,10 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     padding:4px 0 6px;
   }
 
-  body.keyboard-open .prompt-meta-row{
-    margin-bottom:0;
-  }
-
   body.keyboard-open .prompt-text{
     font-size:clamp(18px, 5.2vw, 22px);
     line-height:1.14;
     margin:0 0 2px;
-  }
-
-  body.keyboard-open .prompt-nudge-shell,
-  body.keyboard-open .mirror-next-pass-nudge{
-    font-size:clamp(12px, 3.4vw, 14px);
-    line-height:1.32;
-    margin-top:clamp(8px, 1.4vw, 11px);
-  }
-
-  body.keyboard-open .prompt-nudge,
-  body.keyboard-open .mirror-next-pass-nudge{
-    font-size:clamp(12px, 3.4vw, 14px);
-    line-height:1.32;
-    padding-top:5px;
-    padding-bottom:6px;
   }
 
   body.keyboard-open #recentWritingTrigger{
@@ -6450,8 +6277,13 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     margin:0;
     padding:0;
     border:none;
-    overflow:hidden;
-    pointer-events:none;
+    overflow:visible;
+    pointer-events:auto;
+  }
+
+  body.focus-mode:not(.expanded-field) .header-brand,
+  body.focus-mode:not(.expanded-field) .style-tab{
+    display:none !important;
   }
 
   body.focus-mode.expanded-field .header{
@@ -6522,16 +6354,6 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   body.focus-mode .prompt-text{
     font-size:21px;
     line-height:1.16;
-  }
-
-  body.focus-mode .prompt-nudge{
-    font-size:13px;
-    line-height:1.32;
-  }
-
-  body.focus-mode .mirror-next-pass-nudge{
-    font-size:13px;
-    line-height:1.32;
   }
 
   body.focus-mode .editor-shell{
@@ -6671,22 +6493,9 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     padding:4px 0 6px;
   }
 
-  body.focus-mode .prompt-topline{
-    margin-bottom:2px;
-    font-size:10px;
-  }
-
   body.focus-mode .prompt-text{
     font-size:18px;
     line-height:1.12;
-  }
-
-  body.focus-mode .prompt-nudge{
-    font-size:12px;
-  }
-
-  body.focus-mode .mirror-next-pass-nudge{
-    font-size:12px;
   }
 
   body.focus-mode .editor-shell{
@@ -6780,14 +6589,6 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
 
   body.focus-mode .prompt-text{
     font-size:16px;
-  }
-
-  body.focus-mode .prompt-nudge{
-    font-size:11px;
-  }
-
-  body.focus-mode .mirror-next-pass-nudge{
-    font-size:11px;
   }
 
   body.focus-mode .editor-shell{
@@ -7041,7 +6842,7 @@ html[data-theme="dark"] .metric-explainer{
   display:none;
 }
 
-.calibration-handoff-section{
+.firstSessionEntry-handoff-section{
   box-sizing:border-box;
   margin-top:0.75rem;
   padding:0.75rem 0.85rem 0.85rem;
@@ -7051,11 +6852,11 @@ html[data-theme="dark"] .metric-explainer{
   background:color-mix(in srgb, var(--panel) 55%, transparent);
 }
 
-.calibration-handoff-section.hidden{
+.firstSessionEntry-handoff-section.hidden{
   display:none;
 }
 
-.calibration-handoff-title{
+.firstSessionEntry-handoff-title{
   margin:0 0 0.35rem;
   font-size:0.95rem;
   font-weight:600;
@@ -7063,21 +6864,21 @@ html[data-theme="dark"] .metric-explainer{
   color:var(--ink);
 }
 
-.calibration-handoff-body{
+.firstSessionEntry-handoff-body{
   margin:0 0 0.65rem;
   font-size:0.88rem;
   line-height:1.45;
   color:var(--muted);
 }
 
-.calibration-handoff-actions{
+.firstSessionEntry-handoff-actions{
   display:flex;
   flex-wrap:wrap;
   gap:0.5rem 0.65rem;
   align-items:center;
 }
 
-.calibration-handoff-btn{
+.firstSessionEntry-handoff-btn{
   margin:0;
   padding:0.45rem 0.85rem;
   font-size:0.82rem;
@@ -7091,23 +6892,23 @@ html[data-theme="dark"] .metric-explainer{
   touch-action:manipulation;
 }
 
-.calibration-handoff-btn--primary{
+.firstSessionEntry-handoff-btn--primary{
   font-weight:600;
   border-color:color-mix(in srgb, var(--ink) 18%, var(--line));
 }
 
-.calibration-handoff-btn--secondary{
+.firstSessionEntry-handoff-btn--secondary{
   font-weight:500;
   background:transparent;
 }
 
-.calibration-handoff-feedback{
+.firstSessionEntry-handoff-feedback{
   margin-top:0.6rem;
   padding-top:0.55rem;
   border-top:1px solid color-mix(in srgb, var(--line) 50%, transparent);
 }
 
-.calibration-handoff-feedback__title{
+.firstSessionEntry-handoff-feedback__title{
   margin:0 0 0.3rem;
   font-size:0.8rem;
   font-weight:600;
@@ -7116,14 +6917,14 @@ html[data-theme="dark"] .metric-explainer{
   opacity:0.9;
 }
 
-.calibration-handoff-feedback__body{
+.firstSessionEntry-handoff-feedback__body{
   margin:0 0 0.4rem;
   font-size:0.78rem;
   line-height:1.45;
   color:var(--muted);
 }
 
-.calibration-handoff-feedback__link{
+.firstSessionEntry-handoff-feedback__link{
   display:inline-block;
   font-size:0.78rem;
   line-height:1.35;
@@ -7135,16 +6936,16 @@ html[data-theme="dark"] .metric-explainer{
   touch-action:manipulation;
 }
 
-.calibration-handoff-feedback__link:hover{
+.firstSessionEntry-handoff-feedback__link:hover{
   color:var(--muted);
 }
 
-html[data-theme="dark"] .calibration-handoff-section{
+html[data-theme="dark"] .firstSessionEntry-handoff-section{
   background:color-mix(in srgb, var(--ink) 6%, var(--panel));
   border-color:color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
-html[data-theme="dark"] .calibration-handoff-feedback{
+html[data-theme="dark"] .firstSessionEntry-handoff-feedback{
   border-top-color:color-mix(in srgb, var(--ink) 20%, transparent);
 }
 
@@ -7279,8 +7080,6 @@ html[data-theme="dark"] .calibration-handoff-feedback{
   font-style:normal;
   opacity:0.9;
 }
-
-/* mirror-next-pass-nudge uses shared guidance lane styles near prompt-nudge. */
 
 /* Post-run mirror block: minimal upward settle when panel body mounts. */
 #mirrorReflectionSection:not(.hidden) .mirror-reflection-root{

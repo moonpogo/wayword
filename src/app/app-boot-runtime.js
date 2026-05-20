@@ -35,12 +35,12 @@
     return ro;
   }
 
-  function bindEditorCalibrationOverlayResizeObserver(input) {
+  function bindEditorFirstSessionEntryOverlayResizeObserver(input) {
     var overlay = input.$("editorOverlay");
     if (!overlay || typeof input.ResizeObserver === "undefined") return null;
     var ro = new input.ResizeObserver(function () {
-      if (overlay.classList.contains("editor-overlay--calibration") && !overlay.classList.contains("hidden")) {
-        input.syncEditorCalibrationOverlayClip();
+      if (overlay.classList.contains("editor-overlay--firstSessionEntry") && !overlay.classList.contains("hidden")) {
+        input.syncEditorFirstSessionEntryOverlayClip();
       }
     });
     ro.observe(overlay);
@@ -64,7 +64,7 @@
     input.renderHistory();
     input.renderProfile();
     input.syncPatternsLayoutMode();
-    input.renderCalibration();
+    input.renderFirstSessionEntry();
     input.renderProfileSummaryStrip();
     input.updateEnterButtonVisibility();
   }
@@ -72,7 +72,7 @@
   window.waywordAppBootRuntime = {
     bindViewportObservers: bindViewportObservers,
     bindEditorShellEdgeResizeObserver: bindEditorShellEdgeResizeObserver,
-    bindEditorCalibrationOverlayResizeObserver: bindEditorCalibrationOverlayResizeObserver,
+    bindEditorFirstSessionEntryOverlayResizeObserver: bindEditorFirstSessionEntryOverlayResizeObserver,
     runInitialRender: runInitialRender
   };
 })();

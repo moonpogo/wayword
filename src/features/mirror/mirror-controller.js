@@ -61,7 +61,7 @@
       return globalThis.WaywordMirror.buildMirrorSessionDigest(input);
     },
 
-    computeMirrorPipelineOutcome(text, run, recentReflectionFamilyKeys, calibrationIncomplete) {
+    computeMirrorPipelineOutcome(text, run, recentReflectionFamilyKeys, firstSessionEntryIncomplete) {
       if (!mirrorPipelineAvailable()) {
         return { result: null, loadFailed: true };
       }
@@ -75,8 +75,8 @@
         if (Array.isArray(recentReflectionFamilyKeys) && recentReflectionFamilyKeys.length) {
           payload.recentReflectionFamilyKeys = recentReflectionFamilyKeys;
         }
-        if (calibrationIncomplete === true) {
-          payload.calibrationIncomplete = true;
+        if (firstSessionEntryIncomplete === true) {
+          payload.firstSessionEntryIncomplete = true;
         }
         const result = globalThis.WaywordMirror.runMirrorPipeline(payload);
         return { result, loadFailed: false };

@@ -39,7 +39,7 @@
         input.syncViewportHeightVar();
         input.syncKeyboardOpenClass();
         input.syncEditorShellChamferEdge();
-        input.syncEditorCalibrationOverlayClip();
+        input.syncEditorFirstSessionEntryOverlayClip();
         if (!input.isMobileViewport()) {
           input.setFocusMode(false);
         }

@@ -23,7 +23,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=20260519-control-spine-cache-bust-1" />
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
 </head>
 <body>
@@ -236,15 +236,17 @@
             <div class="subhed">Notice how you write, as you write</div>
           </div>
 
-          <div
-            id="styleTab"
-            class="style-tab hidden"
-            role="button"
-            tabindex="0"
-            aria-controls="profileView"
-            aria-expanded="false"
-          >
-            Patterns
+          <div class="header-actions" id="headerActionsCluster">
+            <div
+              id="styleTab"
+              class="style-tab hidden"
+              role="button"
+              tabindex="0"
+              aria-controls="profileView"
+              aria-expanded="false"
+            >
+              Patterns
+            </div>
           </div>
         </div>
       </header>
@@ -255,42 +257,26 @@
 
             <div id="promptCard" class="prompt-card">
               <div class="prompt-main">
-                <div class="prompt-meta-row">
-                  <div class="prompt-meta-left">
-                    <div class="prompt-topline" id="promptFamilyLabel">Prompt</div>
-                    <button id="promptRerollBtn" class="prompt-reroll-btn" type="button" aria-label="Get a different prompt (2 rerolls left)" data-rerolls="2">
-                      <span class="prompt-reroll-icon" aria-hidden="true">✎</span>
-                    </button>
-                  </div>
-                  <div class="prompt-meta-actions">
-                    <button
-                      id="fieldExpandedToggle"
-                      class="field-expand-toggle"
-                      type="button"
-                      aria-label="Show surrounding context"
-                      aria-pressed="false"
-                    >
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <rect x="2.75" y="2.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
-                        <rect x="10.75" y="2.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
-                        <rect x="2.75" y="10.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
-                        <rect x="10.75" y="10.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
                 <div class="prompt-text" id="promptText"></div>
-                <div
-                  id="mirrorNextPassSlot"
-                  class="mirror-next-pass-slot hidden"
-                  aria-live="polite"
-                  aria-hidden="true"
-                ></div>
-                <div id="promptNudgeShell" class="prompt-nudge-shell prompt-nudge-shell--hidden" aria-hidden="true">
-                  <p id="promptNudge" class="prompt-nudge" aria-hidden="true">
-                    <span id="promptNudgeText" class="prompt-nudge-text"></span>
-                  </p>
-                </div>
+              </div>
+              <div id="rightControlSpine" class="right-control-spine prompt-control-spine" aria-label="Writing controls">
+                <button
+                  id="fieldExpandedToggle"
+                  class="field-expand-toggle"
+                  type="button"
+                  aria-label="Show surrounding context"
+                  aria-pressed="false"
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="2.75" y="2.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+                    <rect x="10.75" y="2.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+                    <rect x="2.75" y="10.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+                    <rect x="10.75" y="10.75" width="4.5" height="4.5" rx="1.1" stroke="currentColor" stroke-width="1.1"/>
+                  </svg>
+                </button>
+                <button id="promptRerollBtn" class="prompt-reroll-btn" type="button" aria-label="Get a different prompt (2 rerolls left)" data-rerolls="2">
+                  <span class="prompt-reroll-icon" aria-hidden="true">✎</span>
+                </button>
               </div>
             </div>
 
@@ -493,36 +479,6 @@
                   <div id="mirrorReflectionRoot" class="mirror-reflection-root"></div>
                 </section>
 
-                <section
-                  id="calibrationHandoffSection"
-                  class="calibration-handoff-section hidden"
-                  aria-labelledby="calibrationHandoffTitle"
-                  aria-hidden="true"
-                >
-                  <h2 id="calibrationHandoffTitle" class="calibration-handoff-title">Baseline set</h2>
-                  <p class="calibration-handoff-body">Patterns can now look across saved drafts.</p>
-                  <div class="calibration-handoff-actions">
-                    <button type="button" id="calibrationHandoffContinueBtn" class="calibration-handoff-btn calibration-handoff-btn--primary">
-                      Continue
-                    </button>
-                    <button type="button" id="calibrationHandoffViewPatternsBtn" class="calibration-handoff-btn calibration-handoff-btn--secondary">
-                      Open Patterns
-                    </button>
-                  </div>
-                  <div class="calibration-handoff-feedback">
-                    <div class="calibration-handoff-feedback__title">Help shape early Wayword</div>
-                    <p class="calibration-handoff-feedback__body">
-                      Tell us what felt clear, strange, or worth returning to.
-                    </p>
-                    <a
-                      class="calibration-handoff-feedback__link"
-                      data-wayword-research-form="1"
-                      href="#"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >Give feedback →</a>
-                  </div>
-                </section>
               </div>
 
               <section id="profileSummarySection" class="soft-strip-section hidden">
@@ -667,6 +623,7 @@
   <script src="/src/app/app-boot-runtime.js"></script>
   <script src="/src/features/writing/mobile-editor-caret-reveal.js"></script>
   <script src="/src/app/app-events-runtime.js"></script>
+  <script src="/src/app/behavioral-telemetry-runtime.js"></script>
   <script src="/src/app/prompt-runtime.js"></script>
   <script src="/src/app/progression-runtime.js"></script>
   <script src="/src/app/run-controller-runtime.js"></script>
@@ -681,12 +638,11 @@
   <script src="/src/data/runs/savedRunsCanonicalRead.js"></script>
   <script src="/src/data/runs/savedRunPersistence.js"></script>
   <script src="/src/features/prompts/prompt-library.js"></script>
-  <script src="/src/features/prompts/calibration-prompts.js"></script>
   <script src="/src/features/prompts/layered-prompts.js"></script>
   <script src="/src/features/prompts/prompt-system-mode.js"></script>
   <script src="/src/features/prompts/strata-engine.js"></script>
   <script src="/src/features/writing/prompt-selection.js"></script>
-  <script src="/src/features/writing/prompt-interactions.js"></script>
+  <script src="/src/features/writing/prompt-interactions.js?v=20260519-control-spine-cache-bust-1"></script>
   <script src="/src/features/writing/semantic-picker-interactions.js"></script>
   <script src="/src/features/writing/post-submit-phase.js"></script>
   <script src="/src/features/writing/completed-ui-restart-interactions.js"></script>
@@ -707,8 +663,7 @@
   <script src="/src/features/writing/writing-exercise-words-coordinator.js"></script>
   <script src="/src/features/writing/writing-exercise-banner-presentation.js"></script>
   <script src="/src/features/writing/writing-meta-surface-coordinator.js"></script>
-  <script src="/src/features/writing/latent-nudge-controller.js"></script>
-  <script src="/src/features/writing/editor-permission-controller.js"></script>
+  <script src="/src/features/writing/entry-delay-hint-controller.js"></script>
   <script src="/src/features/writing/writing-prompt-card-presentation.js"></script>
   <script src="/src/features/writing/writing-prompt-reroll-presentation.js"></script>
   <script src="/src/features/writing/writing-target-label-presentation.js"></script>
@@ -739,6 +694,6 @@
   <script src="/src/ui/patterns-repeat-lexical-gate.js?v=20260422-patterns-sot"></script>
   <script src="/src/ui/render-post-run.js"></script>
   <script src="/src/ui/view-controller.js"></script>
-  <script src="/script.js?v=20260429-dev-season-fixtures"></script>
+  <script src="/script.js?v=20260519-control-spine-cache-bust-1"></script>
 </body>
 </html>

@@ -10,10 +10,10 @@
   );
 
   window.waywordConfig = Object.freeze({
-    CALIBRATION_THRESHOLD: 5,
-    CALIBRATION_MIN_WORDS: 40,
-    CALIBRATION_MIN_SENTENCE_UNITS: 3,
-    CALIBRATION_INSUFFICIENT_COPY: "Add enough writing for the next save to register.",
+    FIRST_SESSION_ENTRY_THRESHOLD: 5,
+    FIRST_SESSION_ENTRY_MIN_WORDS: 40,
+    FIRST_SESSION_ENTRY_MIN_SENTENCE_UNITS: 3,
+    FIRST_SESSION_ENTRY_INSUFFICIENT_COPY: "Add enough writing for the next save to register.",
     ZEN_GARDEN_OPENABLE: false,
     PROMPT_REROLL_LIMIT: 2,
     /** Last N picked prompt ids: same id cannot repeat while still in this window. */
@@ -38,7 +38,7 @@
     BANNED_PANEL_DEBOUNCE_MS: 220,
     EDITOR_SEMANTIC_DOT_PX: 6,
     EDITOR_SEMANTIC_DOT_GAP_PX: 4,
-    BOTTOM_CHROME_CALIBRATION_HIDE_MS: 200,
+    BOTTOM_CHROME_FIRST_SESSION_ENTRY_HIDE_MS: 200,
     REVIEW_RUN_REFLECTION_MAX: 3,
     REVIEW_RUN_MIN_WORDS: 28,
     REVIEW_RUN_DULL_REPEATS: new Set([
