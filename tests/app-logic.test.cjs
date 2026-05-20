@@ -92,6 +92,20 @@ function loadRunControllerRuntimeContext(overrides = {}) {
   });
 }
 
+function loadRunControllerContext(overrides = {}) {
+  return loadBrowserScripts(
+    [
+      "src/data/run-model.js",
+      "src/features/writing/submit-run-preparation.js",
+      "src/features/writing/run-controller.js",
+    ],
+    {
+      console: silentConsole(),
+      ...overrides,
+    }
+  );
+}
+
 function loadAppBootRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/app-boot-runtime.js"], {
     console: silentConsole(),
@@ -1366,6 +1380,9 @@ test("run controller runtime registers built deps and keeps input callable surfa
       return true;
     },
     flushEditorSurfaceIntoWriteDocOnce() {},
+    captureEditorSurfaceIntoWriteDocForSubmit() {
+      return "captured draft";
+    },
     getEditorText() {
       return "draft";
     },
@@ -1424,8 +1441,139 @@ test("run controller runtime registers built deps and keeps input callable surfa
   assert.equal(registered, deps);
   assert.equal(deps.state, input.state);
   assert.equal(deps.getEditorSurfaceComposing(), true);
+  assert.equal(deps.captureEditorSurfaceIntoWriteDocForSubmit(), "captured draft");
   assert.equal(deps.getEditorText(), "draft");
   assert.equal(typeof deps.requestMirrorReflectionAttentionSettle, "function");
+});
+
+test("run controller submits live editor text while IME composition is active", () => {
+  const submissions = [];
+  const context = loadRunControllerContext({
+    waywordCompletionDecisionCoordinator: {
+      coordinateSubmitCompletion(input) {
+        submissions.push({
+          currentText: input.currentText,
+          totalWords: input.analysis.totalWords,
+        });
+      },
+    },
+    waywordPostSubmitUiReconciler: {
+      reconcilePostSubmitUi(input) {
+        input.renderWritingState();
+        input.renderMeta();
+        input.renderSidebar();
+      },
+    },
+  });
+  const state = {
+    active: true,
+    submitted: false,
+    completedUiActive: false,
+    timerSeconds: 30,
+    timerWaitingForFirstInput: false,
+    timeRemaining: 0,
+    exerciseWords: [],
+    repeatLimit: 2,
+    prompt: "Prompt",
+    savedRunIds: new Set(),
+    history: [],
+  };
+  let flushed = false;
+  let captured = false;
+
+  context.waywordRunController.registerDeps({
+    state,
+    $() {
+      return null;
+    },
+    editorInput: { id: "editor" },
+    getEditorSurfaceComposing() {
+      return true;
+    },
+    flushEditorSurfaceIntoWriteDocOnce() {
+      flushed = true;
+    },
+    captureEditorSurfaceIntoWriteDocForSubmit() {
+      captured = true;
+      return "visible composed words";
+    },
+    getEditorText() {
+      return "";
+    },
+    analyze(text) {
+      const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+      return {
+        totalWords: words.length,
+        uniqueCount: new Set(words).size,
+        uniqueRatio: 1,
+        avgSentenceLength: words.length,
+        repeated: [],
+        bannedHits: [],
+        repeatedStarters: [],
+        starterExampleList: [],
+        counts: {},
+        starterCounts: {},
+        punctuation: {},
+        perspective: {},
+      };
+    },
+    getRecentEntries() {
+      return [];
+    },
+    makeRunId() {
+      return "run-ime-1";
+    },
+    persist() {},
+    INACTIVITY_EASE_RUN_KEY: "ease",
+    clearExerciseIfCompleted() {},
+    applyWriteDocSemanticFlagsFromAnalysisCore() {},
+    updateEnterButtonVisibility() {},
+    stopTimer() {},
+    completeWordmark() {},
+    getActiveTargetWordsForScoring() {
+      return 1;
+    },
+    computeRunScoreV1() {
+      return { runScore: 100, scoreBreakdown: { completion: 25 } };
+    },
+    computeAndStoreMirrorPipelineResult() {},
+    recomputeProgressionLevel() {},
+    applyProgressionToState() {},
+    renderHistory() {},
+    renderProfileSummaryStrip() {},
+    renderProfile() {},
+    renderHighlight() {},
+    renderWritingState() {},
+    renderMeta() {},
+    renderSidebar() {},
+    resetEntryDelayHint() {},
+    beginEntryDelayHintWatch() {},
+    queueViewportSync() {},
+    setExerciseWords() {},
+    generatePrompt() {
+      return "Prompt";
+    },
+    setEditorText() {},
+    setBannedEditorOpen() {},
+    setOptionsOpen() {},
+    showProfile() {},
+    scheduleDeferredEditorFocus() {},
+    scheduleEditorDotOverlaySync() {},
+    syncEditorBottomChromeForFirstSessionEntryOverlay() {},
+    focusEditorToStart() {},
+    updateTimeFill() {},
+    waywordPostRunRenderer: { renderReflectionLine() {} },
+    requestMirrorReflectionAttentionSettle() {},
+  });
+
+  context.waywordRunController.submitWriting(true);
+
+  assert.equal(flushed, false, "submit must not re-project the editor while composition is active");
+  assert.equal(captured, true, "submit should snapshot the live composition surface");
+  assert.equal(submissions.length, 1);
+  assert.equal(submissions[0].currentText, "visible composed words");
+  assert.equal(submissions[0].totalWords, 3);
+  assert.equal(state.submitted, true);
 });
 
 test("app boot runtime binds viewport listeners and initial render sequence", () => {
@@ -1670,6 +1818,17 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   assert.ok(calls.includes("picker"));
   assert.ok(calls.includes("preventDefault"));
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
+
+  calls.length = 0;
+  listeners.get("keydown")({
+    key: "Enter",
+    shiftKey: false,
+    isComposing: true,
+    preventDefault() {
+      calls.push("preventDefault");
+    },
+  });
+  assert.deepEqual(calls, [], "IME Enter should remain available for candidate composition");
 
   calls.length = 0;
   listeners.get("input")();

@@ -226,12 +226,20 @@
       return;
     }
 
-    if (d.editorInput && !d.getEditorSurfaceComposing()) {
-      d.flushEditorSurfaceIntoWriteDocOnce();
+    let currentText;
+    if (d.editorInput && d.getEditorSurfaceComposing()) {
+      currentText =
+        typeof d.captureEditorSurfaceIntoWriteDocForSubmit === "function"
+          ? d.captureEditorSurfaceIntoWriteDocForSubmit()
+          : d.getEditorText();
+    } else {
+      if (d.editorInput) {
+        d.flushEditorSurfaceIntoWriteDocOnce();
+      }
+      currentText = d.getEditorText();
     }
     d.resetEntryDelayHint?.();
 
-    const currentText = d.getEditorText();
     const analysis = d.analyze(currentText);
 
     if (analysis.totalWords === 0) {
