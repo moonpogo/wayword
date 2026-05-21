@@ -138,6 +138,10 @@ function logPatternsTransitionSnapshot(_label, _extra = {}) {
 }
 
 const $ = (id) => document.getElementById(id);
+const now = () =>
+  typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
 
 /** Category accent tokens live in category-colors.css; resolved at runtime via getCategoryAccentColor. */
 function getCategoryAccentCssVarName(key) {
@@ -1948,7 +1952,6 @@ function onPromptRerollControlClick(e) {
 
 function onPromptClusterControlPointerDownFallback(e) {
   armPromptControlFocusExitGuard();
-  e.preventDefault();
   e.stopPropagation();
 }
 
@@ -1956,6 +1959,8 @@ function armPromptControlFocusExitGuard() {
   if (!isMobileViewport()) return;
   suppressFocusExitUntil = performance.now() + 420;
 }
+
+let lastFieldTogglePointerUpAtMs = 0;
 
 function normalizeCanonicalLayoutStateBeforeFoldToggle() {
   if (!isMobileViewport()) return;
@@ -2000,8 +2005,26 @@ function runFieldExpandedToggleAction() {
 /** Field expanded toggle only — never prompt reroll (explicit target + propagation guard). */
 function onFieldExpandedControlClick(e) {
   if (e.currentTarget?.id !== "fieldExpandedToggle") return;
+  if (performance.now() - lastFieldTogglePointerUpAtMs < 420) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    return;
+  }
   const t = e.target;
   if (t instanceof Element && t.closest("#promptRerollBtn")) return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation();
+  runFieldExpandedToggleAction();
+}
+
+function onFieldExpandedControlPointerUp(e) {
+  if (e.currentTarget?.id !== "fieldExpandedToggle") return;
+  if (e.button != null && e.button !== 0) return;
+  const t = e.target;
+  if (t instanceof Element && t.closest("#promptRerollBtn")) return;
+  lastFieldTogglePointerUpAtMs = performance.now();
   e.preventDefault();
   e.stopPropagation();
   e.stopImmediatePropagation();
@@ -2017,7 +2040,8 @@ function bindPromptClusterControlsOnce() {
       $,
       armPromptControlFocusExitGuard,
       onPromptRerollControlClick,
-      onFieldExpandedControlClick
+      onFieldExpandedControlClick,
+      onFieldExpandedControlPointerUp
     });
     return;
   }
@@ -2033,6 +2057,8 @@ function bindPromptClusterControlsOnce() {
   if (field) {
     field.removeEventListener("pointerdown", onPromptClusterControlPointerDownFallback);
     field.addEventListener("pointerdown", onPromptClusterControlPointerDownFallback);
+    field.removeEventListener("pointerup", onFieldExpandedControlPointerUp);
+    field.addEventListener("pointerup", onFieldExpandedControlPointerUp);
     field.removeEventListener("click", onFieldExpandedControlClick);
     field.addEventListener("click", onFieldExpandedControlClick);
   }
@@ -4727,17 +4753,6 @@ function seasonalRunsLast90DaysFromSavedRuns(runs) {
   return seasonal;
 }
 
-function buildSeasonDayBuckets(seasonalRows) {
-  const buckets = new Map();
-  for (const row of seasonalRows) {
-    const d = new Date(row.timestampMs);
-    const key = toDayKeyLocal(d);
-    const count = buckets.get(key) || 0;
-    buckets.set(key, count + 1);
-  }
-  return buckets;
-}
-
 let devSeasonFixtureName = null;
 
 function seasonDayKeysLast90Local() {
@@ -4794,6 +4809,18 @@ function buildFixtureCountMapSteady() {
   return out;
 }
 
+function buildFixtureCountMapExtreme() {
+  const out = new Map();
+  for (let i = 0; i < 90; i += 1) {
+    if (i % 17 === 0) {
+      out.set(i, 0);
+      continue;
+    }
+    out.set(i, i % 3 === 0 ? 4 : i % 2 === 0 ? 3 : 2);
+  }
+  return out;
+}
+
 function fixtureCountMapByName(name) {
   const n = String(name || "").toLowerCase();
   if (n === "sparse") return buildFixtureCountMapSparse();
@@ -4801,6 +4828,7 @@ function fixtureCountMapByName(name) {
   if (n === "heavy") return buildFixtureCountMapHeavy();
   if (n === "clustered") return buildFixtureCountMapClustered();
   if (n === "steady") return buildFixtureCountMapSteady();
+  if (n === "extreme") return buildFixtureCountMapExtreme();
   return null;
 }
 
@@ -4809,35 +4837,181 @@ function buildDevSeasonFixtureViewModel(name) {
   if (!countMap) return null;
   const dayKeys = seasonDayKeysLast90Local();
   const dayBuckets = new Map();
+  const seasonalRows = [];
   let runsCount = 0;
   for (const [index, count] of countMap.entries()) {
     const i = Number(index);
     if (!Number.isInteger(i) || i < 0 || i >= dayKeys.length) continue;
-    const c = Math.max(1, Number(count) || 1);
+    const c = Math.max(0, Number(count) || 0);
+    if (c <= 0) continue;
     dayBuckets.set(dayKeys[i], c);
     runsCount += c;
+    const dayDate = new Date(dayKeys[i] + "T12:00:00");
+    for (let runIndex = 0; runIndex < c; runIndex += 1) {
+      const startMinute = (runIndex * 210 + i * 17) % 1440;
+      const startAt = new Date(dayDate);
+      startAt.setHours(Math.floor(startMinute / 60), startMinute % 60, 0, 0);
+      const durationMinutes = name === "extreme"
+        ? Math.max(18, Math.min(240, 70 + ((i * 11 + runIndex * 29) % 150)))
+        : Math.max(6, 12 + ((i * 7 + runIndex * 19) % 72));
+      const wordCount = name === "extreme"
+        ? Math.max(120, 300 + ((i * 53 + runIndex * 97) % 900))
+        : Math.max(35, 60 + ((i * 31 + runIndex * 43) % 420));
+      const phase = (i + runIndex) % 9;
+      const completed = phase <= 5;
+      const interrupted = phase === 6 || phase === 7;
+      const abandoned = phase === 8;
+      seasonalRows.push({
+        timestampMs: startAt.getTime(),
+        run: {
+          startedAt: startAt.toISOString(),
+          durationMinutes,
+          wordCount,
+          completed,
+          submitted: completed,
+          interrupted,
+          abandoned,
+        },
+      });
+    }
   }
-  return { dayBuckets, runsCount };
+  return { dayBuckets, runsCount, seasonalRows };
 }
 
-function buildCurrentSeasonGridModel(dayBuckets) {
-  const now = new Date();
-  now.setHours(12, 0, 0, 0);
-  const days = [];
-  for (let i = 89; i >= 0; i -= 1) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const key = toDayKeyLocal(d);
-    const runCount = dayBuckets.get(key) || 0;
-    days.push({
-      key,
-      runCount,
-      level: runCount <= 0 ? 0 : runCount === 1 ? 1 : 2,
-      label: `${key}: ${runCount} ${runCount === 1 ? "run" : "runs"}`,
-    });
+/* season wheel instrument contract: begin */
+function seasonWheelResolveStartMinuteLocal(run, fallbackTimestampMs) {
+  const candidates = [
+    run?.startedAt,
+    run?.startAt,
+    run?.startTime,
+    run?.meta?.startedAt,
+    run?.meta?.startAt,
+    run?.meta?.startTime,
+    fallbackTimestampMs,
+  ];
+  for (const raw of candidates) {
+    if (raw == null) continue;
+    let ms = null;
+    if (raw instanceof Date && Number.isFinite(raw.getTime())) ms = raw.getTime();
+    else if (typeof raw === "number" && Number.isFinite(raw)) {
+      ms = raw > 1e12 ? raw : raw > 1e9 ? raw * 1000 : null;
+    } else if (typeof raw === "string") {
+      const parsedNum = Number(raw);
+      if (Number.isFinite(parsedNum)) ms = parsedNum > 1e12 ? parsedNum : parsedNum > 1e9 ? parsedNum * 1000 : null;
+      if (ms == null) {
+        const parsedDate = Date.parse(raw);
+        if (Number.isFinite(parsedDate)) ms = parsedDate;
+      }
+    }
+    if (!Number.isFinite(ms)) continue;
+    const d = new Date(ms);
+    const minute = d.getHours() * 60 + d.getMinutes();
+    if (minute >= 0 && minute <= 1439) return minute;
   }
-  return days;
+  return 0;
 }
+
+function seasonWheelResolveDurationMinutes(run, wordCount) {
+  const durationCandidates = [
+    run?.durationMinutes,
+    run?.durationMin,
+    run?.minutes,
+    run?.durationSeconds != null ? Number(run.durationSeconds) / 60 : null,
+    run?.durationSec != null ? Number(run.durationSec) / 60 : null,
+    run?.durationMs != null ? Number(run.durationMs) / 60000 : null,
+    run?.elapsedMs != null ? Number(run.elapsedMs) / 60000 : null,
+    run?.meta?.durationMinutes,
+    run?.meta?.durationSeconds != null ? Number(run.meta.durationSeconds) / 60 : null,
+  ];
+  for (const raw of durationCandidates) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return Math.min(360, Math.max(1, Math.round(n)));
+  }
+  const fallback = Math.ceil(Math.max(1, Number(wordCount) || 0) / 35);
+  return Math.min(180, Math.max(3, fallback));
+}
+
+function seasonWheelResolveWordCount(run) {
+  const explicit = Math.max(0, Number(run?.wordCount ?? run?.words) || 0);
+  if (explicit > 0) return explicit;
+  const text = String(run?.text || "");
+  const tokens = text.trim() ? text.trim().split(/\s+/).length : 0;
+  return Math.max(0, tokens);
+}
+
+function seasonWheelResolveIntegrity(run, durationMinutes, wordCount) {
+  if (run?.abandoned === true || run?.aborted === true) return "abandoned";
+  if (run?.interrupted === true) return "interrupted";
+  if (run?.completed === true || run?.submitted === true) return "complete";
+  if (durationMinutes <= 7 || wordCount <= 25) return "interrupted";
+  if (run?.completed === false || run?.submitted === false) return "partial";
+  return "partial";
+}
+
+function buildSeasonWheelInstrumentModel(seasonalRows, options = {}) {
+  const seasonLengthDays = Math.max(1, Number(options.seasonLengthDays) || 90);
+  const nowDate = options.nowDate instanceof Date ? new Date(options.nowDate) : new Date();
+  nowDate.setHours(12, 0, 0, 0);
+  const seasonStart = new Date(nowDate);
+  seasonStart.setDate(nowDate.getDate() - (seasonLengthDays - 1));
+  const seasonStartMs = seasonStart.getTime();
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  const rows = Array.isArray(seasonalRows) ? seasonalRows : [];
+  const segments = [];
+  for (const row of rows) {
+    const timestampMs = Number(row?.timestampMs);
+    if (!Number.isFinite(timestampMs)) continue;
+    const run = row?.run || {};
+    const d = new Date(timestampMs);
+    d.setHours(12, 0, 0, 0);
+    const dayIndex = Math.round((d.getTime() - seasonStartMs) / dayMs);
+    if (dayIndex < 0 || dayIndex >= seasonLengthDays) continue;
+    const wordCount = seasonWheelResolveWordCount(run);
+    const startMinute = seasonWheelResolveStartMinuteLocal(run, timestampMs);
+    const durationMinutes = seasonWheelResolveDurationMinutes(run, wordCount);
+    const integrity = seasonWheelResolveIntegrity(run, durationMinutes, wordCount);
+    segments.push({ dayIndex, startMinute, durationMinutes, wordCount, integrity, timestampMs });
+  }
+
+  segments.sort((a, b) => {
+    if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex;
+    if (a.startMinute !== b.startMinute) return a.startMinute - b.startMinute;
+    return a.timestampMs - b.timestampMs;
+  });
+  return { seasonLengthDays, segments };
+}
+
+function seasonWheelHueFromMinute(minute) {
+  const m = Math.max(0, Math.min(1439, Number(minute) || 0));
+  if (m < 240) return 246;
+  if (m < 360) return 272;
+  if (m < 540) return 228;
+  if (m < 720) return 46;
+  if (m < 840) return 54;
+  if (m < 1020) return 30;
+  if (m < 1200) return 16;
+  return 306;
+}
+
+function seasonWheelStrokeWidthFromWords(wordCount) {
+  const words = Math.max(1, Number(wordCount) || 1);
+  const scaled = Math.log10(words);
+  if (scaled < 1.45) return 0.7;
+  if (scaled < 1.8) return 1.2;
+  if (scaled < 2.1) return 1.9;
+  if (scaled < 2.4) return 2.9;
+  if (scaled < 2.7) return 4.2;
+  return 5.8;
+}
+
+function seasonWheelStyleFromIntegrity(integrity) {
+  if (integrity === "complete") return { opacity: 0.9, dash: "" };
+  if (integrity === "partial") return { opacity: 0.56, dash: "" };
+  if (integrity === "abandoned") return { opacity: 0.19, dash: "1 3" };
+  return { opacity: 0.31, dash: "1 2.2" };
+}
+/* season wheel instrument contract: end */
 
 function seasonalWordsSaved(seasonalRows) {
   return seasonalRows.reduce((sum, row) => {
@@ -4862,65 +5036,721 @@ function currentMeteorologicalSeasonLabel(dateObj = new Date()) {
   return "WINTER";
 }
 
+function currentMeteorologicalSeasonLengthDays(dateObj = new Date()) {
+  const d = new Date(dateObj);
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  if (m >= 3 && m <= 5) {
+    const start = new Date(y, 2, 1);   // Mar 1
+    const end = new Date(y, 5, 1);     // Jun 1 (exclusive)
+    return Math.round((end - start) / (24 * 60 * 60 * 1000));
+  }
+  if (m >= 6 && m <= 8) {
+    const start = new Date(y, 5, 1);   // Jun 1
+    const end = new Date(y, 8, 1);     // Sep 1
+    return Math.round((end - start) / (24 * 60 * 60 * 1000));
+  }
+  if (m >= 9 && m <= 11) {
+    const start = new Date(y, 8, 1);   // Sep 1
+    const end = new Date(y, 11, 1);    // Dec 1
+    return Math.round((end - start) / (24 * 60 * 60 * 1000));
+  }
+  // Winter crosses year boundary: Dec 1 -> Mar 1
+  const start = m === 12 ? new Date(y, 11, 1) : new Date(y - 1, 11, 1);
+  const end = m === 12 ? new Date(y + 1, 2, 1) : new Date(y, 2, 1);
+  return Math.round((end - start) / (24 * 60 * 60 * 1000));
+}
+
+function currentMeteorologicalSeasonStart(dateObj = new Date()) {
+  const d = new Date(dateObj);
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  if (m >= 3 && m <= 5) return new Date(y, 2, 1);
+  if (m >= 6 && m <= 8) return new Date(y, 5, 1);
+  if (m >= 9 && m <= 11) return new Date(y, 8, 1);
+  return m === 12 ? new Date(y, 11, 1) : new Date(y - 1, 11, 1);
+}
+
+function formatShortMonthDay(dateObj) {
+  return dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
+  const size = 2200;
+  const cx = 1100;
+  const cy = 1100;
+  const canonScaffold = options.scaffoldPreset === "canon";
+  const innerR = canonScaffold ? 18 : 122;
+  const outerR = 900;
+  const radialSpan = outerR - innerR;
+  const seasonDays = Math.max(1, Number(options.seasonDays) || (canonScaffold ? 91 : 90));
+  const dayIndex = Number.isInteger(options.dayIndex) ? options.dayIndex : 42;
+  const startMinute = Math.max(0, Math.min(1439, Number(options.startMinute) || 1080));
+  const durationMinutes = Math.max(1, Math.min(360, Number(options.durationMinutes) || 120));
+  const endMinute = Math.max(startMinute + 1, Math.min(1440, startMinute + durationMinutes));
+  const wordCount = Math.max(1, Number(options.wordCount) || 520);
+  const integrity = options.integrity || "complete";
+  const seasonLabel = String(options.seasonLabel || "SPRING").toUpperCase();
+  const isDesktop = Boolean(options.isDesktop);
+  const highlightDay = options.highlightDay !== false;
+  const seasonStartDate = options.seasonStartDate instanceof Date ? options.seasonStartDate : null;
+
+  const polar = (r, angleDeg) => {
+    const a = ((angleDeg - 90) * Math.PI) / 180;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+  };
+  const minuteToRadius = (minute) => innerR + (minute / 1440) * radialSpan;
+
+  let spokes = "";
+  for (let d = 0; d < seasonDays; d += 1) {
+    const angle = (d / seasonDays) * 360;
+    const [x1, y1] = polar(innerR, angle);
+    const [x2, y2] = polar(outerR, angle);
+    const isActiveSpoke = highlightDay && d === dayIndex;
+    if (canonScaffold) {
+      spokes += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#d9c5a4" stroke-opacity="0.18" stroke-width="1.05"/>`;
+    } else {
+      spokes += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#d8cdbf" stroke-opacity="${isActiveSpoke ? 0.38 : 0.11}" stroke-width="${isActiveSpoke ? 1.5 : 1}"/>`;
+    }
+  }
+
+  // Canon-like outer perimeter ticks: tangent-oriented dashes outside the season ring,
+  // with a clear minor/major cadence.
+  let outerTicks = "";
+  for (let d = 0; d < seasonDays; d += 1) {
+    // Canon-like sparse rhythm: minor every 6 spokes, major every 12.
+    if (d % 6 !== 0) continue;
+    const angle = (d / seasonDays) * 360;
+    const isMajor = d % 12 === 0;
+    const tickLen = isMajor ? 34 : 13;
+    const tickW = isMajor ? 3.8 : 2.0;
+    const tickCenterR = outerR + (isMajor ? 33 : 23);
+    const [tx, ty] = polar(tickCenterR, angle);
+    const tickColor = isMajor ? "var(--sw-major-tick, #f0c47b)" : "var(--sw-minor-tick, #e8d2ad)";
+    const tickOpacity = isMajor ? 0.54 : 0.27;
+    // Tangent alignment (angle + 90) better matches canon perimeter tick posture.
+    outerTicks += `<rect x="${(tx - tickW * 0.5).toFixed(2)}" y="${(ty - tickLen * 0.5).toFixed(2)}" width="${tickW.toFixed(2)}" height="${tickLen.toFixed(2)}" rx="${(tickW * 0.5).toFixed(2)}" ry="${(tickW * 0.5).toFixed(2)}" fill="${tickColor}" fill-opacity="${tickOpacity}" transform="rotate(${(angle + 90).toFixed(4)} ${tx.toFixed(2)} ${ty.toFixed(2)})"/>`;
+  }
+
+  let fourHourRings = "";
+  if (canonScaffold) {
+    fourHourRings = `
+      <circle cx="${cx}" cy="${cy}" r="251.67" fill="none" stroke="#e8d2ad" stroke-opacity="0.28" stroke-width="1.45" stroke-dasharray="2 8"/>
+      <circle cx="${cx}" cy="${cy}" r="381.33" fill="none" stroke="#f0c47b" stroke-opacity="0.38" stroke-width="1.7" stroke-dasharray="3 9"/>
+      <circle cx="${cx}" cy="${cy}" r="511.00" fill="none" stroke="#e8d2ad" stroke-opacity="0.28" stroke-width="1.45" stroke-dasharray="2 8"/>
+      <circle cx="${cx}" cy="${cy}" r="640.67" fill="none" stroke="#f0c47b" stroke-opacity="0.38" stroke-width="1.7" stroke-dasharray="3 9"/>
+      <circle cx="${cx}" cy="${cy}" r="770.33" fill="none" stroke="#e8d2ad" stroke-opacity="0.28" stroke-width="1.45" stroke-dasharray="2 8"/>
+    `;
+  } else {
+    for (let hours = 4; hours <= 24; hours += 4) {
+      const r = minuteToRadius(hours * 60);
+      const isMajor = hours % 8 === 0;
+      fourHourRings += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="none" stroke="#e9d2ad" stroke-opacity="${isMajor ? 0.34 : 0.22}" stroke-width="${isMajor ? 1.4 : 1.1}" stroke-dasharray="${isMajor ? "3 8" : "2 8"}"/>`;
+    }
+  }
+
+  const canonRuns = [
+    { startMinute: 180, durationMinutes: 62, wordCount: 420, integrity: "complete" },   // 03:00 pre-dawn
+    { startMinute: 435, durationMinutes: 38, wordCount: 210, integrity: "partial" },    // 07:15 dawn/morning
+    { startMinute: 710, durationMinutes: 22, wordCount: 110, integrity: "interrupted" },// 11:50 midday short
+    { startMinute: 915, durationMinutes: 96, wordCount: 760, integrity: "complete" },    // 15:15 afternoon long
+    { startMinute: 1120, durationMinutes: 54, wordCount: 520, integrity: "complete" },   // 18:40 evening
+    { startMinute: 1365, durationMinutes: 14, wordCount: 72, integrity: "abandoned" },   // 22:45 night faint
+  ];
+  const userRun = {
+    startMinute,
+    durationMinutes,
+    wordCount,
+    integrity,
+  };
+  const runs = Array.isArray(options.runs) && options.runs.length ? options.runs : [...canonRuns, userRun];
+  const normalizedRuns = runs
+    .map((run) => {
+      const runDayIndex = Number.isInteger(run.dayIndex) ? run.dayIndex : dayIndex;
+      const runStart = Math.max(0, Math.min(1439, Number(run.startMinute) || 0));
+      const runDuration = Math.max(1, Math.min(360, Number(run.durationMinutes) || 1));
+      const runEnd = Math.max(runStart + 1, Math.min(1440, runStart + runDuration));
+      return {
+        ...run,
+        dayIndex: runDayIndex,
+        startMinute: runStart,
+        durationMinutes: runDuration,
+        endMinute: runEnd,
+      };
+    })
+    .sort((a, b) => {
+      if (a.dayIndex !== b.dayIndex) return a.dayIndex - b.dayIndex;
+      if (a.startMinute !== b.startMinute) return a.startMinute - b.startMinute;
+      return (Number(b.wordCount) || 0) - (Number(a.wordCount) || 0);
+    });
+
+  // For same-day clustered runs, preserve temporal order while adding a tiny
+  // outward separation so consecutive runs read as cumulative habitation.
+  const runLayout = [];
+  let activeDay = -1;
+  let prevEndForDay = -1;
+  for (const run of normalizedRuns) {
+    if (run.dayIndex !== activeDay) {
+      activeDay = run.dayIndex;
+      prevEndForDay = -1;
+    }
+    const minGap = 3;
+    let layoutStart = run.startMinute;
+    let layoutEnd = run.endMinute;
+    if (prevEndForDay >= 0 && layoutStart < prevEndForDay + minGap) {
+      const shift = (prevEndForDay + minGap) - layoutStart;
+      layoutStart = Math.min(1439, layoutStart + shift);
+      layoutEnd = Math.min(1440, layoutEnd + shift);
+      if (layoutEnd <= layoutStart) layoutEnd = Math.min(1440, layoutStart + 1);
+    }
+    prevEndForDay = Math.max(prevEndForDay, layoutEnd);
+    runLayout.push({ ...run, layoutStart, layoutEnd });
+  }
+  const runCount = runLayout.length;
+  const completedCount = runLayout.filter((r) => (r.integrity || "partial") === "complete").length;
+  const totalWords = runLayout.reduce((sum, r) => sum + Math.max(0, Number(r.wordCount) || 0), 0);
+  const activeDaysCount = new Set(runLayout.map((r) => Number.isInteger(r.dayIndex) ? r.dayIndex : dayIndex)).size;
+  const completePct = runCount ? Math.round((completedCount / runCount) * 100) : 0;
+  const activePct = seasonDays ? Math.round((activeDaysCount / seasonDays) * 100) : 0;
+
+  let runSegmentsGlow = "";
+  let runSegmentsCore = "";
+  let runSegmentsAccent = "";
+  let runBloom = "";
+  let runHitTargets = "";
+  let runOrdinal = 0;
+  for (const run of runLayout) {
+    const runDayIndex = Number.isInteger(run.dayIndex) ? run.dayIndex : dayIndex;
+    const runAngle = (runDayIndex / seasonDays) * 360;
+    const runStart = Math.max(0, Math.min(1439, Number(run.layoutStart) || Number(run.startMinute) || 0));
+    const runDuration = Math.max(1, Math.min(360, Number(run.durationMinutes) || 1));
+    const runEnd = Math.max(runStart + 1, Math.min(1440, Number(run.layoutEnd) || (runStart + runDuration)));
+    const runWords = Math.max(1, Number(run.wordCount) || 1);
+    const runIntegrity = run.integrity || "partial";
+    const runCountChunk = Math.max(1, Math.min(16, Math.round(Number(run.runCount) || (runWords >= 260 ? (runWords / 90) : 1))));
+    let completeRuns = Math.max(0, Number(run.completeRuns) || 0);
+    let partialRuns = Math.max(0, Number(run.partialRuns) || 0);
+    let interruptedRuns = Math.max(0, Number(run.interruptedRuns) || 0);
+    let abandonedRuns = Math.max(0, Number(run.abandonedRuns) || 0);
+    if (completeRuns + partialRuns + interruptedRuns + abandonedRuns <= 0) {
+      if (runIntegrity === "complete") completeRuns = runCountChunk;
+      else if (runIntegrity === "partial") {
+        completeRuns = Math.max(0, runCountChunk - 1);
+        partialRuns = 1;
+      } else if (runIntegrity === "abandoned") {
+        abandonedRuns = Math.max(1, Math.ceil(runCountChunk * 0.5));
+        partialRuns = Math.max(0, runCountChunk - abandonedRuns);
+      } else {
+        interruptedRuns = Math.max(1, Math.ceil(runCountChunk * 0.5));
+        partialRuns = Math.max(0, runCountChunk - interruptedRuns);
+      }
+    }
+    const mixTotal = completeRuns + partialRuns + interruptedRuns + abandonedRuns;
+    if (mixTotal !== runCountChunk) {
+      const delta = runCountChunk - mixTotal;
+      completeRuns = Math.max(0, completeRuns + delta);
+    }
+    const r0 = minuteToRadius(runStart);
+    const r1 = minuteToRadius(runEnd);
+    const [sx, sy] = polar(r0, runAngle);
+    const [ex, ey] = polar(r1, runAngle);
+    const hue = seasonWheelHueFromMinute(runStart);
+    const style = seasonWheelStyleFromIntegrity(runIntegrity);
+    const coreWidth = seasonWheelStrokeWidthFromWords(runWords) * 2.15;
+    const glowWidth = coreWidth + 5.8;
+    const accentWidth = Math.max(1.6, coreWidth * 0.52);
+    const light = runIntegrity === "complete" ? 62 : runIntegrity === "partial" ? 66 : 72;
+    const runLen = Math.max(8, Math.hypot(ex - sx, ey - sy));
+    const runMidR = (r0 + r1) * 0.5;
+    const [mx, my] = polar(runMidR, runAngle);
+    const capsuleColor = `hsl(${hue} 88% ${light}%)`;
+    const coreOpacity = runIntegrity === "complete" ? 0.98 : runIntegrity === "partial" ? 0.72 : style.opacity;
+    const glowOpacity = runIntegrity === "abandoned" || runIntegrity === "interrupted" ? 0.14 : 0.21;
+    const accentColor = `hsl(${hue} 88% ${Math.max(56, light - 6)}%)`;
+
+    const addLineStack = (xA, yA, xB, yB, dashed = false) => {
+      runSegmentsGlow += `<line x1="${xA.toFixed(2)}" y1="${yA.toFixed(2)}" x2="${xB.toFixed(2)}" y2="${yB.toFixed(2)}" stroke="${capsuleColor}" stroke-opacity="${glowOpacity.toFixed(3)}" stroke-width="${glowWidth.toFixed(2)}" stroke-linecap="round" filter="url(#runGlow)"/>`;
+      runSegmentsCore += `<line x1="${xA.toFixed(2)}" y1="${yA.toFixed(2)}" x2="${xB.toFixed(2)}" y2="${yB.toFixed(2)}" stroke="${capsuleColor}" stroke-opacity="${coreOpacity.toFixed(3)}" stroke-width="${coreWidth.toFixed(2)}" stroke-linecap="round"${dashed ? ` stroke-dasharray="5 5"` : ""}/>`;
+      if (!dashed && (runIntegrity === "complete" || runIntegrity === "partial")) {
+        runSegmentsAccent += `<line x1="${xA.toFixed(2)}" y1="${yA.toFixed(2)}" x2="${xB.toFixed(2)}" y2="${yB.toFixed(2)}" stroke="${accentColor}" stroke-opacity="0.34" stroke-width="${accentWidth.toFixed(2)}" stroke-linecap="round"/>`;
+      }
+    };
+
+    if (runIntegrity === "complete" || runIntegrity === "partial") {
+      const [bx, by] = polar(runMidR, runAngle);
+      const bloomR = Math.max(9.6, coreWidth * 1.08);
+      runBloom += `<circle cx="${bx.toFixed(2)}" cy="${by.toFixed(2)}" r="${bloomR.toFixed(2)}" fill="${capsuleColor}" opacity=".04" filter="url(#softBloom)"/>`;
+    }
+
+    runOrdinal += 1;
+    const runDate = seasonStartDate ? new Date(seasonStartDate.getTime() + runDayIndex * 24 * 60 * 60 * 1000) : null;
+    const dateLabel = runDate
+      ? runDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : `Day ${runDayIndex + 1}`;
+    const hour24 = Math.floor(runStart / 60);
+    const minute = runStart % 60;
+    const ampm = hour24 >= 12 ? "PM" : "AM";
+    const hour12 = hour24 % 12 || 12;
+    const timeLabel = `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`;
+    runHitTargets += `<line x1="${sx.toFixed(2)}" y1="${sy.toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="transparent" stroke-opacity="0" stroke-width="${Math.max(26, coreWidth + 10).toFixed(2)}" stroke-linecap="round" class="sw-run-hit" data-run-id="${runOrdinal}" data-day-index="${runDayIndex}" data-date-label="${dateLabel}" data-start-minute="${runStart}" data-duration-minutes="${runDuration}" data-word-count="${runWords}" data-integrity="${runIntegrity}" data-time-label="${timeLabel}" data-run-count="${runCountChunk}" data-complete-runs="${completeRuns}" data-partial-runs="${partialRuns}" data-interrupted-runs="${interruptedRuns}" data-abandoned-runs="${abandonedRuns}"/>`;
+
+    const segmentCountFromChunk = runCountChunk > 1
+      ? Math.max(2, Math.min(14, runCountChunk))
+      : (style.dash ? Math.max(2, Math.min(5, Math.floor(runLen / 26))) : 1);
+
+    if (segmentCountFromChunk === 1) {
+      addLineStack(sx, sy, ex, ey, false);
+    } else {
+      const count = segmentCountFromChunk;
+      const gap = runCountChunk > 1 ? 3.4 : 6;
+      const segLen = Math.max(5, (runLen - (count - 1) * gap) / count);
+      for (let i = 0; i < count; i += 1) {
+        const centerOffset = -runLen * 0.5 + segLen * 0.5 + i * (segLen + gap);
+        const segMidR = runMidR + centerOffset;
+        const segR0 = segMidR - segLen * 0.5;
+        const segR1 = segMidR + segLen * 0.5;
+        const [xA, yA] = polar(segR0, runAngle);
+        const [xB, yB] = polar(segR1, runAngle);
+        const dashed = style.dash && runCountChunk <= 1;
+        addLineStack(xA, yA, xB, yB, dashed);
+      }
+    }
+  }
+
+  const integrityLabel = String(integrity || "partial").toUpperCase();
+  const hh = String(Math.floor(startMinute / 60)).padStart(2, "0");
+  const mm = String(startMinute % 60).padStart(2, "0");
+  const medallionInfo = isDesktop
+    ? `<text x="${cx}" y="${cy - 22}" text-anchor="middle" font-size="14" letter-spacing="3.2" fill="var(--sw-medallion-sub, #bda889)" font-family="Georgia, 'Times New Roman', serif">CURRENT SEASON</text>
+       <text x="${cx}" y="${cy + 7}" text-anchor="middle" font-size="28" letter-spacing="2.4" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${seasonLabel}</text>
+       <text x="${cx}" y="${cy + 30}" text-anchor="middle" font-size="11" letter-spacing="1.9" fill="var(--sw-medallion-sub, #bda889)" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">${hh}:${mm}  +${durationMinutes}M  ${wordCount}W  ${integrityLabel}</text>`
+    : ``;
+
+  const mobileHeader = !isDesktop
+    ? `<text x="186" y="152" text-anchor="start" font-size="29" letter-spacing="7.4" fill="var(--sw-medallion-sub, #bda889)" font-family="Georgia, 'Times New Roman', serif">CURRENT SEASON</text>
+       <text x="186" y="238" text-anchor="start" font-size="92" letter-spacing="2.8" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${seasonLabel}</text>`
+    : ``;
+  let mobileQuadrantLabels = ``;
+  if (!isDesktop && seasonStartDate) {
+    const q0 = new Date(seasonStartDate.getTime());
+    const q1 = new Date(seasonStartDate.getTime() + Math.round(seasonDays * 0.25) * 86400000);
+    const q2 = new Date(seasonStartDate.getTime() + Math.round(seasonDays * 0.5) * 86400000);
+    const q3 = new Date(seasonStartDate.getTime() + Math.round(seasonDays * 0.75) * 86400000);
+    const labelRadius = outerR + 114;
+    const [nX, nY] = polar(labelRadius, 0);
+    const [eX, eY] = polar(labelRadius, 90);
+    const [sX, sY] = polar(labelRadius, 180);
+    const [wX, wY] = polar(labelRadius, 270);
+    mobileQuadrantLabels = `<text x="${nX.toFixed(2)}" y="${(nY + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${formatShortMonthDay(q0)}</text>
+       <text x="${eX.toFixed(2)}" y="${(eY + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${formatShortMonthDay(q1)}</text>
+       <text x="${sX.toFixed(2)}" y="${(sY + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${formatShortMonthDay(q2)}</text>
+       <text x="${wX.toFixed(2)}" y="${(wY + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${formatShortMonthDay(q3)}</text>`;
+  }
+
+  const avgRunsPerActiveDay = activeDaysCount > 0 ? (runCount / activeDaysCount) : 0;
+
+  return `<svg class="current-season-canon-tile__image season-wheel-debug-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 2200" role="img" aria-label="Season wheel debug single-spoke" data-season-days="${seasonDays}" data-days-written="${activeDaysCount}" data-total-runs="${runCount}" data-completed-runs="${completedCount}" data-completed-pct="${completePct}" data-total-words="${totalWords}" data-avg-runs-day="${avgRunsPerActiveDay.toFixed(1)}">
+  <defs>
+    <filter id="runGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2.8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softBloom" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="2200" height="2200" fill="var(--sw-bg, #08090d)"/>
+  <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="none" stroke="var(--sw-season-ring, #e4ac5f)" stroke-opacity="${canonScaffold ? 0.58 : 0.56}" stroke-width="2"/>
+  ${fourHourRings}
+  ${spokes}
+  ${outerTicks}
+  ${runBloom}
+  ${runSegmentsGlow}
+  ${runSegmentsCore}
+  ${runSegmentsAccent}
+  <g class="sw-hit-layer">${runHitTargets}</g>
+  <circle cx="${cx}" cy="${cy}" r="${innerR - 34}" fill="var(--sw-bg, #08090d)" stroke="var(--sw-hub-ring, #c9a173)" stroke-opacity="0.4" stroke-width="1.2"/>
+  ${mobileHeader}
+  ${mobileQuadrantLabels}
+  ${medallionInfo}
+  </svg>`;
+}
+
+function buildSeasonWheelPairSpokeDebugSvg(options = {}) {
+  const dayIndex = Number.isInteger(options.dayIndex) ? options.dayIndex : 42;
+  const seasonDays = Math.max(1, Number(options.seasonDays) || 92);
+  const seasonLabel = String(options.seasonLabel || "SPRING").toUpperCase();
+  const isDesktop = Boolean(options.isDesktop);
+  const dayA = [
+    { startMinute: 210, durationMinutes: 55, wordCount: 380, integrity: "complete" },
+    { startMinute: 890, durationMinutes: 70, wordCount: 640, integrity: "complete" },
+    { startMinute: 1330, durationMinutes: 18, wordCount: 90, integrity: "abandoned" },
+  ];
+  const dayB = [
+    { startMinute: 460, durationMinutes: 38, wordCount: 190, integrity: "partial" },
+    { startMinute: 1010, durationMinutes: 110, wordCount: 840, integrity: "complete" },
+    { startMinute: 1210, durationMinutes: 11, wordCount: 42, integrity: "interrupted" },
+  ];
+  return buildSeasonWheelSingleSpokeDebugSvg({
+    dayIndex,
+    seasonDays,
+    seasonLabel,
+    isDesktop,
+    runs: dayA.concat(dayB.map((r) => ({ ...r, dayIndex: dayIndex + 1 }))),
+    pairMode: true,
+    pairDayIndex: dayIndex + 1,
+  });
+}
+
+function buildSeasonWheelFullRingDebugSvg(options = {}) {
+  const seasonDays = Math.max(1, Number(options.seasonDays) || 91);
+  const seasonLabel = String(options.seasonLabel || "SPRING").toUpperCase();
+  const isDesktop = Boolean(options.isDesktop);
+  const seasonStartDate = options.seasonStartDate instanceof Date ? options.seasonStartDate : null;
+  const runs = [];
+  const hash01 = (a, b) => {
+    const x = Math.sin((a + 1) * 12.9898 + (b + 1) * 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  };
+
+  const buildBurst = (dayIndex, startMinute, runBand, avgWordsBand, integrity) => {
+    const runsInBurst = Math.max(1, Math.min(6, Math.round(1 + hash01(dayIndex, runBand) * 3.8)));
+    const wordsPerRun = Math.round(28 + hash01(dayIndex, avgWordsBand) * 68);
+    const totalWordsBurst = Math.round(wordsPerRun * runsInBurst);
+    const avgMinutesPerRun = 1.5 + hash01(dayIndex, avgWordsBand + 100) * 3.7;
+    const durationMinutes = Math.max(2, Math.min(46, Math.round(runsInBurst * avgMinutesPerRun + Math.max(0, runsInBurst - 1) * 1.1)));
+    let completeRuns = 0;
+    let partialRuns = 0;
+    let interruptedRuns = 0;
+    let abandonedRuns = 0;
+    if (integrity === "complete") {
+      completeRuns = Math.max(1, runsInBurst - (hash01(dayIndex, runBand + 200) > 0.82 ? 1 : 0));
+      partialRuns = runsInBurst - completeRuns;
+    } else if (integrity === "partial") {
+      completeRuns = Math.max(0, Math.floor(runsInBurst * 0.45));
+      partialRuns = Math.max(1, runsInBurst - completeRuns);
+    } else if (integrity === "abandoned") {
+      abandonedRuns = Math.max(1, Math.ceil(runsInBurst * 0.55));
+      partialRuns = Math.max(0, runsInBurst - abandonedRuns);
+    } else {
+      interruptedRuns = Math.max(1, Math.ceil(runsInBurst * 0.5));
+      partialRuns = Math.max(0, runsInBurst - interruptedRuns);
+    }
+    return {
+      dayIndex,
+      startMinute,
+      durationMinutes,
+      runCount: runsInBurst,
+      wordCount: totalWordsBurst,
+      completeRuns,
+      partialRuns,
+      interruptedRuns,
+      abandonedRuns,
+      integrity,
+    };
+  };
+
+  for (let dayIndex = 0; dayIndex < seasonDays; dayIndex += 1) {
+    // Preserve occasional silent spokes so interruption remains visible.
+    if (hash01(dayIndex, 99) < 0.12) continue;
+
+    const phase = dayIndex / seasonDays;
+    const hasPreDawn = hash01(dayIndex, 1) > 0.34;
+    const hasMorning = hash01(dayIndex, 2) > 0.29;
+    const hasAfternoon = hash01(dayIndex, 3) > 0.12;
+    const hasEvening = hash01(dayIndex, 4) > 0.22;
+    const hasNight = hash01(dayIndex, 5) > 0.53;
+
+    if (hasPreDawn) {
+      const jitter = hash01(dayIndex, 11);
+      runs.push(buildBurst(dayIndex, Math.round(145 + jitter * 145), 12, 13, hash01(dayIndex, 14) > 0.86 ? "partial" : "complete"));
+    }
+
+    if (hasMorning) {
+      const jitter = hash01(dayIndex, 21);
+      runs.push(buildBurst(dayIndex, Math.round(360 + jitter * 210), 22, 23, hash01(dayIndex, 24) > 0.79 ? "interrupted" : "partial"));
+    }
+
+    if (hasAfternoon) {
+      const jitter = hash01(dayIndex, 31);
+      runs.push(buildBurst(dayIndex, Math.round(780 + jitter * 330), 32, 33, "complete"));
+    }
+
+    if (hasEvening) {
+      const jitter = hash01(dayIndex, 41);
+      runs.push(buildBurst(dayIndex, Math.round(1020 + jitter * 250), 42, 43, phase > 0.7 && hash01(dayIndex, 44) > 0.72 ? "partial" : "complete"));
+    }
+
+    if (hasNight) {
+      const jitter = hash01(dayIndex, 51);
+      runs.push(buildBurst(dayIndex, Math.round(1275 + jitter * 155), 52, 53, hash01(dayIndex, 54) > 0.58 ? "abandoned" : "interrupted"));
+    }
+  }
+
+  return buildSeasonWheelSingleSpokeDebugSvg({
+    dayIndex: Math.floor(seasonDays * 0.48),
+    seasonDays,
+    seasonLabel,
+    isDesktop,
+    seasonStartDate,
+    highlightDay: false,
+    scaffoldPreset: "canon",
+    runs,
+  });
+}
+
+function buildSeasonWheelFullRingFromSeasonalRows(seasonalRows, options = {}) {
+  const seasonDays = Math.max(1, Number(options.seasonDays) || currentMeteorologicalSeasonLengthDays(new Date()));
+  const seasonLabel = String(options.seasonLabel || currentMeteorologicalSeasonLabel(new Date())).toUpperCase();
+  const isDesktop = Boolean(options.isDesktop);
+  const seasonStartDate = options.seasonStartDate instanceof Date ? options.seasonStartDate : currentMeteorologicalSeasonStart(new Date());
+  const model = buildSeasonWheelInstrumentModel(Array.isArray(seasonalRows) ? seasonalRows : [], {
+    seasonLengthDays: seasonDays,
+    nowDate: new Date(),
+  });
+  const runs = (Array.isArray(model?.segments) ? model.segments : []).map((seg) => {
+    const integrity = String(seg.integrity || "partial");
+    const runCount = 1;
+    return {
+      dayIndex: seg.dayIndex,
+      startMinute: seg.startMinute,
+      durationMinutes: seg.durationMinutes,
+      wordCount: seg.wordCount,
+      integrity,
+      runCount,
+      completeRuns: integrity === "complete" ? 1 : 0,
+      partialRuns: integrity === "partial" ? 1 : 0,
+      interruptedRuns: integrity === "interrupted" ? 1 : 0,
+      abandonedRuns: integrity === "abandoned" ? 1 : 0,
+    };
+  });
+  return buildSeasonWheelSingleSpokeDebugSvg({
+    dayIndex: Math.floor(seasonDays * 0.5),
+    seasonDays,
+    seasonLabel,
+    isDesktop,
+    seasonStartDate,
+    highlightDay: false,
+    scaffoldPreset: "canon",
+    runs,
+  });
+}
+
+let canonSeasonWheelSvgCache = null;
+
+async function loadCanonSeasonWheelSvgText() {
+  if (canonSeasonWheelSvgCache) return canonSeasonWheelSvgCache;
+  const res = await fetch("assets/wayword_season_wheel_v15_subtext_removed.svg", { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load canon SVG: ${res.status}`);
+  const raw = await res.text();
+  const cleaned = raw
+    .replace(/<\?xml[^>]*>/gi, "")
+    .replace(/<!DOCTYPE[^>]*>/gi, "")
+    .trim();
+  canonSeasonWheelSvgCache = cleaned;
+  return canonSeasonWheelSvgCache;
+}
+
 function renderCurrentSeasonPanel() {
   const root = $("currentSeasonRoot");
   const wrap = $("currentSeasonPanel");
   if (!root || !wrap) return;
-  const seasonLabel = currentMeteorologicalSeasonLabel(new Date());
-  const fixtureVm = WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED
-    ? buildDevSeasonFixtureViewModel(devSeasonFixtureName)
-    : null;
-  const savedRuns = readSavedRunsChronological();
-  const seasonalRows = fixtureVm ? [] : seasonalRunsLast90DaysFromSavedRuns(savedRuns);
-  const dayBuckets = fixtureVm ? fixtureVm.dayBuckets : buildSeasonDayBuckets(seasonalRows);
-  const runsCount = fixtureVm ? fixtureVm.runsCount : seasonalRows.length;
-  const activeDays = dayBuckets.size;
-
-  if (runsCount <= 0) {
-    root.innerHTML = `
-      <div class="current-season-card">
-        <div class="section-title card-section-title current-season-title">SEASON</div>
-        <p class="current-season-name">${seasonLabel}</p>
-        <p class="current-season-empty">Current season begins with saved runs.</p>
-      </div>
-    `;
-    wrap.classList.remove("hidden");
-    wrap.setAttribute("aria-hidden", "false");
-    return;
+  const seasonLengthDays = currentMeteorologicalSeasonLengthDays(new Date());
+  let debugMode = "";
+  const nowDate = new Date();
+  const seasonLabelNow = currentMeteorologicalSeasonLabel(nowDate);
+  const seasonStartNow = currentMeteorologicalSeasonStart(nowDate);
+  const isDesktop = isDesktopPatternsViewport();
+  let seasonWheelRows = [];
+  if (devSeasonFixtureName) {
+    const fixtureVm = buildDevSeasonFixtureViewModel(devSeasonFixtureName);
+    seasonWheelRows = Array.isArray(fixtureVm?.seasonalRows) ? fixtureVm.seasonalRows : [];
+  } else {
+    seasonWheelRows = seasonalRunsLast90DaysFromSavedRuns(readSavedRunsChronological());
   }
-
-  const grid = buildCurrentSeasonGridModel(dayBuckets);
-  const totalMarks = grid.length || 90;
-  const arcStartDeg = -135;
-  const arcSweepDeg = 270;
-  const gridHtml = grid
-    .map((d, index) => {
-      const t = totalMarks > 1 ? index / (totalMarks - 1) : 0;
-      const angle = arcStartDeg + t * arcSweepDeg;
-      const monthBoundary = index > 0 && index % 30 === 0 ? " is-month-boundary" : "";
-      const flowClass = t <= 0.33 ? " is-flow-early" : t >= 0.66 ? " is-flow-late" : " is-flow-mid";
-      const boundaryStart = index === 0 ? " is-boundary-start" : "";
-      return `<span class="season-wheel__mark is-level-${d.level}${monthBoundary}${boundaryStart}${flowClass}" style="--season-index:${index};--season-total:${totalMarks};--season-angle:${angle}deg;" aria-hidden="true"></span>`;
-    })
-    .join("");
-  const quiet = selectSeasonalQuietLine(runsCount, activeDays);
-
+  try {
+    if (WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED) {
+      const params = new URLSearchParams(location.search);
+      debugMode = String(params.get("seasonWheelDebug") || "").toLowerCase();
+    }
+  } catch (_) {
+    debugMode = "";
+  }
   root.innerHTML = `
-    <div class="current-season-card">
-      <div class="section-title card-section-title current-season-title">SEASON</div>
-      <p class="current-season-name">${seasonLabel}</p>
-      <div class="season-wheel" aria-hidden="true">
-        <span class="season-wheel__ring season-wheel__ring--outer"></span>
-        <span class="season-wheel__ring season-wheel__ring--middle"></span>
-        <span class="season-wheel__ring season-wheel__ring--inner"></span>
-        <span class="season-wheel__hub"></span>
-        ${gridHtml}
-      </div>
-      <p class="current-season-note">${quiet}</p>
+    <div class="current-season-canon-tile">
+      ${
+        debugMode === "single"
+          ? buildSeasonWheelSingleSpokeDebugSvg({
+              dayIndex: 42,
+              startMinute: 1080,
+              durationMinutes: 120,
+              wordCount: 520,
+              integrity: "complete",
+              seasonLabel: seasonLabelNow,
+              seasonDays: seasonLengthDays,
+              seasonStartDate: seasonStartNow,
+              isDesktop,
+            })
+          : debugMode === "pair"
+            ? buildSeasonWheelPairSpokeDebugSvg({
+                dayIndex: 42,
+                seasonDays: seasonLengthDays,
+                seasonLabel: seasonLabelNow,
+                isDesktop,
+              })
+            : debugMode === "canonexact"
+              ? `<div id="seasonWheelCanonExactMount" class="current-season-canon-exact-mount" aria-label="Canon exact season wheel"></div>`
+            : buildSeasonWheelFullRingFromSeasonalRows(seasonWheelRows, {
+                seasonDays: seasonLengthDays,
+                seasonLabel: seasonLabelNow,
+                seasonStartDate: seasonStartNow,
+                isDesktop,
+              })
+      }
     </div>
+    <div id="seasonWheelMobileLegend"></div>
   `;
+  if (!isDesktop && (debugMode === "single" || debugMode === "pair" || debugMode === "full" || !debugMode)) {
+    const svg = root.querySelector(".season-wheel-debug-svg");
+    const legendRoot = root.querySelector("#seasonWheelMobileLegend");
+    if (svg && legendRoot) {
+      const seasonDays = Number(svg.getAttribute("data-season-days") || 0);
+      const daysWritten = Number(svg.getAttribute("data-days-written") || 0);
+      const totalRuns = Number(svg.getAttribute("data-total-runs") || 0);
+      const completedRuns = Number(svg.getAttribute("data-completed-runs") || 0);
+      const completedPct = Number(svg.getAttribute("data-completed-pct") || 0);
+      const totalWords = Number(svg.getAttribute("data-total-words") || 0);
+      const avgRunsDay = Number(svg.getAttribute("data-avg-runs-day") || 0);
+      legendRoot.innerHTML = `<div class="season-wheel-mobile-legend" aria-label="Season summary">
+        <div><span>Season Length</span><strong>${seasonDays} days</strong></div>
+        <div><span>Days Written</span><strong>${daysWritten}</strong></div>
+        <div><span>Total Runs</span><strong>${totalRuns}</strong></div>
+        <div><span>Completed</span><strong>${completedRuns} (${completedPct}%)</strong></div>
+        <div><span>Total Words</span><strong>${totalWords.toLocaleString()}</strong></div>
+        <div><span>Avg Runs / Day</span><strong>${avgRunsDay}</strong></div>
+      </div>`;
+    }
+  }
+  if (debugMode === "canonexact") {
+    const mount = root.querySelector("#seasonWheelCanonExactMount");
+    if (mount) {
+      loadCanonSeasonWheelSvgText()
+        .then((svgText) => {
+          mount.innerHTML = svgText;
+          const inlineSvg = mount.querySelector("svg");
+          if (inlineSvg) inlineSvg.classList.add("current-season-canon-tile__image");
+        })
+        .catch(() => {
+          mount.innerHTML = `<img class="current-season-canon-tile__image" src="assets/wayword_season_wheel_v15_subtext_removed.svg" alt="Canon season wheel"/>`;
+        });
+    }
+  }
+  if (debugMode === "single" || debugMode === "pair" || debugMode === "full" || !debugMode) {
+    initSeasonWheelDebugInspector(root);
+  }
   wrap.classList.remove("hidden");
   wrap.setAttribute("aria-hidden", "false");
+}
+
+function initSeasonWheelDebugInspector(root) {
+  const tile = root.querySelector(".current-season-canon-tile");
+  const svg = tile?.querySelector(".season-wheel-debug-svg");
+  if (!tile || !svg) return;
+  let tip = tile.querySelector(".season-wheel-run-tooltip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.className = "season-wheel-run-tooltip";
+    tip.setAttribute("aria-hidden", "true");
+    tile.appendChild(tip);
+  }
+  let isPinned = false;
+  const placeTip = (clientX, clientY) => {
+    const rect = tile.getBoundingClientRect();
+    const x = Math.max(12, Math.min(rect.width - 220, clientX - rect.left + 14));
+    const y = Math.max(12, Math.min(rect.height - 120, clientY - rect.top - 20));
+    tip.style.left = `${x}px`;
+    tip.style.top = `${y}px`;
+  };
+  const renderTip = (el) => {
+    const dateLabel = el.getAttribute("data-date-label") || "";
+    const runWords = Number(el.getAttribute("data-word-count") || 0);
+    const runMinutes = Number(el.getAttribute("data-duration-minutes") || 0);
+    const runCount = Math.max(1, Number(el.getAttribute("data-run-count") || 1));
+    const completeRuns = Math.max(0, Number(el.getAttribute("data-complete-runs") || 0));
+    const partialRuns = Math.max(0, Number(el.getAttribute("data-partial-runs") || 0));
+    const interruptedRuns = Math.max(0, Number(el.getAttribute("data-interrupted-runs") || 0));
+    const abandonedRuns = Math.max(0, Number(el.getAttribute("data-abandoned-runs") || 0));
+    const timeLabel = el.getAttribute("data-time-label") || "";
+    let mixLabel = "";
+    if (completeRuns === runCount) mixLabel = "all complete";
+    else if (partialRuns === runCount) mixLabel = "all partial";
+    else if (interruptedRuns === runCount) mixLabel = "all interrupted";
+    else if (abandonedRuns === runCount) mixLabel = "all abandoned";
+    else {
+      const mix = [];
+      if (completeRuns > 0) mix.push(`${completeRuns} complete`);
+      if (partialRuns > 0) mix.push(`${partialRuns} partial`);
+      if (interruptedRuns > 0) mix.push(`${interruptedRuns} interrupted`);
+      if (abandonedRuns > 0) mix.push(`${abandonedRuns} abandoned`);
+      mixLabel = mix.join(" · ");
+    }
+    tip.innerHTML = `<div class="season-wheel-run-tooltip__date">${dateLabel}</div>
+      <div class="season-wheel-run-tooltip__rule" aria-hidden="true"></div>
+      <div>${runCount} run${runCount === 1 ? "" : "s"}</div>
+      <div>${runWords} words</div>
+      <div>${runMinutes} min</div>
+      <div>${mixLabel}</div>
+      <div>${timeLabel}</div>`;
+    tip.classList.add("is-visible");
+    tip.setAttribute("aria-hidden", "false");
+  };
+  const hideTip = () => {
+    isPinned = false;
+    tip.classList.remove("is-visible");
+    tip.setAttribute("aria-hidden", "true");
+  };
+  svg.querySelectorAll(".sw-run-hit").forEach((el) => {
+    el.addEventListener("mouseenter", (event) => {
+      if (isPinned) return;
+      renderTip(el);
+      placeTip(event.clientX, event.clientY);
+    });
+    el.addEventListener("mousemove", (event) => {
+      if (isPinned || !tip.classList.contains("is-visible")) return;
+      placeTip(event.clientX, event.clientY);
+    });
+    el.addEventListener("mouseleave", () => {
+      if (!isPinned) hideTip();
+    });
+    el.addEventListener("click", (event) => {
+      renderTip(el);
+      placeTip(event.clientX, event.clientY);
+      isPinned = true;
+    });
+    el.addEventListener("touchstart", (event) => {
+      const t = event.touches && event.touches[0];
+      renderTip(el);
+      if (t) placeTip(t.clientX, t.clientY);
+      isPinned = true;
+    }, { passive: true });
+  });
+  tile.addEventListener("mouseleave", () => {
+    if (!isPinned) hideTip();
+  });
+  tile.addEventListener("pointerdown", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest(".sw-run-hit")) return;
+    if (target.closest(".season-wheel-run-tooltip")) return;
+    hideTip();
+  });
 }
 
 function renderProfileLocked() {
@@ -5621,7 +6451,7 @@ function registerDevOnlyHelpers() {
   if (!WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED) return;
   window.waywordDevResetFirstSessionEntry = waywordDevResetFirstSessionEntryForTesting;
   window.waywordDevSeasonFixtures = {
-    availableFixtures: Object.freeze(["sparse", "moderate", "heavy", "clustered", "steady"]),
+    availableFixtures: Object.freeze(["sparse", "moderate", "heavy", "clustered", "steady", "extreme"]),
     useFixture(name) {
       const normalized = String(name || "").toLowerCase();
       if (!fixtureCountMapByName(normalized)) {
@@ -5646,6 +6476,10 @@ function runDevOnlyBootActions() {
   if (!WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED) return;
   try {
     const params = new URLSearchParams(location.search);
+    const fixtureParam = String(params.get("seasonFixture") || "").toLowerCase();
+    if (fixtureParam && fixtureCountMapByName(fixtureParam)) {
+      devSeasonFixtureName = fixtureParam;
+    }
     if (params.get("resetFirstSessionEntry") === "1") {
       waywordDevResetFirstSessionEntryForTesting();
       params.delete("resetFirstSessionEntry");
