@@ -39,13 +39,27 @@ Purpose:
 Shows the current writing season.
 
 Data:
-last 90 days of saved runs, run dates, active days, word volume.
+last 90 days of saved runs, run timestamps, durations, word volume, completion state.
 
 Visual grammar:
-season wheel, almanac ring, radial field, quiet marks, monthly arcs, Wayword O and lens resonance.
+one circular season map with one spoke per day and a literal 24-hour radial timeline on each spoke.
+
+Canonical encoding:
+- angle = day within season
+- radial position = run start time
+- radial length = run duration
+- segment thickness = stepped/log word-count scale
+- segment opacity and dash = completion integrity (complete, partial, interrupted, abandoned)
+- hue = time-of-day band only
+- empty spoke and empty radial space = meaningful silence
 
 Current implementation:
-Current Season seed exists as Season Wheel in Patterns.
+Current Season wheel now renders as a data-driven temporal instrument (not a symbolic mark grid).
+
+Production behavior:
+- The Season Wheel panel now defaults to live seasonal run data (no query flag required).
+- `seasonFixture` and `seasonWheelDebug` are dev-only controls and are ignored in production mode.
+- `canonExact` remains a QA parity reference mode for development validation only.
 
 ### 2. Trace Field
 Purpose:
@@ -92,8 +106,8 @@ This should probably wait for enough history and may belong to Almanac and archi
 - Mobile instruments should feel like tactile specimens, not dashboards.
 
 ## Current Season Direction
-- The current implementation is a seed, not the final form.
-- The Season Wheel should evolve toward a richer, more tactile seasonal instrument.
+- The Season Wheel is now an instrument-first temporal map.
+- Future work should refine calibration, not change core geometry.
 - Avoid rectangular activity grids and GitHub contribution-chart grammar.
 - Avoid making run counts the center of the section.
 - The season name should orient the user.
@@ -124,7 +138,7 @@ Almanac, past seasons, annual cycle, motif returns, deeper strata, exports and y
 ## Near-Term Roadmap
 1. Stabilize Current Season branch.
 2. Dogfood Season Wheel on mobile and desktop.
-3. Decide if wheel needs one more visual-density pass.
+3. Continue instrument calibration (density/contrast) while preserving literal temporal mapping.
 4. Next candidate instrument: Trace Field, using existing repeated-word data.
 5. Later candidate: Pulse.
 6. Delay Drift Atlas until enough longitudinal data exists.

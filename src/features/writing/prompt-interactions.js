@@ -3,7 +3,6 @@
     if (inputRef && typeof inputRef.armPromptControlFocusExitGuard === "function") {
       inputRef.armPromptControlFocusExitGuard();
     }
-    e.preventDefault();
     e.stopPropagation();
   }
 
@@ -27,6 +26,10 @@
     if (field) {
       field.removeEventListener("pointerdown", onPromptClusterControlPointerDown);
       field.addEventListener("pointerdown", onPromptClusterControlPointerDown);
+      if (typeof input.onFieldExpandedControlPointerUp === "function") {
+        field.removeEventListener("pointerup", input.onFieldExpandedControlPointerUp);
+        field.addEventListener("pointerup", input.onFieldExpandedControlPointerUp);
+      }
       field.removeEventListener("click", input.onFieldExpandedControlClick);
       field.addEventListener("click", input.onFieldExpandedControlClick);
     }
