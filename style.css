@@ -241,8 +241,8 @@ button,input,textarea{
   display:block;
   height:100%;
   background-color:currentColor;
-  -webkit-mask:url("/assets/brand/wayword-logo.svg") center / contain no-repeat;
-  mask:url("/assets/brand/wayword-logo.svg") center / contain no-repeat;
+  -webkit-mask:url("/assets/brand/wayword-logo.svg?v=20260521b") center / contain no-repeat;
+  mask:url("/assets/brand/wayword-logo.svg?v=20260521b") center / contain no-repeat;
   flex-shrink:0;
 }
 
@@ -1058,10 +1058,12 @@ html[data-theme="dark"] .theme-moon{
 
 .prompt-card{
   --prompt-row-inset-y:10px;
-  --prompt-control-grid-size:28px;
+  --prompt-control-grid-size:30px;
   --prompt-control-reroll-size:30px;
   --prompt-control-gap:2px;
   --prompt-control-stack-h:calc(var(--prompt-control-grid-size) + var(--prompt-control-reroll-size) + var(--prompt-control-gap));
+  --prompt-text-size:28px;
+  --prompt-text-leading:1.18;
   border-top:2px solid var(--ink);
   border-bottom:1px solid var(--line);
   padding:var(--prompt-row-inset-y) 0;
@@ -1072,7 +1074,7 @@ html[data-theme="dark"] .theme-moon{
 
 .prompt-main{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   min-width:0;
   min-height:var(--prompt-control-stack-h);
   padding-right:42px;
@@ -1080,7 +1082,7 @@ html[data-theme="dark"] .theme-moon{
 
 .prompt-control-spine{
   position:absolute;
-  top:var(--prompt-row-inset-y);
+  top:calc(var(--prompt-row-inset-y) - 1px);
   right:0;
   z-index:2;
   display:grid;
@@ -1103,17 +1105,17 @@ html[data-theme="dark"] .theme-moon{
 }
 
 .prompt-text{
-  font-size:28px;
-  line-height:1.18;
+  font-size:var(--prompt-text-size);
+  line-height:var(--prompt-text-leading);
   margin:0;
 }
 
 .prompt-control-spine #fieldExpandedToggle{
   grid-row:1;
-  width:34px;
-  height:34px;
-  min-width:34px;
-  min-height:34px;
+  width:var(--prompt-control-grid-size);
+  height:var(--prompt-control-grid-size);
+  min-width:var(--prompt-control-grid-size);
+  min-height:var(--prompt-control-grid-size);
   margin:0;
   padding:0;
   align-self:start;
@@ -6114,12 +6116,18 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   .prompt-card{
+    --prompt-row-inset-y:6px;
+    --prompt-control-grid-size:30px;
+    --prompt-control-reroll-size:30px;
+    --prompt-control-gap:2px;
+    --prompt-text-size:clamp(18px, 5vw, 20px);
+    --prompt-text-leading:1.16;
     margin-bottom:6px;
     padding:6px 0 8px;
   }
 
   .prompt-text{
-    margin:0 0 3px;
+    margin:0;
   }
 
   .editor-pill-band{
@@ -6156,14 +6164,12 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   body.keyboard-open .prompt-card{
-    margin-bottom:4px;
-    padding:4px 0 6px;
+    margin-bottom:6px;
+    padding:6px 0 8px;
   }
 
   body.keyboard-open .prompt-text{
-    font-size:clamp(18px, 5.2vw, 22px);
-    line-height:1.14;
-    margin:0 0 2px;
+    margin:0;
   }
 
   body.keyboard-open #recentWritingTrigger{
@@ -6244,12 +6250,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   body.focus-mode.keyboard-open .prompt-card{
-    margin-bottom:3px;
-    padding:4px 0 5px;
-  }
-
-  body.focus-mode.keyboard-open .prompt-text{
-    font-size:clamp(17px, 5vw, 20px);
+    margin-bottom:6px;
+    padding:6px 0 8px;
   }
 
   body.focus-mode.keyboard-open .below-editor-stack{
@@ -6352,11 +6354,6 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   body.focus-mode .prompt-card{
     margin-bottom:6px;
     padding:6px 0 8px;
-  }
-
-  body.focus-mode .prompt-text{
-    font-size:21px;
-    line-height:1.16;
   }
 
   body.focus-mode .editor-shell{
@@ -6492,13 +6489,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   }
 
   body.focus-mode .prompt-card{
-    margin-bottom:4px;
-    padding:4px 0 6px;
-  }
-
-  body.focus-mode .prompt-text{
-    font-size:18px;
-    line-height:1.12;
+    margin-bottom:6px;
+    padding:6px 0 8px;
   }
 
   body.focus-mode .editor-shell{
@@ -6590,10 +6582,6 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
     font-size:10px;
   }
 
-  body.focus-mode .prompt-text{
-    font-size:16px;
-  }
-
   body.focus-mode .editor-shell{
     min-height:130px;
   }
@@ -6640,8 +6628,8 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
 }
 
 @media (max-width:430px){
-  .prompt-text{
-    font-size:20px;
+  .prompt-card{
+    --prompt-text-size:clamp(18px, 5.1vw, 20px);
   }
 
   .editor-options-panel{
