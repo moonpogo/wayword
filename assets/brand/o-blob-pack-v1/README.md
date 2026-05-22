@@ -1,7 +1,9 @@
-# O Blob Pack V1
+# O Blob Pack V1 (Minimal)
 
-Extracted from current production `assets/brand/wayword-logo.svg`.
+Derived from current production `assets/brand/wayword-logo.svg`.
 
-- `light/` and `dark/`: source + 512..8192 PNG + SVG wrappers
-- `favicon-candidates/`: square profile/app/favicon-ready PNGs and ICO
-- `raw/`: exact extracted source files
+Included:
+- light max PNG: `light/png/o-blob-light-8192.png`
+- dark max PNG: `dark/png/o-blob-dark-8192.png`
+- favicon/app square: `favicon-candidates/*/o-blob-*-512.png`
+- ico: `favicon-candidates/*/o-blob-*.ico`
