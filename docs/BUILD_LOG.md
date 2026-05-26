@@ -1,5 +1,16 @@
 # Build Log
 
+## 2026-05-25: Supabase auth redirect hardening
+
+- Audited Supabase auth redirect call sites for `signInWithOtp`, `signUp`, `resetPasswordForEmail`, and `emailRedirectTo`.
+- Runtime auth uses an origin-aware redirect builder for magic-link email auth:
+  - preserves localhost behavior for `http://127.0.0.1:3001` and `http://localhost:3001`
+  - resolves production/deployed links to the active origin when available
+  - falls back to `https://wayword.me` if origin is unavailable
+- Required Supabase Auth URL Configuration:
+  - Site URL: `https://wayword.me`
+  - Redirect URLs: `https://wayword.me/**`, `http://127.0.0.1:3001/**`, `http://localhost:3001/**`
+
 ## 2026-04-24: Structural audit refresh + V1 structure freeze
 
 - Structural audit refreshed after three completed coordination extractions:

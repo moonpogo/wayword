@@ -1520,7 +1520,7 @@ var WaywordMirror = (() => {
   // src/features/mirror/pipeline/mirrorExperiments.ts
   function applyThinRefusalExperiment(input, result) {
     if (!mirrorThinRefusalExperimentActive()) return result;
-    if (input.calibrationIncomplete) return result;
+    if (input.firstSessionEntryIncomplete) return result;
     const main = result.main;
     if (!main) return result;
     if (main.category === "low_signal") return result;
