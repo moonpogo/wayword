@@ -218,3 +218,11 @@ This pass is a working-tree stabilization pass, not a released commit.
 - Added **`npm run verify:merge`** in `package.json`: bundles `npm test`, `node --check script.js`, `verify:mirror-bundle`, and `verify:patterns-surface` so the default automated gate does not depend on remembering four separate commands (still no CI workflow change).
 - **`docs/QA_REGRESSION_CHECKLIST.md`**: calls out when to run `verify:merge` vs full `test:regression` for changes touching `script.js` / `index.html` / runtime seams.
 - **`docs/V1_CHANGE_GUARDRAILS.md`**: required verification now leads with `verify:merge` and optional `test:regression` when Playwright is available.
+
+## 2026-05-25: Vercel static deployment sanity checks
+
+- Confirm production serves root static outputs directly (`index.html` + referenced `/src/**` scripts).
+- After deploy, verify these URLs load in-browser:
+  - `/env.runtime.js`
+  - `/src/infrastructure/telemetry/telemetry-runtime.js`
+- If either URL fails, deployment output directory/config is misaligned with runtime script paths in `index.html`.
