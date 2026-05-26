@@ -96,10 +96,10 @@ function extractBetween(source, startMarker, endMarker) {
 
 function loadAccountSurfaceRendererContext(overrides = {}) {
   const source = fs.readFileSync("script.js", "utf8");
-  const start = source.indexOf("function renderAccountSurface()");
+  const start = source.indexOf("function isAccountEnvConfigured()");
   const end = source.indexOf("function bindAccountSurface()", start);
   if (start < 0 || end < 0 || end <= start) {
-    throw new Error("unable to extract renderAccountSurface from script.js");
+    throw new Error("unable to extract account helpers from script.js");
   }
   const functionCode = source.slice(start, end).trim();
 
@@ -123,7 +123,10 @@ function loadAccountSurfaceRendererContext(overrides = {}) {
     waywordPersistenceRuntime: null,
     $: (id) => nodes[id] || null,
     isAccountPanelOpen: () => false,
-    setAccountMessage: () => {},
+    setAccountMessage(message) {
+      nodes.accountPanelMessage.textContent = String(message || "");
+      nodes.accountPanelMessage.classList.toggle("hidden", !nodes.accountPanelMessage.textContent.trim());
+    },
     ...overrides,
   });
 
@@ -3597,6 +3600,33 @@ test("account surface keeps sign-in available when URL/key are configured and RL
   );
 });
 
+test("account surface keeps sign-in available when URL/key are configured and RLS is verified", () => {
+  const context = loadAccountSurfaceRendererContext({
+    waywordEnv: {
+      SUPABASE_URL: "https://x.supabase.co",
+      SUPABASE_ANON_KEY: "anon",
+      SUPABASE_RLS_VERIFIED: "true",
+      isSupabaseConfigured: true,
+    },
+    state: {
+      account: { hasSession: false },
+      continuityMigration: { status: "not_started" },
+    },
+  });
+
+  context.renderAccountSurface();
+
+  assert.equal(
+    context.__accountNodes.accountPanelSummary.textContent,
+    "Keep your writing connected across sessions."
+  );
+  assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), false);
+  assert.equal(
+    context.__accountNodes.accountPanelSummary.textContent.includes("local preview"),
+    false
+  );
+});
+
 test("account surface shows local-preview message when URL/key are missing", () => {
   const context = loadAccountSurfaceRendererContext({
     waywordEnv: {
@@ -3618,4 +3648,24 @@ test("account surface shows local-preview message when URL/key are missing", () 
     "Account continuity is not configured in this local preview."
   );
   assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), true);
+});
+
+test("account runtime-unavailable copy uses configured-env-safe message", () => {
+  const context = loadAccountSurfaceRendererContext({
+    waywordEnv: {
+      SUPABASE_URL: "https://x.supabase.co",
+      SUPABASE_ANON_KEY: "anon",
+      SUPABASE_RLS_VERIFIED: "true",
+      isSupabaseConfigured: true,
+    },
+  });
+
+  assert.equal(
+    context.getAccountRuntimeUnavailableMessage(true),
+    "Account sign-in is temporarily unavailable. Please try again."
+  );
+  assert.equal(
+    context.getAccountRuntimeUnavailableMessage(false),
+    "Account continuity is not configured in this local preview."
+  );
 });

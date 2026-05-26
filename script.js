@@ -6984,6 +6984,59 @@ function closeAccountPanel() {
   document.body.classList.remove("settings-open");
 }
 
+function isAccountEnvConfigured() {
+  return Boolean(window.waywordEnv && window.waywordEnv.isSupabaseConfigured);
+}
+
+function isAccountRlsVerified() {
+  var env = window.waywordEnv || {};
+  return env.SUPABASE_RLS_VERIFIED === true || env.SUPABASE_RLS_VERIFIED === "true";
+}
+
+function selectAccountSummaryCopy(input) {
+  var configured = Boolean(input && input.configured);
+  var hasSession = Boolean(input && input.hasSession);
+  var syncGuarded = Boolean(input && input.syncGuarded);
+  if (!configured) return "Account continuity is not configured in this local preview.";
+  if (hasSession) return "Signed in. Account continuity available.";
+  if (syncGuarded) {
+    return "Sign-in is available. Remote sync remains guarded until RLS verification is completed.";
+  }
+  return "Keep your writing connected across sessions.";
+}
+
+function getAccountRuntimeUnavailableMessage(configured) {
+  if (!configured) return "Account continuity is not configured in this local preview.";
+  return "Account sign-in is temporarily unavailable. Please try again.";
+}
+
+function shouldEnableAccountDebugMode() {
+  try {
+    var host = String(window.location && window.location.hostname ? window.location.hostname : "").toLowerCase();
+    var isLocalHost = host === "localhost" || host === "127.0.0.1";
+    if (isLocalHost) return true;
+    var search = String(window.location && window.location.search ? window.location.search : "");
+    var params = new URLSearchParams(search);
+    return params.get("waywordAccountDebug") === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function publishAccountDebugState(nextState) {
+  if (!shouldEnableAccountDebugMode()) return;
+  var prior = window.waywordAccountDebug && typeof window.waywordAccountDebug === "object"
+    ? window.waywordAccountDebug
+    : {};
+  var merged = Object.assign({}, prior, nextState || {}, { capturedAt: new Date().toISOString() });
+  window.waywordAccountDebug = merged;
+  try {
+    console.info("[wayword-account-debug]", merged);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 function renderAccountSurface() {
   const summary = $("accountPanelSummary");
   const fallback = $("accountPanelFallback");
@@ -6991,21 +7044,21 @@ function renderAccountSurface() {
   const signOutBtn = $("accountSignOutBtn");
   const actions = $("accountActions");
   const accountState = state.account || {};
-  const configured = Boolean(window.waywordEnv && window.waywordEnv.isSupabaseConfigured);
+  const configured = isAccountEnvConfigured();
   const hasSession = Boolean(accountState.hasSession);
   const migrationStatus = String(state.continuityMigration?.status || "not_started");
   const syncGuarded = configured && migrationStatus === "skipped_unverified_rls";
+  const summaryBranch = !configured
+    ? "missing_env"
+    : hasSession
+      ? "signed_in"
+      : syncGuarded
+        ? "sync_guarded"
+        : "signed_out_ready";
+  const summaryCopy = selectAccountSummaryCopy({ configured, hasSession, syncGuarded });
 
   if (summary) {
-    if (!configured) {
-      summary.textContent = "Account continuity is not configured in this local preview.";
-    } else if (hasSession) {
-      summary.textContent = "Signed in. Account continuity available.";
-    } else if (syncGuarded) {
-      summary.textContent = "Sign-in is available. Remote sync remains guarded until RLS verification is completed.";
-    } else {
-      summary.textContent = "Keep your writing connected across sessions.";
-    }
+    summary.textContent = summaryCopy;
   }
 
   if (fallback) {
@@ -7034,6 +7087,35 @@ function renderAccountSurface() {
       setAccountMessage("Sync remains gated until live RLS verification is completed.");
     }
   }
+
+  let authRuntimeReady = false;
+  try {
+    const runtime = window.waywordAuthSessionRuntime;
+    authRuntimeReady = Boolean(runtime && typeof runtime.signInWithMagicLink === "function");
+  } catch (_) {
+    authRuntimeReady = false;
+  }
+
+  let supabaseClientReady = false;
+  try {
+    const clientApi = window.waywordSupabaseClient;
+    const client = clientApi && typeof clientApi.getClient === "function" ? clientApi.getClient() : null;
+    supabaseClientReady = Boolean(client);
+  } catch (_) {
+    supabaseClientReady = false;
+  }
+
+  publishAccountDebugState({
+    envConfigured: configured,
+    rlsVerified: isAccountRlsVerified(),
+    hasSession: hasSession,
+    migrationStatus: migrationStatus,
+    summaryBranch: summaryBranch,
+    summaryCopy: summaryCopy,
+    authRuntimeReady: authRuntimeReady,
+    supabaseClientReady: supabaseClientReady,
+    messageCopy: String($("accountPanelMessage")?.textContent || ""),
+  });
 }
 
 function bindAccountSurface() {
@@ -7071,12 +7153,13 @@ function bindAccountSurface() {
     }
     const runtime = window.waywordAuthSessionRuntime;
     if (!runtime || typeof runtime.signInWithMagicLink !== "function") {
-      const configured = Boolean(window.waywordEnv && window.waywordEnv.isSupabaseConfigured);
-      if (!configured) {
-        setAccountMessage("Account continuity is not configured in this local preview.");
-      } else {
-        setAccountMessage("Account sign-in is temporarily unavailable. Please try again.");
-      }
+      const configured = isAccountEnvConfigured();
+      setAccountMessage(getAccountRuntimeUnavailableMessage(configured));
+      publishAccountDebugState({
+        submitBranch: configured ? "runtime_missing_configured_env" : "runtime_missing_no_env",
+        envConfigured: configured,
+        authRuntimeReady: false,
+      });
       return;
     }
     const result = await runtime.signInWithMagicLink(email);
