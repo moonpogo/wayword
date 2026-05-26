@@ -3,11 +3,10 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 
-const HOST = "127.0.0.1";
+const HOST = process.env.HOST || "127.0.0.1";
 const ROOT = path.resolve(__dirname, "..");
 const ENV_PATH = path.join(ROOT, ".env");
 const DEFAULT_PORT = Number(process.env.PORT) || 3001;
-const MAX_PORT_ATTEMPTS = 10;
 
 const CONTENT_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -95,6 +94,10 @@ function injectRuntimeEnvHtml(htmlText) {
 function createServer() {
   return http.createServer((req, res) => {
     const requestUrl = new URL(req.url || "/", `http://${HOST}`);
+    if (requestUrl.pathname === "/__health") {
+      sendResponse(res, 200, "ok");
+      return;
+    }
     let targetPath = resolveRequestPath(requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname);
 
     if (!targetPath.startsWith(ROOT)) {
@@ -129,12 +132,12 @@ function createServer() {
   });
 }
 
-function listenWithFallback(startPort, attemptsRemaining) {
+function startServer(startPort) {
   const server = createServer();
   server.on("error", (error) => {
-    if (error && error.code === "EADDRINUSE" && attemptsRemaining > 1) {
-      listenWithFallback(startPort + 1, attemptsRemaining - 1);
-      return;
+    if (error && error.code === "EADDRINUSE") {
+      console.error(`Port ${startPort} is already in use. Stop the existing preview process and retry.`);
+      process.exit(1);
     }
 
     console.error(error && error.message ? error.message : String(error));
@@ -146,4 +149,4 @@ function listenWithFallback(startPort, attemptsRemaining) {
   });
 }
 
-listenWithFallback(DEFAULT_PORT, MAX_PORT_ATTEMPTS);
+startServer(DEFAULT_PORT);

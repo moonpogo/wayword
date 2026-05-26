@@ -1036,7 +1036,7 @@ button,input,textarea{
   object-position:left center;
   -webkit-mask-position:left center;
   mask-position:left center;
-  transform:translateX(-6px) translateY(-0.04em) scale(1.34);
+  transform:translateX(-14px) translateY(-0.04em) scale(1.34);
   transform-origin:left center;
 }
 

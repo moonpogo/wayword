@@ -56,8 +56,10 @@ Key docs:
 
 ```sh
 npm install
-npm run preview
+npm run preview:live
 ```
+
+`preview:live` is the canonical local preview command. It kills stale preview processes, starts a fresh server on `127.0.0.1:3001`, health-checks `/__health`, and only reports success when the app is actually reachable.
 
 The preview server serves the static app locally. The production app is deployed at https://wayword.me/.
 
