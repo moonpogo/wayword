@@ -6994,12 +6994,15 @@ function renderAccountSurface() {
   const configured = Boolean(window.waywordEnv && window.waywordEnv.isSupabaseConfigured);
   const hasSession = Boolean(accountState.hasSession);
   const migrationStatus = String(state.continuityMigration?.status || "not_started");
+  const syncGuarded = configured && migrationStatus === "skipped_unverified_rls";
 
   if (summary) {
     if (!configured) {
       summary.textContent = "Account continuity is not configured in this local preview.";
     } else if (hasSession) {
       summary.textContent = "Signed in. Account continuity available.";
+    } else if (syncGuarded) {
+      summary.textContent = "Sign-in is available. Remote sync remains guarded until RLS verification is completed.";
     } else {
       summary.textContent = "Keep your writing connected across sessions.";
     }

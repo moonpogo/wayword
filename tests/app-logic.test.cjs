@@ -94,6 +94,44 @@ function extractBetween(source, startMarker, endMarker) {
   return source.slice(start, end + endMarker.length);
 }
 
+function loadAccountSurfaceRendererContext(overrides = {}) {
+  const source = fs.readFileSync("script.js", "utf8");
+  const start = source.indexOf("function renderAccountSurface()");
+  const end = source.indexOf("function bindAccountSurface()", start);
+  if (start < 0 || end < 0 || end <= start) {
+    throw new Error("unable to extract renderAccountSurface from script.js");
+  }
+  const functionCode = source.slice(start, end).trim();
+
+  const nodes = {
+    accountPanelSummary: { textContent: "" },
+    accountPanelFallback: { textContent: "" },
+    accountPanelMessage: { textContent: "", classList: createClassList(), dataset: {} },
+    accountSignInForm: { classList: createClassList() },
+    accountSignOutBtn: { classList: createClassList() },
+    accountActions: { classList: createClassList() },
+    accountBackdrop: { classList: createClassList(["hidden"]) },
+  };
+
+  const context = loadBrowserScripts([], {
+    console: silentConsole(),
+    state: {
+      account: { hasSession: false },
+      continuityMigration: { status: "not_started" },
+    },
+    waywordEnv: {},
+    waywordPersistenceRuntime: null,
+    $: (id) => nodes[id] || null,
+    isAccountPanelOpen: () => false,
+    setAccountMessage: () => {},
+    ...overrides,
+  });
+
+  context.__accountNodes = nodes;
+  require("vm").runInContext(functionCode, context, { filename: "script.js:renderAccountSurface" });
+  return context;
+}
+
 function loadRunControllerRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/run-controller-runtime.js"], {
     console: silentConsole(),
@@ -3530,4 +3568,50 @@ test("legacy migration merges rows missing from canonical store only once", () =
   const second = context.waywordRunMigration.mergeLegacyHistoryMissingIntoCanonicalStore(repo);
   assert.equal(second.merged, 0);
   assert.equal(second.skipped, 1);
+});
+
+test("account surface keeps sign-in available when URL/key are configured and RLS is unverified", () => {
+  const context = loadAccountSurfaceRendererContext({
+    waywordEnv: {
+      SUPABASE_URL: "https://x.supabase.co",
+      SUPABASE_ANON_KEY: "anon",
+      SUPABASE_RLS_VERIFIED: "false",
+      isSupabaseConfigured: true,
+    },
+    state: {
+      account: { hasSession: false },
+      continuityMigration: { status: "skipped_unverified_rls" },
+    },
+  });
+
+  context.renderAccountSurface();
+
+  assert.equal(
+    context.__accountNodes.accountPanelSummary.textContent,
+    "Sign-in is available. Remote sync remains guarded until RLS verification is completed."
+  );
+  assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), false);
+});
+
+test("account surface shows local-preview message when URL/key are missing", () => {
+  const context = loadAccountSurfaceRendererContext({
+    waywordEnv: {
+      SUPABASE_URL: "",
+      SUPABASE_ANON_KEY: "",
+      SUPABASE_RLS_VERIFIED: "false",
+      isSupabaseConfigured: false,
+    },
+    state: {
+      account: { hasSession: false },
+      continuityMigration: { status: "not_started" },
+    },
+  });
+
+  context.renderAccountSurface();
+
+  assert.equal(
+    context.__accountNodes.accountPanelSummary.textContent,
+    "Account continuity is not configured in this local preview."
+  );
+  assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), true);
 });
