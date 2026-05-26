@@ -7071,7 +7071,12 @@ function bindAccountSurface() {
     }
     const runtime = window.waywordAuthSessionRuntime;
     if (!runtime || typeof runtime.signInWithMagicLink !== "function") {
-      setAccountMessage("Account continuity is not configured in this local preview.");
+      const configured = Boolean(window.waywordEnv && window.waywordEnv.isSupabaseConfigured);
+      if (!configured) {
+        setAccountMessage("Account continuity is not configured in this local preview.");
+      } else {
+        setAccountMessage("Account sign-in is temporarily unavailable. Please try again.");
+      }
       return;
     }
     const result = await runtime.signInWithMagicLink(email);

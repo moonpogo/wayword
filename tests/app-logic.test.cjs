@@ -3591,6 +3591,10 @@ test("account surface keeps sign-in available when URL/key are configured and RL
     "Sign-in is available. Remote sync remains guarded until RLS verification is completed."
   );
   assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), false);
+  assert.equal(
+    context.__accountNodes.accountPanelSummary.textContent.includes("local preview"),
+    false
+  );
 });
 
 test("account surface shows local-preview message when URL/key are missing", () => {
