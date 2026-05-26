@@ -83,7 +83,10 @@ function getBrowserEnvPayload() {
 
 function injectRuntimeEnvHtml(htmlText) {
   var payload = getBrowserEnvPayload();
-  var injection = "\n<script>window.__WAYWORD_ENV = " + JSON.stringify(payload) + ";</script>\n";
+  var injection =
+    "\n<script>(function(){var payload=" +
+    JSON.stringify(payload) +
+    ";var current=window.__WAYWORD_ENV&&typeof window.__WAYWORD_ENV==='object'?window.__WAYWORD_ENV:{};window.__WAYWORD_ENV=Object.assign({}, current, payload);})();</script>\n";
   if (htmlText.includes("window.__WAYWORD_ENV")) return htmlText;
   if (htmlText.includes("</head>")) return htmlText.replace("</head>", injection + "</head>");
   return injection + htmlText;
