@@ -84,8 +84,11 @@ Bundle and surface checks:
 ```sh
 npm run build:mirror
 npm run verify:mirror-bundle
+npm run verify:brand-lock
 npm run verify:patterns-surface
 ```
+
+Brand lock: `assets/brand/wayword-logo.svg` is hash-locked to the canonical logo asset. Redraw/replacement must be explicitly approved and intentionally updated.
 
 Social asset generation (dev-only):
 
