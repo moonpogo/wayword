@@ -50,7 +50,16 @@
       lastMirrorLoadFailed: false,
       completedUiActive: false,
       /** Mobile writing field: when true, surrounding header/context is revealed (still in the same focus habitat). */
-      isExpandedField: false
+      isExpandedField: false,
+      account: {
+        mode: "local-only",
+        hasSession: false,
+        lastAuthEvent: ""
+      },
+      continuityMigration: {
+        status: "not_started",
+        lastBatchId: ""
+      }
     };
   }
 

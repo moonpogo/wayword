@@ -105,6 +105,46 @@
       persist: input && input.persist,
     });
 
+    // Track 3 start: best-effort authenticated persistence path.
+    // Local continuity remains canonical fallback if this fails or is unavailable.
+    try {
+      if (
+        window.waywordPersistenceRuntime &&
+        typeof window.waywordPersistenceRuntime.syncSavedRun === "function"
+      ) {
+        Promise.resolve(window.waywordPersistenceRuntime.syncSavedRun(fallbackRun))
+          .then(function (syncResult) {
+            var synced = Boolean(syncResult && syncResult.ok);
+            window.waywordRetentionEvents &&
+              typeof window.waywordRetentionEvents.markRunSaved === "function" &&
+              window.waywordRetentionEvents.markRunSaved({
+                sync_status: synced ? "server_synced" : "local_only_fallback",
+                is_authenticated: synced || (syncResult && syncResult.reason !== "no_authenticated_session"),
+              });
+            if (!synced) {
+              console.warn("wayword: persistence runtime sync failed; local continuity remains authoritative", syncResult);
+            }
+          })
+          .catch(function (err) {
+            window.waywordRetentionEvents &&
+              typeof window.waywordRetentionEvents.markRunSaved === "function" &&
+              window.waywordRetentionEvents.markRunSaved({
+                sync_status: "local_only_fallback",
+                is_authenticated: false,
+              });
+            console.warn("wayword: persistence runtime sync failed; local continuity remains authoritative", err);
+          });
+      }
+    } catch (persistSyncErr) {
+      window.waywordRetentionEvents &&
+        typeof window.waywordRetentionEvents.markRunSaved === "function" &&
+        window.waywordRetentionEvents.markRunSaved({
+          sync_status: "local_only_fallback",
+          is_authenticated: false,
+        });
+      console.warn("wayword: persistence runtime sync threw synchronously; local continuity remains authoritative", persistSyncErr);
+    }
+
     return {
       canonicalDoc: canonicalDoc,
       legacyRow: legacyRow,

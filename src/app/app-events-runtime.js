@@ -5,7 +5,9 @@
     editorInput.dataset.appEventsBound = "1";
 
     editorInput.addEventListener("focus", function () {
-      input.setFocusMode(true);
+      if (!window.__WAYWORD_DEV_VISUAL_PROFILE) {
+        input.setFocusMode(true);
+      }
       if (typeof input.onEditorFocusForEntryDelayHint === "function") {
         input.onEditorFocusForEntryDelayHint();
       }
@@ -271,10 +273,13 @@
           },
           dockFocusModeForMobile: false,
         });
-        if (input.isMobileViewport()) {
+        if (input.isMobileViewport() && !window.__WAYWORD_DEV_VISUAL_PROFILE) {
           input.setFocusMode(true);
         }
         input.startWriting({ deferEditorFocus: true });
+        if (typeof input.onBeginClicked === "function") {
+          input.onBeginClicked({ source: "begin_button" });
+        }
       });
     }
 

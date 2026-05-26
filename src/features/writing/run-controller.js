@@ -137,6 +137,12 @@
     d.applyProgressionToState();
     d.state.timerWaitingForFirstInput = Boolean(d.state.timerSeconds);
     d.state.prompt = d.generatePrompt();
+    if (
+      window.waywordRetentionEvents &&
+      typeof window.waywordRetentionEvents.beginSession === "function"
+    ) {
+      window.waywordRetentionEvents.beginSession();
+    }
     if (typeof d.startTelemetryRun === "function") {
       d.startTelemetryRun();
     }

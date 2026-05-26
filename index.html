@@ -10,6 +10,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32x32.png?v=5" />
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16x16.png?v=5" />
   <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png?v=5" />
+  <link rel="preload" href="/assets/brand/wayword-logo.svg?v=20260521b" as="image" type="image/svg+xml" />
   <script>
     (function () {
       try {
@@ -23,7 +24,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="/style.css?v=20260522-logo-refresh-1" />
+  <link rel="stylesheet" href="/style.css?v=20260525-right-rail-logo-tone-1" />
   <script defer src="https://cdn.vercel-insights.com/v1/script.js"></script>
 </head>
 <body>
@@ -32,7 +33,14 @@
     <section id="landingView" class="landing-view">
       <div class="landing-gate">
         <h1 class="landing-wordmark" aria-label="Wayword">
-          <span class="wayword-logo wayword-logo--landing" aria-hidden="true"></span>
+          <img
+            class="wayword-logo wayword-logo--landing"
+            src="/assets/brand/wayword-logo.svg?v=20260521b"
+            alt=""
+            aria-hidden="true"
+            decoding="sync"
+            fetchpriority="high"
+          />
         </h1>
 
         <div class="landing-copy">
@@ -230,11 +238,29 @@
       <div class="app-write-surface">
       <header class="header">
         <div class="header-theme"></div>
+        <button
+          id="accountBtn"
+          class="account-corner-btn"
+          type="button"
+          aria-label="Account"
+          aria-haspopup="dialog"
+          aria-controls="accountBackdrop"
+          aria-expanded="false"
+        >
+          <span class="account-corner-btn__glyph" aria-hidden="true"></span>
+        </button>
 
         <div class="write-field-context">
           <div class="header-brand brand-block">
             <h1 class="wordmark" id="wordmark" aria-label="Wayword">
-              <span class="wayword-logo wayword-logo--header" aria-hidden="true"></span>
+              <img
+                class="wayword-logo wayword-logo--header"
+                src="/assets/brand/wayword-logo.svg?v=20260521b"
+                alt=""
+                aria-hidden="true"
+                decoding="sync"
+                fetchpriority="high"
+              />
             </h1>
 
             <div class="subhed">Notice how you write, as you write</div>
@@ -611,6 +637,48 @@
           </div>
         </div>
       </div>
+
+      <div
+        id="accountBackdrop"
+        class="editor-options-backdrop dim-layer hidden"
+        aria-hidden="true"
+      >
+        <section
+          id="accountPanel"
+          class="settings-modal account-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="accountPanelTitle"
+          aria-hidden="true"
+        >
+          <div class="account-panel__head">
+            <h2 id="accountPanelTitle" class="account-panel__title">Account</h2>
+            <button id="accountCloseBtn" type="button" class="account-panel__close" aria-label="Close account panel">✕</button>
+          </div>
+
+          <p id="accountPanelSummary" class="account-panel__summary"></p>
+          <p id="accountPanelFallback" class="account-panel__fallback"></p>
+
+          <form id="accountSignInForm" class="account-panel__form hidden">
+            <label for="accountEmailInput">Email</label>
+            <div class="account-panel__form-row">
+              <input id="accountEmailInput" type="email" autocomplete="email" inputmode="email" />
+              <button id="accountSignInBtn" type="submit">Send sign-in link</button>
+            </div>
+          </form>
+
+          <p id="accountPanelMessage" class="account-panel__message hidden" aria-live="polite"></p>
+
+          <div id="accountActions" class="account-panel__actions hidden">
+            <button id="accountExportBtn" type="button">Export account runs (JSON)</button>
+            <button id="accountDeleteAllBtn" type="button">Delete all account runs</button>
+          </div>
+
+          <div class="account-panel__foot">
+            <button id="accountSignOutBtn" type="button" class="hidden">Sign out</button>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 
@@ -620,6 +688,17 @@
   <script src="/src/features/mirror/mirror-controller.js"></script>
   <script src="/src/dom/elements.js"></script>
   <script src="/src/config/constants.js"></script>
+  <script src="/src/config/env.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/src/infrastructure/auth/supabase-client.js"></script>
+  <script src="/src/infrastructure/auth/auth-session-runtime.js"></script>
+  <script src="/src/infrastructure/telemetry/event-registry.js"></script>
+  <script src="/src/infrastructure/telemetry/telemetry-runtime.js"></script>
+  <script src="/src/infrastructure/telemetry/retention-events.js"></script>
+  <script src="/src/infrastructure/persistence/local-run-store.js"></script>
+  <script src="/src/infrastructure/persistence/run-migration-utils.js"></script>
+  <script src="/src/infrastructure/persistence/supabase-run-store.js"></script>
+  <script src="/src/infrastructure/persistence/persistence-runtime.js"></script>
   <script src="/src/data/storage.js"></script>
   <script src="/src/app/app-state.js"></script>
   <!-- App runtime seam helpers: loaded before script.js so main orchestration can delegate to them directly. -->

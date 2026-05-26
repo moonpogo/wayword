@@ -4912,6 +4912,15 @@ function seasonWheelResolveStartMinuteLocal(run, fallbackTimestampMs) {
 }
 
 function seasonWheelResolveDurationMinutes(run, wordCount) {
+  const timerConfigured = Number(run?.activeTimerSeconds);
+  const timerRemaining = Number(run?.timeRemaining);
+  if (Number.isFinite(timerConfigured) && timerConfigured > 0) {
+    const spent = Number.isFinite(timerRemaining) ? Math.max(0, timerConfigured - Math.max(0, timerRemaining)) : timerConfigured;
+    const spentMinutes = spent / 60;
+    if (Number.isFinite(spentMinutes) && spentMinutes > 0) {
+      return Math.min(360, Math.max(1, Math.round(spentMinutes)));
+    }
+  }
   const durationCandidates = [
     run?.durationMinutes,
     run?.durationMin,
@@ -4943,6 +4952,8 @@ function seasonWheelResolveIntegrity(run, durationMinutes, wordCount) {
   if (run?.abandoned === true || run?.aborted === true) return "abandoned";
   if (run?.interrupted === true) return "interrupted";
   if (run?.completed === true || run?.submitted === true) return "complete";
+  if (run?.wasSuccessful === true) return "complete";
+  if (run?.finishedWithinTime === true && wordCount >= 35) return "complete";
   if (durationMinutes <= 7 || wordCount <= 25) return "interrupted";
   if (run?.completed === false || run?.submitted === false) return "partial";
   return "partial";
@@ -4984,10 +4995,10 @@ function buildSeasonWheelInstrumentModel(seasonalRows, options = {}) {
 
 function seasonWheelHueFromMinute(minute) {
   const m = Math.max(0, Math.min(1439, Number(minute) || 0));
-  if (m < 240) return 246;
+  if (m < 240) return 252;
   if (m < 360) return 272;
   if (m < 540) return 228;
-  if (m < 720) return 46;
+  if (m < 720) return 44;
   if (m < 840) return 54;
   if (m < 1020) return 30;
   if (m < 1200) return 16;
@@ -5010,6 +5021,54 @@ function seasonWheelStyleFromIntegrity(integrity) {
   if (integrity === "partial") return { opacity: 0.56, dash: "" };
   if (integrity === "abandoned") return { opacity: 0.19, dash: "1 3" };
   return { opacity: 0.31, dash: "1 2.2" };
+}
+
+function buildSeasonWheelInstrumentSvgMarkup(model) {
+  const safeModel = model && typeof model === "object" ? model : {};
+  const seasonLengthDays = Math.max(1, Number(safeModel.seasonLengthDays) || 90);
+  const segments = Array.isArray(safeModel.segments) ? safeModel.segments : [];
+
+  const size = 220;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = 86;
+  const minuteRadius = 30;
+  const dayAngle = (Math.PI * 2) / seasonLengthDays;
+
+  let daySpokes = "";
+  const baselineSpokes = Math.max(1, Math.min(3, seasonLengthDays));
+  for (let i = 0; i < baselineSpokes; i += 1) {
+    const theta = -Math.PI / 2 + i * dayAngle;
+    const x = cx + Math.cos(theta) * radius;
+    const y = cy + Math.sin(theta) * radius;
+    daySpokes += `<line x1="${cx.toFixed(2)}" y1="${cy.toFixed(2)}" x2="${x.toFixed(2)}" y2="${y.toFixed(2)}" stroke="hsl(38 31% 66%)" stroke-opacity="0.09" stroke-width="0.6"/>`;
+  }
+
+  let runSegments = "";
+  for (const segment of segments) {
+    const dayIndex = Math.max(0, Math.min(seasonLengthDays - 1, Number(segment?.dayIndex) || 0));
+    const startMinute = Math.max(0, Math.min(1439, Number(segment?.startMinute) || 0));
+    const runDuration = Math.max(1, Number(segment?.durationMinutes) || 1);
+    const runWordCount = Math.max(1, Number(segment?.wordCount) || 1);
+
+    const theta = -Math.PI / 2 + dayIndex * dayAngle;
+    const minuteOffset = ((startMinute / 1440) * 2 - 1) * minuteRadius;
+    const segmentCenterRadius = radius + minuteOffset;
+    const segmentLength = Math.max(2, Math.min(26, Math.sqrt(runDuration) * 2.8));
+    const x1 = cx + Math.cos(theta) * (segmentCenterRadius - segmentLength / 2);
+    const y1 = cy + Math.sin(theta) * (segmentCenterRadius - segmentLength / 2);
+    const x2 = cx + Math.cos(theta) * (segmentCenterRadius + segmentLength / 2);
+    const y2 = cy + Math.sin(theta) * (segmentCenterRadius + segmentLength / 2);
+
+    const hue = seasonWheelHueFromMinute(startMinute);
+    const style = seasonWheelStyleFromIntegrity(segment?.integrity);
+    const strokeWidth = seasonWheelStrokeWidthFromWords(runWordCount);
+    const dash = style.dash ? ` stroke-dasharray="${style.dash}"` : "";
+
+    runSegments += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="hsl(${hue} 67% 58%)" stroke-opacity="${style.opacity}" stroke-width="${strokeWidth.toFixed(2)}" stroke-linecap="round"${dash}/>`;
+  }
+
+  return `<svg class="season-wheel__svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" role="img" aria-hidden="true"><circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="hsl(36 42% 77%)" stroke-opacity="0.2" stroke-width="1"/><circle cx="${cx}" cy="${cy}" r="${(radius * 0.66).toFixed(2)}" fill="none" stroke="hsl(36 42% 77%)" stroke-opacity="0.2" stroke-width="0.9"/>${daySpokes}${runSegments}</svg>`;
 }
 /* season wheel instrument contract: end */
 
@@ -6197,7 +6256,7 @@ function showProfile(show = true) {
   ) {
     return;
   }
-  return window.waywordPatternsTransitionCoordinator.showProfile(show, {
+  const result = window.waywordPatternsTransitionCoordinator.showProfile(show, {
     $,
     state,
     editorInput,
@@ -6213,6 +6272,18 @@ function showProfile(show = true) {
     syncPatternsLayoutMode: window.waywordViewController.syncPatternsLayoutMode,
     logPatternsTransitionSnapshot
   });
+  if (show !== false) {
+    try {
+      window.waywordRetentionEvents?.markObservatoryRevisited({
+        surface_name: "patterns",
+        available: true,
+        sparse_state: Array.isArray(state.history) ? state.history.length < 3 : true,
+      });
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return result;
 }
 
 /* -----------------------------
@@ -6379,7 +6450,16 @@ function bindPrimaryEventControls() {
     editorInput,
     getEditorText,
     submitWriting,
-    saveBannedInline
+    saveBannedInline,
+    onBeginClicked(payload) {
+      try {
+        window.waywordRetentionEvents?.markOnboardingCompleted({
+          source: payload && payload.source ? payload.source : "begin_button",
+        });
+      } catch (_) {
+        /* ignore */
+      }
+    }
   });
 }
 
@@ -6449,6 +6529,228 @@ function bindPanelControlWiring() {
 
 function registerDevOnlyHelpers() {
   if (!WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED) return;
+  function devVisualSeedRng(seedText) {
+    let h = 2166136261;
+    const s = String(seedText || "");
+    for (let i = 0; i < s.length; i += 1) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    let t = h >>> 0;
+    return function () {
+      t += 0x6d2b79f5;
+      let x = t;
+      x = Math.imul(x ^ (x >>> 15), x | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function devVisualBuildRuns(profileName) {
+    const p = String(profileName || "").toLowerCase();
+    const rng = devVisualSeedRng(`wayword-dev-visual:${p}`);
+    const now = Date.now();
+    const dayMs = 86400000;
+    const runs = [];
+    let runIndex = 0;
+    const promptPool = [
+      "Describe a sound nearby and follow it into detail.",
+      "Write one sentence you almost deleted, then keep it.",
+      "Name a room detail that changed the tone of a conversation.",
+      "Start with the line you keep repeating.",
+      "Write from a moment you softened a direct statement.",
+      "Describe what was visible just before you answered.",
+      "Write the same scene twice: broad, then concrete.",
+      "Follow one repeated word until it reveals the edge.",
+      "Describe the pause before a short reply.",
+      "Write toward what the sentence avoids saying.",
+      "Begin with a plain fact, then complicate it.",
+      "Describe how your tone changed mid-paragraph.",
+      "Write one paragraph without summary language.",
+      "Start with a concrete noun and stay with it.",
+      "Describe the shift between intention and phrasing.",
+      "Write the line you keep circling, then revise once.",
+      "Name one object and let it carry the scene.",
+      "Write from the sentence that feels too safe.",
+      "Describe a small gesture that altered the room.",
+      "Start with what happened, not what it meant.",
+      "Write a version that cuts two qualifiers.",
+      "Describe the same moment from two distances.",
+      "Follow the verb that keeps reappearing.",
+      "Write from the detail you first ignored.",
+      "Name the exact point where tone turned.",
+      "Describe the sentence that finally held."
+    ];
+
+    function buildSyntheticText(targetWords, rngLocal) {
+      const fragments = [
+        "I returned to the same line and revised it toward concrete detail.",
+        "The sentence moved from summary into the surface of what happened.",
+        "I kept one grounded image in place and trimmed safer phrasing.",
+        "The cadence shifted from broad explanation to direct language.",
+        "I held the final sentence long enough to stay specific.",
+      ];
+      const out = [];
+      let words = 0;
+      while (words < targetWords) {
+        const frag = fragments[Math.floor(rngLocal() * fragments.length)];
+        out.push(frag);
+        words += frag.split(/\s+/).length;
+      }
+      return out.join(" ");
+    }
+
+    const addRun = (savedAtMs, options = {}) => {
+      runIndex += 1;
+      const runId = `dev-${p}-${String(runIndex).padStart(5, "0")}`;
+      const prompt =
+        String(options.prompt || "").trim() ||
+        promptPool[(runIndex - 1) % promptPool.length];
+      const complete = options.complete !== false;
+      const interrupted = options.interrupted === true;
+      const abandoned = options.abandoned === true;
+      const wordCount = Math.max(8, Number(options.wordCount) || (complete ? 70 : 28));
+      const durationMinutes = Math.max(1, Number(options.durationMinutes) || (complete ? 14 : 5));
+      const text = buildSyntheticText(wordCount, rng);
+      const startedAtMs = savedAtMs - durationMinutes * 60000;
+      runs.push({
+        runId,
+        savedAt: savedAtMs,
+        timestamp: savedAtMs,
+        startedAt: startedAtMs,
+        durationMinutes,
+        text,
+        prompt,
+        score: 80,
+        runScore: 80,
+        scoreBreakdown: { completion: 20, filler: 20, repetition: 20, openings: 20 },
+        repeatedWords: [["line", 3]],
+        bannedHits: [],
+        repeatedStarters: [["i", 2]],
+        challengeActive: false,
+        challengeCompleted: false,
+        challengeWords: [],
+        wasSuccessful: complete && !interrupted && !abandoned,
+        activeTargetWords: 120,
+        activeTimerSeconds: 240,
+        finishedWithinTime: complete,
+        timeRemaining: 18,
+        wordCount,
+        words: wordCount,
+        unique: 22,
+        uniqueRatio: 0.79,
+        avgSentenceLength: 14,
+        repeatedCount: 1,
+        fillerCount: 0,
+        wordFreq: { line: 3 },
+        starterFreq: { i: 2 },
+        starterExamples: { i: "I revised the sentence toward detail." },
+        punctuation: { commas: 2, periods: 2, exclamations: 0, parentheses: 0, quotes: 0 },
+        perspective: { first: 6, second: 0, third: 0 },
+        completed: complete,
+        submitted: complete,
+        interrupted,
+        abandoned,
+        mirrorLoadFailed: false,
+        mirrorPipelineResult: null,
+      });
+    };
+
+    if (p === "recent20") {
+      for (let i = 0; i < 20; i += 1) {
+        const d = Math.floor(i * 1.5);
+        const h = Math.floor(rng() * 10) + 10;
+        const m = Math.floor(rng() * 60);
+        const complete = rng() < 0.9;
+        const wc = complete ? 60 + Math.floor(rng() * 60) : 20 + Math.floor(rng() * 35);
+        const dur = complete ? 8 + Math.floor(rng() * 16) : 3 + Math.floor(rng() * 8);
+        addRun(now - d * dayMs - h * 3600000 - m * 60000, {
+          prompt: promptPool[i % promptPool.length],
+          complete,
+          interrupted: !complete && rng() < 0.6,
+          wordCount: wc,
+          durationMinutes: dur,
+        });
+      }
+      return runs.sort((a, b) => a.savedAt - b.savedAt);
+    }
+
+    if (p === "seasonextreme") {
+      const seasonDays = 92;
+      const start = now - (seasonDays - 1) * dayMs;
+      for (let d = 0; d < seasonDays; d += 1) {
+        const dailyCount = 8 + Math.floor(rng() * 5); // 8..12/day
+        const clusterMode = rng();
+        for (let i = 0; i < dailyCount; i += 1) {
+          // Mix times each day; some days morning-heavy, some evening-heavy, most mixed.
+          let hour;
+          if (clusterMode < 0.2) hour = 6 + Math.floor(rng() * 8); // morning block
+          else if (clusterMode < 0.4) hour = 14 + Math.floor(rng() * 8); // afternoon/evening block
+          else hour = Math.floor(rng() * 24); // mixed full-day
+          const minute = Math.floor(rng() * 60);
+          const complete = rng() < 0.8;
+          const wc = complete ? 58 + Math.floor(rng() * 150) : 14 + Math.floor(rng() * 60);
+          const dur = complete ? 7 + Math.floor(rng() * 28) : 2 + Math.floor(rng() * 10);
+          addRun(start + d * dayMs + hour * 3600000 + minute * 60000, {
+            complete,
+            interrupted: !complete && rng() < 0.65,
+            abandoned: !complete && rng() < 0.15,
+            wordCount: wc,
+            durationMinutes: dur,
+          });
+        }
+      }
+      return runs.sort((a, b) => a.savedAt - b.savedAt);
+    }
+
+    return [];
+  }
+
+  function installDevVisualProfileRuns(profileName) {
+    const runs = devVisualBuildRuns(profileName);
+    if (!runs.length) return false;
+    window.__WAYWORD_DEV_VISUAL_PROFILE = String(profileName);
+    window.__WAYWORD_DEV_VISUAL_RUNS__ = runs.slice();
+    try {
+      localStorage.setItem("wayword-history", JSON.stringify(runs));
+      localStorage.setItem("wayword-runids", JSON.stringify(runs.map((r) => r.runId)));
+      let items = [];
+      try {
+        if (
+          window.waywordRunDocumentsModel &&
+          typeof window.waywordRunDocumentsModel.createRunDocumentFromLegacyRun === "function" &&
+          window.waywordRunDocumentMarkdown &&
+          typeof window.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown === "function"
+        ) {
+          items = runs.map((run) =>
+            window.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown(
+              window.waywordRunDocumentsModel.createRunDocumentFromLegacyRun(run)
+            )
+          );
+        }
+      } catch (_) {
+        items = [];
+      }
+      localStorage.setItem("wayword-run-documents-v1", JSON.stringify({ storeEnvelopeVersion: 1, items }));
+    } catch (_) {
+      return false;
+    }
+    return true;
+  }
+
+  function refreshDevVisualProfileUi() {
+    try {
+      renderHistory();
+      renderProfile();
+      renderProfileSummaryStrip();
+      renderFirstSessionEntry();
+      renderMeta();
+      queueViewportSync();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   window.waywordDevResetFirstSessionEntry = waywordDevResetFirstSessionEntryForTesting;
   window.waywordDevSeasonFixtures = {
     availableFixtures: Object.freeze(["sparse", "moderate", "heavy", "clustered", "steady", "extreme"]),
@@ -6470,22 +6772,63 @@ function registerDevOnlyHelpers() {
       return true;
     },
   };
+  window.waywordDevVisualProfiles = {
+    availableProfiles: Object.freeze(["recent20", "seasonExtreme"]),
+    applyProfile(name) {
+      const ok = installDevVisualProfileRuns(name);
+      if (!ok) {
+        console.warn("waywordDevVisualProfiles: unknown profile", name);
+        return false;
+      }
+      // Keep the real season panel driven by seeded runs (no synthetic wheel fixture override).
+      refreshDevVisualProfileUi();
+      return true;
+    },
+    clearProfile() {
+      delete window.__WAYWORD_DEV_VISUAL_PROFILE;
+      delete window.__WAYWORD_DEV_VISUAL_RUNS__;
+      return true;
+    }
+  };
 }
 
 function runDevOnlyBootActions() {
   if (!WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED) return;
   try {
     const params = new URLSearchParams(location.search);
-    const fixtureParam = String(params.get("seasonFixture") || "").toLowerCase();
-    if (fixtureParam && fixtureCountMapByName(fixtureParam)) {
-      devSeasonFixtureName = fixtureParam;
+    if (params.get("visualExport") === "1") {
+      try {
+        document.documentElement.dataset.waywordVisualExport = "1";
+        document.body.classList.add("visual-export-mode");
+        const fixture = String(params.get("fixture") || "").trim().toLowerCase();
+        if (fixture) {
+          window.__WAYWORD_VISUAL_EXPORT_FIXTURE__ = fixture;
+          document.documentElement.dataset.waywordVisualExportFixture = fixture;
+        }
+      } catch (_) {
+        /* ignore */
+      }
     }
     if (params.get("resetFirstSessionEntry") === "1") {
       waywordDevResetFirstSessionEntryForTesting();
       params.delete("resetFirstSessionEntry");
-      const q = params.toString();
-      history.replaceState(null, "", location.pathname + (q ? `?${q}` : "") + location.hash);
     }
+    const fixtureParam = String(params.get("seasonFixture") || "").toLowerCase();
+    if (fixtureParam && fixtureCountMapByName(fixtureParam)) {
+      devSeasonFixtureName = fixtureParam;
+    }
+    const visualProfile = String(params.get("visualProfile") || "").trim();
+    if (visualProfile && window.waywordDevVisualProfiles && typeof window.waywordDevVisualProfiles.applyProfile === "function") {
+      window.waywordDevVisualProfiles.applyProfile(visualProfile);
+    }
+    const visualView = String(params.get("view") || "").trim().toLowerCase();
+    if (visualView === "patterns") {
+      window.__WAYWORD_DEV_VISUAL_VIEW = "patterns";
+    } else if (visualView === "recent") {
+      window.__WAYWORD_DEV_VISUAL_VIEW = "recent";
+    }
+    const q = params.toString();
+    history.replaceState(null, "", location.pathname + (q ? `?${q}` : "") + location.hash);
   } catch (_) {
     /* ignore */
   }
@@ -6550,8 +6893,259 @@ function runInitialBootRender() {
   });
 }
 
+function initAccountContinuityAuthScaffold() {
+  const runtime = window.waywordAuthSessionRuntime;
+  if (!runtime || typeof runtime.init !== "function") return;
+
+  runtime.init({
+    getDraftText: getEditorText,
+    setDraftText: setEditorText,
+    onStatus(status) {
+      const accountState = state.account || (state.account = {});
+      accountState.mode = status && status.mode ? status.mode : "local-only";
+      accountState.hasSession = Boolean(status && status.hasSession);
+      renderAccountSurface();
+    },
+    onAuthStateChange(eventInfo) {
+      const accountState = state.account || (state.account = {});
+      accountState.lastAuthEvent = eventInfo && eventInfo.event ? String(eventInfo.event) : "";
+      accountState.hasSession = Boolean(eventInfo && eventInfo.hasSession);
+      renderAccountSurface();
+    },
+    onAuthError() {
+      // Draft preservation is handled inside the runtime; keep UX steady here.
+      setAccountMessage("We could not complete sign-in. Writing stays available.");
+    },
+    onRetentionHook() {
+      try {
+        window.waywordTelemetryRuntime?.detectReturnSession({ thresholdHours: 12 });
+      } catch (_) {
+        /* ignore */
+      }
+    },
+  });
+}
+
+function initPersistenceContinuityRuntime() {
+  var runtime = window.waywordPersistenceRuntime;
+  if (!runtime || typeof runtime.init !== "function") return;
+  runtime.init({
+    onStatus: function (status) {
+      var migrationState = state.continuityMigration || (state.continuityMigration = {});
+      migrationState.status = status && status.migrationStatus ? status.migrationStatus : migrationState.status || "not_started";
+      renderAccountSurface();
+    },
+  });
+}
+
+function initRetentionInstrumentationRuntime() {
+  try {
+    window.waywordTelemetryRuntime?.detectReturnSession({ thresholdHours: 12 });
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+function setAccountMessage(text, kind = "info") {
+  const msg = $("accountPanelMessage");
+  if (!msg) return;
+  const content = String(text || "").trim();
+  msg.textContent = content;
+  msg.classList.toggle("hidden", !content);
+  msg.dataset.kind = kind;
+}
+
+function isAccountPanelOpen() {
+  return !$("accountBackdrop")?.classList.contains("hidden");
+}
+
+function openAccountPanel() {
+  const backdrop = $("accountBackdrop");
+  const panel = $("accountPanel");
+  const btn = $("accountBtn");
+  if (!backdrop || !panel || !btn) return;
+  backdrop.classList.remove("hidden");
+  backdrop.setAttribute("aria-hidden", "false");
+  panel.setAttribute("aria-hidden", "false");
+  btn.setAttribute("aria-expanded", "true");
+  document.body.classList.add("settings-open");
+  renderAccountSurface();
+}
+
+function closeAccountPanel() {
+  const backdrop = $("accountBackdrop");
+  const panel = $("accountPanel");
+  const btn = $("accountBtn");
+  if (!backdrop || !panel || !btn) return;
+  backdrop.classList.add("hidden");
+  backdrop.setAttribute("aria-hidden", "true");
+  panel.setAttribute("aria-hidden", "true");
+  btn.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("settings-open");
+}
+
+function renderAccountSurface() {
+  const summary = $("accountPanelSummary");
+  const fallback = $("accountPanelFallback");
+  const signInForm = $("accountSignInForm");
+  const signOutBtn = $("accountSignOutBtn");
+  const actions = $("accountActions");
+  const accountState = state.account || {};
+  const configured = Boolean(window.waywordEnv && window.waywordEnv.isSupabaseConfigured);
+  const hasSession = Boolean(accountState.hasSession);
+  const migrationStatus = String(state.continuityMigration?.status || "not_started");
+
+  if (summary) {
+    if (!configured) {
+      summary.textContent = "Account continuity is not configured in this local preview.";
+    } else if (hasSession) {
+      summary.textContent = "Signed in. Account continuity available.";
+    } else {
+      summary.textContent = "Keep your writing connected across sessions.";
+    }
+  }
+
+  if (fallback) {
+    fallback.textContent = "Writing still saves locally if sync is unavailable.";
+  }
+
+  if (signInForm) {
+    signInForm.classList.toggle("hidden", !configured || hasSession);
+  }
+  if (signOutBtn) {
+    signOutBtn.classList.toggle("hidden", !configured || !hasSession);
+  }
+  if (actions) {
+    const canAccountActions =
+      configured &&
+      hasSession &&
+      window.waywordPersistenceRuntime &&
+      typeof window.waywordPersistenceRuntime.exportOwnedRuns === "function" &&
+      typeof window.waywordPersistenceRuntime.deleteAllOwnedRuns === "function";
+    actions.classList.toggle("hidden", !canAccountActions);
+  }
+
+  if (isAccountPanelOpen()) {
+    const existing = $("accountPanelMessage")?.textContent || "";
+    if (!existing.trim() && configured && migrationStatus === "skipped_unverified_rls") {
+      setAccountMessage("Sync remains gated until live RLS verification is completed.");
+    }
+  }
+}
+
+function bindAccountSurface() {
+  const accountBtn = $("accountBtn");
+  const backdrop = $("accountBackdrop");
+  const closeBtn = $("accountCloseBtn");
+  const signInForm = $("accountSignInForm");
+  const emailInput = $("accountEmailInput");
+  const signOutBtn = $("accountSignOutBtn");
+  const exportBtn = $("accountExportBtn");
+  const deleteAllBtn = $("accountDeleteAllBtn");
+
+  accountBtn?.addEventListener("click", () => {
+    if (isAccountPanelOpen()) closeAccountPanel();
+    else openAccountPanel();
+  });
+
+  closeBtn?.addEventListener("click", () => closeAccountPanel());
+  backdrop?.addEventListener("click", (e) => {
+    if (e.target === backdrop) closeAccountPanel();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !isAccountPanelOpen()) return;
+    e.preventDefault();
+    closeAccountPanel();
+  });
+
+  signInForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = String(emailInput?.value || "").trim();
+    if (!email) {
+      setAccountMessage("Enter an email address.");
+      return;
+    }
+    const runtime = window.waywordAuthSessionRuntime;
+    if (!runtime || typeof runtime.signInWithMagicLink !== "function") {
+      setAccountMessage("Account continuity is not configured in this local preview.");
+      return;
+    }
+    const result = await runtime.signInWithMagicLink(email);
+    if (result && result.error) {
+      try {
+        console.info("[wayword-auth-ui] sign-in link send failed", {
+          errorCode: result.error.code || "",
+          errorStatus: result.error.status || "",
+          errorMessage: result.error.message || "",
+        });
+      } catch (_) {
+        /* ignore */
+      }
+      setAccountMessage("Could not send sign-in link. Writing remains available locally.");
+      return;
+    }
+    setAccountMessage("Check your email for a sign-in link.");
+  });
+
+  signOutBtn?.addEventListener("click", async () => {
+    const runtime = window.waywordAuthSessionRuntime;
+    if (!runtime || typeof runtime.signOut !== "function") return;
+    const result = await runtime.signOut();
+    if (result && result.error) {
+      setAccountMessage("Could not sign out right now.");
+      return;
+    }
+    setAccountMessage("Signed out.");
+  });
+
+  exportBtn?.addEventListener("click", async () => {
+    const runtime = window.waywordPersistenceRuntime;
+    if (!runtime || typeof runtime.exportOwnedRuns !== "function") return;
+    const result = await runtime.exportOwnedRuns();
+    if (!result || !result.ok) {
+      setAccountMessage("Could not export account runs right now.");
+      return;
+    }
+    try {
+      const payload = JSON.stringify(result.exportData || {}, null, 2);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `wayword-runs-export-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setAccountMessage("Account runs exported.");
+    } catch (_) {
+      setAccountMessage("Export prepared but download could not start.");
+    }
+  });
+
+  deleteAllBtn?.addEventListener("click", async () => {
+    const ok = window.confirm("Delete all account runs? Local writing remains separate.");
+    if (!ok) return;
+    const runtime = window.waywordPersistenceRuntime;
+    if (!runtime || typeof runtime.deleteAllOwnedRuns !== "function") return;
+    const result = await runtime.deleteAllOwnedRuns();
+    if (!result || !result.ok) {
+      setAccountMessage("Could not delete account runs right now.");
+      return;
+    }
+    setAccountMessage("Account runs deleted. Local writing is unchanged.");
+  });
+
+  renderAccountSurface();
+}
+
 bindBootObservers();
 runInitialBootRender();
+initAccountContinuityAuthScaffold();
+initPersistenceContinuityRuntime();
+initRetentionInstrumentationRuntime();
+bindAccountSurface();
 installRightControlSpineOwnershipObserver();
 enforceRightControlSpineOwnership("boot:post-initial-render");
 startRightControlSpineStabilizer(8000);
@@ -6576,6 +7170,71 @@ bindMetricExplainerDelegation("recentRailList");
 recentRunsUi.bindRecentRunsOpenCloseControls();
 recentRunsUi.bindRecentRunsExpandDismissUi();
 bindClearSavedRunsPatternsControlsOnce();
+
+function runDevVisualProfileHealthCheckWhenReady() {
+  const hasDevProfile = Boolean(window.__WAYWORD_DEV_VISUAL_PROFILE);
+  if (!hasDevProfile) return;
+  const view = String(window.__WAYWORD_DEV_VISUAL_VIEW || "").toLowerCase();
+  let attempts = 0;
+  const maxAttempts = 80;
+  const timer = window.setInterval(() => {
+    attempts += 1;
+    try {
+      const appVisible = $("appView")?.getAttribute("aria-hidden") !== "true";
+      const hasEditor = Boolean($("editorInput"));
+      if (!appVisible || !hasEditor) {
+        if (attempts >= maxAttempts) window.clearInterval(timer);
+        return;
+      }
+
+      try {
+        const promptText = String($("promptText")?.textContent || "").trim();
+        if (!promptText && typeof generatePrompt === "function") {
+          generatePrompt();
+          renderMeta();
+        }
+        if (typeof renderHistory === "function") renderHistory();
+        if (typeof renderProfile === "function") renderProfile();
+      } catch (_) {
+        /* ignore */
+      }
+
+      setFocusMode(false);
+
+      if (view === "patterns") {
+        if (typeof showProfile === "function") {
+          showProfile(true);
+          window.clearInterval(timer);
+          return;
+        }
+      } else if (view === "recent") {
+        if (typeof setRecentDrawerOpen === "function") {
+          setRecentDrawerOpen(true);
+          window.clearInterval(timer);
+          return;
+        }
+        const first = document.querySelector("#recentRailList .recent-entry");
+        if (first) {
+          first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          window.clearInterval(timer);
+          return;
+        }
+      } else {
+        window.clearInterval(timer);
+        return;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    if (attempts >= maxAttempts) window.clearInterval(timer);
+  }, 120);
+}
+
+try {
+  runDevVisualProfileHealthCheckWhenReady();
+} catch (_) {
+  /* ignore */
+}
 
 queueViewportSync();
 schedulePostLayoutViewportReconcile();

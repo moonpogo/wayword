@@ -85,6 +85,15 @@ function toPlainJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function extractBetween(source, startMarker, endMarker) {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
+  if (start < 0 || end < 0 || end <= start) {
+    throw new Error(`unable to extract block between markers: ${startMarker} .. ${endMarker}`);
+  }
+  return source.slice(start, end + endMarker.length);
+}
+
 function loadRunControllerRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/run-controller-runtime.js"], {
     console: silentConsole(),
@@ -797,6 +806,123 @@ test("strata engine routing path remains v1-local and excludes resonance", () =>
   assert.equal(script.includes("PROMPT_LAYERS.TORSION"), true);
   assert.equal(script.includes("PROMPT_LAYERS.RESONANCE"), false);
   assert.equal(script.includes("buildStrataWeightedPromptCatalog"), true);
+});
+
+test("season wheel instrument model maps runs into day/time/duration segments", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const buildModel = new Function(`${block}; return buildSeasonWheelInstrumentModel;`)();
+
+  const model = buildModel(
+    [
+      {
+        timestampMs: Date.parse("2026-03-04T18:25:00-08:00"),
+        run: {
+          startedAt: "2026-03-04T18:10:00-08:00",
+          durationMinutes: 47,
+          wordCount: 512,
+          completed: true,
+        },
+      },
+      {
+        timestampMs: Date.parse("2026-03-04T23:58:00-08:00"),
+        run: {
+          startedAt: "2026-03-04T23:50:00-08:00",
+          durationMinutes: 6,
+          words: 19,
+          submitted: false,
+        },
+      },
+    ],
+    { seasonLengthDays: 90, nowDate: new Date("2026-05-20T12:00:00-07:00") }
+  );
+
+  assert.equal(model.seasonLengthDays, 90);
+  assert.equal(model.segments.length, 2);
+  assert.deepEqual(
+    model.segments.map((s) => ({
+      dayIndex: s.dayIndex,
+      startMinute: s.startMinute,
+      durationMinutes: s.durationMinutes,
+      wordCount: s.wordCount,
+      integrity: s.integrity,
+    })),
+    [
+      { dayIndex: 12, startMinute: 1090, durationMinutes: 47, wordCount: 512, integrity: "complete" },
+      { dayIndex: 12, startMinute: 1430, durationMinutes: 6, wordCount: 19, integrity: "interrupted" },
+    ]
+  );
+});
+
+test("season wheel instrument model falls back safely and excludes out-of-window rows", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const buildModel = new Function(`${block}; return buildSeasonWheelInstrumentModel;`)();
+
+  const model = buildModel(
+    [
+      {
+        timestampMs: Date.parse("2026-05-19T09:11:00-07:00"),
+        run: { text: "one two three four five six seven", submitted: false },
+      },
+      {
+        timestampMs: Date.parse("2026-01-01T09:11:00-08:00"),
+        run: { startedAt: "2026-01-01T09:10:00-08:00", durationMinutes: 30, wordCount: 300, completed: true },
+      },
+      {
+        timestampMs: Number.NaN,
+        run: { wordCount: 10 },
+      },
+    ],
+    { seasonLengthDays: 90, nowDate: new Date("2026-05-20T12:00:00-07:00") }
+  );
+
+  assert.equal(model.segments.length, 1);
+  assert.equal(model.segments[0].dayIndex, 88);
+  assert.equal(model.segments[0].startMinute, 551);
+  assert.equal(model.segments[0].durationMinutes, 3);
+  assert.equal(model.segments[0].wordCount, 7);
+  assert.equal(model.segments[0].integrity, "interrupted");
+});
+
+test("season wheel instrument svg renderer emits one spoke per day and segment marks", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const api = new Function(
+    `${block}; return { buildSeasonWheelInstrumentSvgMarkup, seasonWheelHueFromMinute, seasonWheelStyleFromIntegrity };`
+  )();
+
+  const svg = api.buildSeasonWheelInstrumentSvgMarkup({
+    seasonLengthDays: 5,
+    segments: [
+      { dayIndex: 0, startMinute: 180, durationMinutes: 40, wordCount: 450, integrity: "complete" },
+      { dayIndex: 3, startMinute: 1300, durationMinutes: 8, wordCount: 18, integrity: "interrupted" },
+      { dayIndex: 3, startMinute: 1360, durationMinutes: 5, wordCount: 12, integrity: "abandoned" },
+    ],
+  });
+
+  assert.equal(svg.includes('class="season-wheel__svg"'), true);
+  assert.equal((svg.match(/stroke-opacity="0.2"/g) || []).length, 2);
+  assert.equal((svg.match(/stroke-opacity="0.09"/g) || []).length, 3);
+  assert.equal((svg.match(/stroke-linecap="round"/g) || []).length, 3);
+  assert.equal(svg.includes('stroke-dasharray="1 2.2"'), true);
+  assert.equal(svg.includes('stroke-dasharray="1 3"'), true);
+  assert.equal(svg.includes('aria-hidden="true"'), true);
+  assert.equal(api.seasonWheelHueFromMinute(60), 252);
+  assert.equal(api.seasonWheelHueFromMinute(640), 44);
+  assert.deepEqual(api.seasonWheelStyleFromIntegrity("complete"), { opacity: 0.9, dash: "" });
 });
 
 test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {

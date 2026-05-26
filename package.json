@@ -19,10 +19,14 @@
     "interpret:behavior": "node scripts/interpret-behavioral-telemetry.js",
     "postinstall": "playwright install chromium",
     "test:smoke": "node --test tests/browser-smoke.test.cjs",
-    "test:logic": "node --test tests/app-logic.test.cjs tests/mirror-pipeline.test.cjs tests/patterns-aggregation.test.cjs",
+    "test:logic": "node --test tests/app-logic.test.cjs tests/mirror-pipeline.test.cjs tests/patterns-aggregation.test.cjs tests/trace-field-v0-harness.test.cjs tests/persistence-migration.test.cjs tests/retention-telemetry.test.cjs tests/auth-session-runtime.test.cjs",
     "test": "npm run test:logic",
     "verify:merge": "npm test && node --check script.js && npm run verify:mirror-bundle && npm run verify:patterns-surface",
-    "test:regression": "npm test && node --check script.js && npm run test:smoke"
+    "test:regression": "npm test && node --check script.js && npm run test:smoke",
+    "generate:social-assets": "node scripts/generate-social-assets.js",
+    "export:visuals": "node scripts/export-visual-assets.js",
+    "test:trace-field": "node --test tests/trace-field-v0-harness.test.cjs",
+    "trace-field:v0": "node scripts/run-trace-field-v0-harness.js"
   },
   "repository": {
     "type": "git",
@@ -34,5 +38,8 @@
   "bugs": {
     "url": "https://github.com/moonpogo/wayword/issues"
   },
-  "homepage": "https://wayword.me/"
+  "homepage": "https://wayword.me/",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1"
+  }
 }

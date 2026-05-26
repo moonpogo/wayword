@@ -85,6 +85,56 @@ npm run verify:mirror-bundle
 npm run verify:patterns-surface
 ```
 
+Social asset generation (dev-only):
+
+```sh
+npm run generate:social-assets
+```
+
+Each run writes a dated batch:
+
+- `artifacts/social/YYYY-MM-DD/pinterest/`
+- `artifacts/social/YYYY-MM-DD/square/`
+- `artifacts/social/YYYY-MM-DD/raw-screenshots/`
+- `artifacts/social/YYYY-MM-DD/metadata/`
+
+Profiles (deterministic fixtures):
+
+- `sparse_user`
+- `steady_user`
+- `intense_user`
+- `clustered_user`
+- `nocturnal_user`
+- `calibration_user`
+- `returning_user`
+
+Every exported image has matching metadata JSON in `metadata/`, and all rows are aggregated in `metadata/pinterest-assets.csv` for upload workflows.
+
+Useful flags:
+
+```sh
+node scripts/generate-social-assets.js --profile=intense_user --state=seasonal-wheel --count=20 --seed=1234 --fresh
+```
+
+- `--profile=<name>` chooses one fixture profile.
+- `--state=<state>` chooses one app state.
+- `--count=<n>` sets scenario batch size (default weekly batch is 20–40 assets depending on states/compositions).
+- `--seed=<value>` keeps output deterministic.
+- `--fresh` recreates the current dated folder from scratch.
+
+The CSV includes:
+
+- filename
+- board recommendation
+- title
+- description
+- alt text
+- source app state
+- fixture profile
+- suggested tags
+
+All fixtures are dev-only generation data. They are injected only during asset capture and do not change production behavior or user data.
+
 ## Status
 
 Wayword is in active V1 development. The current focus is preserving the core writing loop while reducing orchestration risk, keeping Mirror output restrained, and improving the reliability of local saved-run flows.

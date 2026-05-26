@@ -5,6 +5,7 @@ const path = require("path");
 
 const HOST = "127.0.0.1";
 const ROOT = path.resolve(__dirname, "..");
+const ENV_PATH = path.join(ROOT, ".env");
 const DEFAULT_PORT = Number(process.env.PORT) || 3001;
 const MAX_PORT_ATTEMPTS = 10;
 
@@ -40,6 +41,54 @@ function sendResponse(res, statusCode, body, contentType = "text/plain; charset=
   res.end(body);
 }
 
+function parseDotEnvFile(filePath) {
+  try {
+    var raw = fs.readFileSync(filePath, "utf8");
+    var lines = raw.split(/\r?\n/);
+    var out = {};
+    for (var i = 0; i < lines.length; i += 1) {
+      var line = lines[i];
+      if (!line || /^\s*#/.test(line)) continue;
+      var idx = line.indexOf("=");
+      if (idx <= 0) continue;
+      var key = line.slice(0, idx).trim();
+      var value = line.slice(idx + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      out[key] = value;
+    }
+    return out;
+  } catch (_) {
+    return {};
+  }
+}
+
+function getBrowserEnvPayload() {
+  var fromFile = parseDotEnvFile(ENV_PATH);
+  function pick(name) {
+    var processValue = process.env[name];
+    if (typeof processValue === "string" && processValue.trim()) return processValue.trim();
+    var fileValue = fromFile[name];
+    if (typeof fileValue === "string" && fileValue.trim()) return fileValue.trim();
+    return "";
+  }
+
+  return {
+    SUPABASE_URL: pick("SUPABASE_URL"),
+    SUPABASE_ANON_KEY: pick("SUPABASE_ANON_KEY"),
+    SUPABASE_RLS_VERIFIED: pick("SUPABASE_RLS_VERIFIED"),
+  };
+}
+
+function injectRuntimeEnvHtml(htmlText) {
+  var payload = getBrowserEnvPayload();
+  var injection = "\n<script>window.__WAYWORD_ENV = " + JSON.stringify(payload) + ";</script>\n";
+  if (htmlText.includes("window.__WAYWORD_ENV")) return htmlText;
+  if (htmlText.includes("</head>")) return htmlText.replace("</head>", injection + "</head>");
+  return injection + htmlText;
+}
+
 function createServer() {
   return http.createServer((req, res) => {
     const requestUrl = new URL(req.url || "/", `http://${HOST}`);
@@ -66,6 +115,11 @@ function createServer() {
         }
 
         const ext = path.extname(targetPath).toLowerCase();
+        if (ext === ".html") {
+          var html = data.toString("utf8");
+          sendResponse(res, 200, injectRuntimeEnvHtml(html), CONTENT_TYPES[ext] || "text/html; charset=utf-8");
+          return;
+        }
         sendResponse(res, 200, data, CONTENT_TYPES[ext] || "application/octet-stream");
       });
     });
