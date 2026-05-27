@@ -20,10 +20,11 @@ It is not a notes app, document editor, writing coach, diagnostic tool, or AI wr
 ## Current Product
 
 - Prompted writing runs designed for reflection.
+- Entry-first prompt routing with deterministic V1 catalog weighting and bounded rerolls.
 - Submit-time Mirror observations over the current draft.
 - Recent Runs for reviewing saved local history.
 - Patterns for cross-run signals when enough saved runs qualify.
-- Browser-local persistence through `localStorage`.
+- Local-first saved-run persistence in browser storage, with optional account/auth runtime when environment config is present.
 - Desktop and mobile writing surfaces.
 
 Wayword keeps its visible feedback observational. It does not grade, diagnose, rewrite, infer identity, or tell the writer what to do next.
@@ -34,7 +35,8 @@ Wayword keeps its visible feedback observational. It does not grade, diagnose, r
 - TypeScript for the deterministic Mirror and Patterns pipelines.
 - esbuild for the committed browser IIFE bundle.
 - Playwright and Node's built-in test runner for smoke and logic coverage.
-- No frontend framework and no backend service.
+- No frontend framework.
+- Static app deployment with optional Supabase-backed account/auth infrastructure loaded at runtime when configured.
 
 ## Architecture
 
@@ -43,6 +45,7 @@ Wayword is currently a static browser app with explicit script ordering in `inde
 The Mirror pipeline is deterministic TypeScript compiled into `mirror-engine.iife.js`, then consumed by browser runtime controllers. Submit-time analysis produces statement-only Mirror output for the current draft and stores digest data for later cross-run Patterns.
 
 Saved runs are local-first. The app writes a canonical run-document store (`wayword-run-documents-v1`) while maintaining legacy history keys for compatibility and migration repair.
+Account/auth runtime scaffolding is present (`src/infrastructure/auth/*` + runtime env config) and can activate Supabase session flows, but the write -> submit -> observe loop and local saved-run flows remain functional without a remote backend.
 
 Key docs:
 
@@ -50,6 +53,8 @@ Key docs:
 - `docs/V1_ARCHITECTURE_SNAPSHOT.md`
 - `docs/SAVED_RUNS_PERSISTENCE.md`
 - `docs/QA_REGRESSION_CHECKLIST.md`
+- `docs/MIRROR_V1_DOCTRINE.md`
+- `docs/PATTERNS_OBSERVATORY_BRIEF.md`
 - `src/app/README.md`
 
 ## Run Locally
@@ -67,8 +72,13 @@ The preview server serves the static app locally. The production app is deployed
 
 ```sh
 npm test
-npm run test:smoke
 npm run verify:merge
+```
+
+Optional fuller checks:
+
+```sh
+npm run test:smoke
 npm run test:regression
 ```
 
@@ -90,61 +100,18 @@ npm run verify:patterns-surface
 
 Brand lock: `assets/brand/wayword-logo.svg` is hash-locked to the canonical logo asset. Redraw/replacement must be explicitly approved and intentionally updated.
 
-Social asset generation (dev-only):
+Social asset generation is available as a dev-only utility:
 
 ```sh
 npm run generate:social-assets
 ```
-
-Each run writes a dated batch:
-
-- `artifacts/social/YYYY-MM-DD/pinterest/`
-- `artifacts/social/YYYY-MM-DD/square/`
-- `artifacts/social/YYYY-MM-DD/raw-screenshots/`
-- `artifacts/social/YYYY-MM-DD/metadata/`
-
-Profiles (deterministic fixtures):
-
-- `sparse_user`
-- `steady_user`
-- `intense_user`
-- `clustered_user`
-- `nocturnal_user`
-- `calibration_user`
-- `returning_user`
-
-Every exported image has matching metadata JSON in `metadata/`, and all rows are aggregated in `metadata/pinterest-assets.csv` for upload workflows.
-
-Useful flags:
-
-```sh
-node scripts/generate-social-assets.js --profile=intense_user --state=seasonal-wheel --count=20 --seed=1234 --fresh
-```
-
-- `--profile=<name>` chooses one fixture profile.
-- `--state=<state>` chooses one app state.
-- `--count=<n>` sets scenario batch size (default weekly batch is 20–40 assets depending on states/compositions).
-- `--seed=<value>` keeps output deterministic.
-- `--fresh` recreates the current dated folder from scratch.
-
-The CSV includes:
-
-- filename
-- board recommendation
-- title
-- description
-- alt text
-- source app state
-- fixture profile
-- suggested tags
-
-All fixtures are dev-only generation data. They are injected only during asset capture and do not change production behavior or user data.
+Implementation details and output structure live in `scripts/generate-social-assets.js` and `scripts/helpers/social-state-seeds.js`.
 
 ## Status
 
 Wayword is in active V1 development. The current focus is preserving the core writing loop while reducing orchestration risk, keeping Mirror output restrained, and improving the reliability of local saved-run flows.
 
-Known constraints are documented in `docs/V1_ARCHITECTURE_SNAPSHOT.md`, including the remaining `script.js` monolith, explicit load-order dependency, committed Mirror bundle, dual Recent Runs surfaces, and local persistence migration path.
+Known constraints are documented in `docs/V1_ARCHITECTURE_SNAPSHOT.md`, including the remaining `script.js` monolith, explicit load-order dependency, committed Mirror bundle, dual Recent Runs surfaces, local persistence migration path, and account/runtime scaffolding boundaries.
 
 ## AI-Assisted Development
 
