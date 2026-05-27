@@ -6,6 +6,7 @@ async function captureEmailRedirectTo(location) {
   let capturedPayload = null;
   const context = loadBrowserScripts(["src/infrastructure/auth/auth-session-runtime.js"], {
     console: silentConsole(),
+    URLSearchParams,
     location,
     waywordSupabaseClient: {
       getClient() {
@@ -25,20 +26,22 @@ async function captureEmailRedirectTo(location) {
   return capturedPayload?.options?.emailRedirectTo || "";
 }
 
-test("auth-session-runtime builds localhost redirect for 127.0.0.1 dev origin", async () => {
+test("auth-session-runtime defaults localhost origin to production-safe redirect", async () => {
   const redirect = await captureEmailRedirectTo({
     origin: "http://127.0.0.1:3001",
     pathname: "/index.html",
     hostname: "127.0.0.1",
+    search: "",
   });
-  assert.equal(redirect, "http://127.0.0.1:3001/index.html");
+  assert.equal(redirect, "https://wayword.me/index.html");
 });
 
-test("auth-session-runtime builds localhost redirect for localhost dev origin", async () => {
+test("auth-session-runtime allows explicit localhost redirect opt-in", async () => {
   const redirect = await captureEmailRedirectTo({
     origin: "http://localhost:3001",
     pathname: "/index.html",
     hostname: "localhost",
+    search: "?waywordLocalAuthRedirect=1",
   });
   assert.equal(redirect, "http://localhost:3001/index.html");
 });

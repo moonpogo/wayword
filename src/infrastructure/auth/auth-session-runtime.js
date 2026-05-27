@@ -77,6 +77,18 @@
     return safeHost === "localhost" || safeHost === "127.0.0.1";
   }
 
+  function shouldUseLocalAuthRedirect(locationObj) {
+    try {
+      var host = String(locationObj && locationObj.hostname ? locationObj.hostname : "").toLowerCase();
+      if (!isLocalHostName(host)) return false;
+      var search = String(locationObj && locationObj.search ? locationObj.search : "");
+      var params = new URLSearchParams(search);
+      return params.get("waywordLocalAuthRedirect") === "1";
+    } catch (_) {
+      return false;
+    }
+  }
+
   function buildEmailRedirectTo() {
     var locationObj = window.location || {};
     var origin = String(locationObj.origin || "").trim();
@@ -85,10 +97,10 @@
 
     if (origin) {
       var hostname = String(locationObj.hostname || "").trim();
-      if (isLocalHostName(hostname)) {
+      if (isLocalHostName(hostname) && shouldUseLocalAuthRedirect(locationObj)) {
         return origin + pathname;
       }
-      if (origin.indexOf("http://") === 0 || origin.indexOf("https://") === 0) {
+      if (!isLocalHostName(hostname) && (origin.indexOf("http://") === 0 || origin.indexOf("https://") === 0)) {
         return origin + pathname;
       }
     }
