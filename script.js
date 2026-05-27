@@ -4770,6 +4770,21 @@ function seasonalRunsLast90DaysFromSavedRuns(runs, options = {}) {
   }
   return seasonal;
 }
+
+function seasonalRunsForCalendarWindow(savedRuns, seasonCalendar) {
+  const all = Array.isArray(savedRuns) ? savedRuns : [];
+  const startMs = Number(seasonCalendar?.seasonStartLocal?.getTime?.());
+  const endMs = Number(seasonCalendar?.seasonEndLocal?.getTime?.());
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return [];
+  const seasonal = [];
+  for (const run of all) {
+    const ms = parseRunTimestampMsForSeason(run);
+    if (!Number.isFinite(ms)) continue;
+    if (ms < startMs || ms > endMs) continue;
+    seasonal.push({ run, timestampMs: ms });
+  }
+  return seasonal;
+}
 /* season wheel timestamp contract: end */
 
 let devSeasonFixtureName = null;
@@ -4979,19 +4994,36 @@ function seasonWheelResolveIntegrity(run, durationMinutes, wordCount) {
 }
 
 function buildSeasonWheelInstrumentModel(seasonalRows, options = {}) {
+  const startOfDayLocal = (dateObj) => {
+    const d = new Date(dateObj);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+  const endOfDayLocal = (dateObj) => {
+    const d = new Date(dateObj);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  };
+  const addDaysLocal = (dateObj, days) => {
+    const d = new Date(dateObj);
+    d.setDate(d.getDate() + Number(days || 0));
+    return d;
+  };
+  const dayDiffLocal = (laterDate, earlierDate) => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const a = startOfDayLocal(laterDate);
+    const b = startOfDayLocal(earlierDate);
+    const aOrdinal = Math.floor(Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) / dayMs);
+    const bOrdinal = Math.floor(Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) / dayMs);
+    return aOrdinal - bOrdinal;
+  };
   const seasonLengthDays = Math.max(1, Number(options.seasonLengthDays) || 90);
   const nowDate = options.nowDate instanceof Date ? new Date(options.nowDate) : new Date();
   const nowMs = nowDate.getTime();
-  nowDate.setHours(12, 0, 0, 0);
-  const seasonStartInput = options.seasonStartDate instanceof Date ? new Date(options.seasonStartDate) : null;
-  const seasonStart = seasonStartInput || new Date(nowDate);
-  if (!seasonStartInput) {
-    seasonStart.setDate(nowDate.getDate() - (seasonLengthDays - 1));
-  }
-  seasonStart.setHours(12, 0, 0, 0);
-  const dayMs = 24 * 60 * 60 * 1000;
-  const dayOrdinalLocal = (d) => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / dayMs);
-  const seasonStartOrdinal = dayOrdinalLocal(seasonStart);
+  const seasonStartInput = options.seasonStartDate instanceof Date ? startOfDayLocal(options.seasonStartDate) : null;
+  const seasonEndInput = options.seasonEndDate instanceof Date ? endOfDayLocal(options.seasonEndDate) : null;
+  const seasonStart = seasonStartInput || startOfDayLocal(addDaysLocal(nowDate, -(seasonLengthDays - 1)));
+  const seasonEnd = seasonEndInput || endOfDayLocal(addDaysLocal(seasonStart, seasonLengthDays - 1));
 
   const rows = Array.isArray(seasonalRows) ? seasonalRows : [];
   const segments = [];
@@ -4999,9 +5031,10 @@ function buildSeasonWheelInstrumentModel(seasonalRows, options = {}) {
     const timestampMs = Number(row?.timestampMs);
     if (!Number.isFinite(timestampMs)) continue;
     if (timestampMs > nowMs) continue;
+    if (timestampMs < seasonStart.getTime() || timestampMs > seasonEnd.getTime()) continue;
     const run = row?.run || {};
     const d = new Date(timestampMs);
-    const dayIndex = dayOrdinalLocal(d) - seasonStartOrdinal;
+    const dayIndex = dayDiffLocal(d, seasonStart);
     if (dayIndex < 0 || dayIndex >= seasonLengthDays) continue;
     const wordCount = seasonWheelResolveWordCount(run);
     const startMinute = seasonWheelResolveStartMinuteLocal(run, timestampMs);
@@ -5112,48 +5145,89 @@ function selectSeasonalQuietLine(runsCount, activeDays) {
   return "This season is still sparse, but gathering.";
 }
 
+/* season wheel calendar contract: begin */
+function localStartOfDay(dateObj) {
+  const d = new Date(dateObj);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function localEndOfDay(dateObj) {
+  const d = new Date(dateObj);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function addLocalDays(dateObj, days) {
+  const d = new Date(dateObj);
+  d.setDate(d.getDate() + Number(days || 0));
+  return d;
+}
+
+function differenceInLocalCalendarDays(laterDate, earlierDate) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const a = localStartOfDay(laterDate);
+  const b = localStartOfDay(earlierDate);
+  const aOrdinal = Math.floor(Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) / dayMs);
+  const bOrdinal = Math.floor(Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) / dayMs);
+  return aOrdinal - bOrdinal;
+}
+
+function inclusiveLocalCalendarDayCount(startDate, endDate) {
+  return Math.max(1, differenceInLocalCalendarDays(endDate, startDate) + 1);
+}
+
+function buildCurrentSeasonCalendar(dateObj = new Date()) {
+  const d = new Date(dateObj);
+  const y = d.getFullYear();
+  const value = (d.getMonth() + 1) * 100 + d.getDate();
+  let seasonLabel = "SPRING";
+  let seasonStartLocal = localStartOfDay(new Date(y, 2, 20));
+  let seasonEndLocal = localEndOfDay(new Date(y, 5, 20));
+
+  if (value >= 321 && value <= 620) {
+    seasonLabel = "SPRING";
+    seasonStartLocal = localStartOfDay(new Date(y, 2, 20));
+    seasonEndLocal = localEndOfDay(new Date(y, 5, 20));
+  } else if (value >= 621 && value <= 922) {
+    seasonLabel = "SUMMER";
+    seasonStartLocal = localStartOfDay(new Date(y, 5, 21));
+    seasonEndLocal = localEndOfDay(new Date(y, 8, 22));
+  } else if (value >= 923 && value <= 1220) {
+    seasonLabel = "AUTUMN";
+    seasonStartLocal = localStartOfDay(new Date(y, 8, 23));
+    seasonEndLocal = localEndOfDay(new Date(y, 11, 20));
+  } else if (value >= 1221) {
+    seasonLabel = "WINTER";
+    seasonStartLocal = localStartOfDay(new Date(y, 11, 21));
+    seasonEndLocal = localEndOfDay(new Date(y + 1, 2, 19));
+  } else {
+    seasonLabel = "WINTER";
+    seasonStartLocal = localStartOfDay(new Date(y - 1, 11, 21));
+    seasonEndLocal = localEndOfDay(new Date(y, 2, 19));
+  }
+
+  const spokeCount = inclusiveLocalCalendarDayCount(seasonStartLocal, seasonEndLocal);
+  return {
+    seasonLabel,
+    seasonStartLocal,
+    seasonEndLocal,
+    spokeCount,
+  };
+}
+
 function currentMeteorologicalSeasonLabel(dateObj = new Date()) {
-  const m = dateObj.getMonth() + 1;
-  if (m >= 3 && m <= 5) return "SPRING";
-  if (m >= 6 && m <= 8) return "SUMMER";
-  if (m >= 9 && m <= 11) return "AUTUMN";
-  return "WINTER";
+  return buildCurrentSeasonCalendar(dateObj).seasonLabel;
 }
 
 function currentMeteorologicalSeasonLengthDays(dateObj = new Date()) {
-  const d = new Date(dateObj);
-  const y = d.getFullYear();
-  const m = d.getMonth() + 1;
-  if (m >= 3 && m <= 5) {
-    const start = new Date(y, 2, 1);   // Mar 1
-    const end = new Date(y, 5, 1);     // Jun 1 (exclusive)
-    return Math.round((end - start) / (24 * 60 * 60 * 1000));
-  }
-  if (m >= 6 && m <= 8) {
-    const start = new Date(y, 5, 1);   // Jun 1
-    const end = new Date(y, 8, 1);     // Sep 1
-    return Math.round((end - start) / (24 * 60 * 60 * 1000));
-  }
-  if (m >= 9 && m <= 11) {
-    const start = new Date(y, 8, 1);   // Sep 1
-    const end = new Date(y, 11, 1);    // Dec 1
-    return Math.round((end - start) / (24 * 60 * 60 * 1000));
-  }
-  // Winter crosses year boundary: Dec 1 -> Mar 1
-  const start = m === 12 ? new Date(y, 11, 1) : new Date(y - 1, 11, 1);
-  const end = m === 12 ? new Date(y + 1, 2, 1) : new Date(y, 2, 1);
-  return Math.round((end - start) / (24 * 60 * 60 * 1000));
+  return buildCurrentSeasonCalendar(dateObj).spokeCount;
 }
 
 function currentMeteorologicalSeasonStart(dateObj = new Date()) {
-  const d = new Date(dateObj);
-  const y = d.getFullYear();
-  const m = d.getMonth() + 1;
-  if (m >= 3 && m <= 5) return new Date(y, 2, 1);
-  if (m >= 6 && m <= 8) return new Date(y, 5, 1);
-  if (m >= 9 && m <= 11) return new Date(y, 8, 1);
-  return m === 12 ? new Date(y, 11, 1) : new Date(y - 1, 11, 1);
+  return buildCurrentSeasonCalendar(dateObj).seasonStartLocal;
 }
+/* season wheel calendar contract: end */
 
 function formatShortMonthDay(dateObj) {
   return dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -5167,7 +5241,11 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
   const innerR = canonScaffold ? 18 : 122;
   const outerR = 900;
   const radialSpan = outerR - innerR;
-  const seasonDays = Math.max(1, Number(options.seasonDays) || (canonScaffold ? 91 : 90));
+  const seasonCalendar = options.seasonCalendar && typeof options.seasonCalendar === "object" ? options.seasonCalendar : null;
+  const seasonDays = Math.max(
+    1,
+    Number(options.seasonDays) || Number(seasonCalendar?.spokeCount) || (canonScaffold ? 93 : 93)
+  );
   const dayIndex = Number.isInteger(options.dayIndex) ? options.dayIndex : 42;
   const startMinute = Math.max(0, Math.min(1439, Number(options.startMinute) || 1080));
   const durationMinutes = Math.max(1, Math.min(360, Number(options.durationMinutes) || 120));
@@ -5177,7 +5255,12 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
   const seasonLabel = String(options.seasonLabel || "SPRING").toUpperCase();
   const isDesktop = Boolean(options.isDesktop);
   const highlightDay = options.highlightDay !== false;
-  const seasonStartDate = options.seasonStartDate instanceof Date ? options.seasonStartDate : null;
+  const seasonStartDate = options.seasonStartDate instanceof Date
+    ? localStartOfDay(options.seasonStartDate)
+    : (seasonCalendar?.seasonStartLocal instanceof Date ? localStartOfDay(seasonCalendar.seasonStartLocal) : null);
+  const seasonEndDate = options.seasonEndDate instanceof Date
+    ? localEndOfDay(options.seasonEndDate)
+    : (seasonCalendar?.seasonEndLocal instanceof Date ? localEndOfDay(seasonCalendar.seasonEndLocal) : null);
 
   const polar = (r, angleDeg) => {
     const a = ((angleDeg - 90) * Math.PI) / 180;
@@ -5382,7 +5465,8 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     const ampm = hour24 >= 12 ? "PM" : "AM";
     const hour12 = hour24 % 12 || 12;
     const timeLabel = `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`;
-    runHitTargets += `<line x1="${sx.toFixed(2)}" y1="${sy.toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="transparent" stroke-opacity="0" stroke-width="${Math.max(26, coreWidth + 10).toFixed(2)}" stroke-linecap="round" class="sw-run-hit" data-run-id="${runOrdinal}" data-day-index="${runDayIndex}" data-date-label="${dateLabel}" data-start-minute="${runStart}" data-duration-minutes="${runDuration}" data-word-count="${runWords}" data-integrity="${runIntegrity}" data-time-label="${timeLabel}" data-run-count="${runCountChunk}" data-complete-runs="${completeRuns}" data-partial-runs="${partialRuns}" data-interrupted-runs="${interruptedRuns}" data-abandoned-runs="${abandonedRuns}"/>`;
+    const radiusRatio = runStart / 1440;
+    runHitTargets += `<line x1="${sx.toFixed(2)}" y1="${sy.toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="transparent" stroke-opacity="0" stroke-width="${Math.max(26, coreWidth + 10).toFixed(2)}" stroke-linecap="round" class="sw-run-hit" data-run-id="${runOrdinal}" data-day-index="${runDayIndex}" data-date-label="${dateLabel}" data-start-minute="${runStart}" data-duration-minutes="${runDuration}" data-word-count="${runWords}" data-integrity="${runIntegrity}" data-time-label="${timeLabel}" data-run-count="${runCountChunk}" data-complete-runs="${completeRuns}" data-partial-runs="${partialRuns}" data-interrupted-runs="${interruptedRuns}" data-abandoned-runs="${abandonedRuns}" data-radius-ratio="${radiusRatio.toFixed(6)}"/>`;
 
     const segmentCountFromChunk = runCountChunk > 1
       ? Math.max(2, Math.min(14, runCountChunk))
@@ -5422,29 +5506,42 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     : ``;
   let mobileQuadrantLabels = ``;
   if (!isDesktop && seasonStartDate) {
-    const addLocalDays = (dateObj, days) => {
-      const d = new Date(dateObj);
-      d.setDate(d.getDate() + days);
-      return d;
-    };
-    const q0 = addLocalDays(seasonStartDate, 0);
-    const q1 = addLocalDays(seasonStartDate, Math.round(seasonDays * 0.25));
-    const q2 = addLocalDays(seasonStartDate, Math.round(seasonDays * 0.5));
-    const q3 = addLocalDays(seasonStartDate, Math.round(seasonDays * 0.75));
     const labelRadius = outerR + 114;
-    const [nX, nY] = polar(labelRadius, 0);
-    const [eX, eY] = polar(labelRadius, 90);
-    const [sX, sY] = polar(labelRadius, 180);
-    const [wX, wY] = polar(labelRadius, 270);
-    mobileQuadrantLabels = `<text x="${nX.toFixed(2)}" y="${(nY + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${formatShortMonthDay(q0)}</text>
-       <text x="${eX.toFixed(2)}" y="${(eY + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${formatShortMonthDay(q1)}</text>
-       <text x="${sX.toFixed(2)}" y="${(sY + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${formatShortMonthDay(q2)}</text>
-       <text x="${wX.toFixed(2)}" y="${(wY + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif">${formatShortMonthDay(q3)}</text>`;
+    const labelDates = [];
+    labelDates.push(localStartOfDay(seasonStartDate));
+    const startYear = seasonStartDate.getFullYear();
+    const endYear = (seasonEndDate || seasonStartDate).getFullYear();
+    for (let year = startYear; year <= endYear; year += 1) {
+      for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+        const monthStart = localStartOfDay(new Date(year, monthIndex, 1));
+        if (monthStart < seasonStartDate) continue;
+        if (seasonEndDate && monthStart > seasonEndDate) continue;
+        labelDates.push(monthStart);
+      }
+    }
+    if (seasonEndDate) {
+      const endStartDay = localStartOfDay(seasonEndDate);
+      if (!labelDates.some((d) => d.getTime() === endStartDay.getTime())) {
+        labelDates.push(endStartDay);
+      }
+    }
+    const uniqueSorted = Array.from(new Map(labelDates.map((d) => [d.getTime(), d])).values())
+      .sort((a, b) => a.getTime() - b.getTime());
+    mobileQuadrantLabels = uniqueSorted
+      .map((dateObj) => {
+        const index = differenceInLocalCalendarDays(dateObj, seasonStartDate);
+        if (index < 0 || index >= seasonDays) return "";
+        const angle = (index / seasonDays) * 360;
+        const [lx, ly] = polar(labelRadius, angle);
+        return `<text x="${lx.toFixed(2)}" y="${(ly + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif" data-label-day-index="${index}" data-label-date="${toDayKeyLocal(dateObj)}">${formatShortMonthDay(dateObj)}</text>`;
+      })
+      .filter(Boolean)
+      .join("");
   }
 
   const avgRunsPerActiveDay = activeDaysCount > 0 ? (runCount / activeDaysCount) : 0;
 
-  return `<svg class="current-season-canon-tile__image season-wheel-debug-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 2200" role="img" aria-label="Season wheel debug single-spoke" data-season-days="${seasonDays}" data-days-written="${activeDaysCount}" data-total-runs="${runCount}" data-completed-runs="${completedCount}" data-completed-pct="${completePct}" data-total-words="${totalWords}" data-avg-runs-day="${avgRunsPerActiveDay.toFixed(1)}">
+  return `<svg class="current-season-canon-tile__image season-wheel-debug-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 2200" role="img" aria-label="Season wheel debug single-spoke" data-season-days="${seasonDays}" data-days-written="${activeDaysCount}" data-total-runs="${runCount}" data-completed-runs="${completedCount}" data-completed-pct="${completePct}" data-total-words="${totalWords}" data-avg-runs-day="${avgRunsPerActiveDay.toFixed(1)}" data-season-start-local="${seasonStartDate ? seasonStartDate.toISOString() : ""}" data-season-end-local="${seasonEndDate ? seasonEndDate.toISOString() : ""}">
   <defs>
     <filter id="runGlow" x="-80%" y="-80%" width="260%" height="260%">
       <feGaussianBlur stdDeviation="2.8" result="blur"/>
@@ -5602,14 +5699,23 @@ function buildSeasonWheelFullRingDebugSvg(options = {}) {
 }
 
 function buildSeasonWheelFullRingFromSeasonalRows(seasonalRows, options = {}) {
-  const seasonDays = Math.max(1, Number(options.seasonDays) || currentMeteorologicalSeasonLengthDays(new Date()));
-  const seasonLabel = String(options.seasonLabel || currentMeteorologicalSeasonLabel(new Date())).toUpperCase();
+  const seasonCalendar = options.seasonCalendar && typeof options.seasonCalendar === "object"
+    ? options.seasonCalendar
+    : buildCurrentSeasonCalendar(new Date());
+  const seasonDays = Math.max(1, Number(options.seasonDays) || Number(seasonCalendar.spokeCount) || 1);
+  const seasonLabel = String(options.seasonLabel || seasonCalendar.seasonLabel || currentMeteorologicalSeasonLabel(new Date())).toUpperCase();
   const isDesktop = Boolean(options.isDesktop);
-  const seasonStartDate = options.seasonStartDate instanceof Date ? options.seasonStartDate : currentMeteorologicalSeasonStart(new Date());
+  const seasonStartDate = options.seasonStartDate instanceof Date
+    ? localStartOfDay(options.seasonStartDate)
+    : localStartOfDay(seasonCalendar.seasonStartLocal || currentMeteorologicalSeasonStart(new Date()));
+  const seasonEndDate = options.seasonEndDate instanceof Date
+    ? localEndOfDay(options.seasonEndDate)
+    : localEndOfDay(seasonCalendar.seasonEndLocal || addLocalDays(seasonStartDate, seasonDays - 1));
   const model = buildSeasonWheelInstrumentModel(Array.isArray(seasonalRows) ? seasonalRows : [], {
     seasonLengthDays: seasonDays,
     nowDate: new Date(),
     seasonStartDate,
+    seasonEndDate,
   });
   const runs = (Array.isArray(model?.segments) ? model.segments : []).map((seg) => {
     const integrity = String(seg.integrity || "partial");
@@ -5633,6 +5739,13 @@ function buildSeasonWheelFullRingFromSeasonalRows(seasonalRows, options = {}) {
     seasonLabel,
     isDesktop,
     seasonStartDate,
+    seasonEndDate,
+    seasonCalendar: {
+      seasonLabel,
+      seasonStartLocal: seasonStartDate,
+      seasonEndLocal: seasonEndDate,
+      spokeCount: seasonDays,
+    },
     highlightDay: false,
     scaffoldPreset: "canon",
     runs,
@@ -5819,18 +5932,20 @@ function renderCurrentSeasonPanel() {
   const root = $("currentSeasonRoot");
   const wrap = $("currentSeasonPanel");
   if (!root || !wrap) return;
-  const seasonLengthDays = currentMeteorologicalSeasonLengthDays(new Date());
   let debugMode = "";
   const nowDate = new Date();
-  const seasonLabelNow = currentMeteorologicalSeasonLabel(nowDate);
-  const seasonStartNow = currentMeteorologicalSeasonStart(nowDate);
+  const seasonCalendarNow = buildCurrentSeasonCalendar(nowDate);
+  const seasonLengthDays = seasonCalendarNow.spokeCount;
+  const seasonLabelNow = seasonCalendarNow.seasonLabel;
+  const seasonStartNow = seasonCalendarNow.seasonStartLocal;
+  const seasonEndNow = seasonCalendarNow.seasonEndLocal;
   const isDesktop = isDesktopPatternsViewport();
   let seasonWheelRows = [];
   if (devSeasonFixtureName) {
     const fixtureVm = buildDevSeasonFixtureViewModel(devSeasonFixtureName);
     seasonWheelRows = Array.isArray(fixtureVm?.seasonalRows) ? fixtureVm.seasonalRows : [];
   } else {
-    seasonWheelRows = seasonalRunsLast90DaysFromSavedRuns(readSavedRunsChronological());
+    seasonWheelRows = seasonalRunsForCalendarWindow(readSavedRunsChronological(), seasonCalendarNow);
   }
   try {
     if (WAYWORD_DEV_FIRST_SESSION_ENTRY_RESET_ENABLED) {
@@ -5853,6 +5968,8 @@ function renderCurrentSeasonPanel() {
               seasonLabel: seasonLabelNow,
               seasonDays: seasonLengthDays,
               seasonStartDate: seasonStartNow,
+              seasonEndDate: seasonEndNow,
+              seasonCalendar: seasonCalendarNow,
               isDesktop,
             })
           : debugMode === "pair"
@@ -5868,6 +5985,8 @@ function renderCurrentSeasonPanel() {
                 seasonDays: seasonLengthDays,
                 seasonLabel: seasonLabelNow,
                 seasonStartDate: seasonStartNow,
+                seasonEndDate: seasonEndNow,
+                seasonCalendar: seasonCalendarNow,
                 isDesktop,
               })
       }

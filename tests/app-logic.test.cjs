@@ -974,6 +974,34 @@ test("season wheel timestamp parser prefers canonical saved timestamp and ignore
   assert.equal(rows[2].timestampMs, Date.parse("2026-05-26T04:31:00-07:00"));
 });
 
+test("season wheel calendar model maps Spring 2026 local days with exact spoke count", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel calendar contract: begin */",
+    "/* season wheel calendar contract: end */"
+  );
+  const api = new Function(
+    `${block}; return { buildCurrentSeasonCalendar, differenceInLocalCalendarDays, inclusiveLocalCalendarDayCount };`
+  )();
+
+  const spring = api.buildCurrentSeasonCalendar(new Date("2026-05-26T15:00:00-07:00"));
+  assert.equal(spring.seasonLabel, "SPRING");
+  assert.equal(spring.seasonStartLocal.toISOString(), new Date("2026-03-20T00:00:00-07:00").toISOString());
+  assert.equal(spring.seasonEndLocal.toISOString(), new Date("2026-06-20T23:59:59.999-07:00").toISOString());
+  assert.equal(spring.spokeCount, 93);
+  assert.equal(api.inclusiveLocalCalendarDayCount(spring.seasonStartLocal, spring.seasonEndLocal), 93);
+
+  assert.equal(api.differenceInLocalCalendarDays(new Date("2026-03-20T12:00:00-07:00"), spring.seasonStartLocal), 0);
+  assert.equal(api.differenceInLocalCalendarDays(new Date("2026-03-21T12:00:00-07:00"), spring.seasonStartLocal), 1);
+  assert.equal(api.differenceInLocalCalendarDays(new Date("2026-04-01T12:00:00-07:00"), spring.seasonStartLocal), 12);
+  assert.equal(api.differenceInLocalCalendarDays(new Date("2026-05-01T12:00:00-07:00"), spring.seasonStartLocal), 42);
+  assert.equal(api.differenceInLocalCalendarDays(new Date("2026-05-26T12:00:00-07:00"), spring.seasonStartLocal), 67);
+  assert.equal(api.differenceInLocalCalendarDays(new Date("2026-06-01T12:00:00-07:00"), spring.seasonStartLocal), 73);
+  assert.equal(api.differenceInLocalCalendarDays(new Date("2026-06-20T12:00:00-07:00"), spring.seasonStartLocal), 92);
+  assert.equal(api.differenceInLocalCalendarDays(new Date("2026-06-21T12:00:00-07:00"), spring.seasonStartLocal), 93);
+});
+
 test("season wheel instrument svg renderer emits one spoke per day and segment marks", () => {
   const script = fs.readFileSync("script.js", "utf8");
   const block = extractBetween(
@@ -1028,14 +1056,15 @@ test("season wheel model anchors day indexing to season start and keeps May 26 o
       },
     ],
     {
-      seasonLengthDays: 92,
+      seasonLengthDays: 93,
       nowDate: new Date("2026-05-26T20:00:00-07:00"),
-      seasonStartDate: new Date("2026-03-01T00:00:00-08:00"),
+      seasonStartDate: new Date("2026-03-20T00:00:00-07:00"),
+      seasonEndDate: new Date("2026-06-20T23:59:59.999-07:00"),
     }
   );
 
   assert.equal(model.segments.length, 1);
-  assert.equal(model.segments[0].dayIndex, 86);
+  assert.equal(model.segments[0].dayIndex, 67);
   assert.equal(model.segments[0].startMinute, 1090);
 });
 
@@ -1061,15 +1090,76 @@ test("season wheel model keeps late-night local runs on the same local day and t
       },
     ],
     {
-      seasonLengthDays: 92,
+      seasonLengthDays: 93,
       nowDate: new Date("2026-05-26T23:59:00-07:00"),
-      seasonStartDate: new Date("2026-03-01T00:00:00-08:00"),
+      seasonStartDate: new Date("2026-03-20T00:00:00-07:00"),
+      seasonEndDate: new Date("2026-06-20T23:59:59.999-07:00"),
     }
   );
 
   assert.equal(model.segments.length, 1);
-  assert.equal(model.segments[0].dayIndex, 86);
+  assert.equal(model.segments[0].dayIndex, 67);
   assert.equal(model.segments[0].startMinute, 1430);
+});
+
+test("season wheel model keeps same spoke for midnight and late-night local runs with different radius", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const buildModel = new Function(`${block}; return buildSeasonWheelInstrumentModel;`)();
+
+  const model = buildModel(
+    [
+      {
+        timestampMs: Date.parse("2026-05-26T00:00:00-07:00"),
+        run: { startedAt: "2026-05-26T00:00:00-07:00", durationMinutes: 6, wordCount: 30, submitted: false },
+      },
+      {
+        timestampMs: Date.parse("2026-05-26T23:59:00-07:00"),
+        run: { startedAt: "2026-05-26T23:59:00-07:00", durationMinutes: 6, wordCount: 30, submitted: false },
+      },
+    ],
+    {
+      seasonLengthDays: 93,
+      nowDate: new Date("2026-05-26T23:59:00-07:00"),
+      seasonStartDate: new Date("2026-03-20T00:00:00-07:00"),
+      seasonEndDate: new Date("2026-06-20T23:59:59.999-07:00"),
+    }
+  );
+
+  assert.equal(model.segments.length, 2);
+  assert.equal(model.segments[0].dayIndex, model.segments[1].dayIndex);
+  assert.equal(model.segments[0].startMinute, 0);
+  assert.equal(model.segments[1].startMinute, 1439);
+});
+
+test("season wheel model sets local 3 PM radius ratio near 15/24", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const buildModel = new Function(`${block}; return buildSeasonWheelInstrumentModel;`)();
+  const model = buildModel(
+    [
+      {
+        timestampMs: Date.parse("2026-05-26T15:00:00-07:00"),
+        run: { startedAt: "2026-05-26T15:00:00-07:00", durationMinutes: 20, wordCount: 120, completed: true },
+      },
+    ],
+    {
+      seasonLengthDays: 93,
+      nowDate: new Date("2026-05-26T20:00:00-07:00"),
+      seasonStartDate: new Date("2026-03-20T00:00:00-07:00"),
+      seasonEndDate: new Date("2026-06-20T23:59:59.999-07:00"),
+    }
+  );
+  const ratio = model.segments[0].startMinute / 1440;
+  assert.equal(Math.abs(ratio - 15 / 24) < 0.00001, true);
 });
 
 test("season wheel model excludes future-dated runs beyond current local date/time", () => {
@@ -1094,13 +1184,58 @@ test("season wheel model excludes future-dated runs beyond current local date/ti
       },
     ],
     {
-      seasonLengthDays: 92,
+      seasonLengthDays: 93,
       nowDate: new Date("2026-05-26T20:00:00-07:00"),
-      seasonStartDate: new Date("2026-03-01T00:00:00-08:00"),
+      seasonStartDate: new Date("2026-03-20T00:00:00-07:00"),
+      seasonEndDate: new Date("2026-06-20T23:59:59.999-07:00"),
     }
   );
 
   assert.equal(model.segments.length, 0);
+});
+
+test("season wheel labels place season start and month boundaries at computed day indexes", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const calendarBlock = extractBetween(
+    script,
+    "/* season wheel calendar contract: begin */",
+    "/* season wheel calendar contract: end */"
+  );
+  const instrumentBlock = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const svgStart = script.indexOf("function formatShortMonthDay");
+  const svgEnd = script.indexOf("function buildSeasonWheelPairSpokeDebugSvg");
+  const svgBlock = script.slice(svgStart, svgEnd);
+  const dayKeyHelper = `
+    function pad2(n) { return String(n).padStart(2, "0"); }
+    function toDayKeyLocal(dateObj) {
+      return \`\${dateObj.getFullYear()}-\${pad2(dateObj.getMonth() + 1)}-\${pad2(dateObj.getDate())}\`;
+    }
+  `;
+  const api = new Function(
+    `${dayKeyHelper}\n${calendarBlock}\n${instrumentBlock}\n${svgBlock}\nreturn { buildCurrentSeasonCalendar, buildSeasonWheelSingleSpokeDebugSvg };`
+  )();
+  const seasonCalendar = api.buildCurrentSeasonCalendar(new Date("2026-05-26T15:00:00-07:00"));
+  const svg = api.buildSeasonWheelSingleSpokeDebugSvg({
+    seasonDays: seasonCalendar.spokeCount,
+    seasonLabel: seasonCalendar.seasonLabel,
+    seasonStartDate: seasonCalendar.seasonStartLocal,
+    seasonEndDate: seasonCalendar.seasonEndLocal,
+    seasonCalendar,
+    isDesktop: false,
+    highlightDay: false,
+    runs: [],
+  });
+
+  assert.equal(svg.includes('data-label-date="2026-03-20">Mar 20</text>'), true);
+  assert.equal(svg.includes('data-label-day-index="12" data-label-date="2026-04-01">Apr 1</text>'), true);
+  assert.equal(svg.includes('data-label-day-index="42" data-label-date="2026-05-01">May 1</text>'), true);
+  assert.equal(svg.includes('data-label-day-index="73" data-label-date="2026-06-01">Jun 1</text>'), true);
+  assert.equal(svg.includes('data-label-day-index="92" data-label-date="2026-06-20">Jun 20</text>'), true);
+  assert.equal(svg.includes(">Mar 1</text>"), false);
 });
 
 test("season wheel tooltip placement keeps popover within panel bounds and flips near bottom", () => {
