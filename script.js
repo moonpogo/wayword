@@ -5507,35 +5507,20 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
   let mobileQuadrantLabels = ``;
   if (!isDesktop && seasonStartDate) {
     const labelRadius = outerR + 114;
-    const labelDates = [];
-    labelDates.push(localStartOfDay(seasonStartDate));
-    const startYear = seasonStartDate.getFullYear();
-    const endYear = (seasonEndDate || seasonStartDate).getFullYear();
-    for (let year = startYear; year <= endYear; year += 1) {
-      for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-        const monthStart = localStartOfDay(new Date(year, monthIndex, 1));
-        if (monthStart < seasonStartDate) continue;
-        if (seasonEndDate && monthStart > seasonEndDate) continue;
-        labelDates.push(monthStart);
-      }
-    }
-    if (seasonEndDate) {
-      const endStartDay = localStartOfDay(seasonEndDate);
-      if (!labelDates.some((d) => d.getTime() === endStartDay.getTime())) {
-        labelDates.push(endStartDay);
-      }
-    }
-    const uniqueSorted = Array.from(new Map(labelDates.map((d) => [d.getTime(), d])).values())
-      .sort((a, b) => a.getTime() - b.getTime());
-    mobileQuadrantLabels = uniqueSorted
-      .map((dateObj) => {
-        const index = differenceInLocalCalendarDays(dateObj, seasonStartDate);
-        if (index < 0 || index >= seasonDays) return "";
-        const angle = (index / seasonDays) * 360;
-        const [lx, ly] = polar(labelRadius, angle);
-        return `<text x="${lx.toFixed(2)}" y="${(ly + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif" data-label-day-index="${index}" data-label-date="${toDayKeyLocal(dateObj)}">${formatShortMonthDay(dateObj)}</text>`;
+    const quarterIndex = (fraction) =>
+      Math.max(0, Math.min(seasonDays - 1, Math.round((seasonDays - 1) * fraction)));
+    const anchors = [
+      { key: "north", angle: 0, dayIndex: 0 },
+      { key: "east", angle: 90, dayIndex: quarterIndex(0.25) },
+      { key: "south", angle: 180, dayIndex: quarterIndex(0.5) },
+      { key: "west", angle: 270, dayIndex: quarterIndex(0.75) },
+    ];
+    mobileQuadrantLabels = anchors
+      .map((anchor) => {
+        const dateObj = addLocalDays(seasonStartDate, anchor.dayIndex);
+        const [lx, ly] = polar(labelRadius, anchor.angle);
+        return `<text x="${lx.toFixed(2)}" y="${(ly + 8).toFixed(2)}" text-anchor="middle" font-size="23" letter-spacing="1.7" fill="var(--sw-medallion-label, #d6c8b2)" font-family="Georgia, 'Times New Roman', serif" data-label-anchor="${anchor.key}" data-label-day-index="${anchor.dayIndex}" data-label-date="${toDayKeyLocal(dateObj)}">${formatShortMonthDay(dateObj)}</text>`;
       })
-      .filter(Boolean)
       .join("");
   }
 

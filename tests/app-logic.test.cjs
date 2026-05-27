@@ -1194,7 +1194,7 @@ test("season wheel model excludes future-dated runs beyond current local date/ti
   assert.equal(model.segments.length, 0);
 });
 
-test("season wheel labels place season start and month boundaries at computed day indexes", () => {
+test("season wheel labels use cardinal anchors from calendar model without north collision", () => {
   const script = fs.readFileSync("script.js", "utf8");
   const calendarBlock = extractBetween(
     script,
@@ -1230,11 +1230,14 @@ test("season wheel labels place season start and month boundaries at computed da
     runs: [],
   });
 
-  assert.equal(svg.includes('data-label-date="2026-03-20">Mar 20</text>'), true);
-  assert.equal(svg.includes('data-label-day-index="12" data-label-date="2026-04-01">Apr 1</text>'), true);
-  assert.equal(svg.includes('data-label-day-index="42" data-label-date="2026-05-01">May 1</text>'), true);
-  assert.equal(svg.includes('data-label-day-index="73" data-label-date="2026-06-01">Jun 1</text>'), true);
-  assert.equal(svg.includes('data-label-day-index="92" data-label-date="2026-06-20">Jun 20</text>'), true);
+  assert.equal(svg.includes('data-label-anchor="north" data-label-day-index="0" data-label-date="2026-03-20">Mar 20</text>'), true);
+  assert.equal(svg.includes('data-label-anchor="east" data-label-day-index="23" data-label-date="2026-04-12">Apr 12</text>'), true);
+  assert.equal(svg.includes('data-label-anchor="south" data-label-day-index="46" data-label-date="2026-05-05">May 5</text>'), true);
+  assert.equal(svg.includes('data-label-anchor="west" data-label-day-index="69" data-label-date="2026-05-28">May 28</text>'), true);
+  assert.equal(svg.includes('data-label-date="2026-06-20">Jun 20</text>'), false);
+  assert.equal(svg.includes(">Apr 1</text>"), false);
+  assert.equal(svg.includes(">May 1</text>"), false);
+  assert.equal(svg.includes(">Jun 1</text>"), false);
   assert.equal(svg.includes(">Mar 1</text>"), false);
 });
 
