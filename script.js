@@ -1212,6 +1212,16 @@ function flushEditorSurfaceIntoWriteDocOnce() {
   flushEditorDotOverlaySync();
 }
 
+function captureEditorSurfaceIntoWriteDocForSubmit() {
+  if (!editorInput || !state.active || state.submitted) return getEditorText();
+
+  const raw = getEditorSurfaceRawText(editorInput);
+  const previousWriteDoc = state.writeDoc;
+  state.writeDoc = parseRawToWriteDoc(raw, previousWriteDoc);
+  applyWriteDocSemanticFlagsFromAnalysis();
+  return serializeWriteDoc(state.writeDoc);
+}
+
 function getEditorText() {
   return serializeWriteDoc(state.writeDoc);
 }
@@ -6182,6 +6192,7 @@ function buildRunControllerRegistrationInput() {
       return editorSurfaceComposing;
     },
     flushEditorSurfaceIntoWriteDocOnce,
+    captureEditorSurfaceIntoWriteDocForSubmit,
     getEditorText,
     analyze,
     getRecentEntries,
@@ -6351,6 +6362,7 @@ function bindEditorInputEvents() {
       return state.active && !state.submitted;
     },
     flushEditorSurfaceIntoWriteDocOnce,
+    captureEditorSurfaceIntoWriteDocForSubmit,
     tryStartTimerOnFirstMeaningfulInput,
     pulseWordmark,
     renderHighlight,
