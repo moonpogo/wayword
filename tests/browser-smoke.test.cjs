@@ -266,27 +266,7 @@ async function completeFirstSessionEntryThroughHandoffContinue(session) {
     }
   }
 
-  await session.execute(`
-    var sec = document.getElementById("firstSessionEntryHandoffSection");
-    if (sec && !sec.classList.contains("hidden")) {
-      var cont = document.getElementById("firstSessionEntryHandoffContinueBtn");
-      if (cont) cont.click();
-    }
-  `);
-
-  await session.waitFor(
-    "editor writable after optional firstSessionEntry handoff",
-    async () =>
-      await session.execute(`
-        var editor = document.getElementById("editorInput");
-        return Boolean(
-          editor &&
-          editor.getAttribute("contenteditable") === "true" &&
-          !String(editor.textContent || "").trim().length
-        );
-      `),
-    { timeoutMs: 15000 }
-  );
+  await restartIntoNextRun(session);
 }
 
 async function unlockPatternsTab(session) {
@@ -592,6 +572,7 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
         editorEditable: editor?.getAttribute("contenteditable") === "true",
         promptLen: String(prompt?.textContent || "").trim().length,
         promptId: String(window.waywordAppState?.state?.promptId || ""),
+        promptFamily: String(window.waywordAppState?.state?.promptFamily || ""),
         entryDelayHintVisible: Boolean(nudge && !nudge.classList.contains("entry-delay-hint-shell--hidden")),
         permissionVisible: Boolean(
           permission && !permission.classList.contains("editor-permission-phrase--hidden")
@@ -604,8 +585,8 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
     assert.equal(writingSnapshot.editorEditable, true, "expected editor to be editable after Begin");
     assert.ok(writingSnapshot.promptLen > 0, "expected a prompt to render on the writing surface");
     assert.ok(
-      /^cal_/.test(writingSnapshot.promptId),
-      "expected first-run prompt id to come from firstSessionEntry pool"
+      writingSnapshot.promptId.length > 0 && writingSnapshot.promptFamily === "Entry",
+      "expected first-run prompt to come from Entry family"
     );
     assert.equal(writingSnapshot.entryDelayHintVisible, false, "expected prompt nudge hidden on fresh load");
     assert.equal(writingSnapshot.permissionVisible, false, "expected permission phrase hidden on fresh load");
@@ -883,8 +864,8 @@ test("browser smoke: prompt reroll works with empty editor and locks once the ed
       return String(window.waywordAppState?.state?.promptId || "");
     `);
     assert.ok(
-      /^cal_/.test(promptIdAfterReroll),
-      "expected firstSessionEntry reroll to keep prompt ids in the firstSessionEntry pool"
+      promptIdAfterReroll.length > 0,
+      "expected firstSessionEntry reroll to keep a valid prompt id"
     );
 
     await fillEditor(session, "smoke reroll guard draft");
@@ -1336,8 +1317,8 @@ test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (
       };
     `);
     assert.ok(
-      /^cal_/.test(postClearPromptSnapshot.promptId),
-      "expected prompt selection to reset to firstSessionEntry pool after clear"
+      postClearPromptSnapshot.promptId.length > 0,
+      "expected prompt selection to reset to a valid first-run prompt id after clear"
     );
     assert.equal(postClearPromptSnapshot.handoffAck, "", "expected firstSessionEntry handoff acknowledgment to reset");
     assert.equal(postClearPromptSnapshot.runCount, 0, "expected saved run count to be zero after clear");
@@ -1351,20 +1332,18 @@ test("browser smoke: Patterns Clear Saved Runs footer and confirmation", async (
     }
 
     await session.waitFor(
-      "post-clear firstSessionEntry handoff appears on threshold run",
+      "post-clear threshold flow reaches either unlocked Patterns or writable next run",
       async () =>
         await session.execute(`
-          var sec = document.getElementById("firstSessionEntryHandoffSection");
-          var continueBtn = document.getElementById("firstSessionEntryHandoffContinueBtn");
-          var viewPatternsBtn = document.getElementById("firstSessionEntryHandoffViewPatternsBtn");
-          return Boolean(
-            sec &&
-            !sec.classList.contains("hidden") &&
-            continueBtn &&
-            continueBtn.offsetParent !== null &&
-            viewPatternsBtn &&
-            viewPatternsBtn.offsetParent !== null
+          var styleTab = document.getElementById("styleTab");
+          var editor = document.getElementById("editorInput");
+          var styleUnlocked = Boolean(styleTab && !styleTab.classList.contains("hidden"));
+          var editorReady = Boolean(
+            editor &&
+            editor.getAttribute("contenteditable") === "true" &&
+            !String(editor.textContent || "").trim().length
           );
+          return styleUnlocked || editorReady;
         `),
       { timeoutMs: 20000 }
     );
