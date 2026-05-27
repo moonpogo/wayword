@@ -3943,28 +3943,28 @@ function buildBaseline(entries) {
 }
 
 const FIRST_SESSION_ENTRY_OBS_REPETITION = [
-  "Certain words recur.",
-  "One word returns across short spans.",
+  "Certain words are beginning to recur.",
+  "One word returns in short spans.",
   "The same word surfaces again."
 ];
 const FIRST_SESSION_ENTRY_OBS_OPENINGS = [
-  "Sentence openings repeat.",
-  "Opening phrases echo.",
-  "The same line start recurs."
+  "Sentence openings begin to repeat.",
+  "Opening phrases are starting to echo.",
+  "The same line start returns."
 ];
 const FIRST_SESSION_ENTRY_OBS_FRAGMENTATION = [
-  "Lines run short.",
-  "Thought fragments across many short units."
+  "Lines stay short.",
+  "Thought arrives in short fragments."
 ];
 const FIRST_SESSION_ENTRY_OBS_LONG = [
-  "Average sentence length sits above your recent baseline.",
-  "Sentences run longer than in your last few saved runs."
+  "Sentences are running longer than recent traces.",
+  "This run leans longer than your last few saved runs."
 ];
 const FIRST_SESSION_ENTRY_OBS_FALLBACK = [
   "A baseline is still forming.",
-  "This pass stays close to the prompt.",
-  "The signal is still light.",
-  "A pattern is not clear yet."
+  "The trace is still light.",
+  "A pattern has not settled yet.",
+  "The shape is beginning, but still quiet."
 ];
 
 function pickFirstSessionEntryObservationPhrase(phrases, seed) {
@@ -4002,8 +4002,8 @@ function selectFirstSessionEntryObservation(text, priorEntries, ensureBaselineCa
     (rc >= 2 || (rc >= 1 && mr >= 4));
 
   if (repetitionApplies) {
-    if (rc === 1 && mr >= 5) return "One word returns across short spans.";
-    if (rc >= 3 || mr >= 6) return "Certain words recur.";
+    if (rc === 1 && mr >= 5) return "One word returns in short spans.";
+    if (rc >= 3 || mr >= 6) return "Certain words are beginning to recur.";
     if (rc === 1) return "The same word surfaces again.";
     if (rc === 2) return pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_REPETITION, seed);
     return pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_REPETITION, seed);
@@ -4038,7 +4038,7 @@ function selectFirstSessionEntryObservation(text, priorEntries, ensureBaselineCa
 
   if (longApplies) {
     return baselineOk && t.avgSentenceLength > baseline.avgSentenceLength * 1.28
-      ? "Average sentence length sits above your recent baseline."
+      ? "Sentences are running longer than recent traces."
       : pickFirstSessionEntryObservationPhrase(FIRST_SESSION_ENTRY_OBS_LONG, seed);
   }
 
@@ -4717,16 +4717,24 @@ function toDayKeyLocal(dateObj) {
   return `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
 }
 
+/* season wheel timestamp contract: begin */
 function parseRunTimestampMsForSeason(run) {
   const candidates = [
-    run?.timestamp,
     run?.savedAt,
+    run?.timestamp,
+    run?.saved_at,
+    run?.local_created_at,
     run?.createdAt,
+    run?.created_at,
     run?.completedAt,
     run?.date,
     run?.ts,
     run?.meta?.savedAt,
+    run?.meta?.saved_at,
+    run?.meta?.local_created_at,
     run?.meta?.timestamp,
+    run?.meta?.createdAt,
+    run?.meta?.created_at,
   ];
   for (const raw of candidates) {
     if (raw == null) continue;
@@ -4748,9 +4756,9 @@ function parseRunTimestampMsForSeason(run) {
   return null;
 }
 
-function seasonalRunsLast90DaysFromSavedRuns(runs) {
+function seasonalRunsLast90DaysFromSavedRuns(runs, options = {}) {
   const all = Array.isArray(runs) ? runs : [];
-  const now = Date.now();
+  const now = Number.isFinite(Number(options.nowMs)) ? Number(options.nowMs) : Date.now();
   const windowMs = 90 * 24 * 60 * 60 * 1000;
   const start = now - windowMs;
   const seasonal = [];
@@ -4762,6 +4770,7 @@ function seasonalRunsLast90DaysFromSavedRuns(runs) {
   }
   return seasonal;
 }
+/* season wheel timestamp contract: end */
 
 let devSeasonFixtureName = null;
 
@@ -4972,21 +4981,27 @@ function seasonWheelResolveIntegrity(run, durationMinutes, wordCount) {
 function buildSeasonWheelInstrumentModel(seasonalRows, options = {}) {
   const seasonLengthDays = Math.max(1, Number(options.seasonLengthDays) || 90);
   const nowDate = options.nowDate instanceof Date ? new Date(options.nowDate) : new Date();
+  const nowMs = nowDate.getTime();
   nowDate.setHours(12, 0, 0, 0);
-  const seasonStart = new Date(nowDate);
-  seasonStart.setDate(nowDate.getDate() - (seasonLengthDays - 1));
-  const seasonStartMs = seasonStart.getTime();
+  const seasonStartInput = options.seasonStartDate instanceof Date ? new Date(options.seasonStartDate) : null;
+  const seasonStart = seasonStartInput || new Date(nowDate);
+  if (!seasonStartInput) {
+    seasonStart.setDate(nowDate.getDate() - (seasonLengthDays - 1));
+  }
+  seasonStart.setHours(12, 0, 0, 0);
   const dayMs = 24 * 60 * 60 * 1000;
+  const dayOrdinalLocal = (d) => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / dayMs);
+  const seasonStartOrdinal = dayOrdinalLocal(seasonStart);
 
   const rows = Array.isArray(seasonalRows) ? seasonalRows : [];
   const segments = [];
   for (const row of rows) {
     const timestampMs = Number(row?.timestampMs);
     if (!Number.isFinite(timestampMs)) continue;
+    if (timestampMs > nowMs) continue;
     const run = row?.run || {};
     const d = new Date(timestampMs);
-    d.setHours(12, 0, 0, 0);
-    const dayIndex = Math.round((d.getTime() - seasonStartMs) / dayMs);
+    const dayIndex = dayOrdinalLocal(d) - seasonStartOrdinal;
     if (dayIndex < 0 || dayIndex >= seasonLengthDays) continue;
     const wordCount = seasonWheelResolveWordCount(run);
     const startMinute = seasonWheelResolveStartMinuteLocal(run, timestampMs);
@@ -5091,10 +5106,10 @@ function seasonalWordsSaved(seasonalRows) {
 }
 
 function selectSeasonalQuietLine(runsCount, activeDays) {
-  if (runsCount <= 2 || activeDays <= 2) return "A quiet season is forming.";
-  if (activeDays >= 18) return "This season has several active days.";
-  if (activeDays >= 10) return "A steady season is forming.";
-  return "The season is still sparse.";
+  if (runsCount <= 2 || activeDays <= 2) return "A season is beginning to take shape.";
+  if (activeDays >= 18) return "Several active days are now visible in this season.";
+  if (activeDays >= 10) return "A steadier seasonal trace is forming.";
+  return "This season is still sparse, but gathering.";
 }
 
 function currentMeteorologicalSeasonLabel(dateObj = new Date()) {
@@ -5352,7 +5367,13 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     }
 
     runOrdinal += 1;
-    const runDate = seasonStartDate ? new Date(seasonStartDate.getTime() + runDayIndex * 24 * 60 * 60 * 1000) : null;
+    const runDate = seasonStartDate
+      ? (() => {
+          const d = new Date(seasonStartDate);
+          d.setDate(d.getDate() + runDayIndex);
+          return d;
+        })()
+      : null;
     const dateLabel = runDate
       ? runDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       : `Day ${runDayIndex + 1}`;
@@ -5401,10 +5422,15 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     : ``;
   let mobileQuadrantLabels = ``;
   if (!isDesktop && seasonStartDate) {
-    const q0 = new Date(seasonStartDate.getTime());
-    const q1 = new Date(seasonStartDate.getTime() + Math.round(seasonDays * 0.25) * 86400000);
-    const q2 = new Date(seasonStartDate.getTime() + Math.round(seasonDays * 0.5) * 86400000);
-    const q3 = new Date(seasonStartDate.getTime() + Math.round(seasonDays * 0.75) * 86400000);
+    const addLocalDays = (dateObj, days) => {
+      const d = new Date(dateObj);
+      d.setDate(d.getDate() + days);
+      return d;
+    };
+    const q0 = addLocalDays(seasonStartDate, 0);
+    const q1 = addLocalDays(seasonStartDate, Math.round(seasonDays * 0.25));
+    const q2 = addLocalDays(seasonStartDate, Math.round(seasonDays * 0.5));
+    const q3 = addLocalDays(seasonStartDate, Math.round(seasonDays * 0.75));
     const labelRadius = outerR + 114;
     const [nX, nY] = polar(labelRadius, 0);
     const [eX, eY] = polar(labelRadius, 90);
@@ -5583,6 +5609,7 @@ function buildSeasonWheelFullRingFromSeasonalRows(seasonalRows, options = {}) {
   const model = buildSeasonWheelInstrumentModel(Array.isArray(seasonalRows) ? seasonalRows : [], {
     seasonLengthDays: seasonDays,
     nowDate: new Date(),
+    seasonStartDate,
   });
   const runs = (Array.isArray(model?.segments) ? model.segments : []).map((seg) => {
     const integrity = String(seg.integrity || "partial");
@@ -5625,6 +5652,167 @@ async function loadCanonSeasonWheelSvgText() {
     .trim();
   canonSeasonWheelSvgCache = cleaned;
   return canonSeasonWheelSvgCache;
+}
+
+function initSeasonWheelZoom(root) {
+  const tile = root.querySelector(".current-season-canon-tile");
+  if (!tile || tile.dataset.zoomReady === "true") return;
+  const graphic = tile.querySelector(".season-wheel-debug-svg, .current-season-canon-tile__image");
+  if (!(graphic instanceof Element)) return;
+
+  const viewport = document.createElement("div");
+  viewport.className = "season-wheel-zoom-viewport";
+  const content = document.createElement("div");
+  content.className = "season-wheel-zoom-content";
+
+  const resetBtn = document.createElement("button");
+  resetBtn.type = "button";
+  resetBtn.className = "season-wheel-zoom-reset";
+  resetBtn.setAttribute("aria-label", "Reset season wheel view");
+  resetBtn.title = "Reset view";
+  resetBtn.innerHTML = "&#8634;";
+
+  tile.insertBefore(viewport, tile.firstChild);
+  viewport.appendChild(content);
+  content.appendChild(graphic);
+  tile.appendChild(resetBtn);
+
+  let scale = 1;
+  let tx = 0;
+  let ty = 0;
+  let isPanning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panOriginX = 0;
+  let panOriginY = 0;
+  const pointers = new Map();
+  let pinchStartDistance = 0;
+  let pinchStartScale = 1;
+  let pinchAnchor = null;
+
+  const minScale = 1;
+  const maxScale = 8;
+
+  const getViewportSize = () => {
+    const rect = viewport.getBoundingClientRect();
+    return { width: rect.width || tile.clientWidth || 1, height: rect.height || tile.clientHeight || 1 };
+  };
+
+  const clampTransform = () => {
+    const { width, height } = getViewportSize();
+    const maxX = ((scale - 1) * width) / 2;
+    const maxY = ((scale - 1) * height) / 2;
+    tx = Math.min(maxX, Math.max(-maxX, tx));
+    ty = Math.min(maxY, Math.max(-maxY, ty));
+  };
+
+  const applyTransform = () => {
+    clampTransform();
+    content.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`;
+    resetBtn.classList.toggle("is-active", scale > 1.001 || Math.abs(tx) > 0.2 || Math.abs(ty) > 0.2);
+  };
+
+  const zoomAtClientPoint = (nextScale, clientX, clientY) => {
+    const safeScale = Math.min(maxScale, Math.max(minScale, nextScale));
+    if (Math.abs(safeScale - scale) < 0.0001) return;
+    const rect = viewport.getBoundingClientRect();
+    const px = clientX - rect.left - rect.width / 2;
+    const py = clientY - rect.top - rect.height / 2;
+    const worldX = (px - tx) / scale;
+    const worldY = (py - ty) / scale;
+    tx = px - worldX * safeScale;
+    ty = py - worldY * safeScale;
+    scale = safeScale;
+    applyTransform();
+  };
+
+  const resetView = () => {
+    scale = 1;
+    tx = 0;
+    ty = 0;
+    applyTransform();
+  };
+
+  resetBtn.addEventListener("click", resetView);
+
+  viewport.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const delta = -event.deltaY;
+      const zoomFactor = Math.exp(delta * 0.0016);
+      zoomAtClientPoint(scale * zoomFactor, event.clientX, event.clientY);
+    },
+    { passive: false }
+  );
+
+  viewport.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      const pts = [...pointers.values()];
+      pinchStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      pinchStartScale = scale;
+      pinchAnchor = {
+        x: (pts[0].x + pts[1].x) / 2,
+        y: (pts[0].y + pts[1].y) / 2,
+      };
+      isPanning = false;
+    } else if (scale > 1.001 && pointers.size === 1) {
+      isPanning = true;
+      panStartX = event.clientX;
+      panStartY = event.clientY;
+      panOriginX = tx;
+      panOriginY = ty;
+    }
+  });
+
+  viewport.addEventListener("pointermove", (event) => {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2 && pinchStartDistance > 0 && pinchAnchor) {
+      const pts = [...pointers.values()];
+      const nextDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      if (nextDistance > 0) {
+        const pinchScale = pinchStartScale * (nextDistance / pinchStartDistance);
+        zoomAtClientPoint(pinchScale, pinchAnchor.x, pinchAnchor.y);
+      }
+      return;
+    }
+    if (isPanning && pointers.size === 1) {
+      tx = panOriginX + (event.clientX - panStartX);
+      ty = panOriginY + (event.clientY - panStartY);
+      applyTransform();
+    }
+  });
+
+  const finishPointer = (event) => {
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) {
+      pinchStartDistance = 0;
+      pinchAnchor = null;
+    }
+    if (pointers.size === 0) {
+      isPanning = false;
+    } else if (pointers.size === 1 && scale > 1.001) {
+      const [pt] = [...pointers.values()];
+      panStartX = pt.x;
+      panStartY = pt.y;
+      panOriginX = tx;
+      panOriginY = ty;
+      isPanning = true;
+    }
+  };
+
+  viewport.addEventListener("pointerup", finishPointer);
+  viewport.addEventListener("pointercancel", finishPointer);
+  viewport.addEventListener("pointerleave", (event) => {
+    if (event.pointerType === "mouse") finishPointer(event);
+  });
+
+  window.addEventListener("resize", applyTransform);
+  tile.dataset.zoomReady = "true";
+  applyTransform();
 }
 
 function renderCurrentSeasonPanel() {
@@ -5715,18 +5903,47 @@ function renderCurrentSeasonPanel() {
           mount.innerHTML = svgText;
           const inlineSvg = mount.querySelector("svg");
           if (inlineSvg) inlineSvg.classList.add("current-season-canon-tile__image");
+          initSeasonWheelZoom(root);
         })
         .catch(() => {
           mount.innerHTML = `<img class="current-season-canon-tile__image" src="assets/wayword_season_wheel_v15_subtext_removed.svg" alt="Canon season wheel"/>`;
+          initSeasonWheelZoom(root);
         });
     }
   }
+  initSeasonWheelZoom(root);
   if (debugMode === "single" || debugMode === "pair" || debugMode === "full" || !debugMode) {
     initSeasonWheelDebugInspector(root);
   }
   wrap.classList.remove("hidden");
   wrap.setAttribute("aria-hidden", "false");
 }
+
+/* season wheel tooltip placement contract: begin */
+function placeTooltipWithinBounds(anchorRect, tooltipRect, containerRect, options = {}) {
+  const gap = Math.max(0, Number(options.gap) || 10);
+  const inset = Math.max(0, Number(options.inset) || 10);
+  const anchorCenterX = anchorRect.left + anchorRect.width / 2;
+
+  let left = anchorCenterX - tooltipRect.width / 2;
+  const minLeft = containerRect.left + inset;
+  const maxLeft = containerRect.right - inset - tooltipRect.width;
+  left = Math.min(maxLeft, Math.max(minLeft, left));
+
+  let top = anchorRect.bottom + gap;
+  const maxTop = containerRect.bottom - inset - tooltipRect.height;
+  if (top > maxTop) {
+    top = anchorRect.top - tooltipRect.height - gap;
+  }
+  const minTop = containerRect.top + inset;
+  top = Math.min(maxTop, Math.max(minTop, top));
+
+  return {
+    left: Math.round(left),
+    top: Math.round(top),
+  };
+}
+/* season wheel tooltip placement contract: end */
 
 function initSeasonWheelDebugInspector(root) {
   const tile = root.querySelector(".current-season-canon-tile");
@@ -5740,12 +5957,13 @@ function initSeasonWheelDebugInspector(root) {
     tile.appendChild(tip);
   }
   let isPinned = false;
-  const placeTip = (clientX, clientY) => {
-    const rect = tile.getBoundingClientRect();
-    const x = Math.max(12, Math.min(rect.width - 220, clientX - rect.left + 14));
-    const y = Math.max(12, Math.min(rect.height - 120, clientY - rect.top - 20));
-    tip.style.left = `${x}px`;
-    tip.style.top = `${y}px`;
+  const placeTipForAnchor = (anchorEl) => {
+    const anchorRect = anchorEl.getBoundingClientRect();
+    const containerRect = tile.getBoundingClientRect();
+    const tooltipRect = tip.getBoundingClientRect();
+    const pos = placeTooltipWithinBounds(anchorRect, tooltipRect, containerRect, { gap: 10, inset: 10 });
+    tip.style.left = `${pos.left - containerRect.left}px`;
+    tip.style.top = `${pos.top - containerRect.top}px`;
   };
   const renderTip = (el) => {
     const dateLabel = el.getAttribute("data-date-label") || "";
@@ -5786,29 +6004,46 @@ function initSeasonWheelDebugInspector(root) {
     tip.setAttribute("aria-hidden", "true");
   };
   svg.querySelectorAll(".sw-run-hit").forEach((el) => {
+    if (!el.hasAttribute("tabindex")) {
+      el.setAttribute("tabindex", "0");
+    }
     el.addEventListener("mouseenter", (event) => {
       if (isPinned) return;
       renderTip(el);
-      placeTip(event.clientX, event.clientY);
-    });
-    el.addEventListener("mousemove", (event) => {
-      if (isPinned || !tip.classList.contains("is-visible")) return;
-      placeTip(event.clientX, event.clientY);
+      placeTipForAnchor(el);
     });
     el.addEventListener("mouseleave", () => {
       if (!isPinned) hideTip();
     });
     el.addEventListener("click", (event) => {
       renderTip(el);
-      placeTip(event.clientX, event.clientY);
+      placeTipForAnchor(el);
       isPinned = true;
     });
     el.addEventListener("touchstart", (event) => {
-      const t = event.touches && event.touches[0];
       renderTip(el);
-      if (t) placeTip(t.clientX, t.clientY);
+      placeTipForAnchor(el);
       isPinned = true;
     }, { passive: true });
+    el.addEventListener("focus", () => {
+      renderTip(el);
+      placeTipForAnchor(el);
+    });
+    el.addEventListener("blur", () => {
+      if (!isPinned) hideTip();
+    });
+    el.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        hideTip();
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        renderTip(el);
+        placeTipForAnchor(el);
+        isPinned = true;
+      }
+    });
   });
   tile.addEventListener("mouseleave", () => {
     if (!isPinned) hideTip();

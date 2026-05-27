@@ -948,6 +948,32 @@ test("season wheel instrument model falls back safely and excludes out-of-window
   assert.equal(model.segments[0].integrity, "interrupted");
 });
 
+test("season wheel timestamp parser prefers canonical saved timestamp and ignores missing values safely", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel timestamp contract: begin */",
+    "/* season wheel timestamp contract: end */"
+  );
+  const api = new Function(`${block}; return { parseRunTimestampMsForSeason, seasonalRunsLast90DaysFromSavedRuns };`)();
+
+  const nowMs = Date.parse("2026-05-26T20:00:00-07:00");
+  const rows = api.seasonalRunsLast90DaysFromSavedRuns(
+    [
+      { savedAt: "2026-05-26T18:11:00-07:00", timestamp: "2026-05-31T18:11:00-07:00" },
+      { timestamp: "2026-05-26T23:58:00Z" },
+      { created_at: "2026-05-26T04:31:00-07:00" },
+      { savedAt: null, timestamp: null, createdAt: null },
+    ],
+    { nowMs }
+  );
+
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].timestampMs, Date.parse("2026-05-26T18:11:00-07:00"));
+  assert.equal(rows[1].timestampMs, Date.parse("2026-05-26T23:58:00Z"));
+  assert.equal(rows[2].timestampMs, Date.parse("2026-05-26T04:31:00-07:00"));
+});
+
 test("season wheel instrument svg renderer emits one spoke per day and segment marks", () => {
   const script = fs.readFileSync("script.js", "utf8");
   const block = extractBetween(
@@ -978,6 +1004,148 @@ test("season wheel instrument svg renderer emits one spoke per day and segment m
   assert.equal(api.seasonWheelHueFromMinute(60), 252);
   assert.equal(api.seasonWheelHueFromMinute(640), 44);
   assert.deepEqual(api.seasonWheelStyleFromIntegrity("complete"), { opacity: 0.9, dash: "" });
+});
+
+test("season wheel model anchors day indexing to season start and keeps May 26 on May 26", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const buildModel = new Function(`${block}; return buildSeasonWheelInstrumentModel;`)();
+
+  const model = buildModel(
+    [
+      {
+        timestampMs: Date.parse("2026-05-26T18:25:00-07:00"),
+        run: {
+          startedAt: "2026-05-26T18:10:00-07:00",
+          durationMinutes: 47,
+          wordCount: 512,
+          completed: true,
+        },
+      },
+    ],
+    {
+      seasonLengthDays: 92,
+      nowDate: new Date("2026-05-26T20:00:00-07:00"),
+      seasonStartDate: new Date("2026-03-01T00:00:00-08:00"),
+    }
+  );
+
+  assert.equal(model.segments.length, 1);
+  assert.equal(model.segments[0].dayIndex, 86);
+  assert.equal(model.segments[0].startMinute, 1090);
+});
+
+test("season wheel model keeps late-night local runs on the same local day and time", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const buildModel = new Function(`${block}; return buildSeasonWheelInstrumentModel;`)();
+
+  const model = buildModel(
+    [
+      {
+        timestampMs: Date.parse("2026-05-26T23:58:00-07:00"),
+        run: {
+          startedAt: "2026-05-26T23:50:00-07:00",
+          durationMinutes: 9,
+          wordCount: 80,
+          submitted: false,
+        },
+      },
+    ],
+    {
+      seasonLengthDays: 92,
+      nowDate: new Date("2026-05-26T23:59:00-07:00"),
+      seasonStartDate: new Date("2026-03-01T00:00:00-08:00"),
+    }
+  );
+
+  assert.equal(model.segments.length, 1);
+  assert.equal(model.segments[0].dayIndex, 86);
+  assert.equal(model.segments[0].startMinute, 1430);
+});
+
+test("season wheel model excludes future-dated runs beyond current local date/time", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const buildModel = new Function(`${block}; return buildSeasonWheelInstrumentModel;`)();
+
+  const model = buildModel(
+    [
+      {
+        timestampMs: Date.parse("2026-05-27T09:00:00-07:00"),
+        run: {
+          startedAt: "2026-05-27T08:45:00-07:00",
+          durationMinutes: 15,
+          wordCount: 90,
+          completed: true,
+        },
+      },
+    ],
+    {
+      seasonLengthDays: 92,
+      nowDate: new Date("2026-05-26T20:00:00-07:00"),
+      seasonStartDate: new Date("2026-03-01T00:00:00-08:00"),
+    }
+  );
+
+  assert.equal(model.segments.length, 0);
+});
+
+test("season wheel tooltip placement keeps popover within panel bounds and flips near bottom", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    script,
+    "/* season wheel tooltip placement contract: begin */",
+    "/* season wheel tooltip placement contract: end */"
+  );
+  const placeTooltipWithinBounds = new Function(`${block}; return placeTooltipWithinBounds;`)();
+
+  const containerRect = { left: 200, top: 100, right: 500, bottom: 400, width: 300, height: 300 };
+  const tooltipRect = { width: 180, height: 92 };
+
+  const nearBottom = placeTooltipWithinBounds(
+    { left: 310, top: 360, right: 320, bottom: 372, width: 10, height: 12 },
+    tooltipRect,
+    containerRect,
+    { gap: 10, inset: 10 }
+  );
+  assert.equal(nearBottom.top <= 360 - 92 - 10, true, "tooltip should flip above bottom-half anchors");
+
+  const nearLeftEdge = placeTooltipWithinBounds(
+    { left: 202, top: 220, right: 212, bottom: 232, width: 10, height: 12 },
+    tooltipRect,
+    containerRect,
+    { gap: 10, inset: 10 }
+  );
+  assert.equal(nearLeftEdge.left >= 210, true, "tooltip should clamp inward from the left edge");
+
+  const nearRightEdge = placeTooltipWithinBounds(
+    { left: 488, top: 220, right: 498, bottom: 232, width: 10, height: 12 },
+    tooltipRect,
+    containerRect,
+    { gap: 10, inset: 10 }
+  );
+  assert.equal(nearRightEdge.left + tooltipRect.width <= 490, true, "tooltip should clamp inward from the right edge");
+
+  const safeTop = placeTooltipWithinBounds(
+    { left: 345, top: 110, right: 355, bottom: 122, width: 10, height: 12 },
+    tooltipRect,
+    containerRect,
+    { gap: 10, inset: 10 }
+  );
+  assert.equal(safeTop.top >= 110, true, "tooltip should avoid escaping above container");
 });
 
 test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
