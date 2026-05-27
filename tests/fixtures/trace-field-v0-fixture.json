@@ -1,0 +1,25 @@
+{
+  "config": {
+    "minCount": 3,
+    "minRuns": 2,
+    "phraseMinN": 2,
+    "phraseMaxN": 2,
+    "coOccurrenceWindow": 10,
+    "proximityWindow": 5,
+    "maxSingleRunShare": 0.8
+  },
+  "runs": [
+    {
+      "id": "run-001",
+      "text": "At the harbor, fog returns. Harbor bells ring, but the water stays quiet. The lantern and harbor appear again."
+    },
+    {
+      "id": "run-002",
+      "text": "Harbor wind returns at dusk. The lantern beside water glows, but fog stays close to the harbor edge."
+    },
+    {
+      "id": "run-003",
+      "text": "In the harbor district, lantern light returns. Fog and water travel together; not noise but residue remains."
+    }
+  ]
+}

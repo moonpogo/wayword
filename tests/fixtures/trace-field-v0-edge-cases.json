@@ -1,0 +1,30 @@
+{
+  "config": {
+    "minCount": 3,
+    "minRuns": 2,
+    "phraseMinN": 2,
+    "phraseMaxN": 2,
+    "coOccurrenceWindow": 8,
+    "proximityWindow": 5,
+    "maxSingleRunShare": 0.8,
+    "maxRepeatedExcerptShare": 0.6
+  },
+  "runs": [
+    {
+      "id": "edge-run-001",
+      "text": "Harbor lantern returns. Harbor lantern returns. the the the. boilerplate boilerplate boilerplate."
+    },
+    {
+      "id": "edge-run-002",
+      "text": "Harbor lantern returns. Harbor fog returns."
+    },
+    {
+      "id": "edge-run-003",
+      "text": "Harbor lantern returns. Harbor fog returns."
+    },
+    {
+      "id": "edge-run-004",
+      "text": "Anchor residue forms."
+    }
+  ]
+}
