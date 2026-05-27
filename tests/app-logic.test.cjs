@@ -3572,11 +3572,11 @@ test("patterns renderer preserves locked and empty-state output contracts", () =
   });
   assert.match(locked, /profile-locked/);
   assert.match(locked, /CROSS-RUN PATTERN/);
-  assert.match(locked, /Your first reflective pattern is forming/);
-  assert.match(locked, /2 of 3 traces gathered/);
+  assert.match(locked, /Your first cross-run pattern is beginning to form/);
+  assert.match(locked, /2 of 3 traces saved/);
   assert.match(locked, /pattern-trace-formation/);
 
-  assert.match(renderer.patternsMirrorHeroEmptyHtml(), /No cross-run pattern has surfaced yet/);
+  assert.match(renderer.patternsMirrorHeroEmptyHtml(), /Cross-run traces are still gathering/);
   assert.match(
     renderer.patternsMirrorHeroInsufficientRunsHtml({
       totalSavedRuns: 5,
@@ -3584,11 +3584,11 @@ test("patterns renderer preserves locked and empty-state output contracts", () =
       requiredCount: 3,
       cappedProgressCount: 0,
     }),
-    /Longer drafts reveal more stable patterns/
+    /A little more surface helps stable patterns emerge/
   );
   assert.match(
     renderer.patternsMirrorHeroNoStrongPatternHtml(),
-    /Enough traces are saved\.<br>No stable pattern has surfaced yet\./
+    /You have enough traces saved\.<br>A stable pattern has not settled yet\./
   );
 });
 
@@ -3619,7 +3619,7 @@ test("patterns renderer preserves mirror hero path selection contracts", () => {
   }).waywordPatternsRenderer;
   assert.match(
     noStrong.buildPatternsMirrorHeroHtml([{ v: 1, id: "digest-1" }]),
-    /No stable pattern has surfaced yet/
+    /A stable pattern has not settled yet/
   );
 
   const promoted = loadPatternsRendererContext({
