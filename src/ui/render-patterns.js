@@ -6,7 +6,7 @@
   function patternsMirrorHeroEmptyHtml() {
     return (
       '<div class="patterns-mirror-hero patterns-mirror-hero--empty">' +
-      '<p class="patterns-mirror-empty">No cross-run pattern has surfaced yet.</p>' +
+      '<p class="patterns-mirror-empty">Cross-run traces are still gathering.</p>' +
       "</div>"
     );
   }
@@ -45,10 +45,10 @@
     return `
     <div class="profile-locked profile-locked--pattern-formation">
       <div class="section-title card-section-title profile-locked-title">CROSS-RUN PATTERN</div>
-      <div class="profile-locked-copy">Your first reflective pattern is forming.</div>
+      <div class="profile-locked-copy">Your first cross-run pattern is beginning to form.</div>
       <div class="profile-locked-formation-visual">${buildPatternFormationIndicatorSvg(cappedProgressCount)}</div>
-      <div class="profile-locked-copy profile-locked-copy--status">${cappedProgressCount} of ${requiredCount} traces gathered</div>
-      ${showDefensive ? '<div class="profile-locked-copy profile-locked-copy--quiet">Longer drafts reveal more stable patterns.</div>' : ""}
+      <div class="profile-locked-copy profile-locked-copy--status">${cappedProgressCount} of ${requiredCount} traces saved</div>
+      ${showDefensive ? '<div class="profile-locked-copy profile-locked-copy--quiet">A little more surface helps stable patterns emerge.</div>' : ""}
     </div>
   `;
   }
@@ -64,7 +64,7 @@
   function patternsMirrorHeroNoStrongPatternHtml() {
     return (
       '<div class="patterns-mirror-hero patterns-mirror-hero--empty patterns-mirror-hero--empty-no-strong">' +
-      '<p class="patterns-mirror-empty">Enough traces are saved.<br>No stable pattern has surfaced yet.</p>' +
+      '<p class="patterns-mirror-empty">You have enough traces saved.<br>A stable pattern has not settled yet.</p>' +
       "</div>"
     );
   }
@@ -177,12 +177,12 @@
       };
     }
 
-    return {
-      headline: "Not much to echo back yet.",
-      support: "Enough to continue, with little saved material for a sharp cross-run read.",
-      direction: "More saved drafts deepen cross-run reflection.",
-      suggestedExerciseWord: "",
-    };
+      return {
+        headline: "Early traces are present.",
+        support: "There is enough to continue, but not enough yet for a sharp cross-run read.",
+        direction: "A few more saved runs will make the observatory clearer.",
+        suggestedExerciseWord: "",
+      };
   }
 
   function buildPatternCalloutsLegacySectionHtml(calloutsWithStarters) {

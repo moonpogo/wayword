@@ -32,7 +32,9 @@
   }
 
   function lowSignalThinMirrorLine() {
-    return mirrorBonsaiHeadlinesProbe() ? "Signal is thin. Continue." : "Signal is thin. Add surface.";
+    return mirrorBonsaiHeadlinesProbe()
+      ? "The trace is still quiet. Continue."
+      : "The trace is still quiet. Another run will sharpen it.";
   }
 
   function escapeHtml(str) {
