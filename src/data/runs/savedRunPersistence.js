@@ -115,11 +115,18 @@
         Promise.resolve(window.waywordPersistenceRuntime.syncSavedRun(fallbackRun))
           .then(function (syncResult) {
             var synced = Boolean(syncResult && syncResult.ok);
+            var reason = syncResult && syncResult.reason ? String(syncResult.reason) : "";
+            var syncStatus = synced
+              ? "server_synced"
+              : reason === "no_authenticated_session"
+                ? "local_only_no_session"
+                : "local_only_sync_failed";
+            var isAuthenticated = synced || (reason !== "no_authenticated_session");
             window.waywordRetentionEvents &&
               typeof window.waywordRetentionEvents.markRunSaved === "function" &&
               window.waywordRetentionEvents.markRunSaved({
-                sync_status: synced ? "server_synced" : "local_only_fallback",
-                is_authenticated: synced || (syncResult && syncResult.reason !== "no_authenticated_session"),
+                sync_status: syncStatus,
+                is_authenticated: isAuthenticated,
               });
             if (!synced) {
               console.warn("wayword: persistence runtime sync failed; local continuity remains authoritative", syncResult);
@@ -129,7 +136,7 @@
             window.waywordRetentionEvents &&
               typeof window.waywordRetentionEvents.markRunSaved === "function" &&
               window.waywordRetentionEvents.markRunSaved({
-                sync_status: "local_only_fallback",
+                sync_status: "local_only_sync_failed",
                 is_authenticated: false,
               });
             console.warn("wayword: persistence runtime sync failed; local continuity remains authoritative", err);
@@ -139,7 +146,7 @@
       window.waywordRetentionEvents &&
         typeof window.waywordRetentionEvents.markRunSaved === "function" &&
         window.waywordRetentionEvents.markRunSaved({
-          sync_status: "local_only_fallback",
+          sync_status: "local_only_sync_failed",
           is_authenticated: false,
         });
       console.warn("wayword: persistence runtime sync threw synchronously; local continuity remains authoritative", persistSyncErr);
