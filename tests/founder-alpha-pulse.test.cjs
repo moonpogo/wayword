@@ -9,6 +9,7 @@ const {
   buildMarkdown,
   ensureSupabaseEnv,
   loadDotEnv,
+  parseCliArgs,
 } = require("../scripts/generate-founder-alpha-pulse.js");
 
 function iso(ms) {
@@ -179,6 +180,12 @@ test("markdown output contains no writing body field", () => {
 
   assert.equal(markdown.includes("writing_text"), false);
   assert.equal(markdown.includes("draft text"), false);
+});
+
+test("parseCliArgs accepts --as-of ISO timestamp", () => {
+  const options = parseCliArgs(["--as-of", "2026-05-28T12:00:00.000Z"]);
+  assert.equal(options.now instanceof Date, true);
+  assert.equal(options.now.toISOString(), "2026-05-28T12:00:00.000Z");
 });
 
 test("markdown collapses telemetry-unavailable output into a single trust note", () => {

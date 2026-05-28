@@ -425,13 +425,34 @@ function ensureSupabaseEnv() {
   return { url, serviceRole };
 }
 
-async function generateFounderAlphaPulse() {
+function parseCliArgs(argv) {
+  var options = { now: null };
+  for (var idx = 0; idx < argv.length; idx += 1) {
+    var arg = String(argv[idx] || "");
+    if (arg !== "--as-of") continue;
+    var rawValue = String(argv[idx + 1] || "").trim();
+    if (!rawValue) {
+      throw new Error("missing value for --as-of (expected ISO timestamp)");
+    }
+    var parsed = new Date(rawValue);
+    if (!Number.isFinite(parsed.getTime())) {
+      throw new Error("invalid --as-of value (expected ISO timestamp)");
+    }
+    options.now = parsed;
+    idx += 1;
+  }
+  return options;
+}
+
+async function generateFounderAlphaPulse(options) {
   loadDotEnv();
 
   const { url, serviceRole } = ensureSupabaseEnv();
   const supabase = createSupabaseRestClient({ url, serviceRole });
 
-  const todayStart = startOfTodayLocal(new Date());
+  const opts = options && typeof options === "object" ? options : {};
+  const effectiveNow = opts.now instanceof Date && Number.isFinite(opts.now.getTime()) ? opts.now : new Date();
+  const todayStart = startOfTodayLocal(effectiveNow);
   const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
   const dateLabel = isoDateLocal(yesterdayStart);
 
@@ -463,7 +484,15 @@ async function generateFounderAlphaPulse() {
 }
 
 if (require.main === module) {
-  generateFounderAlphaPulse()
+  var cliOptions;
+  try {
+    cliOptions = parseCliArgs(process.argv.slice(2));
+  } catch (error) {
+    console.error(`founder-alpha-pulse failed: ${error.message}`);
+    process.exit(1);
+  }
+
+  generateFounderAlphaPulse(cliOptions)
     .then((result) => {
       console.log(`Founder alpha pulse written: ${path.relative(process.cwd(), result.outPath)}`);
       if (!result.telemetryAvailable) {
@@ -485,4 +514,5 @@ module.exports = {
   generateFounderAlphaPulse,
   listRepoRoots,
   loadDotEnv,
+  parseCliArgs,
 };
