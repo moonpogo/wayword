@@ -5002,6 +5002,79 @@ function seasonWheelResolveIntegrity(run, durationMinutes, wordCount) {
   return "partial";
 }
 
+const SEASON_WHEEL_CLUSTER_GAP_MINUTES = 5;
+
+function buildSeasonWheelDisplayClusters(segments, options = {}) {
+  const clusterGapMinutes = Math.max(1, Number(options.clusterGapMinutes) || SEASON_WHEEL_CLUSTER_GAP_MINUTES);
+  const items = Array.isArray(segments) ? segments : [];
+  const clusters = [];
+  let current = null;
+  const closeCurrent = () => {
+    if (!current) return;
+    const startMinute = current.startMinute;
+    const endMinute = Math.max(startMinute + 1, current.endMinute);
+    const durationMinutes = Math.max(1, endMinute - startMinute);
+    const dominantIntegrity = Object.entries(current.integrityCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "partial";
+    clusters.push({
+      dayIndex: current.dayIndex,
+      startMinute,
+      durationMinutes,
+      wordCount: current.wordCount,
+      integrity: dominantIntegrity,
+      runCount: current.runCount,
+      completeRuns: current.integrityCounts.complete,
+      partialRuns: current.integrityCounts.partial,
+      interruptedRuns: current.integrityCounts.interrupted,
+      abandonedRuns: current.integrityCounts.abandoned,
+      firstTimestampMs: current.firstTimestampMs,
+      lastTimestampMs: current.lastTimestampMs,
+    });
+  };
+  for (const segment of items) {
+    if (!segment || !Number.isFinite(segment.timestampMs)) continue;
+    const segDayIndex = Number(segment.dayIndex);
+    const segStartMinute = Math.max(0, Math.min(1439, Number(segment.startMinute) || 0));
+    const segDuration = Math.max(1, Number(segment.durationMinutes) || 1);
+    const segEndMinute = Math.max(segStartMinute + 1, Math.min(1440, segStartMinute + segDuration));
+    const segWordCount = Math.max(0, Number(segment.wordCount) || 0);
+    const segIntegrity = String(segment.integrity || "partial");
+    const startsNewCluster =
+      !current ||
+      current.dayIndex !== segDayIndex ||
+      (segment.timestampMs - current.lastTimestampMs) / 60000 > clusterGapMinutes;
+    if (startsNewCluster) {
+      closeCurrent();
+      current = {
+        dayIndex: segDayIndex,
+        startMinute: segStartMinute,
+        endMinute: segEndMinute,
+        wordCount: segWordCount,
+        runCount: 1,
+        firstTimestampMs: segment.timestampMs,
+        lastTimestampMs: segment.timestampMs,
+        integrityCounts: {
+          complete: segIntegrity === "complete" ? 1 : 0,
+          partial: segIntegrity === "partial" ? 1 : 0,
+          interrupted: segIntegrity === "interrupted" ? 1 : 0,
+          abandoned: segIntegrity === "abandoned" ? 1 : 0,
+        },
+      };
+      continue;
+    }
+    current.startMinute = Math.min(current.startMinute, segStartMinute);
+    current.endMinute = Math.max(current.endMinute, segEndMinute);
+    current.wordCount += segWordCount;
+    current.runCount += 1;
+    current.lastTimestampMs = segment.timestampMs;
+    if (segIntegrity === "complete") current.integrityCounts.complete += 1;
+    else if (segIntegrity === "partial") current.integrityCounts.partial += 1;
+    else if (segIntegrity === "abandoned") current.integrityCounts.abandoned += 1;
+    else current.integrityCounts.interrupted += 1;
+  }
+  closeCurrent();
+  return { clusterGapMinutes, clusters };
+}
+
 function buildSeasonWheelInstrumentModel(seasonalRows, options = {}) {
   const startOfDayLocal = (dateObj) => {
     const d = new Date(dateObj);
@@ -5057,7 +5130,15 @@ function buildSeasonWheelInstrumentModel(seasonalRows, options = {}) {
     if (a.startMinute !== b.startMinute) return a.startMinute - b.startMinute;
     return a.timestampMs - b.timestampMs;
   });
-  return { seasonLengthDays, segments };
+  const clustered = buildSeasonWheelDisplayClusters(segments, {
+    clusterGapMinutes: options.clusterGapMinutes,
+  });
+  return {
+    seasonLengthDays,
+    segments,
+    clusterGapMinutes: clustered.clusterGapMinutes,
+    clusters: clustered.clusters,
+  };
 }
 
 function seasonWheelHueFromMinute(minute) {
@@ -5382,8 +5463,8 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     prevEndForDay = Math.max(prevEndForDay, layoutEnd);
     runLayout.push({ ...run, layoutStart, layoutEnd });
   }
-  const runCount = runLayout.length;
-  const completedCount = runLayout.filter((r) => (r.integrity || "partial") === "complete").length;
+  const runCount = runLayout.reduce((sum, r) => sum + Math.max(1, Number(r.runCount) || 1), 0);
+  const completedCount = runLayout.reduce((sum, r) => sum + Math.max(0, Number(r.completeRuns) || ((r.integrity || "partial") === "complete" ? Number(r.runCount) || 1 : 0)), 0);
   const totalWords = runLayout.reduce((sum, r) => sum + Math.max(0, Number(r.wordCount) || 0), 0);
   const activeDaysCount = new Set(runLayout.map((r) => Number.isInteger(r.dayIndex) ? r.dayIndex : dayIndex)).size;
   const completePct = runCount ? Math.round((completedCount / runCount) * 100) : 0;
@@ -5394,6 +5475,7 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
   let runSegmentsAccent = "";
   let runBloom = "";
   let runHitTargets = "";
+  let runClusterBadges = "";
   let runOrdinal = 0;
   for (const run of runLayout) {
     const runDayIndex = Number.isInteger(run.dayIndex) ? run.dayIndex : dayIndex;
@@ -5475,7 +5557,14 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     const hour12 = hour24 % 12 || 12;
     const timeLabel = `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`;
     const radiusRatio = runStart / 1440;
-    runHitTargets += `<line x1="${sx.toFixed(2)}" y1="${sy.toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="transparent" stroke-opacity="0" stroke-width="${Math.max(26, coreWidth + 10).toFixed(2)}" stroke-linecap="round" class="sw-run-hit" data-run-id="${runOrdinal}" data-day-index="${runDayIndex}" data-date-label="${dateLabel}" data-start-minute="${runStart}" data-duration-minutes="${runDuration}" data-word-count="${runWords}" data-integrity="${runIntegrity}" data-time-label="${timeLabel}" data-run-count="${runCountChunk}" data-complete-runs="${completeRuns}" data-partial-runs="${partialRuns}" data-interrupted-runs="${interruptedRuns}" data-abandoned-runs="${abandonedRuns}" data-radius-ratio="${radiusRatio.toFixed(6)}"/>`;
+    runHitTargets += `<line x1="${sx.toFixed(2)}" y1="${sy.toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="transparent" stroke-opacity="0" stroke-width="${Math.max(26, coreWidth + 10).toFixed(2)}" stroke-linecap="round" class="sw-run-hit${runCountChunk > 1 ? " is-cluster" : ""}" data-run-id="${runOrdinal}" data-day-index="${runDayIndex}" data-date-label="${dateLabel}" data-start-minute="${runStart}" data-duration-minutes="${runDuration}" data-word-count="${runWords}" data-integrity="${runIntegrity}" data-time-label="${timeLabel}" data-run-count="${runCountChunk}" data-complete-runs="${completeRuns}" data-partial-runs="${partialRuns}" data-interrupted-runs="${interruptedRuns}" data-abandoned-runs="${abandonedRuns}" data-radius-ratio="${radiusRatio.toFixed(6)}" data-clustered="${runCountChunk > 1 ? "true" : "false"}"/>`;
+
+    if (runCountChunk > 1) {
+      const badgeR = Math.max(16, Math.min(24, coreWidth * 2.05));
+      const badgeX = mx;
+      const badgeY = my;
+      runClusterBadges += `<g class="sw-run-cluster-badge" data-cluster-count="${runCountChunk}" data-day-index="${runDayIndex}"><circle cx="${badgeX.toFixed(2)}" cy="${badgeY.toFixed(2)}" r="${badgeR.toFixed(2)}" fill="${capsuleColor}" fill-opacity="0.18" stroke="${capsuleColor}" stroke-opacity="0.54" stroke-width="1.4"/><text x="${badgeX.toFixed(2)}" y="${(badgeY + 5.5).toFixed(2)}" text-anchor="middle" font-size="15" font-weight="600" letter-spacing="0.3" fill="${accentColor}" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial">${runCountChunk}</text></g>`;
+    }
 
     const segmentCountFromChunk = runCountChunk > 1
       ? Math.max(2, Math.min(14, runCountChunk))
@@ -5561,6 +5650,7 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
   ${runSegmentsGlow}
   ${runSegmentsCore}
   ${runSegmentsAccent}
+  ${runClusterBadges}
   <g class="sw-hit-layer">${runHitTargets}</g>
   <circle cx="${cx}" cy="${cy}" r="${innerR - 34}" fill="var(--sw-bg, #08090d)" stroke="var(--sw-hub-ring, #c9a173)" stroke-opacity="0.4" stroke-width="1.2"/>
   ${mobileHeader}
@@ -5711,9 +5801,9 @@ function buildSeasonWheelFullRingFromSeasonalRows(seasonalRows, options = {}) {
     seasonStartDate,
     seasonEndDate,
   });
-  const runs = (Array.isArray(model?.segments) ? model.segments : []).map((seg) => {
+  const runs = (Array.isArray(model?.clusters) ? model.clusters : []).map((seg) => {
     const integrity = String(seg.integrity || "partial");
-    const runCount = 1;
+    const runCount = Math.max(1, Number(seg.runCount) || 1);
     return {
       dayIndex: seg.dayIndex,
       startMinute: seg.startMinute,
@@ -5721,10 +5811,10 @@ function buildSeasonWheelFullRingFromSeasonalRows(seasonalRows, options = {}) {
       wordCount: seg.wordCount,
       integrity,
       runCount,
-      completeRuns: integrity === "complete" ? 1 : 0,
-      partialRuns: integrity === "partial" ? 1 : 0,
-      interruptedRuns: integrity === "interrupted" ? 1 : 0,
-      abandonedRuns: integrity === "abandoned" ? 1 : 0,
+      completeRuns: Math.max(0, Number(seg.completeRuns) || 0),
+      partialRuns: Math.max(0, Number(seg.partialRuns) || 0),
+      interruptedRuns: Math.max(0, Number(seg.interruptedRuns) || 0),
+      abandonedRuns: Math.max(0, Number(seg.abandonedRuns) || 0),
     };
   });
   return buildSeasonWheelSingleSpokeDebugSvg({
