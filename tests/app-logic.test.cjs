@@ -4089,7 +4089,7 @@ test("account surface keeps sign-in available when URL/key are configured and RL
 
   assert.equal(
     context.__accountNodes.accountPanelSummary.textContent,
-    "Sign-in is available. Remote sync remains guarded until RLS verification is completed."
+    "Sign-in is available."
   );
   assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), false);
   assert.equal(
@@ -4116,7 +4116,7 @@ test("account surface keeps sign-in available when URL/key are configured and RL
 
   assert.equal(
     context.__accountNodes.accountPanelSummary.textContent,
-    "Keep your writing connected across sessions."
+    "Sign in to keep writing available across devices."
   );
   assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), false);
   assert.equal(
@@ -4143,7 +4143,7 @@ test("account surface shows local-preview message when URL/key are missing", () 
 
   assert.equal(
     context.__accountNodes.accountPanelSummary.textContent,
-    "Account continuity is not configured in this local preview."
+    "Sign-in is not set up in this preview."
   );
   assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), true);
 });
@@ -4164,6 +4164,6 @@ test("account runtime-unavailable copy uses configured-env-safe message", () => 
   );
   assert.equal(
     context.getAccountRuntimeUnavailableMessage(false),
-    "Account continuity is not configured in this local preview."
+    "Sign-in is not set up in this preview."
   );
 });

@@ -7348,16 +7348,16 @@ function selectAccountSummaryCopy(input) {
   var configured = Boolean(input && input.configured);
   var hasSession = Boolean(input && input.hasSession);
   var syncGuarded = Boolean(input && input.syncGuarded);
-  if (!configured) return "Account continuity is not configured in this local preview.";
-  if (hasSession) return "Signed in. Account continuity available.";
+  if (!configured) return "Sign-in is not set up in this preview.";
+  if (hasSession) return "Signed in. Saved writing can continue across devices.";
   if (syncGuarded) {
-    return "Sign-in is available. Remote sync remains guarded until RLS verification is completed.";
+    return "Sign-in is available.";
   }
-  return "Keep your writing connected across sessions.";
+  return "Sign in to keep writing available across devices.";
 }
 
 function getAccountRuntimeUnavailableMessage(configured) {
-  if (!configured) return "Account continuity is not configured in this local preview.";
+  if (!configured) return "Sign-in is not set up in this preview.";
   return "Account sign-in is temporarily unavailable. Please try again.";
 }
 
@@ -7413,7 +7413,7 @@ function renderAccountSurface() {
   }
 
   if (fallback) {
-    fallback.textContent = "Writing still saves locally if sync is unavailable.";
+    fallback.textContent = "Writing remains available on this device.";
   }
 
   if (signInForm) {
@@ -7546,7 +7546,7 @@ function bindAccountSurface() {
     if (!runtime || typeof runtime.exportOwnedRuns !== "function") return;
     const result = await runtime.exportOwnedRuns();
     if (!result || !result.ok) {
-      setAccountMessage("Could not export account runs right now.");
+      setAccountMessage("Could not download saved writing right now.");
       return;
     }
     try {
@@ -7560,23 +7560,23 @@ function bindAccountSurface() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setAccountMessage("Account runs exported.");
+      setAccountMessage("Saved writing downloaded.");
     } catch (_) {
       setAccountMessage("Export prepared but download could not start.");
     }
   });
 
   deleteAllBtn?.addEventListener("click", async () => {
-    const ok = window.confirm("Delete all account runs? Local writing remains separate.");
+    const ok = window.confirm("Delete saved writing? Writing on this device stays available.");
     if (!ok) return;
     const runtime = window.waywordPersistenceRuntime;
     if (!runtime || typeof runtime.deleteAllOwnedRuns !== "function") return;
     const result = await runtime.deleteAllOwnedRuns();
     if (!result || !result.ok) {
-      setAccountMessage("Could not delete account runs right now.");
+      setAccountMessage("Could not delete saved writing right now.");
       return;
     }
-    setAccountMessage("Account runs deleted. Local writing is unchanged.");
+    setAccountMessage("Saved writing deleted. Writing on this device is unchanged.");
   });
 
   renderAccountSurface();
