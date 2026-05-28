@@ -1,6 +1,7 @@
 (function () {
   var STORAGE_KEY = "waywordRetentionTelemetryV1";
   var LAST_SEEN_KEY = "wayword-retention-last-seen-at";
+  var SYNCED_COUNT_KEY = "wayword-retention-telemetry-synced-count";
   var MAX_EVENTS = 1500;
 
   function safeString(value) {
@@ -42,6 +43,65 @@
 
   function buildRuntime() {
     var storage = readStorage();
+    var syncInFlight = false;
+    var lastSyncAt = 0;
+
+    function syncEventsToServer() {
+      if (syncInFlight) return;
+      var now = Date.now();
+      if (now - lastSyncAt < 2000) return;
+
+      var supabaseApi = window.waywordSupabaseClient;
+      var supabase = supabaseApi && typeof supabaseApi.getClient === "function" ? supabaseApi.getClient() : null;
+      if (!supabase) return;
+
+      var authRuntime = window.waywordAuthSessionRuntime;
+      var session = authRuntime && typeof authRuntime.getCurrentSession === "function"
+        ? authRuntime.getCurrentSession()
+        : null;
+      var userId = session && session.user && session.user.id ? String(session.user.id) : null;
+
+      var events = loadEvents(storage);
+      if (!events.length) return;
+      var syncedCount = 0;
+      try {
+        syncedCount = Number(storage && storage.getItem(SYNCED_COUNT_KEY)) || 0;
+      } catch (_) {
+        syncedCount = 0;
+      }
+      var unsynced = events.slice(Math.max(0, syncedCount));
+      if (!unsynced.length) return;
+      var chunk = unsynced.slice(0, 200);
+
+      syncInFlight = true;
+      lastSyncAt = now;
+      supabase
+        .from("retention_events")
+        .insert(
+          chunk.map(function (row) {
+            return {
+              event: row.event,
+              payload: row.payload || {},
+              timestamp: row.timestamp || nowIso(),
+              user_id: userId,
+            };
+          })
+        )
+        .then(function (result) {
+          if (!result || !result.error) {
+            try {
+              var nextCount = syncedCount + chunk.length;
+              storage && storage.setItem(SYNCED_COUNT_KEY, String(nextCount));
+            } catch (_) {
+              /* ignore */
+            }
+          }
+          syncInFlight = false;
+        })
+        .catch(function () {
+          syncInFlight = false;
+        });
+    }
 
     function track(eventName, payload) {
       var registry = window.waywordTelemetryEventRegistry;
@@ -62,6 +122,7 @@
       var events = loadEvents(storage);
       events.push(eventRow);
       saveEvents(storage, events);
+      syncEventsToServer();
 
       try {
         if (

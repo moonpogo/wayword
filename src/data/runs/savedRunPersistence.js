@@ -128,11 +128,8 @@
         Promise.resolve(window.waywordPersistenceRuntime.syncSavedRun(fallbackRun))
           .then(function (syncResult) {
             var synced = Boolean(syncResult && syncResult.ok);
-            var noSession = Boolean(
-              syncResult &&
-                (syncResult.reason === "no_authenticated_session" ||
-                  syncResult.reason === "supabase_not_configured")
-            );
+            var reason = syncResult && syncResult.reason ? String(syncResult.reason) : "";
+            var noSession = reason === "no_authenticated_session" || reason === "supabase_not_configured";
             markRetentionEvent("markRunSaved", {
               sync_status: synced
                 ? "server_synced"
