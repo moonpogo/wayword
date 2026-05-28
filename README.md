@@ -75,7 +75,15 @@ npm test
 npm run verify:merge
 ```
 
-Optional fuller checks:
+Alpha/public release gate:
+
+```sh
+npm run verify:alpha
+```
+
+`verify:alpha` runs `verify:merge` plus Playwright smoke coverage.
+
+Additional checks:
 
 ```sh
 npm run test:smoke

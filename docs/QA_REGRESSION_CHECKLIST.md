@@ -1,5 +1,38 @@
 # QA Regression Checklist
 
+## Alpha/public release gate (required before deploy)
+
+Run and record pass/fail for:
+
+1. **`npm test`**
+2. **`npm run verify:merge`**
+3. **`npm run test:smoke`**
+
+Shortcut: **`npm run verify:alpha`** (`verify:merge` + `test:smoke`)
+
+Expected evidence in release summary:
+- Command list with timestamps
+- Pass/fail result for each command
+- If any command is skipped, explicit reason and risk callout
+
+## Known hardening risks and required coverage
+
+- Rapid consecutive runs collapsing:
+  - Automated: `tests/app-logic.test.cjs` submit/preparation and canonical projection regressions
+  - Manual: rapid consecutive submit pass in this checklist
+- Malformed storage / canonical read corruption:
+  - Automated: storage and canonical-read resilience tests in `tests/app-logic.test.cjs` and `tests/persistence-migration.test.cjs`
+- Failure-state language drift:
+  - Automated: account/runtime failure-state copy assertions in `tests/app-logic.test.cjs` and `tests/auth-session-runtime.test.cjs`
+  - Manual: signed-in/signed-out and sync-unavailable wording pass
+- Mobile beforeinput/keyboard submit behavior:
+  - Automated: mobile submit-event coverage in `tests/app-logic.test.cjs`
+  - Smoke: mobile focus/drawer/pattern flows in `tests/browser-smoke.test.cjs`
+  - Manual: iPhone Safari typing/newline/submit continuity pass
+- Recent Runs / Patterns / Season projection coherence:
+  - Automated: aggregation/projection checks in `tests/app-logic.test.cjs` and `tests/patterns-aggregation.test.cjs`
+  - Smoke: Recent Runs + Patterns open/close and post-submit flow checks
+
 ## Automated regression bundle (core flows)
 
 Run these in order when hardening or before a V1-sensitive merge:

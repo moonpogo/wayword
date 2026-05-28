@@ -1,4 +1,18 @@
 (function () {
+  function trySubmitFromEditor(input) {
+    if (!input || !input.state) return false;
+    if (input.state.submitted) {
+      if (input.state.completedUiActive && !input.state.optionsOpen) {
+        input.runPostSubmitAutoNewRunNow();
+      }
+      return true;
+    }
+    if (input.getEditorSurfaceComposing && input.getEditorSurfaceComposing()) return false;
+    if (input.getEditorText().trim().length === 0) return false;
+    input.submitWriting(false);
+    return true;
+  }
+
   function bindEditorInputEvents(input) {
     var editorInput = input.editorInput;
     if (!editorInput || editorInput.dataset.appEventsBound === "1") return;
@@ -133,14 +147,7 @@
       if (e.key === "Enter" && !e.shiftKey) {
         if (e.isComposing || input.getEditorSurfaceComposing()) return;
         e.preventDefault();
-        if (input.state.submitted) {
-          if (input.state.completedUiActive && !input.state.optionsOpen) {
-            input.runPostSubmitAutoNewRunNow();
-          }
-          return;
-        }
-        if (input.getEditorText().trim().length === 0) return;
-        input.submitWriting(false);
+        trySubmitFromEditor(input);
       }
 
       var moveCaretKeys = {
@@ -161,6 +168,16 @@
         window.requestAnimationFrame(function () {
           window.waywordMobileEditorCaretReveal.schedule(editorInput);
         });
+      }
+    });
+
+    editorInput.addEventListener("beforeinput", function (e) {
+      if (!input.isMobileViewport || !input.isMobileViewport()) return;
+      var inputType = String(e && e.inputType ? e.inputType : "");
+      if (inputType !== "insertLineBreak" && inputType !== "insertParagraph") return;
+      if (e.isComposing || input.getEditorSurfaceComposing()) return;
+      if (trySubmitFromEditor(input)) {
+        e.preventDefault();
       }
     });
 
@@ -345,6 +362,8 @@
     if (enterSubmitBtn && enterSubmitBtn.dataset.appControlBound !== "1") {
       enterSubmitBtn.dataset.appControlBound = "1";
       enterSubmitBtn.addEventListener("click", function () {
+        if (input.state && input.state.submitted) return;
+        if (input.getEditorSurfaceComposing && input.getEditorSurfaceComposing()) return;
         if (!input.editorInput || input.getEditorText().trim().length === 0) return;
         input.submitWriting(false);
       });

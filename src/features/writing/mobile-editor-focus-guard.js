@@ -1,23 +1,27 @@
 (function () {
+  function asElement(target) {
+    return target && target.nodeType === 1 ? target : null;
+  }
+
   function isFocusExitSafeTarget(target) {
+    var el = asElement(target);
     return Boolean(
-      target &&
-        typeof target.closest === "function" &&
-        (target.closest("#optionsTrigger") ||
-          target.closest("#editorOptionsPanel") ||
-          target.closest("#editorOptionsBackdrop") ||
-          target.closest("#enterSubmitBtn") ||
-          target.closest("#recentWritingTrigger") ||
-          target.closest("#recentDrawer") ||
-          target.closest("#recentDrawerBackdrop") ||
-          target.closest("#recentRailExpandedBackdrop") ||
-          target.closest("#recentDrawerCloseBtn") ||
-          target.closest("#recentRailExpandedCloseBtn") ||
-          target.closest("#recentDrawerList") ||
-          target.closest("#styleTab") ||
-          target.closest("#profileView") ||
-          target.closest("#fieldExpandedToggle") ||
-          target.closest("#promptRerollBtn"))
+      el &&
+        (el.closest("#optionsTrigger") ||
+          el.closest("#editorOptionsPanel") ||
+          el.closest("#editorOptionsBackdrop") ||
+          el.closest("#enterSubmitBtn") ||
+          el.closest("#recentWritingTrigger") ||
+          el.closest("#recentDrawer") ||
+          el.closest("#recentDrawerBackdrop") ||
+          el.closest("#recentRailExpandedBackdrop") ||
+          el.closest("#recentDrawerCloseBtn") ||
+          el.closest("#recentRailExpandedCloseBtn") ||
+          el.closest("#recentDrawerList") ||
+          el.closest("#styleTab") ||
+          el.closest("#profileView") ||
+          el.closest("#fieldExpandedToggle") ||
+          el.closest("#promptRerollBtn"))
     );
   }
 
@@ -73,7 +77,8 @@
     if (!document.body.classList.contains("focus-mode")) return;
     if (document.activeElement !== input.editorInput) return;
 
-    var target = e.target;
+    var target = asElement(e.target);
+    if (!target) return;
     var interactiveControl = target.closest(
       "button,a,input,textarea,select,[role='button']"
     );

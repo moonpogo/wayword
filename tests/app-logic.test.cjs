@@ -200,6 +200,13 @@ function loadAppEventsRuntimeContext(overrides = {}) {
   });
 }
 
+function loadMobileEditorFocusGuardContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/writing/mobile-editor-focus-guard.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
 function loadBehavioralTelemetryRuntimeContext(overrides = {}) {
   return loadBrowserScripts(["src/app/behavioral-telemetry-runtime.js"], {
     console: silentConsole(),
@@ -2231,6 +2238,9 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   const input = {
     editorInput,
     state: { active: true, submitted: false, completedUiActive: false, optionsOpen: false },
+    isMobileViewport() {
+      return true;
+    },
     setFocusMode(value) {
       calls.push(["setFocusMode", value]);
     },
@@ -2331,6 +2341,17 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
 
   calls.length = 0;
+  listeners.get("beforeinput")({
+    inputType: "insertParagraph",
+    isComposing: false,
+    preventDefault() {
+      calls.push("beforeinputPreventDefault");
+    },
+  });
+  assert.ok(calls.includes("beforeinputPreventDefault"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
+
+  calls.length = 0;
   listeners.get("keydown")({
     key: "Enter",
     shiftKey: false,
@@ -2358,6 +2379,71 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   calls.length = 0;
   listeners.get("focus")();
   assert.ok(calls.includes("entryDelayFocus"), "expected editor focus to arm pre-entry hint timer");
+});
+
+test("app events runtime blocks submit click while composing or already submitted", () => {
+  const context = loadAppEventsRuntimeContext();
+  const listeners = new Map();
+  const enterSubmitBtn = {
+    dataset: {},
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+  };
+  const calls = [];
+  const input = {
+    $(id) {
+      return id === "enterSubmitBtn" ? enterSubmitBtn : null;
+    },
+    state: { submitted: false },
+    editorInput: {},
+    getEditorText() {
+      return "hello";
+    },
+    getEditorSurfaceComposing() {
+      return true;
+    },
+    submitWriting(value) {
+      calls.push(["submitWriting", value]);
+    },
+  };
+
+  context.waywordAppEventsRuntime.bindPrimaryControls(input);
+
+  listeners.get("click")();
+  assert.equal(calls.length, 0, "submit click should no-op while composing");
+
+  input.state.submitted = true;
+  input.getEditorSurfaceComposing = () => false;
+  listeners.get("click")();
+  assert.equal(calls.length, 0, "submit click should no-op once run is already submitted");
+});
+
+test("mobile editor focus guard tolerates non-element pointer targets", () => {
+  const bodyClass = createClassList(["focus-mode"]);
+  const context = loadMobileEditorFocusGuardContext({
+    document: {
+      body: { classList: bodyClass },
+      activeElement: null,
+    },
+  });
+  let blurred = false;
+  const editorInput = {
+    blur() {
+      blurred = true;
+    },
+  };
+  context.document.activeElement = editorInput;
+  context.waywordMobileEditorFocusGuard.handleDocumentPointerDown(
+    {
+      editorInput,
+      isMobileViewport() {
+        return true;
+      },
+    },
+    { target: { nodeType: 3 } }
+  );
+  assert.equal(blurred, false);
 });
 
 test("behavioral telemetry logs pre-entry and writing events locally only", () => {

@@ -112,12 +112,11 @@ Rapid back-to-back writing runs may be collapsing into one saved run or one obse
   - No runtime behavior change unrelated to testability
   - No CI platform migration
 - Acceptance criteria:
-  - Gate includes `npm test` and `npm run verify:merge` as non-optional checks
+  - Gate includes `npm test`, `npm run verify:merge`, and `npm run test:smoke` as non-optional alpha/public checks
   - Known-risk regressions (rapid consecutive runs, sparse Patterns state, mobile writing behavior) are covered by tests or explicit manual checklist steps
   - Release summaries include gate pass/fail evidence
 - Test commands:
-  - `npm test`
-  - `npm run verify:merge`
+  - `npm run verify:alpha`
 
 ## Codex Operating Rules
 - One branch, one risk.
