@@ -1,4 +1,53 @@
 (function () {
+  function collectExistingRunIds(input) {
+    var ids = new Set();
+    if (!input || !input.state) return ids;
+
+    var fromSet = input.state.savedRunIds;
+    if (fromSet && typeof fromSet.forEach === "function") {
+      fromSet.forEach(function (value) {
+        var id = String(value == null ? "" : value).trim();
+        if (id) ids.add(id);
+      });
+    }
+
+    var history = Array.isArray(input.state.history) ? input.state.history : [];
+    for (var i = 0; i < history.length; i += 1) {
+      var row = history[i];
+      var runId = String(row && row.runId ? row.runId : "").trim();
+      if (runId) ids.add(runId);
+    }
+    return ids;
+  }
+
+  function buildFallbackRunId(existingIds) {
+    var attempts = 0;
+    while (attempts < 1000) {
+      attempts += 1;
+      var candidate =
+        "run_" +
+        Date.now().toString(36) +
+        "_" +
+        attempts.toString(36) +
+        "_" +
+        Math.random().toString(36).slice(2, 8);
+      if (!existingIds.has(candidate)) return candidate;
+    }
+    return "run_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 12);
+  }
+
+  function generateUniqueRunId(makeRunId, existingIds) {
+    if (typeof makeRunId === "function") {
+      for (var attempt = 0; attempt < 12; attempt += 1) {
+        var raw = makeRunId();
+        var candidate = String(raw == null ? "" : raw).trim();
+        if (!candidate) continue;
+        if (!existingIds.has(candidate)) return candidate;
+      }
+    }
+    return buildFallbackRunId(existingIds);
+  }
+
   /**
    * Submit-time preparation before completion routing:
    * - snapshot timer/challenge state
@@ -47,8 +96,12 @@
       finishedWithinTime;
 
     var now = Date.now();
+    var existingIds = collectExistingRunIds(input);
+    var runId = generateUniqueRunId(input.makeRunId, existingIds);
     var run = window.waywordRunModel.createSubmittedRun({
-      makeRunId: input.makeRunId,
+      makeRunId: function () {
+        return runId;
+      },
       now: now,
       currentText: input.currentText,
       prompt: input.prompt,

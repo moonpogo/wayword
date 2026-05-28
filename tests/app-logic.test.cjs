@@ -3931,6 +3931,76 @@ test("saved-run persistence writes canonical documents and reads them back in bo
   assert.equal(chronological[0].text, "alpha draft");
 });
 
+test("submit run preparation forces unique run ids for back-to-back same-day submits", () => {
+  const context = loadBrowserScripts(
+    ["src/data/run-model.js", "src/features/writing/submit-run-preparation.js"],
+    { console: silentConsole() }
+  );
+
+  const state = {
+    timerSeconds: 0,
+    timerWaitingForFirstInput: false,
+    timeRemaining: 0,
+    exerciseWords: [],
+    submitted: false,
+    completedUiActive: false,
+    repeatLimit: 2,
+    savedRunIds: new Set(),
+    history: [],
+  };
+  const analysis = {
+    totalWords: 63,
+    repeated: [],
+    bannedHits: [],
+    repeatedStarters: [],
+    starterExampleList: [],
+    uniqueCount: 60,
+    uniqueRatio: 0.95,
+    avgSentenceLength: 10.5,
+    counts: {},
+    starterCounts: {},
+    punctuation: {},
+    perspective: {},
+  };
+
+  const baseInput = {
+    state,
+    currentText: "first run body",
+    prompt: "same prompt",
+    analysis,
+    fromTimer: false,
+    makeRunId: () => "run-collision",
+    clearExerciseIfCompleted() {},
+    applyWriteDocSemanticFlagsFromAnalysisCore() {},
+    updateEnterButtonVisibility() {},
+    stopTimer() {},
+    completeWordmark() {},
+    getActiveTargetWordsForScoring() {
+      return 60;
+    },
+    computeRunScoreV1() {
+      return { runScore: 88, scoreBreakdown: { total: 88 } };
+    },
+  };
+
+  const first = context.waywordSubmitRunPreparation.prepareSubmitRun({
+    ...baseInput,
+    currentText: "first run body",
+  });
+  state.savedRunIds.add(first.run.runId);
+
+  const second = context.waywordSubmitRunPreparation.prepareSubmitRun({
+    ...baseInput,
+    currentText: "second run body",
+  });
+
+  assert.equal(first.run.runId, "run-collision");
+  assert.notEqual(second.run.runId, "run-collision");
+  assert.notEqual(second.run.runId, first.run.runId);
+  assert.equal(first.run.wordCount, 63);
+  assert.equal(second.run.wordCount, 63);
+});
+
 test("saved-run persistence keeps legacy sync alive when canonical upsert fails", () => {
   const removedMarkers = [];
   const context = loadSavedRunsContext();
