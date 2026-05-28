@@ -4780,9 +4780,6 @@ html[data-theme="dark"] .profile-hero{
 .season-wheel-zoom-content{
   width:100%;
   height:100%;
-  transform-origin:50% 50%;
-  will-change:transform;
-  transition:transform 120ms ease-out;
 }
 
 .season-wheel-zoom-content > .season-wheel-debug-svg,
@@ -4837,6 +4834,10 @@ html[data-theme="dark"] .profile-hero{
   --sw-bg:color-mix(in srgb, var(--panel) 97%, #000 3%);
   --sw-season-ring:color-mix(in srgb, #e4ac5f 72%, var(--line) 28%);
   --sw-hub-ring:color-mix(in srgb, #c9a173 68%, var(--line) 32%);
+  --sw-spoke:color-mix(in srgb, #d9c5a4 68%, var(--line) 32%);
+  --sw-spoke-active:color-mix(in srgb, #e8c998 74%, var(--line) 26%);
+  --sw-grid-minor:color-mix(in srgb, #e8d2ad 74%, var(--line) 26%);
+  --sw-grid-major:color-mix(in srgb, #f0c47b 78%, var(--line) 22%);
   --sw-minor-tick:color-mix(in srgb, #e8d2ad 74%, var(--line) 26%);
   --sw-major-tick:color-mix(in srgb, #f0c47b 78%, var(--line) 22%);
   --sw-medallion-label:color-mix(in srgb, #e7d9c4 82%, var(--ink) 18%);
@@ -4846,12 +4847,16 @@ html[data-theme="dark"] .profile-hero{
 
 html[data-theme="light"] .season-wheel-debug-svg{
   --sw-bg:color-mix(in srgb, var(--panel) 82%, #efe4d2 18%);
-  --sw-season-ring:color-mix(in srgb, #b97a32 70%, var(--line) 30%);
-  --sw-hub-ring:color-mix(in srgb, #9f6b2d 65%, var(--line) 35%);
-  --sw-minor-tick:color-mix(in srgb, #b98956 66%, var(--line) 34%);
-  --sw-major-tick:color-mix(in srgb, #a66a2f 72%, var(--line) 28%);
-  --sw-medallion-label:color-mix(in srgb, #5a4128 84%, var(--ink) 16%);
-  --sw-medallion-sub:color-mix(in srgb, #6e5438 72%, var(--muted) 28%);
+  --sw-season-ring:color-mix(in srgb, #9f6a2f 76%, var(--line) 24%);
+  --sw-hub-ring:color-mix(in srgb, #885826 72%, var(--line) 28%);
+  --sw-spoke:color-mix(in srgb, #8a5d34 54%, var(--line) 46%);
+  --sw-spoke-active:color-mix(in srgb, #7a4f29 64%, var(--line) 36%);
+  --sw-grid-minor:color-mix(in srgb, #9f7247 52%, var(--line) 48%);
+  --sw-grid-major:color-mix(in srgb, #8d5d2f 60%, var(--line) 40%);
+  --sw-minor-tick:color-mix(in srgb, #9d7348 60%, var(--line) 40%);
+  --sw-major-tick:color-mix(in srgb, #8b5f30 68%, var(--line) 32%);
+  --sw-medallion-label:color-mix(in srgb, #503620 90%, var(--ink) 10%);
+  --sw-medallion-sub:color-mix(in srgb, #65462a 80%, var(--muted) 20%);
 }
 
 .season-wheel-run-tooltip{

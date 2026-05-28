@@ -5275,9 +5275,9 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     const [x2, y2] = polar(outerR, angle);
     const isActiveSpoke = highlightDay && d === dayIndex;
     if (canonScaffold) {
-      spokes += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#d9c5a4" stroke-opacity="0.18" stroke-width="1.05"/>`;
+      spokes += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="var(--sw-spoke, #d9c5a4)" stroke-opacity="0.25" stroke-width="1.05"/>`;
     } else {
-      spokes += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#d8cdbf" stroke-opacity="${isActiveSpoke ? 0.38 : 0.11}" stroke-width="${isActiveSpoke ? 1.5 : 1}"/>`;
+      spokes += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${isActiveSpoke ? "var(--sw-spoke-active, #d8cdbf)" : "var(--sw-spoke, #d8cdbf)"}" stroke-opacity="${isActiveSpoke ? 0.52 : 0.2}" stroke-width="${isActiveSpoke ? 1.5 : 1.05}"/>`;
     }
   }
 
@@ -5302,17 +5302,17 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
   let fourHourRings = "";
   if (canonScaffold) {
     fourHourRings = `
-      <circle cx="${cx}" cy="${cy}" r="251.67" fill="none" stroke="#e8d2ad" stroke-opacity="0.28" stroke-width="1.45" stroke-dasharray="2 8"/>
-      <circle cx="${cx}" cy="${cy}" r="381.33" fill="none" stroke="#f0c47b" stroke-opacity="0.38" stroke-width="1.7" stroke-dasharray="3 9"/>
-      <circle cx="${cx}" cy="${cy}" r="511.00" fill="none" stroke="#e8d2ad" stroke-opacity="0.28" stroke-width="1.45" stroke-dasharray="2 8"/>
-      <circle cx="${cx}" cy="${cy}" r="640.67" fill="none" stroke="#f0c47b" stroke-opacity="0.38" stroke-width="1.7" stroke-dasharray="3 9"/>
-      <circle cx="${cx}" cy="${cy}" r="770.33" fill="none" stroke="#e8d2ad" stroke-opacity="0.28" stroke-width="1.45" stroke-dasharray="2 8"/>
+      <circle cx="${cx}" cy="${cy}" r="251.67" fill="none" stroke="var(--sw-grid-minor, #e8d2ad)" stroke-opacity="0.33" stroke-width="1.45" stroke-dasharray="2 8"/>
+      <circle cx="${cx}" cy="${cy}" r="381.33" fill="none" stroke="var(--sw-grid-major, #f0c47b)" stroke-opacity="0.44" stroke-width="1.7" stroke-dasharray="3 9"/>
+      <circle cx="${cx}" cy="${cy}" r="511.00" fill="none" stroke="var(--sw-grid-minor, #e8d2ad)" stroke-opacity="0.33" stroke-width="1.45" stroke-dasharray="2 8"/>
+      <circle cx="${cx}" cy="${cy}" r="640.67" fill="none" stroke="var(--sw-grid-major, #f0c47b)" stroke-opacity="0.44" stroke-width="1.7" stroke-dasharray="3 9"/>
+      <circle cx="${cx}" cy="${cy}" r="770.33" fill="none" stroke="var(--sw-grid-minor, #e8d2ad)" stroke-opacity="0.33" stroke-width="1.45" stroke-dasharray="2 8"/>
     `;
   } else {
     for (let hours = 4; hours <= 24; hours += 4) {
       const r = minuteToRadius(hours * 60);
       const isMajor = hours % 8 === 0;
-      fourHourRings += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="none" stroke="#e9d2ad" stroke-opacity="${isMajor ? 0.34 : 0.22}" stroke-width="${isMajor ? 1.4 : 1.1}" stroke-dasharray="${isMajor ? "3 8" : "2 8"}"/>`;
+      fourHourRings += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="none" stroke="${isMajor ? "var(--sw-grid-major, #f0c47b)" : "var(--sw-grid-minor, #e8d2ad)"}" stroke-opacity="${isMajor ? 0.44 : 0.3}" stroke-width="${isMajor ? 1.4 : 1.1}" stroke-dasharray="${isMajor ? "3 8" : "2 8"}"/>`;
     }
   }
 
@@ -5775,74 +5775,128 @@ function initSeasonWheelZoom(root) {
   content.appendChild(graphic);
   tile.appendChild(resetBtn);
 
-  let scale = 1;
-  let tx = 0;
-  let ty = 0;
-  let isPanning = false;
-  let panStartX = 0;
-  let panStartY = 0;
-  let panOriginX = 0;
-  let panOriginY = 0;
   const pointers = new Map();
   let pinchStartDistance = 0;
   let pinchStartScale = 1;
   let pinchAnchor = null;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panStartVx = 0;
+  let panStartVy = 0;
+  let isPanning = false;
 
   const minScale = 1;
   const maxScale = 8;
+  let scale = 1;
 
-  const getViewportSize = () => {
-    const rect = viewport.getBoundingClientRect();
-    return { width: rect.width || tile.clientWidth || 1, height: rect.height || tile.clientHeight || 1 };
+  const isSvgGraphic = graphic instanceof SVGSVGElement;
+  const baseViewBox = (() => {
+    if (!isSvgGraphic) return null;
+    const raw = graphic.getAttribute("viewBox");
+    if (raw) {
+      const nums = raw.trim().split(/\s+/).map(Number);
+      if (nums.length === 4 && nums.every(Number.isFinite) && nums[2] > 0 && nums[3] > 0) {
+        return { x: nums[0], y: nums[1], w: nums[2], h: nums[3] };
+      }
+    }
+    const w = Number(graphic.getAttribute("width")) || 100;
+    const h = Number(graphic.getAttribute("height")) || 100;
+    return { x: 0, y: 0, w, h };
+  })();
+  let vx = baseViewBox ? baseViewBox.x : 0;
+  let vy = baseViewBox ? baseViewBox.y : 0;
+  let vw = baseViewBox ? baseViewBox.w : 0;
+  let vh = baseViewBox ? baseViewBox.h : 0;
+  let tx = 0;
+  let ty = 0;
+
+  const getViewportRect = () => viewport.getBoundingClientRect();
+  const clampViewBox = () => {
+    if (!baseViewBox) return;
+    const maxX = baseViewBox.x + baseViewBox.w - vw;
+    const maxY = baseViewBox.y + baseViewBox.h - vh;
+    vx = Math.min(maxX, Math.max(baseViewBox.x, vx));
+    vy = Math.min(maxY, Math.max(baseViewBox.y, vy));
   };
-
-  const clampTransform = () => {
-    const { width, height } = getViewportSize();
-    const maxX = ((scale - 1) * width) / 2;
-    const maxY = ((scale - 1) * height) / 2;
+  const applyViewBox = () => {
+    if (!isSvgGraphic || !baseViewBox) return;
+    clampViewBox();
+    graphic.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
+    resetBtn.classList.toggle("is-active", scale > 1.001);
+  };
+  const applyFallbackTransform = () => {
+    const rect = getViewportRect();
+    const maxX = ((scale - 1) * rect.width) / 2;
+    const maxY = ((scale - 1) * rect.height) / 2;
     tx = Math.min(maxX, Math.max(-maxX, tx));
     ty = Math.min(maxY, Math.max(-maxY, ty));
-  };
-
-  const applyTransform = () => {
-    clampTransform();
     content.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`;
     resetBtn.classList.toggle("is-active", scale > 1.001 || Math.abs(tx) > 0.2 || Math.abs(ty) > 0.2);
   };
+  const apply = () => {
+    if (isSvgGraphic) applyViewBox();
+    else applyFallbackTransform();
+  };
+  const clientToSvg = (clientX, clientY) => {
+    const rect = getViewportRect();
+    const nx = (clientX - rect.left) / Math.max(1, rect.width);
+    const ny = (clientY - rect.top) / Math.max(1, rect.height);
+    return {
+      x: vx + nx * vw,
+      y: vy + ny * vh,
+    };
+  };
 
+  // Prefer native SVG viewBox zoom for crisp vector fidelity; fallback transform only for non-SVG content.
   const zoomAtClientPoint = (nextScale, clientX, clientY) => {
     const safeScale = Math.min(maxScale, Math.max(minScale, nextScale));
     if (Math.abs(safeScale - scale) < 0.0001) return;
-    const rect = viewport.getBoundingClientRect();
+    if (isSvgGraphic && baseViewBox) {
+      const p = clientToSvg(clientX, clientY);
+      const nextW = baseViewBox.w / safeScale;
+      const nextH = baseViewBox.h / safeScale;
+      const rect = getViewportRect();
+      const nx = (clientX - rect.left) / Math.max(1, rect.width);
+      const ny = (clientY - rect.top) / Math.max(1, rect.height);
+      vx = p.x - nx * nextW;
+      vy = p.y - ny * nextH;
+      vw = nextW;
+      vh = nextH;
+      scale = safeScale;
+      applyViewBox();
+      return;
+    }
+    const deltaScale = safeScale / scale;
+    const rect = getViewportRect();
     const px = clientX - rect.left - rect.width / 2;
     const py = clientY - rect.top - rect.height / 2;
-    const worldX = (px - tx) / scale;
-    const worldY = (py - ty) / scale;
-    tx = px - worldX * safeScale;
-    ty = py - worldY * safeScale;
+    tx = px - (px - tx) * deltaScale;
+    ty = py - (py - ty) * deltaScale;
     scale = safeScale;
-    applyTransform();
+    applyFallbackTransform();
   };
 
   const resetView = () => {
     scale = 1;
-    tx = 0;
-    ty = 0;
-    applyTransform();
+    if (isSvgGraphic && baseViewBox) {
+      vx = baseViewBox.x;
+      vy = baseViewBox.y;
+      vw = baseViewBox.w;
+      vh = baseViewBox.h;
+    } else {
+      tx = 0;
+      ty = 0;
+    }
+    apply();
   };
 
   resetBtn.addEventListener("click", resetView);
-
-  viewport.addEventListener(
-    "wheel",
-    (event) => {
-      event.preventDefault();
-      const delta = -event.deltaY;
-      const zoomFactor = Math.exp(delta * 0.0016);
-      zoomAtClientPoint(scale * zoomFactor, event.clientX, event.clientY);
-    },
-    { passive: false }
-  );
+  viewport.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    const delta = -event.deltaY;
+    const zoomFactor = Math.exp(delta * 0.0016);
+    zoomAtClientPoint(scale * zoomFactor, event.clientX, event.clientY);
+  }, { passive: false });
 
   viewport.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
@@ -5851,17 +5905,15 @@ function initSeasonWheelZoom(root) {
       const pts = [...pointers.values()];
       pinchStartDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       pinchStartScale = scale;
-      pinchAnchor = {
-        x: (pts[0].x + pts[1].x) / 2,
-        y: (pts[0].y + pts[1].y) / 2,
-      };
+      pinchAnchor = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
       isPanning = false;
     } else if (scale > 1.001 && pointers.size === 1) {
       isPanning = true;
       panStartX = event.clientX;
       panStartY = event.clientY;
-      panOriginX = tx;
-      panOriginY = ty;
+      panStartVx = vx;
+      panStartVy = vy;
+      viewport.setPointerCapture?.(event.pointerId);
     }
   });
 
@@ -5872,16 +5924,23 @@ function initSeasonWheelZoom(root) {
       const pts = [...pointers.values()];
       const nextDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       if (nextDistance > 0) {
-        const pinchScale = pinchStartScale * (nextDistance / pinchStartDistance);
-        zoomAtClientPoint(pinchScale, pinchAnchor.x, pinchAnchor.y);
+        zoomAtClientPoint(pinchStartScale * (nextDistance / pinchStartDistance), pinchAnchor.x, pinchAnchor.y);
       }
       return;
     }
-    if (isPanning && pointers.size === 1) {
-      tx = panOriginX + (event.clientX - panStartX);
-      ty = panOriginY + (event.clientY - panStartY);
-      applyTransform();
+    if (!isPanning || pointers.size !== 1) return;
+    if (isSvgGraphic && baseViewBox) {
+      const rect = getViewportRect();
+      const dxPx = event.clientX - panStartX;
+      const dyPx = event.clientY - panStartY;
+      vx = panStartVx - (dxPx / Math.max(1, rect.width)) * vw;
+      vy = panStartVy - (dyPx / Math.max(1, rect.height)) * vh;
+      applyViewBox();
+      return;
     }
+    tx += event.movementX;
+    ty += event.movementY;
+    applyFallbackTransform();
   });
 
   const finishPointer = (event) => {
@@ -5896,8 +5955,8 @@ function initSeasonWheelZoom(root) {
       const [pt] = [...pointers.values()];
       panStartX = pt.x;
       panStartY = pt.y;
-      panOriginX = tx;
-      panOriginY = ty;
+      panStartVx = vx;
+      panStartVy = vy;
       isPanning = true;
     }
   };
@@ -5907,10 +5966,9 @@ function initSeasonWheelZoom(root) {
   viewport.addEventListener("pointerleave", (event) => {
     if (event.pointerType === "mouse") finishPointer(event);
   });
-
-  window.addEventListener("resize", applyTransform);
+  window.addEventListener("resize", apply);
   tile.dataset.zoomReady = "true";
-  applyTransform();
+  apply();
 }
 
 function renderCurrentSeasonPanel() {
