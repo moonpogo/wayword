@@ -1331,6 +1331,84 @@ test("season wheel tooltip placement keeps popover within panel bounds and flips
   assert.equal(safeTop.top >= 110, true, "tooltip should avoid escaping above container");
 });
 
+test("season fixture clustered10rapid yields 10 distinct same-day runs", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const dayKeyHelper = `
+    function pad2(n) { return String(n).padStart(2, "0"); }
+    function toDayKeyLocal(dateObj) {
+      return \`\${dateObj.getFullYear()}-\${pad2(dateObj.getMonth() + 1)}-\${pad2(dateObj.getDate())}\`;
+    }
+  `;
+  const fixtureBlock = extractBetween(
+    script,
+    "let devSeasonFixtureName = null;",
+    "/* season wheel instrument contract: begin */"
+  );
+  const api = new Function(
+    `${dayKeyHelper}\n${fixtureBlock}; return { buildDevSeasonFixtureViewModel, fixtureCountMapByName };`
+  )();
+
+  const fixtureMap = api.fixtureCountMapByName("clustered10rapid");
+  assert.equal(fixtureMap instanceof Map, true);
+  assert.equal(fixtureMap.get(67), 10);
+
+  const vm = api.buildDevSeasonFixtureViewModel("clustered10rapid");
+  assert.equal(vm.runsCount, 10);
+  assert.equal(vm.seasonalRows.length, 10);
+  assert.equal(vm.dayBuckets.size, 1);
+  assert.equal(Array.from(vm.dayBuckets.values())[0], 10);
+
+  const timestamps = vm.seasonalRows.map((row) => row.timestampMs);
+  assert.equal(new Set(timestamps).size, 10, "expected 10 distinct rapid timestamps");
+});
+
+test("season wheel full-ring output preserves clustered10rapid run count in summary data", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const dayKeyHelper = `
+    function pad2(n) { return String(n).padStart(2, "0"); }
+    function toDayKeyLocal(dateObj) {
+      return \`\${dateObj.getFullYear()}-\${pad2(dateObj.getMonth() + 1)}-\${pad2(dateObj.getDate())}\`;
+    }
+  `;
+  const fixtureBlock = extractBetween(
+    script,
+    "let devSeasonFixtureName = null;",
+    "/* season wheel instrument contract: begin */"
+  );
+  const instrumentBlock = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const calendarBlock = extractBetween(
+    script,
+    "/* season wheel calendar contract: begin */",
+    "/* season wheel calendar contract: end */"
+  );
+  const svgStart = script.indexOf("function formatShortMonthDay");
+  const svgEnd = script.indexOf("function buildSeasonWheelPairSpokeDebugSvg");
+  const svgBlock = script.slice(svgStart, svgEnd);
+  const fullRingStart = script.indexOf("function buildSeasonWheelFullRingFromSeasonalRows");
+  const fullRingEnd = script.indexOf("let canonSeasonWheelSvgCache = null;");
+  const fullRingBlock = script.slice(fullRingStart, fullRingEnd);
+  const api = new Function(
+    `${dayKeyHelper}\n${fixtureBlock}\n${instrumentBlock}\n${calendarBlock}\n${svgBlock}\n${fullRingBlock}\nreturn { buildDevSeasonFixtureViewModel, buildSeasonWheelFullRingFromSeasonalRows, buildCurrentSeasonCalendar };`
+  )();
+
+  const fixtureVm = api.buildDevSeasonFixtureViewModel("clustered10rapid");
+  const seasonCalendar = api.buildCurrentSeasonCalendar(new Date("2026-05-26T15:00:00-07:00"));
+  const svg = api.buildSeasonWheelFullRingFromSeasonalRows(fixtureVm.seasonalRows, {
+    seasonDays: seasonCalendar.spokeCount,
+    seasonLabel: seasonCalendar.seasonLabel,
+    seasonStartDate: seasonCalendar.seasonStartLocal,
+    seasonEndDate: seasonCalendar.seasonEndLocal,
+    seasonCalendar,
+    isDesktop: false,
+  });
+
+  assert.equal(svg.includes('data-total-runs="10"'), true);
+});
+
 test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
   const selection = loadPromptSelectionContext().waywordPromptSelection;
   const context = loadBrowserScripts(

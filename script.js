@@ -4855,6 +4855,11 @@ function buildFixtureCountMapExtreme() {
   return out;
 }
 
+function buildFixtureCountMapClustered10Rapid() {
+  // One dense same-day cluster to stress aggregation and observability.
+  return new Map([[67, 10]]);
+}
+
 function fixtureCountMapByName(name) {
   const n = String(name || "").toLowerCase();
   if (n === "sparse") return buildFixtureCountMapSparse();
@@ -4863,6 +4868,7 @@ function fixtureCountMapByName(name) {
   if (n === "clustered") return buildFixtureCountMapClustered();
   if (n === "steady") return buildFixtureCountMapSteady();
   if (n === "extreme") return buildFixtureCountMapExtreme();
+  if (n === "clustered10rapid") return buildFixtureCountMapClustered10Rapid();
   return null;
 }
 
@@ -4882,7 +4888,10 @@ function buildDevSeasonFixtureViewModel(name) {
     runsCount += c;
     const dayDate = new Date(dayKeys[i] + "T12:00:00");
     for (let runIndex = 0; runIndex < c; runIndex += 1) {
-      const startMinute = (runIndex * 210 + i * 17) % 1440;
+      const startMinute =
+        name === "clustered10rapid"
+          ? (13 * 60 + runIndex) % 1440
+          : (runIndex * 210 + i * 17) % 1440;
       const startAt = new Date(dayDate);
       startAt.setHours(Math.floor(startMinute / 60), startMinute % 60, 0, 0);
       const durationMinutes = name === "extreme"
@@ -7162,7 +7171,15 @@ function registerDevOnlyHelpers() {
 
   window.waywordDevResetFirstSessionEntry = waywordDevResetFirstSessionEntryForTesting;
   window.waywordDevSeasonFixtures = {
-    availableFixtures: Object.freeze(["sparse", "moderate", "heavy", "clustered", "steady", "extreme"]),
+    availableFixtures: Object.freeze([
+      "sparse",
+      "moderate",
+      "heavy",
+      "clustered",
+      "steady",
+      "extreme",
+      "clustered10rapid",
+    ]),
     useFixture(name) {
       const normalized = String(name || "").toLowerCase();
       if (!fixtureCountMapByName(normalized)) {
