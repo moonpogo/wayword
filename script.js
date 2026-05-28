@@ -7323,7 +7323,7 @@ function initAccountContinuityAuthScaffold() {
     },
     onAuthError() {
       // Draft preservation is handled inside the runtime; keep UX steady here.
-      setAccountMessage("We could not complete sign-in. Writing stays available.");
+      setAccountMessage("Account sign-in is not available right now. Your writing is still here.");
     },
     onRetentionHook() {
       try {
@@ -7406,17 +7406,17 @@ function selectAccountSummaryCopy(input) {
   var configured = Boolean(input && input.configured);
   var hasSession = Boolean(input && input.hasSession);
   var syncGuarded = Boolean(input && input.syncGuarded);
-  if (!configured) return "Sign-in is not set up in this preview.";
-  if (hasSession) return "Signed in. Saved writing can continue across devices.";
+  if (!configured) return "Account sync is not set up in this preview.";
+  if (hasSession) return "Signed in. Writing can continue across devices.";
   if (syncGuarded) {
-    return "Sign-in is available.";
+    return "Sign in is available. Account sync is not available right now.";
   }
   return "Sign in to keep writing available across devices.";
 }
 
 function getAccountRuntimeUnavailableMessage(configured) {
-  if (!configured) return "Sign-in is not set up in this preview.";
-  return "Account sign-in is temporarily unavailable. Please try again.";
+  if (!configured) return "Account sync is not set up in this preview.";
+  return "Account sign-in is not available right now.";
 }
 
 function shouldEnableAccountDebugMode() {
@@ -7471,7 +7471,7 @@ function renderAccountSurface() {
   }
 
   if (fallback) {
-    fallback.textContent = "Writing remains available on this device.";
+    fallback.textContent = "Your writing is still here on this device.";
   }
 
   if (signInForm) {
@@ -7493,7 +7493,7 @@ function renderAccountSurface() {
   if (isAccountPanelOpen()) {
     const existing = $("accountPanelMessage")?.textContent || "";
     if (!existing.trim() && configured && migrationStatus === "skipped_unverified_rls") {
-      setAccountMessage("Sync remains gated until live RLS verification is completed.");
+      setAccountMessage("Account sync is not available right now. Writing is still saved on this device.");
     }
   }
 
@@ -7582,7 +7582,7 @@ function bindAccountSurface() {
       } catch (_) {
         /* ignore */
       }
-      setAccountMessage("Could not send sign-in link. Writing remains available locally.");
+      setAccountMessage("Account sign-in is not available right now. Writing is still saved on this device.");
       return;
     }
     setAccountMessage("Check your email for a sign-in link.");
@@ -7593,7 +7593,7 @@ function bindAccountSurface() {
     if (!runtime || typeof runtime.signOut !== "function") return;
     const result = await runtime.signOut();
     if (result && result.error) {
-      setAccountMessage("Could not sign out right now.");
+      setAccountMessage("Sign out is not available right now.");
       return;
     }
     setAccountMessage("Signed out.");
@@ -7604,7 +7604,7 @@ function bindAccountSurface() {
     if (!runtime || typeof runtime.exportOwnedRuns !== "function") return;
     const result = await runtime.exportOwnedRuns();
     if (!result || !result.ok) {
-      setAccountMessage("Could not download saved writing right now.");
+      setAccountMessage("Export is not available right now.");
       return;
     }
     try {
@@ -7618,9 +7618,9 @@ function bindAccountSurface() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setAccountMessage("Saved writing downloaded.");
+      setAccountMessage("Writing archive downloaded.");
     } catch (_) {
-      setAccountMessage("Export prepared but download could not start.");
+      setAccountMessage("Writing archive is ready, but download did not start.");
     }
   });
 
@@ -7631,10 +7631,10 @@ function bindAccountSurface() {
     if (!runtime || typeof runtime.deleteAllOwnedRuns !== "function") return;
     const result = await runtime.deleteAllOwnedRuns();
     if (!result || !result.ok) {
-      setAccountMessage("Could not delete saved writing right now.");
+      setAccountMessage("Delete is not available right now.");
       return;
     }
-    setAccountMessage("Saved writing deleted. Writing on this device is unchanged.");
+    setAccountMessage("Saved cloud writing deleted. Writing on this device is unchanged.");
   });
 
   renderAccountSurface();

@@ -22,6 +22,53 @@
     }
   }
 
+  function toFiniteTimestamp(run) {
+    var savedAt = run && run.savedAt;
+    if (typeof savedAt === "number" && Number.isFinite(savedAt) && savedAt > 0) return savedAt;
+    var timestamp = run && run.timestamp;
+    if (typeof timestamp === "number" && Number.isFinite(timestamp) && timestamp > 0) return timestamp;
+    return NaN;
+  }
+
+  function normalizeStableCanonicalRuns(docs) {
+    var rows = Array.isArray(docs) ? docs : [];
+    var entries = [];
+    for (var i = 0; i < rows.length; i += 1) {
+      var run = rows[i];
+      var runId = String(run && run.runId ? run.runId : "").trim();
+      if (!runId) continue;
+      var ts = toFiniteTimestamp(run);
+      if (!Number.isFinite(ts)) continue;
+      entries.push({ run: run, runId: runId, ts: ts, index: i });
+    }
+
+    // Keep exactly one canonical row per run id. Winner is the newest timestamp;
+    // if tied, keep the later record in storage order for deterministic behavior.
+    var winners = Object.create(null);
+    for (var j = 0; j < entries.length; j += 1) {
+      var entry = entries[j];
+      var existing = winners[entry.runId];
+      if (!existing) {
+        winners[entry.runId] = entry;
+        continue;
+      }
+      if (entry.ts > existing.ts || (entry.ts === existing.ts && entry.index > existing.index)) {
+        winners[entry.runId] = entry;
+      }
+    }
+
+    var deduped = Object.keys(winners).map(function (id) {
+      return winners[id];
+    });
+    deduped.sort(function (a, b) {
+      if (a.ts !== b.ts) return a.ts - b.ts;
+      return a.index - b.index;
+    });
+    return deduped.map(function (entry) {
+      return entry.run;
+    });
+  }
+
   /**
    * @param {Record<string, unknown>} doc
    * @returns {Record<string, unknown>}
@@ -41,7 +88,7 @@
    */
   function listSavedRunsChronological() {
     var U = window.waywordRunDocumentUtils;
-    var docs = listParsedOrEmpty().slice();
+    var docs = normalizeStableCanonicalRuns(listParsedOrEmpty());
     if (U && typeof U.sortRunsNewestFirst === "function") {
       var newestFirst = U.sortRunsNewestFirst(docs);
       return newestFirst.slice().reverse().map(toLegacyHistoryRow);
@@ -60,7 +107,7 @@
    */
   function listSavedRunsNewestFirst() {
     var U = window.waywordRunDocumentUtils;
-    var docs = listParsedOrEmpty().slice();
+    var docs = normalizeStableCanonicalRuns(listParsedOrEmpty());
     if (U && typeof U.sortRunsNewestFirst === "function") {
       return U.sortRunsNewestFirst(docs).map(toLegacyHistoryRow);
     }

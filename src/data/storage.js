@@ -1,4 +1,15 @@
 (function () {
+  function readJsonArrayOrEmpty(key) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   window.waywordStorage = {
     loadTheme() {
       return localStorage.getItem("wayword-theme") || "light";
@@ -9,15 +20,15 @@
     },
 
     loadHistory() {
-      return JSON.parse(localStorage.getItem("wayword-history") || "[]");
+      return readJsonArrayOrEmpty("wayword-history");
     },
 
     loadSavedRunIdsSet() {
-      return new Set(JSON.parse(localStorage.getItem("wayword-runids") || "[]"));
+      return new Set(readJsonArrayOrEmpty("wayword-runids"));
     },
 
     loadCompletedChallengesSet() {
-      return new Set(JSON.parse(localStorage.getItem("wayword-completed-challenges") || "[]"));
+      return new Set(readJsonArrayOrEmpty("wayword-completed-challenges"));
     },
 
     saveHistoryAndRunIds(history, savedRunIds) {

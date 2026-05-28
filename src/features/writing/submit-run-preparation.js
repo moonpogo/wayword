@@ -17,6 +17,22 @@
       var runId = String(row && row.runId ? row.runId : "").trim();
       if (runId) ids.add(runId);
     }
+
+    if (typeof input.readSavedRunsChronological === "function") {
+      try {
+        var canonicalRuns = input.readSavedRunsChronological();
+        if (Array.isArray(canonicalRuns)) {
+          for (var j = 0; j < canonicalRuns.length; j += 1) {
+            var canonicalRunId = String(
+              canonicalRuns[j] && canonicalRuns[j].runId ? canonicalRuns[j].runId : ""
+            ).trim();
+            if (canonicalRunId) ids.add(canonicalRunId);
+          }
+        }
+      } catch (_) {
+        // Keep submit flow resilient when canonical reads are unavailable.
+      }
+    }
     return ids;
   }
 

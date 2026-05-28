@@ -306,6 +306,7 @@
         completeWordmark: d.completeWordmark,
         getActiveTargetWordsForScoring: d.getActiveTargetWordsForScoring,
         computeRunScoreV1: d.computeRunScoreV1,
+        readSavedRunsChronological: d.readSavedRunsChronological,
       }));
     } else {
       console.error("wayword: submit run preparation helper missing; falling back to inline submit preparation");

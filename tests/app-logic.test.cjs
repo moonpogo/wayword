@@ -94,6 +94,36 @@ function extractBetween(source, startMarker, endMarker) {
   return source.slice(start, end + endMarker.length);
 }
 
+function loadAggregateProfileContext(overrides = {}) {
+  const source = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(source, "function aggregateProfile()", "return agg;\n}");
+  const context = loadBrowserScripts([], {
+    console: silentConsole(),
+    punctuationMarks: { ".": ".", ",": ",", "!": "!" },
+    readSavedRunsChronological() {
+      return [];
+    },
+    ...overrides,
+  });
+  require("vm").runInContext(block, context, { filename: "script.js:aggregateProfile" });
+  return context;
+}
+
+function loadSeasonTimestampAggregationContext(overrides = {}) {
+  const source = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    source,
+    "function parseRunTimestampMsForSeason(run) {",
+    "/* season wheel timestamp contract: end */"
+  );
+  const context = loadBrowserScripts([], {
+    console: silentConsole(),
+    ...overrides,
+  });
+  require("vm").runInContext(block, context, { filename: "script.js:season-timestamp-contract" });
+  return context;
+}
+
 function loadAccountSurfaceRendererContext(overrides = {}) {
   const source = fs.readFileSync("script.js", "utf8");
   const start = source.indexOf("function isAccountEnvConfigured()");
@@ -355,6 +385,14 @@ function loadSavedRunsContext(overrides = {}) {
       ...overrides,
     }
   );
+}
+
+function loadStorageContext(overrides = {}) {
+  return loadBrowserScripts(["src/data/storage.js"], {
+    console: silentConsole(),
+    localStorage: createMemoryStorage(),
+    ...overrides,
+  });
 }
 
 function loadRunMigrationContext(overrides = {}) {
@@ -4001,6 +4039,169 @@ test("submit run preparation forces unique run ids for back-to-back same-day sub
   assert.equal(second.run.wordCount, 63);
 });
 
+test("submit run preparation avoids run id collisions already present in canonical saved runs", () => {
+  const context = loadBrowserScripts(
+    ["src/data/run-model.js", "src/features/writing/submit-run-preparation.js"],
+    { console: silentConsole() }
+  );
+
+  const state = {
+    timerSeconds: 0,
+    timerWaitingForFirstInput: false,
+    timeRemaining: 0,
+    exerciseWords: [],
+    submitted: false,
+    completedUiActive: false,
+    repeatLimit: 2,
+    savedRunIds: new Set(),
+    history: [],
+  };
+  const analysis = {
+    totalWords: 63,
+    repeated: [],
+    bannedHits: [],
+    repeatedStarters: [],
+    starterExampleList: [],
+    uniqueCount: 60,
+    uniqueRatio: 0.95,
+    avgSentenceLength: 10.5,
+    counts: {},
+    starterCounts: {},
+    punctuation: {},
+    perspective: {},
+  };
+
+  const result = context.waywordSubmitRunPreparation.prepareSubmitRun({
+    state,
+    currentText: "run body",
+    prompt: "same prompt",
+    analysis,
+    fromTimer: false,
+    makeRunId: () => "run-collision",
+    readSavedRunsChronological() {
+      return [{ runId: "run-collision" }];
+    },
+    clearExerciseIfCompleted() {},
+    applyWriteDocSemanticFlagsFromAnalysisCore() {},
+    updateEnterButtonVisibility() {},
+    stopTimer() {},
+    completeWordmark() {},
+    getActiveTargetWordsForScoring() {
+      return 60;
+    },
+    computeRunScoreV1() {
+      return { runScore: 88, scoreBreakdown: { total: 88 } };
+    },
+  });
+
+  assert.notEqual(result.run.runId, "run-collision");
+});
+
+test("canonical read preserves three rapid consecutive saved runs with same prompt after refresh projection", () => {
+  const context = loadSavedRunsContext();
+  context.waywordRunDocumentRepo =
+    context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+      storage: context.localStorage,
+    });
+
+  const history = [];
+  const savedRunIds = new Set();
+  const persist = () => {};
+  const prompt = "same prompt";
+
+  for (let i = 0; i < 3; i += 1) {
+    const runId = `run-${i + 1}`;
+    context.waywordSavedRunPersistence.persistSuccessfulSavedRun({
+      run: { runId },
+      canonicalSaveInput: makeCanonicalSaveInput({
+        runId,
+        savedAt: 1710000000000 + i,
+        timestamp: 1710000000000 + i,
+        body: `body ${i + 1}`,
+        prompt,
+      }),
+      history,
+      savedRunIds,
+      inactivityEaseRunKey: "ease-key",
+      persist,
+    });
+  }
+
+  const chronological = context.waywordSavedRunsRead.listSavedRunsChronological();
+  assert.equal(chronological.length, 3);
+  const runIds = Array.from(chronological, (row) => row.runId);
+  assert.deepEqual(runIds, ["run-1", "run-2", "run-3"]);
+  assert.equal(new Set(runIds).size, 3);
+});
+
+test("profile and season aggregations retain distinct consecutive runs", () => {
+  const runs = [
+    {
+      runId: "run-1",
+      savedAt: Date.parse("2026-05-01T10:00:00.000Z"),
+      wordCount: 50,
+      uniqueRatio: 0.7,
+      avgSentenceLength: 8,
+      repeatedCount: 1,
+      fillerCount: 0,
+      wordFreq: { alpha: 2 },
+      starterFreq: { i: 1 },
+      starterExamples: { i: "I started." },
+      punctuation: { ".": 3 },
+      perspective: { first: 2 },
+    },
+    {
+      runId: "run-2",
+      savedAt: Date.parse("2026-05-01T10:00:00.500Z"),
+      wordCount: 60,
+      uniqueRatio: 0.75,
+      avgSentenceLength: 9,
+      repeatedCount: 1,
+      fillerCount: 0,
+      wordFreq: { beta: 3 },
+      starterFreq: { we: 1 },
+      starterExamples: { we: "We moved." },
+      punctuation: { ",": 2 },
+      perspective: { first: 1 },
+    },
+    {
+      runId: "run-3",
+      savedAt: Date.parse("2026-05-01T10:00:01.000Z"),
+      wordCount: 70,
+      uniqueRatio: 0.8,
+      avgSentenceLength: 10,
+      repeatedCount: 2,
+      fillerCount: 1,
+      wordFreq: { gamma: 4 },
+      starterFreq: { they: 1 },
+      starterExamples: { they: "They answered." },
+      punctuation: { "!": 1 },
+      perspective: { third: 2 },
+    },
+  ];
+
+  const aggregateContext = loadAggregateProfileContext({
+    readSavedRunsChronological() {
+      return runs;
+    },
+  });
+  const aggregate = aggregateContext.aggregateProfile();
+  assert.equal(aggregate.totalRuns, 3);
+  assert.equal(aggregate.totalWords, 180);
+  assert.equal(aggregate.wordFreq.alpha, 2);
+  assert.equal(aggregate.wordFreq.beta, 3);
+  assert.equal(aggregate.wordFreq.gamma, 4);
+
+  const seasonContext = loadSeasonTimestampAggregationContext();
+  const seasonCalendar = {
+    seasonStartLocal: new Date("2026-04-20T00:00:00.000Z"),
+    seasonEndLocal: new Date("2026-06-20T23:59:59.999Z"),
+  };
+  const seasonalRows = seasonContext.seasonalRunsForCalendarWindow(runs, seasonCalendar);
+  assert.equal(seasonalRows.length, 3);
+  assert.equal(new Set(seasonalRows.map((row) => row.run.runId)).size, 3);
+});
+
 test("saved-run persistence keeps legacy sync alive when canonical upsert fails", () => {
   const removedMarkers = [];
   const context = loadSavedRunsContext();
@@ -4092,6 +4293,155 @@ test("run document repository ignores unknown store envelope versions", () => {
   assert.equal(repo.listDocumentsParsed().length, 0);
 });
 
+test("storage wrappers fail safely on malformed or wrong-shape JSON", () => {
+  const context = loadStorageContext();
+  context.localStorage.setItem("wayword-history", "{bad json");
+  context.localStorage.setItem("wayword-runids", "{\"not\":\"array\"}");
+  context.localStorage.setItem("wayword-completed-challenges", "\"nope\"");
+
+  assert.deepEqual(Array.from(context.waywordStorage.loadHistory()), []);
+  assert.deepEqual(Array.from(context.waywordStorage.loadSavedRunIdsSet()), []);
+  assert.deepEqual(Array.from(context.waywordStorage.loadCompletedChallengesSet()), []);
+});
+
+test("canonical read skips partial invalid records and preserves valid neighbors after reload", () => {
+  const context = loadSavedRunsContext();
+  const goodA = context.waywordRunDocumentsModel.createRunDocumentFromLegacyRun({
+    runId: "run-a",
+    text: "alpha body",
+    prompt: "A",
+    savedAt: 100,
+    timestamp: 100,
+    wordCount: 2,
+    words: 2,
+  });
+  const goodB = context.waywordRunDocumentsModel.createRunDocumentFromLegacyRun({
+    runId: "run-b",
+    text: "beta body",
+    prompt: "B",
+    savedAt: 200,
+    timestamp: 200,
+    wordCount: 2,
+    words: 2,
+  });
+
+  const validA = context.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown(goodA);
+  const validB = context.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown(goodB);
+  const invalidMissingRunId = context.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown({
+    ...goodA,
+    runId: "",
+  });
+  const invalidMissingTimestamp = context.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown({
+    ...goodA,
+    runId: "run-c",
+    savedAt: null,
+    timestamp: null,
+  });
+
+  context.localStorage.setItem(
+    context.WAYWORD_RUN_DOCUMENTS_STORAGE_KEY,
+    JSON.stringify({
+      storeEnvelopeVersion: 1,
+      items: [validA, invalidMissingRunId, invalidMissingTimestamp, validB],
+    })
+  );
+  context.waywordRunDocumentRepo =
+    context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+      storage: context.localStorage,
+    });
+
+  const chronological = context.waywordSavedRunsRead.listSavedRunsChronological();
+  assert.deepEqual(
+    Array.from(chronological, (row) => row.runId),
+    ["run-a", "run-b"]
+  );
+});
+
+test("canonical read handles duplicate run ids deterministically and keeps newest winner", () => {
+  const context = loadSavedRunsContext();
+  const oldDoc = context.waywordRunDocumentsModel.createRunDocumentFromLegacyRun({
+    runId: "dup-1",
+    text: "old body",
+    prompt: "A",
+    savedAt: 100,
+    timestamp: 100,
+    wordCount: 2,
+    words: 2,
+  });
+  const newDoc = context.waywordRunDocumentsModel.createRunDocumentFromLegacyRun({
+    runId: "dup-1",
+    text: "new body",
+    prompt: "A",
+    savedAt: 200,
+    timestamp: 200,
+    wordCount: 2,
+    words: 2,
+  });
+  const otherDoc = context.waywordRunDocumentsModel.createRunDocumentFromLegacyRun({
+    runId: "run-z",
+    text: "z body",
+    prompt: "Z",
+    savedAt: 150,
+    timestamp: 150,
+    wordCount: 2,
+    words: 2,
+  });
+
+  context.localStorage.setItem(
+    context.WAYWORD_RUN_DOCUMENTS_STORAGE_KEY,
+    JSON.stringify({
+      storeEnvelopeVersion: 1,
+      items: [
+        context.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown(oldDoc),
+        context.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown(otherDoc),
+        context.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown(newDoc),
+      ],
+    })
+  );
+  context.waywordRunDocumentRepo =
+    context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+      storage: context.localStorage,
+    });
+
+  const chronological = context.waywordSavedRunsRead.listSavedRunsChronological();
+  const newestFirst = context.waywordSavedRunsRead.listSavedRunsNewestFirst();
+  assert.deepEqual(Array.from(chronological, (row) => row.runId), ["run-z", "dup-1"]);
+  assert.equal(chronological[1].text, "new body");
+  assert.deepEqual(Array.from(newestFirst, (row) => row.runId), ["dup-1", "run-z"]);
+});
+
+test("canonical read returns valid runs when malformed markdown neighbors exist", () => {
+  const context = loadSavedRunsContext();
+  const validDoc = context.waywordRunDocumentsModel.createRunDocumentFromLegacyRun({
+    runId: "safe-1",
+    text: "safe body",
+    prompt: "Safe",
+    savedAt: 111,
+    timestamp: 111,
+    wordCount: 2,
+    words: 2,
+  });
+
+  context.localStorage.setItem(
+    context.WAYWORD_RUN_DOCUMENTS_STORAGE_KEY,
+    JSON.stringify({
+      storeEnvelopeVersion: 1,
+      items: [
+        "not markdown",
+        context.waywordRunDocumentMarkdown.serializeRunDocumentToMarkdown(validDoc),
+        "---\n{\"bad\":true}\n---\nbody",
+      ],
+    })
+  );
+  context.waywordRunDocumentRepo =
+    context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+      storage: context.localStorage,
+    });
+
+  const rows = context.waywordSavedRunsRead.listSavedRunsChronological();
+  assert.deepEqual(Array.from(rows, (row) => row.runId), ["safe-1"]);
+});
+
 test("legacy migration merges rows missing from canonical store only once", () => {
   const storage = createMemoryStorage();
   const legacyRow = {
@@ -4141,6 +4491,49 @@ test("legacy migration merges rows missing from canonical store only once", () =
   assert.equal(second.skipped, 1);
 });
 
+test("legacy migration does not overwrite existing canonical run with same id", () => {
+  const storage = createMemoryStorage();
+  const legacyRow = {
+    runId: "same-1",
+    text: "legacy text",
+    prompt: "Legacy",
+    savedAt: 50,
+    timestamp: 50,
+    wordCount: 2,
+    words: 2,
+  };
+  const context = loadRunMigrationContext({
+    localStorage: storage,
+    waywordStorage: {
+      loadHistory() {
+        return [legacyRow];
+      },
+    },
+  });
+  const repo = context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+    storage,
+  });
+  repo.upsertDocument(
+    context.waywordRunDocumentsModel.createRunDocumentFromLegacyRun({
+      runId: "same-1",
+      text: "canonical text",
+      prompt: "Canonical",
+      savedAt: 500,
+      timestamp: 500,
+      wordCount: 2,
+      words: 2,
+    })
+  );
+
+  const result = context.waywordRunMigration.mergeLegacyHistoryMissingIntoCanonicalStore(repo);
+  assert.equal(result.merged, 0);
+  assert.equal(result.skipped, 1);
+
+  const persisted = repo.getDocumentByRunId("same-1");
+  assert.equal(persisted.body, "canonical text");
+  assert.equal(persisted.savedAt, 500);
+});
+
 test("account surface keeps sign-in available when URL/key are configured and RLS is unverified", () => {
   const context = loadAccountSurfaceRendererContext({
     waywordEnv: {
@@ -4159,7 +4552,11 @@ test("account surface keeps sign-in available when URL/key are configured and RL
 
   assert.equal(
     context.__accountNodes.accountPanelSummary.textContent,
-    "Sign-in is available."
+    "Sign in is available. Account sync is not available right now."
+  );
+  assert.equal(
+    context.__accountNodes.accountPanelFallback.textContent,
+    "Your writing is still here on this device."
   );
   assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), false);
   assert.equal(
@@ -4213,7 +4610,7 @@ test("account surface shows local-preview message when URL/key are missing", () 
 
   assert.equal(
     context.__accountNodes.accountPanelSummary.textContent,
-    "Sign-in is not set up in this preview."
+    "Account sync is not set up in this preview."
   );
   assert.equal(context.__accountNodes.accountSignInForm.classList.contains("hidden"), true);
 });
@@ -4230,10 +4627,10 @@ test("account runtime-unavailable copy uses configured-env-safe message", () => 
 
   assert.equal(
     context.getAccountRuntimeUnavailableMessage(true),
-    "Account sign-in is temporarily unavailable. Please try again."
+    "Account sign-in is not available right now."
   );
   assert.equal(
     context.getAccountRuntimeUnavailableMessage(false),
-    "Sign-in is not set up in this preview."
+    "Account sync is not set up in this preview."
   );
 });

@@ -22,7 +22,6 @@
     "eval:mirror": "node scripts/run-wayword-evaluation.js",
     "eval:patterns": "node scripts/run-patterns-evaluation.js",
     "check:coherence": "node scripts/check-coherence.js",
-    "alpha:pulse": "node scripts/generate-founder-alpha-pulse.js",
     "interpret:behavior": "node scripts/interpret-behavioral-telemetry.js",
     "alpha:pulse": "node scripts/generate-founder-alpha-pulse.js",
     "alpha:telemetry-audit": "node scripts/generate-telemetry-sync-report.js",
