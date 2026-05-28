@@ -82,6 +82,19 @@
     }
   }
 
+  function markRetentionEvent(methodName, payload) {
+    try {
+      if (
+        window.waywordRetentionEvents &&
+        typeof window.waywordRetentionEvents[methodName] === "function"
+      ) {
+        window.waywordRetentionEvents[methodName](payload || {});
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   /**
    * Canonical-first saved-run persistence seam. Normative contract: `docs/SAVED_RUNS_PERSISTENCE.md`.
    * Order is intentionally explicit:
@@ -115,33 +128,45 @@
         Promise.resolve(window.waywordPersistenceRuntime.syncSavedRun(fallbackRun))
           .then(function (syncResult) {
             var synced = Boolean(syncResult && syncResult.ok);
-            window.waywordRetentionEvents &&
-              typeof window.waywordRetentionEvents.markRunSaved === "function" &&
-              window.waywordRetentionEvents.markRunSaved({
-                sync_status: synced ? "server_synced" : "local_only_fallback",
-                is_authenticated: synced || (syncResult && syncResult.reason !== "no_authenticated_session"),
-              });
+            var noSession = Boolean(
+              syncResult &&
+                (syncResult.reason === "no_authenticated_session" ||
+                  syncResult.reason === "supabase_not_configured")
+            );
+            markRetentionEvent("markRunSaved", {
+              sync_status: synced
+                ? "server_synced"
+                : noSession
+                  ? "local_only_no_session"
+                  : "local_only_sync_failed",
+              is_authenticated: synced || !noSession,
+            });
+            markRetentionEvent("markMeaningfulSessionCompleted");
             if (!synced) {
               console.warn("wayword: persistence runtime sync failed; local continuity remains authoritative", syncResult);
             }
           })
           .catch(function (err) {
-            window.waywordRetentionEvents &&
-              typeof window.waywordRetentionEvents.markRunSaved === "function" &&
-              window.waywordRetentionEvents.markRunSaved({
-                sync_status: "local_only_fallback",
-                is_authenticated: false,
-              });
+            markRetentionEvent("markRunSaved", {
+              sync_status: "local_only_sync_failed",
+              is_authenticated: true,
+            });
+            markRetentionEvent("markMeaningfulSessionCompleted");
             console.warn("wayword: persistence runtime sync failed; local continuity remains authoritative", err);
           });
-      }
-    } catch (persistSyncErr) {
-      window.waywordRetentionEvents &&
-        typeof window.waywordRetentionEvents.markRunSaved === "function" &&
-        window.waywordRetentionEvents.markRunSaved({
-          sync_status: "local_only_fallback",
+      } else {
+        markRetentionEvent("markRunSaved", {
+          sync_status: "local_only_no_session",
           is_authenticated: false,
         });
+        markRetentionEvent("markMeaningfulSessionCompleted");
+      }
+    } catch (persistSyncErr) {
+      markRetentionEvent("markRunSaved", {
+        sync_status: "local_only_sync_failed",
+        is_authenticated: true,
+      });
+      markRetentionEvent("markMeaningfulSessionCompleted");
       console.warn("wayword: persistence runtime sync threw synchronously; local continuity remains authoritative", persistSyncErr);
     }
 

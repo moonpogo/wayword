@@ -72,6 +72,21 @@
     });
   }
 
+  function flushPendingRetentionEvents() {
+    try {
+      if (
+        window.waywordRetentionEvents &&
+        typeof window.waywordRetentionEvents.flushPending === "function"
+      ) {
+        Promise.resolve(window.waywordRetentionEvents.flushPending()).catch(function () {
+          /* ignore */
+        });
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   function isLocalHostName(hostname) {
     var safeHost = String(hostname || "").toLowerCase();
     return safeHost === "localhost" || safeHost === "127.0.0.1";
@@ -156,6 +171,9 @@
         return;
       }
       currentSession = result && result.data ? result.data.session || null : null;
+      if (currentSession) {
+        flushPendingRetentionEvents();
+      }
       if (typeof input.onStatus === "function") {
         input.onStatus({ mode: "supabase", hasSession: Boolean(currentSession) });
       }
@@ -163,6 +181,9 @@
 
     supabase.auth.onAuthStateChange(function (event, session) {
       currentSession = session || null;
+      if (currentSession) {
+        flushPendingRetentionEvents();
+      }
 
       if (event === "SIGNED_OUT") {
         writeDraftSnapshot(getDraftText);

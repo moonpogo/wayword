@@ -63,6 +63,21 @@
       events.push(eventRow);
       saveEvents(storage, events);
 
+      try {
+        if (
+          window.waywordRetentionEvents &&
+          typeof window.waywordRetentionEvents.persistTelemetryEvent === "function"
+        ) {
+          Promise.resolve(window.waywordRetentionEvents.persistTelemetryEvent(normalizedEvent, eventRow.payload)).catch(
+            function () {
+              /* ignore */
+            }
+          );
+        }
+      } catch (_) {
+        /* ignore */
+      }
+
       return { ok: true, event: eventRow };
     }
 
