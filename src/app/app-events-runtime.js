@@ -1,4 +1,195 @@
 (function () {
+  function createEditorInputDebugTrace(input, editorInput) {
+    var search = "";
+    var host = "";
+    try {
+      search = String((window && window.location && window.location.search) || "");
+      host = String((window && window.location && window.location.hostname) || "").toLowerCase();
+    } catch (_err) {
+      search = "";
+      host = "";
+    }
+    var hasDebugFlag = false;
+    try {
+      hasDebugFlag = new URLSearchParams(search).get("debugInput") === "1";
+    } catch (_err) {
+      hasDebugFlag = search.indexOf("debugInput=1") >= 0;
+    }
+    var isLocalDevHost =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host.endsWith(".local");
+    var enabled = hasDebugFlag || isLocalDevHost;
+    if (!enabled) {
+      return {
+        enabled: false,
+        logEvent: function () {},
+      };
+    }
+
+    var panelEnabled = hasDebugFlag;
+    var badge = null;
+    var panel = null;
+    var panelList = null;
+    var events = [];
+
+    function ensureBadge() {
+      if (!panelEnabled || badge) return;
+      if (!input || !input.document || !input.document.body || typeof input.document.createElement !== "function") return;
+      badge = input.document.createElement("div");
+      badge.id = "debugInputBadge";
+      badge.setAttribute("data-debug-input-badge", "1");
+      badge.textContent = "Input debug active";
+      badge.style.position = "fixed";
+      badge.style.top = "8px";
+      badge.style.left = "8px";
+      badge.style.right = "8px";
+      badge.style.padding = "10px 12px";
+      badge.style.border = "2px solid #ffcc7a";
+      badge.style.borderRadius = "10px";
+      badge.style.background = "rgba(255,170,64,0.22)";
+      badge.style.color = "#fff3de";
+      badge.style.font = "700 13px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial";
+      badge.style.letterSpacing = "0.2px";
+      badge.style.zIndex = "100000";
+      badge.style.textAlign = "center";
+      input.document.body.appendChild(badge);
+    }
+
+    function ensurePanel() {
+      if (!panelEnabled || panel) return;
+      if (!input || !input.document || !input.document.body || typeof input.document.createElement !== "function") return;
+      panel = input.document.createElement("div");
+      panel.id = "debugInputPanel";
+      panel.setAttribute("data-debug-input-panel", "1");
+      panel.style.position = "fixed";
+      panel.style.left = "8px";
+      panel.style.right = "8px";
+      panel.style.bottom = "8px";
+      panel.style.maxHeight = "40vh";
+      panel.style.overflow = "auto";
+      panel.style.padding = "8px";
+      panel.style.border = "1px solid rgba(255,255,255,0.24)";
+      panel.style.borderRadius = "8px";
+      panel.style.background = "rgba(8,9,13,0.92)";
+      panel.style.color = "#e6dccb";
+      panel.style.font = "11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      panel.style.zIndex = "99999";
+      panel.style.whiteSpace = "pre-wrap";
+      var title = input.document.createElement("div");
+      title.textContent = "Input debug active";
+      title.style.fontWeight = "600";
+      title.style.marginBottom = "6px";
+      panel.appendChild(title);
+      panelList = input.document.createElement("div");
+      panel.appendChild(panelList);
+      input.document.body.appendChild(panel);
+    }
+
+    function activeTagName() {
+      try {
+        var active = input.document && input.document.activeElement;
+        return active && active.tagName ? String(active.tagName) : "";
+      } catch (_err) {
+        return "";
+      }
+    }
+
+    function eventTargetTagName(event) {
+      if (!event || !event.target || !event.target.tagName) return "";
+      return String(event.target.tagName);
+    }
+
+    function renderPanel() {
+      if (!panelEnabled || !panelList) return;
+      panelList.textContent = events
+        .map(function (entry) {
+          return [
+            entry.eventType,
+            entry.inputType ? "inputType=" + entry.inputType : "",
+            entry.key ? "key=" + entry.key : "",
+            entry.code ? "code=" + entry.code : "",
+            "mods=" + [entry.shiftKey ? "S" : "", entry.metaKey ? "M" : "", entry.ctrlKey ? "C" : "", entry.altKey ? "A" : ""].join(""),
+            "composing=" + String(entry.isComposing),
+            entry.targetTagName ? "target=" + entry.targetTagName : "",
+            entry.activeElement ? "active=" + entry.activeElement : "",
+            "vw=" + String(entry.viewportWidth),
+            "mobile=" + String(entry.mobileDetected),
+            "submit=" + String(entry.submitAttempted),
+            "preventDefault=" + String(entry.preventDefaultCalled),
+          ]
+            .filter(Boolean)
+            .join(" | ");
+        })
+        .join("\n");
+    }
+
+    ensurePanel();
+    ensureBadge();
+    try {
+      if (input.document && input.document.documentElement) {
+        input.document.documentElement.setAttribute("data-debug-input", "active");
+      }
+      if (input.document && input.document.body) {
+        input.document.body.setAttribute("data-debug-input", "active");
+      }
+    } catch (_err) {
+      // no-op
+    }
+
+    return {
+      enabled: true,
+      logEvent: function (eventType, event, meta) {
+        var details = meta && typeof meta === "object" ? meta : {};
+        var mobileDetected = false;
+        try {
+          mobileDetected = Boolean(input.isMobileViewport && input.isMobileViewport());
+        } catch (_err) {
+          mobileDetected = false;
+        }
+        var viewportWidth = 0;
+        try {
+          viewportWidth = Number(window && window.innerWidth) || 0;
+        } catch (_err) {
+          viewportWidth = 0;
+        }
+        var entry = {
+          eventType: String(eventType || ""),
+          inputType: String((event && event.inputType) || ""),
+          key: String((event && event.key) || ""),
+          code: String((event && event.code) || ""),
+          shiftKey: Boolean(event && event.shiftKey),
+          metaKey: Boolean(event && event.metaKey),
+          ctrlKey: Boolean(event && event.ctrlKey),
+          altKey: Boolean(event && event.altKey),
+          isComposing: Boolean(event && event.isComposing),
+          targetTagName: eventTargetTagName(event),
+          activeElement: activeTagName(),
+          viewportWidth: viewportWidth,
+          mobileDetected: mobileDetected,
+          submitAttempted: Boolean(details.submitAttempted),
+          preventDefaultCalled: Boolean(details.preventDefaultCalled),
+        };
+        events.push(entry);
+        if (events.length > 20) events.splice(0, events.length - 20);
+        try {
+          window.__WAYWORD_INPUT_DEBUG_EVENTS = events.slice();
+          window.__WAYWORD_INPUT_DEBUG_LAST = entry;
+          if (console && typeof console.info === "function") {
+            console.info("[wayword-input-debug]", entry);
+          }
+        } catch (_err) {
+          // no-op
+        }
+        if (panelEnabled) {
+          ensurePanel();
+          renderPanel();
+        }
+      },
+    };
+  }
+
   function trySubmitFromEditor(input) {
     if (!input || !input.state) return false;
     if (input.state.submitted) {
@@ -17,6 +208,7 @@
     var editorInput = input.editorInput;
     if (!editorInput || editorInput.dataset.appEventsBound === "1") return;
     editorInput.dataset.appEventsBound = "1";
+    var debugTrace = createEditorInputDebugTrace(input, editorInput);
 
     editorInput.addEventListener("focus", function () {
       if (!window.__WAYWORD_DEV_VISUAL_PROFILE) {
@@ -49,11 +241,19 @@
       );
     });
 
-    editorInput.addEventListener("compositionstart", function () {
+    editorInput.addEventListener("compositionstart", function (e) {
       input.setEditorSurfaceComposing(true);
+      debugTrace.logEvent("compositionstart", e, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+      });
     });
 
-    editorInput.addEventListener("compositionend", function () {
+    editorInput.addEventListener("compositionend", function (e) {
+      debugTrace.logEvent("compositionend", e, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+      });
       input.setEditorSurfaceComposing(false);
       if (!input.isActiveAndEditable()) return;
       input.flushEditorSurfaceIntoWriteDocOnce();
@@ -81,7 +281,11 @@
       }
     });
 
-    editorInput.addEventListener("input", function () {
+    editorInput.addEventListener("input", function (e) {
+      debugTrace.logEvent("input", e, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+      });
       if (!input.isActiveAndEditable()) return;
       if (input.getEditorSurfaceComposing()) {
         if (
@@ -130,6 +334,14 @@
     );
 
     editorInput.addEventListener("keydown", function (e) {
+      var submitAttempted = false;
+      var preventDefaultCalled = false;
+      var markPreventDefault = function () {
+        preventDefaultCalled = true;
+        if (e && typeof e.preventDefault === "function") {
+          e.preventDefault();
+        }
+      };
       if (
         input.completedUiRestartInteractions &&
         typeof input.completedUiRestartInteractions.handleEditorCompletedRestartKeydown === "function" &&
@@ -147,9 +359,15 @@
       if (e.key === "Enter" && !e.shiftKey) {
         if (e.isComposing || input.getEditorSurfaceComposing()) return;
         if (input.isMobileViewport && input.isMobileViewport()) return;
-        e.preventDefault();
+        markPreventDefault();
+        submitAttempted = true;
         trySubmitFromEditor(input);
       }
+
+      debugTrace.logEvent("keydown", e, {
+        submitAttempted: submitAttempted,
+        preventDefaultCalled: preventDefaultCalled,
+      });
 
       var moveCaretKeys = {
         ArrowDown: true,
@@ -172,7 +390,20 @@
       }
     });
 
+    editorInput.addEventListener("keyup", function (e) {
+      debugTrace.logEvent("keyup", e, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+      });
+    });
+
     editorInput.addEventListener("beforeinput", function (e) {
+      var submitAttempted = false;
+      var preventDefaultCalled = false;
+      debugTrace.logEvent("beforeinput", e, {
+        submitAttempted: submitAttempted,
+        preventDefaultCalled: preventDefaultCalled,
+      });
       if (!input.isMobileViewport || !input.isMobileViewport()) return;
       var inputType = String(e && e.inputType ? e.inputType : "");
       if (inputType !== "insertLineBreak" && inputType !== "insertParagraph") return;
@@ -360,11 +591,22 @@
     var enterSubmitBtn = input.$("enterSubmitBtn");
     if (enterSubmitBtn && enterSubmitBtn.dataset.appControlBound !== "1") {
       enterSubmitBtn.dataset.appControlBound = "1";
-      enterSubmitBtn.addEventListener("click", function () {
-        if (input.state && input.state.submitted) return;
-        if (input.getEditorSurfaceComposing && input.getEditorSurfaceComposing()) return;
-        if (!input.editorInput || input.getEditorText().trim().length === 0) return;
-        input.submitWriting(false);
+      enterSubmitBtn.addEventListener("click", function (e) {
+        var debugTrace = createEditorInputDebugTrace(input, input.editorInput);
+        var submitAttempted = false;
+        var allowed =
+          !(input.state && input.state.submitted) &&
+          !(input.getEditorSurfaceComposing && input.getEditorSurfaceComposing()) &&
+          !!input.editorInput &&
+          input.getEditorText().trim().length > 0;
+        if (allowed) {
+          submitAttempted = true;
+          input.submitWriting(false);
+        }
+        debugTrace.logEvent("submit-click", e, {
+          submitAttempted: submitAttempted,
+          preventDefaultCalled: false,
+        });
       });
     }
 
