@@ -1,4 +1,86 @@
 (function () {
+  function hasDebugInputFlag(search) {
+    var rawSearch = typeof search === "string" ? search : "";
+    try {
+      return new URLSearchParams(rawSearch).get("debugInput") === "1";
+    } catch (_err) {
+      return rawSearch.indexOf("debugInput=1") >= 0;
+    }
+  }
+
+  function initLandingDebugInputPanel() {
+    var search = "";
+    try {
+      search = String((window && window.location && window.location.search) || "");
+    } catch (_err) {
+      search = "";
+    }
+    if (!hasDebugInputFlag(search)) return;
+    var doc = document;
+    if (!doc || !doc.body || typeof doc.createElement !== "function") return;
+    if (doc.documentElement) {
+      doc.documentElement.setAttribute("data-debug-input", "active");
+    }
+    doc.body.setAttribute("data-debug-input", "active");
+
+    if (!doc.getElementById("debugInputBadge")) {
+      var badge = doc.createElement("div");
+      badge.id = "debugInputBadge";
+      badge.setAttribute("data-debug-input-badge", "1");
+      badge.textContent = "Input debug active";
+      badge.style.position = "fixed";
+      badge.style.top = "8px";
+      badge.style.left = "8px";
+      badge.style.right = "8px";
+      badge.style.padding = "10px 12px";
+      badge.style.border = "2px solid #ffcc7a";
+      badge.style.borderRadius = "10px";
+      badge.style.background = "rgba(255,170,64,0.22)";
+      badge.style.color = "#fff3de";
+      badge.style.font = "700 13px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial";
+      badge.style.letterSpacing = "0.2px";
+      badge.style.zIndex = "100000";
+      badge.style.textAlign = "center";
+      doc.body.appendChild(badge);
+    }
+
+    if (!doc.getElementById("debugInputPanel")) {
+      var panel = doc.createElement("div");
+      panel.id = "debugInputPanel";
+      panel.setAttribute("data-debug-input-panel", "1");
+      panel.style.position = "fixed";
+      panel.style.left = "8px";
+      panel.style.right = "8px";
+      panel.style.bottom = "8px";
+      panel.style.maxHeight = "40vh";
+      panel.style.overflow = "auto";
+      panel.style.padding = "8px";
+      panel.style.border = "1px solid rgba(255,255,255,0.24)";
+      panel.style.borderRadius = "8px";
+      panel.style.background = "rgba(8,9,13,0.92)";
+      panel.style.color = "#e6dccb";
+      panel.style.font = "11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      panel.style.zIndex = "99999";
+      panel.style.whiteSpace = "pre-wrap";
+      var title = doc.createElement("div");
+      title.textContent = "Input debug active";
+      title.style.fontWeight = "600";
+      title.style.marginBottom = "6px";
+      panel.appendChild(title);
+      var list = doc.createElement("div");
+      list.id = "debugInputPanelEvents";
+      list.textContent = "Waiting for editor event trace...";
+      panel.appendChild(list);
+      doc.body.appendChild(panel);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initLandingDebugInputPanel, { once: true });
+  } else {
+    initLandingDebugInputPanel();
+  }
+
   function createEditorInputDebugTrace(input, editorInput) {
     var search = "";
     var host = "";
@@ -9,12 +91,7 @@
       search = "";
       host = "";
     }
-    var hasDebugFlag = false;
-    try {
-      hasDebugFlag = new URLSearchParams(search).get("debugInput") === "1";
-    } catch (_err) {
-      hasDebugFlag = search.indexOf("debugInput=1") >= 0;
-    }
+    var hasDebugFlag = hasDebugInputFlag(search);
     var isLocalDevHost =
       host === "localhost" ||
       host === "127.0.0.1" ||
@@ -37,6 +114,11 @@
     function ensureBadge() {
       if (!panelEnabled || badge) return;
       if (!input || !input.document || !input.document.body || typeof input.document.createElement !== "function") return;
+      var existingBadge = input.document.getElementById("debugInputBadge");
+      if (existingBadge) {
+        badge = existingBadge;
+        return;
+      }
       badge = input.document.createElement("div");
       badge.id = "debugInputBadge";
       badge.setAttribute("data-debug-input-badge", "1");
@@ -60,6 +142,14 @@
     function ensurePanel() {
       if (!panelEnabled || panel) return;
       if (!input || !input.document || !input.document.body || typeof input.document.createElement !== "function") return;
+      var existingPanel = input.document.getElementById("debugInputPanel");
+      if (existingPanel) {
+        panel = existingPanel;
+        panelList =
+          input.document.getElementById("debugInputPanelEvents") ||
+          existingPanel.querySelector("div:last-child");
+        return;
+      }
       panel = input.document.createElement("div");
       panel.id = "debugInputPanel";
       panel.setAttribute("data-debug-input-panel", "1");
@@ -83,6 +173,7 @@
       title.style.marginBottom = "6px";
       panel.appendChild(title);
       panelList = input.document.createElement("div");
+      panelList.id = "debugInputPanelEvents";
       panel.appendChild(panelList);
       input.document.body.appendChild(panel);
     }
