@@ -458,6 +458,27 @@ function makeCanonicalSaveInput(overrides = {}) {
   };
 }
 
+function classifyBackToBackParityOutcome(input = {}) {
+  const canonicalCount = Math.max(0, Number(input.canonicalCount) || 0);
+  const legacyCount = Math.max(0, Number(input.legacyCount) || 0);
+  const recentRunsCount = Math.max(0, Number(input.recentRunsCount) || 0);
+  const patternsInputCount = Math.max(0, Number(input.patternsInputCount) || 0);
+  const seasonTotalRuns = Math.max(0, Number(input.seasonTotalRuns) || 0);
+  const distinctRunIds = Math.max(0, Number(input.distinctRunIds) || 0);
+
+  const canonicalMissing = canonicalCount < 2;
+  const legacyMissing = legacyCount < 2;
+  const observatoryMissing =
+    recentRunsCount < 2 || patternsInputCount < 2 || seasonTotalRuns < 2 || distinctRunIds < 2;
+
+  if (canonicalMissing && legacyMissing) return "data_loss";
+  if (canonicalMissing !== legacyMissing) return "canonical_legacy_divergence";
+  if (!observatoryMissing && canonicalCount >= 2 && legacyCount >= 2 && distinctRunIds >= 2) {
+    return "visual_only_clustering";
+  }
+  return "no_failure_detected";
+}
+
 test("prompt selection avoids immediate repeat ids and near-duplicate groups when eligible", () => {
   const context = loadPromptSelectionContext();
   const { promptLibrary, promptEntryById } = buildPromptLibrary();
@@ -478,6 +499,44 @@ test("prompt selection avoids immediate repeat ids and near-duplicate groups whe
   assert.equal(chosen.family, "Scene");
   assert.equal(chosen.entry.id, "obs-3");
   assert.notEqual(chosen.entry.nearDuplicateGroup, "obs-a");
+});
+
+test("back-to-back parity classifier reports data-loss vs divergence vs visual-only clustering", () => {
+  assert.equal(
+    classifyBackToBackParityOutcome({
+      canonicalCount: 1,
+      legacyCount: 1,
+      recentRunsCount: 1,
+      patternsInputCount: 1,
+      seasonTotalRuns: 1,
+      distinctRunIds: 1,
+    }),
+    "data_loss"
+  );
+
+  assert.equal(
+    classifyBackToBackParityOutcome({
+      canonicalCount: 1,
+      legacyCount: 2,
+      recentRunsCount: 1,
+      patternsInputCount: 1,
+      seasonTotalRuns: 1,
+      distinctRunIds: 1,
+    }),
+    "canonical_legacy_divergence"
+  );
+
+  assert.equal(
+    classifyBackToBackParityOutcome({
+      canonicalCount: 2,
+      legacyCount: 2,
+      recentRunsCount: 2,
+      patternsInputCount: 2,
+      seasonTotalRuns: 2,
+      distinctRunIds: 2,
+    }),
+    "visual_only_clustering"
+  );
 });
 
 test("prompt selection falls across families when the forced family is exhausted", () => {
