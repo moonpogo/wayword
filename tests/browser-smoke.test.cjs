@@ -289,6 +289,112 @@ async function readSmokeErrors(session) {
   `);
 }
 
+async function readBackToBackParitySnapshot(session) {
+  return await session.execute(`
+    function safeParseJsonArray(raw) {
+      try {
+        var parsed = JSON.parse(String(raw || "[]"));
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    function canonicalRowsFromEnvelope() {
+      var raw = localStorage.getItem("wayword-run-documents-v1");
+      if (!raw) return [];
+      try {
+        var env = JSON.parse(raw);
+        if (!env || !Array.isArray(env.items)) return [];
+        return env.items.slice();
+      } catch (_) {
+        return [];
+      }
+    }
+    function savedRunsChronological() {
+      if (typeof window.readSavedRunsChronological === "function") {
+        try {
+          var rows = window.readSavedRunsChronological();
+          return Array.isArray(rows) ? rows : [];
+        } catch (_) {}
+      }
+      return [];
+    }
+    var savedRows = savedRunsChronological();
+    var patternsInputs = [];
+    var recentRunsSource = [];
+    if (typeof window.readSavedRunsNewestFirst === "function") {
+      try {
+        var newestRows = window.readSavedRunsNewestFirst();
+        recentRunsSource = Array.isArray(newestRows) ? newestRows : [];
+      } catch (_) {}
+    }
+    if (typeof window.collectMirrorSessionDigestsFromHistory === "function") {
+      try {
+        var digests = window.collectMirrorSessionDigestsFromHistory();
+        patternsInputs = Array.isArray(digests) ? digests : [];
+      } catch (_) {}
+    }
+    if (!patternsInputs.length && savedRows.length) {
+      patternsInputs = savedRows.filter(function (row) {
+        return row && row.mirrorSessionDigest && row.mirrorSessionDigest.v === 1;
+      });
+    }
+
+    var seasonTotalRuns = 0;
+    var seasonSvg = document.querySelector(".season-wheel-debug-svg");
+    if (seasonSvg) {
+      seasonTotalRuns = Number(seasonSvg.getAttribute("data-total-runs") || 0) || 0;
+    } else if (
+      typeof window.seasonalRunsForCalendarWindow === "function" &&
+      typeof window.buildCurrentSeasonCalendar === "function"
+    ) {
+      try {
+        seasonTotalRuns = window.seasonalRunsForCalendarWindow(savedRows, window.buildCurrentSeasonCalendar(new Date())).length;
+      } catch (_) {
+        seasonTotalRuns = 0;
+      }
+    }
+
+    var legacyRows = safeParseJsonArray(localStorage.getItem("wayword-history"));
+    var recentRows = document.querySelectorAll("#recentRailList .recent-entry");
+    var effectivePatternsInputCount = patternsInputs.length > 0 ? patternsInputs.length : savedRows.length;
+    var distinctRunIds = new Set(
+      savedRows.map(function (row) {
+        return String(row && row.runId ? row.runId : "").trim();
+      }).filter(Boolean)
+    ).size;
+    return {
+      canonicalCount: canonicalRowsFromEnvelope().length,
+      legacyCount: legacyRows.length,
+      recentRunsCount: recentRunsSource.length > 0 ? recentRunsSource.length : recentRows.length,
+      patternsInputCount: effectivePatternsInputCount,
+      seasonTotalRuns: seasonTotalRuns,
+      distinctRunIds: distinctRunIds,
+    };
+  `);
+}
+
+function classifyBackToBackParityOutcome(snapshot) {
+  const canonicalCount = Math.max(0, Number(snapshot?.canonicalCount) || 0);
+  const legacyCount = Math.max(0, Number(snapshot?.legacyCount) || 0);
+  const recentRunsCount = Math.max(0, Number(snapshot?.recentRunsCount) || 0);
+  const patternsInputCount = Math.max(0, Number(snapshot?.patternsInputCount) || 0);
+  const seasonTotalRuns = Math.max(0, Number(snapshot?.seasonTotalRuns) || 0);
+  const distinctRunIds = Math.max(0, Number(snapshot?.distinctRunIds) || 0);
+
+  const canonicalMissing = canonicalCount < 2;
+  const legacyMissing = legacyCount < 2;
+  const observatoryMissing =
+    recentRunsCount < 2 || patternsInputCount < 2 || seasonTotalRuns < 2 || distinctRunIds < 2;
+
+  if (canonicalMissing && legacyMissing) return "data_loss";
+  if (canonicalMissing !== legacyMissing) return "canonical_legacy_divergence";
+  if (!observatoryMissing && canonicalCount >= 2 && legacyCount >= 2 && distinctRunIds >= 2) {
+    return "visual_only_clustering";
+  }
+  return "no_failure_detected";
+}
+
 async function readDesktopWritingColumnLayoutSnapshot(session) {
   return await session.execute(`
     var header = document.querySelector(".app-write-surface > .header");
@@ -714,6 +820,54 @@ test("browser smoke: begin -> write -> submit renders Mirror without visible evi
         "expected semantic legend row to enter post-submit muted mode when visible alongside Mirror"
       );
     }
+
+    const errors = await readSmokeErrors(session);
+    assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
+  });
+});
+
+test("browser smoke: back-to-back submits preserve observatory parity and storage parity", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await loadFreshApp(session);
+    await completeFirstSessionEntryThroughHandoffContinue(session);
+
+    const before = await readBackToBackParitySnapshot(session);
+
+    await fillEditor(session, SMOKE_RUN_TEXTS[0]);
+    await submitCurrentRun(session);
+    await restartIntoNextRun(session);
+
+    await fillEditor(session, SMOKE_RUN_TEXTS[1]);
+    await submitCurrentRun(session);
+
+    const after = await readBackToBackParitySnapshot(session);
+    const delta = {
+      canonicalCount: after.canonicalCount - before.canonicalCount,
+      legacyCount: after.legacyCount - before.legacyCount,
+      recentRunsCount: after.recentRunsCount - before.recentRunsCount,
+      patternsInputCount: after.patternsInputCount - before.patternsInputCount,
+      seasonTotalRuns: after.seasonTotalRuns - before.seasonTotalRuns,
+      distinctRunIds: after.distinctRunIds - before.distinctRunIds,
+    };
+    const failureClass = classifyBackToBackParityOutcome({
+      canonicalCount: delta.canonicalCount,
+      legacyCount: delta.legacyCount,
+      recentRunsCount: delta.recentRunsCount,
+      patternsInputCount: delta.patternsInputCount,
+      seasonTotalRuns: delta.seasonTotalRuns,
+      distinctRunIds: delta.distinctRunIds,
+    });
+
+    assert.ok(
+      failureClass === "no_failure_detected" || failureClass === "visual_only_clustering",
+      `Unexpected parity failure classification: ${failureClass}`
+    );
+    assert.equal(delta.canonicalCount, 2, `Expected canonical +2 runs, got ${JSON.stringify({ before, after, delta })}`);
+    assert.equal(delta.legacyCount, 2, `Expected legacy +2 runs, got ${JSON.stringify({ before, after, delta })}`);
+    assert.ok(delta.recentRunsCount >= 2, `Expected Recent Runs to reflect +2 or more, got ${JSON.stringify({ before, after, delta })}`);
+    assert.ok(delta.patternsInputCount >= 2, `Expected Patterns inputs to reflect +2 or more, got ${JSON.stringify({ before, after, delta })}`);
+    assert.ok(delta.seasonTotalRuns >= 2, `Expected Season total to reflect +2 or more, got ${JSON.stringify({ before, after, delta })}`);
+    assert.equal(delta.distinctRunIds, 2, `Expected exactly two new run IDs, got ${JSON.stringify({ before, after, delta })}`);
 
     const errors = await readSmokeErrors(session);
     assert.equal(errors.length, 0, `expected no local browser errors, received: ${JSON.stringify(errors)}`);
