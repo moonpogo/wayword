@@ -1344,8 +1344,13 @@ test("season fixture clustered10rapid yields 10 distinct same-day runs", () => {
     "let devSeasonFixtureName = null;",
     "/* season wheel instrument contract: begin */"
   );
+  const instrumentBlock = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
   const api = new Function(
-    `${dayKeyHelper}\n${fixtureBlock}; return { buildDevSeasonFixtureViewModel, fixtureCountMapByName };`
+    `${dayKeyHelper}\n${fixtureBlock}\n${instrumentBlock}; return { buildDevSeasonFixtureViewModel, fixtureCountMapByName, buildSeasonWheelInstrumentModel };`
   )();
 
   const fixtureMap = api.fixtureCountMapByName("clustered10rapid");
@@ -1360,6 +1365,51 @@ test("season fixture clustered10rapid yields 10 distinct same-day runs", () => {
 
   const timestamps = vm.seasonalRows.map((row) => row.timestampMs);
   assert.equal(new Set(timestamps).size, 10, "expected 10 distinct rapid timestamps");
+
+  const seasonModel = api.buildSeasonWheelInstrumentModel(vm.seasonalRows, {
+    seasonLengthDays: 93,
+    nowDate: new Date("2026-05-26T23:59:00-07:00"),
+    seasonStartDate: new Date("2026-03-20T00:00:00-07:00"),
+    seasonEndDate: new Date("2026-06-20T23:59:59.999-07:00"),
+  });
+  assert.equal(seasonModel.clusterGapMinutes, 5);
+  assert.equal(seasonModel.clusters.length, 1);
+  assert.equal(seasonModel.clusters[0].runCount, 10);
+});
+
+test("season wheel instrument model keeps runs separated when beyond cluster threshold", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const instrumentBlock = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const buildModel = new Function(`${instrumentBlock}; return buildSeasonWheelInstrumentModel;`)();
+
+  const model = buildModel(
+    [
+      {
+        timestampMs: Date.parse("2026-05-26T10:00:00-07:00"),
+        run: { startedAt: "2026-05-26T10:00:00-07:00", durationMinutes: 8, wordCount: 60, completed: true },
+      },
+      {
+        timestampMs: Date.parse("2026-05-26T10:07:00-07:00"),
+        run: { startedAt: "2026-05-26T10:07:00-07:00", durationMinutes: 7, wordCount: 55, completed: true },
+      },
+    ],
+    {
+      seasonLengthDays: 93,
+      nowDate: new Date("2026-05-26T23:59:00-07:00"),
+      seasonStartDate: new Date("2026-03-20T00:00:00-07:00"),
+      seasonEndDate: new Date("2026-06-20T23:59:59.999-07:00"),
+      clusterGapMinutes: 5,
+    }
+  );
+
+  assert.equal(model.segments.length, 2);
+  assert.equal(model.clusters.length, 2);
+  assert.equal(model.clusters[0].runCount, 1);
+  assert.equal(model.clusters[1].runCount, 1);
 });
 
 test("season wheel full-ring output preserves clustered10rapid run count in summary data", () => {
@@ -1407,6 +1457,9 @@ test("season wheel full-ring output preserves clustered10rapid run count in summ
   });
 
   assert.equal(svg.includes('data-total-runs="10"'), true);
+  assert.equal(svg.includes('data-run-count="10"'), true);
+  assert.equal(svg.includes('data-clustered="true"'), true);
+  assert.equal(svg.includes('data-cluster-count="10"'), true);
 });
 
 test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
@@ -2303,7 +2356,7 @@ test("app boot runtime resize observers stay inert when targets are missing", ()
   assert.equal(overlayResult, null);
 });
 
-test("app events runtime binds editor input events once, syncs scroll, and submits on enter", () => {
+test("app events runtime binds editor input events once, syncs scroll, and keeps mobile Enter/newline as writing", () => {
   const context = loadAppEventsRuntimeContext();
   const listeners = new Map();
   const editorInput = {
@@ -2415,8 +2468,12 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "setFocusMode" && entry[1] === true));
   assert.ok(calls.includes("syncScroll"));
   assert.ok(calls.includes("picker"));
-  assert.ok(calls.includes("preventDefault"));
-  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
+  assert.equal(calls.includes("preventDefault"), false);
+  assert.equal(
+    calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false),
+    false,
+    "mobile Enter should not submit"
+  );
 
   calls.length = 0;
   listeners.get("beforeinput")({
@@ -2426,8 +2483,12 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
       calls.push("beforeinputPreventDefault");
     },
   });
-  assert.ok(calls.includes("beforeinputPreventDefault"));
-  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
+  assert.equal(calls.includes("beforeinputPreventDefault"), false);
+  assert.equal(
+    calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false),
+    false,
+    "mobile beforeinput newline should not submit"
+  );
 
   calls.length = 0;
   listeners.get("keydown")({
@@ -2457,6 +2518,65 @@ test("app events runtime binds editor input events once, syncs scroll, and submi
   calls.length = 0;
   listeners.get("focus")();
   assert.ok(calls.includes("entryDelayFocus"), "expected editor focus to arm pre-entry hint timer");
+});
+
+test("app events runtime submits on desktop Enter when not composing", () => {
+  const context = loadAppEventsRuntimeContext();
+  const listeners = new Map();
+  const calls = [];
+  const editorInput = {
+    dataset: {},
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+  };
+  const input = {
+    editorInput,
+    state: { active: true, submitted: false, completedUiActive: false, optionsOpen: false },
+    isMobileViewport() {
+      return false;
+    },
+    getEditorSurfaceComposing() {
+      return false;
+    },
+    isActiveAndEditable() {
+      return true;
+    },
+    flushEditorSurfaceIntoWriteDocOnce() {},
+    tryStartTimerOnFirstMeaningfulInput() {},
+    pulseWordmark() {},
+    renderHighlight() {},
+    renderSidebar() {},
+    updateWordProgress() {},
+    updateEnterButtonVisibility() {},
+    renderMeta() {},
+    onEditorFocusForEntryDelayHint() {},
+    onEditorInputForEntryDelayHint() {},
+    onEditorInputForTelemetry() {},
+    scheduleSemanticPickerFromSelection() {},
+    syncScroll() {},
+    scheduleEditorDotOverlaySync() {},
+    setEditorSurfaceComposing() {},
+    completedUiRestartInteractions: null,
+    submitWriting(value) {
+      calls.push(["submitWriting", value]);
+    },
+    getEditorText() {
+      return "desktop text";
+    },
+  };
+
+  context.waywordAppEventsRuntime.bindEditorInputEvents(input);
+  listeners.get("keydown")({
+    key: "Enter",
+    shiftKey: false,
+    preventDefault() {
+      calls.push("preventDefault");
+    },
+  });
+
+  assert.ok(calls.includes("preventDefault"));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
 });
 
 test("app events runtime blocks submit click while composing or already submitted", () => {
@@ -2491,8 +2611,13 @@ test("app events runtime blocks submit click while composing or already submitte
   listeners.get("click")();
   assert.equal(calls.length, 0, "submit click should no-op while composing");
 
-  input.state.submitted = true;
+  calls.length = 0;
   input.getEditorSurfaceComposing = () => false;
+  listeners.get("click")();
+  assert.deepEqual(calls, [["submitWriting", false]], "explicit submit should still submit when allowed");
+
+  input.state.submitted = true;
+  calls.length = 0;
   listeners.get("click")();
   assert.equal(calls.length, 0, "submit click should no-op once run is already submitted");
 });
