@@ -146,6 +146,7 @@
 
       if (e.key === "Enter" && !e.shiftKey) {
         if (e.isComposing || input.getEditorSurfaceComposing()) return;
+        if (input.isMobileViewport && input.isMobileViewport()) return;
         e.preventDefault();
         trySubmitFromEditor(input);
       }
@@ -176,9 +177,7 @@
       var inputType = String(e && e.inputType ? e.inputType : "");
       if (inputType !== "insertLineBreak" && inputType !== "insertParagraph") return;
       if (e.isComposing || input.getEditorSurfaceComposing()) return;
-      if (trySubmitFromEditor(input)) {
-        e.preventDefault();
-      }
+      return;
     });
 
     editorInput.addEventListener("pointerup", function () {
