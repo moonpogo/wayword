@@ -27,6 +27,7 @@
     "alpha:telemetry-audit": "node scripts/generate-telemetry-sync-report.js",
     "postinstall": "playwright install chromium",
     "test:smoke": "node --test tests/browser-smoke.test.cjs",
+    "test:browser:run-parity": "node --test tests/browser-smoke.test.cjs --test-name-pattern \"back-to-back submits preserve observatory parity and storage parity\"",
     "test:logic": "node --test tests/app-logic.test.cjs tests/mirror-pipeline.test.cjs tests/patterns-aggregation.test.cjs tests/trace-field-v0-harness.test.cjs tests/persistence-migration.test.cjs tests/retention-telemetry.test.cjs tests/auth-session-runtime.test.cjs tests/founder-alpha-pulse.test.cjs",
     "test": "npm run test:logic",
     "verify:merge": "npm test && node --check script.js && npm run verify:mirror-bundle && npm run verify:brand-lock && npm run verify:patterns-surface",
