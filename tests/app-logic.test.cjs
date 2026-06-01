@@ -124,6 +124,27 @@ function loadSeasonTimestampAggregationContext(overrides = {}) {
   return context;
 }
 
+function loadEditorSurfaceTextContext(overrides = {}) {
+  const source = fs.readFileSync("script.js", "utf8");
+  const block = extractBetween(
+    source,
+    "const EDITOR_BLOCK_TAGS = new Set([",
+    "function parseRawToWriteDoc(raw, previousWriteDoc) {"
+  );
+  const trimmed = block.slice(0, block.lastIndexOf("function parseRawToWriteDoc(raw, previousWriteDoc) {"));
+  const context = loadBrowserScripts([], {
+    console: silentConsole(),
+    Node: {
+      TEXT_NODE: 3,
+      ELEMENT_NODE: 1,
+      DOCUMENT_FRAGMENT_NODE: 11,
+    },
+    ...overrides,
+  });
+  require("vm").runInContext(trimmed, context, { filename: "script.js:editor-surface-text" });
+  return context;
+}
+
 function loadAccountSurfaceRendererContext(overrides = {}) {
   const source = fs.readFileSync("script.js", "utf8");
   const start = source.indexOf("function isAccountEnvConfigured()");
@@ -2356,6 +2377,10 @@ test("app boot runtime binds viewport listeners and initial render sequence", ()
     scheduleEditorDotOverlaySync() {
       calls.push("scheduleEditorDotOverlaySync");
     },
+    insertMobileEditorLineBreak() {
+      calls.push("insertMobileEditorLineBreak");
+      return true;
+    },
     renderSidebar() {
       calls.push("renderSidebar");
     },
@@ -2444,6 +2469,32 @@ test("mobile detection keeps desktop viewport without touch as non-mobile", () =
   assert.equal(context.waywordMobileDetection.isLikelyMobileViewport(context.window), false);
 });
 
+test("editor surface text reader preserves newline for block + br contenteditable structure", () => {
+  const context = loadEditorSurfaceTextContext();
+  const root = {
+    nodeType: 1,
+    tagName: "DIV",
+    childNodes: [
+      {
+        nodeType: 1,
+        tagName: "DIV",
+        childNodes: [{ nodeType: 3, textContent: "abc" }],
+      },
+      {
+        nodeType: 1,
+        tagName: "DIV",
+        childNodes: [{ nodeType: 1, tagName: "BR", childNodes: [] }],
+      },
+      {
+        nodeType: 1,
+        tagName: "DIV",
+        childNodes: [{ nodeType: 3, textContent: "def" }],
+      },
+    ],
+  };
+  assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
+});
+
 test("app events runtime binds editor input events once, syncs scroll, and keeps mobile Enter/newline as writing", () => {
   const context = loadAppEventsRuntimeContext();
   const listeners = new Map();
@@ -2525,6 +2576,10 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
     scheduleEditorDotOverlaySync() {
       calls.push("scheduleEditorDotOverlaySync");
     },
+    insertMobileEditorLineBreak() {
+      calls.push("insertMobileEditorLineBreak");
+      return true;
+    },
     completedUiRestartInteractions: null,
     runPostSubmitAutoNewRunNow() {
       calls.push("restart");
@@ -2556,7 +2611,9 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "setFocusMode" && entry[1] === true));
   assert.ok(calls.includes("syncScroll"));
   assert.ok(calls.includes("picker"));
-  assert.equal(calls.includes("preventDefault"), false);
+  assert.equal(calls.includes("preventDefault"), true);
+  assert.equal(calls.includes("insertMobileEditorLineBreak"), true);
+  assert.equal(calls.includes("flush"), true);
   assert.equal(
     calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false),
     false,
@@ -2571,7 +2628,9 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
       calls.push("beforeinputPreventDefault");
     },
   });
-  assert.equal(calls.includes("beforeinputPreventDefault"), false);
+  assert.equal(calls.includes("beforeinputPreventDefault"), true);
+  assert.equal(calls.includes("insertMobileEditorLineBreak"), true);
+  assert.equal(calls.includes("flush"), true);
   assert.equal(
     calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false),
     false,
@@ -2650,6 +2709,10 @@ test("app events runtime treats 430px viewport as mobile even when runtime mobil
     scheduleSemanticPickerFromSelection() {},
     syncScroll() {},
     scheduleEditorDotOverlaySync() {},
+    insertMobileEditorLineBreak() {
+      calls.push("insertMobileEditorLineBreak");
+      return true;
+    },
     setEditorSurfaceComposing() {},
     completedUiRestartInteractions: null,
     submitWriting(value) {
@@ -2667,7 +2730,8 @@ test("app events runtime treats 430px viewport as mobile even when runtime mobil
       calls.push("preventDefault");
     },
   });
-  assert.equal(calls.includes("preventDefault"), false);
+  assert.equal(calls.includes("preventDefault"), true);
+  assert.equal(calls.includes("insertMobileEditorLineBreak"), true);
   assert.equal(
     calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting"),
     false,

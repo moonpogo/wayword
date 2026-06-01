@@ -493,6 +493,29 @@
     return true;
   }
 
+  function insertMobileEditorNewlineAndRefresh(input, editorInput, e, debugTrace, sourceLabel) {
+    var preventDefaultCalled = false;
+    if (e && typeof e.preventDefault === "function") {
+      e.preventDefault();
+      preventDefaultCalled = true;
+    }
+    var inserted = false;
+    if (typeof input.insertMobileEditorLineBreak === "function") {
+      inserted = Boolean(input.insertMobileEditorLineBreak(editorInput, e));
+    } else {
+      inserted = defaultInsertMobileEditorLineBreak(editorInput);
+    }
+    if (inserted) {
+      runPostEditorInputRefresh(input, editorInput);
+    }
+    debugTrace.logEvent("mobile-newline-inserted", e, {
+      submitAttempted: false,
+      preventDefaultCalled: preventDefaultCalled,
+      source: sourceLabel || (inserted ? "manual-mobile-newline" : "manual-mobile-newline-failed"),
+    });
+    return { inserted: inserted, preventDefaultCalled: preventDefaultCalled };
+  }
+
   function bindEditorInputEvents(input) {
     var editorInput = input.editorInput;
     if (!editorInput && typeof input.resolveEditorInput === "function") {
@@ -712,7 +735,22 @@
 
       if (e.key === "Enter" && !e.shiftKey) {
         if (e.isComposing || input.getEditorSurfaceComposing()) return;
-        if (detectMobileEditorContext(input)) return;
+        var hasModifier = Boolean(e.metaKey || e.ctrlKey || e.altKey || e.shiftKey);
+        if (detectMobileEditorContext(input) && !hasModifier) {
+          var mobileInsertResult = insertMobileEditorNewlineAndRefresh(
+            input,
+            editorInput,
+            e,
+            debugTrace,
+            "keydown-mobile"
+          );
+          preventDefaultCalled = mobileInsertResult.preventDefaultCalled;
+          debugTrace.logEvent("keydown", e, {
+            submitAttempted: false,
+            preventDefaultCalled: preventDefaultCalled,
+          });
+          return;
+        }
         markPreventDefault();
         submitAttempted = true;
         trySubmitFromEditor(input);
@@ -762,24 +800,13 @@
       var inputType = String(e && e.inputType ? e.inputType : "");
       if (inputType !== "insertLineBreak" && inputType !== "insertParagraph") return;
       if (e.isComposing || input.getEditorSurfaceComposing()) return;
-      preventDefaultCalled = true;
-      if (e && typeof e.preventDefault === "function") {
-        e.preventDefault();
-      }
-      var inserted = false;
-      if (typeof input.insertMobileEditorLineBreak === "function") {
-        inserted = Boolean(input.insertMobileEditorLineBreak(editorInput, e));
-      } else {
-        inserted = defaultInsertMobileEditorLineBreak(editorInput);
-      }
-      if (inserted) {
-        runPostEditorInputRefresh(input, editorInput);
-      }
-      debugTrace.logEvent("mobile-newline-inserted", e, {
-        submitAttempted: false,
-        preventDefaultCalled: preventDefaultCalled,
-        source: inserted ? "manual-mobile-newline" : "manual-mobile-newline-failed",
-      });
+      preventDefaultCalled = insertMobileEditorNewlineAndRefresh(
+        input,
+        editorInput,
+        e,
+        debugTrace,
+        "beforeinput-mobile"
+      ).preventDefaultCalled;
       return;
     });
 
