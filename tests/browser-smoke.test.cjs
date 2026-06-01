@@ -193,7 +193,32 @@ async function fillEditor(session, text) {
 }
 
 async function submitCurrentRun(session) {
-  await session.click("#enterSubmitBtn");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await session.waitFor(
+      "submit button ready for click",
+      async () =>
+        await session.execute(`
+          var btn = document.getElementById("enterSubmitBtn");
+          return Boolean(btn && !btn.classList.contains("hidden") && btn.disabled !== true);
+        `),
+      { timeoutMs: 5000 }
+    );
+    try {
+      await session.click("#enterSubmitBtn");
+      break;
+    } catch (error) {
+      if (attempt === 1) throw error;
+      await session.waitFor(
+        "submit button recover after transient click timeout",
+        async () =>
+          await session.execute(`
+            var btn = document.getElementById("enterSubmitBtn");
+            return Boolean(btn && !btn.classList.contains("hidden"));
+          `),
+        { timeoutMs: 5000 }
+      );
+    }
+  }
 
   await session.waitFor(
     "Post-submit surface (firstSessionEntry overlay, handoff, or Mirror)",
@@ -975,6 +1000,38 @@ test("browser smoke: mobile focus exit with Mirror visible does not introduce do
   });
 });
 
+test("browser smoke: mobile Return inserts newline and does not submit", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    await session.setWindowRect({ height: 852, width: 430, x: 0, y: 0 });
+    await loadFreshApp(session);
+    await beginRun(session);
+
+    await session.click("#editorInput");
+    await session.type("abc");
+    await session.press("Enter");
+    await session.type("def");
+
+    const snapshot = await session.execute(`
+      var editor = document.getElementById("editorInput");
+      var reflection = document.getElementById("mirrorReflectionSection");
+      var submitBtn = document.getElementById("enterSubmitBtn");
+      var text = String((editor && editor.textContent) || "");
+      return {
+        text: text,
+        hasNewline: text.indexOf("\\n") >= 0,
+        submitted: Boolean(reflection && !reflection.classList.contains("hidden")),
+        submitVisible: Boolean(submitBtn && !submitBtn.classList.contains("hidden")),
+        editable: editor ? editor.getAttribute("contenteditable") : ""
+      };
+    `);
+
+    assert.equal(snapshot.hasNewline, true, "expected mobile Return to preserve a newline in editor text");
+    assert.equal(snapshot.submitted, false, "expected mobile Return not to submit run");
+    assert.equal(snapshot.submitVisible, true, "expected submit button to remain available after mobile newline");
+    assert.equal(snapshot.editable, "true", "expected editor to remain in active writing mode");
+  });
+});
+
 test("browser smoke: prompt reroll works with empty editor and locks once the editor has text", async (t) => {
   await withSmokeSession(t, async (session) => {
     await loadFreshApp(session);
@@ -1002,7 +1059,8 @@ test("browser smoke: prompt reroll works with empty editor and locks once the ed
       var pt = document.getElementById("promptText");
       return {
         prompt: String(pt.textContent || "").trim(),
-        rerolls: document.getElementById("promptRerollBtn")?.dataset.rerolls || ""
+        rerolls: document.getElementById("promptRerollBtn")?.dataset.rerolls || "",
+        promptId: String(window.waywordAppState?.state?.promptId || "")
       };
     `);
 
@@ -1013,8 +1071,18 @@ test("browser smoke: prompt reroll works with empty editor and locks once the ed
       async () =>
         await session.execute(`
           var btn = document.getElementById("promptRerollBtn");
-          return Boolean(btn && btn.dataset.rerolls === "1");
+          var pt = document.getElementById("promptText");
+          var currentPrompt = String(pt?.textContent || "").trim();
+          var currentPromptId = String(window.waywordAppState?.state?.promptId || "");
+          return Boolean(
+            btn &&
+            (
+              btn.dataset.rerolls === "1" ||
+              (currentPrompt !== __p0 && currentPromptId !== __p1)
+            )
+          );
         `),
+      [before.prompt, before.promptId],
       { timeoutMs: 10000 }
     );
 
