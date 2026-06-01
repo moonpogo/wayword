@@ -222,9 +222,43 @@
       }
     }
 
+    function activeElementId() {
+      try {
+        var active = input.document && input.document.activeElement;
+        return active && active.id ? String(active.id) : "";
+      } catch (_err) {
+        return "";
+      }
+    }
+
+    function activeElementClassName() {
+      try {
+        var active = input.document && input.document.activeElement;
+        return active && active.className ? String(active.className) : "";
+      } catch (_err) {
+        return "";
+      }
+    }
+
     function eventTargetTagName(event) {
       if (!event || !event.target || !event.target.tagName) return "";
       return String(event.target.tagName);
+    }
+
+    function eventTargetId(event) {
+      return event && event.target && event.target.id ? String(event.target.id) : "";
+    }
+
+    function eventTargetClassName(event) {
+      return event && event.target && event.target.className ? String(event.target.className) : "";
+    }
+
+    function isEditorCurrentlyFocused() {
+      try {
+        return Boolean(editorInput && input.document && input.document.activeElement === editorInput);
+      } catch (_err) {
+        return false;
+      }
     }
 
     function renderPanel() {
@@ -239,7 +273,12 @@
             "mods=" + [entry.shiftKey ? "S" : "", entry.metaKey ? "M" : "", entry.ctrlKey ? "C" : "", entry.altKey ? "A" : ""].join(""),
             "composing=" + String(entry.isComposing),
             entry.targetTagName ? "target=" + entry.targetTagName : "",
+            entry.targetId ? "targetId=" + entry.targetId : "",
+            entry.targetClassName ? "targetClass=" + entry.targetClassName : "",
             entry.activeElement ? "active=" + entry.activeElement : "",
+            entry.activeElementId ? "activeId=" + entry.activeElementId : "",
+            entry.activeElementClassName ? "activeClass=" + entry.activeElementClassName : "",
+            "editorFocused=" + String(entry.editorFocused),
             entry.editorTagName ? "editorTag=" + entry.editorTagName : "",
             entry.editorId ? "editorId=" + entry.editorId : "",
             entry.editorClassName ? "editorClass=" + entry.editorClassName : "",
@@ -291,7 +330,12 @@
           altKey: Boolean(event && event.altKey),
           isComposing: Boolean(event && event.isComposing),
           targetTagName: eventTargetTagName(event),
+          targetId: eventTargetId(event),
+          targetClassName: eventTargetClassName(event),
           activeElement: activeTagName(),
+          activeElementId: activeElementId(),
+          activeElementClassName: activeElementClassName(),
+          editorFocused: isEditorCurrentlyFocused(),
           viewportWidth: viewportWidth,
           mobileDetected: mobileDetected,
           submitAttempted: Boolean(details.submitAttempted),
@@ -343,9 +387,33 @@
         debugTrace.logEvent("document-" + eventType, e, {
           submitAttempted: false,
           preventDefaultCalled: false,
-          source: "document-fallback",
+          source: "bubble",
         });
       });
+      input.document.addEventListener(eventType, function (e) {
+        debugTrace.logEvent("document-" + eventType, e, {
+          submitAttempted: false,
+          preventDefaultCalled: false,
+          source: "capture",
+        });
+      }, true);
+    });
+
+    ["focusin", "focusout", "selectionchange"].forEach(function (eventType) {
+      input.document.addEventListener(eventType, function (e) {
+        debugTrace.logEvent("document-" + eventType, e, {
+          submitAttempted: false,
+          preventDefaultCalled: false,
+          source: "bubble",
+        });
+      });
+      input.document.addEventListener(eventType, function (e) {
+        debugTrace.logEvent("document-" + eventType, e, {
+          submitAttempted: false,
+          preventDefaultCalled: false,
+          source: "capture",
+        });
+      }, true);
     });
   }
 
@@ -360,6 +428,68 @@
     if (input.getEditorSurfaceComposing && input.getEditorSurfaceComposing()) return false;
     if (input.getEditorText().trim().length === 0) return false;
     input.submitWriting(false);
+    return true;
+  }
+
+  function runPostEditorInputRefresh(input, editorInput) {
+    if (!input.isActiveAndEditable()) return;
+    input.flushEditorSurfaceIntoWriteDocOnce();
+    if (typeof input.onEditorInputForEntryDelayHint === "function") {
+      input.onEditorInputForEntryDelayHint();
+    }
+    if (typeof input.onEditorInputForTelemetry === "function") {
+      input.onEditorInputForTelemetry();
+    }
+    input.tryStartTimerOnFirstMeaningfulInput();
+    input.pulseWordmark();
+    input.renderHighlight();
+    input.renderSidebar();
+    input.updateWordProgress();
+    input.updateEnterButtonVisibility();
+    input.scheduleSemanticPickerFromSelection();
+    if (typeof input.renderMeta === "function") {
+      input.renderMeta();
+    }
+    if (
+      window.waywordMobileEditorCaretReveal &&
+      typeof window.waywordMobileEditorCaretReveal.schedule === "function"
+    ) {
+      window.waywordMobileEditorCaretReveal.schedule(editorInput);
+    }
+  }
+
+  function defaultInsertMobileEditorLineBreak(editorInput) {
+    if (!editorInput) return false;
+    var doc = editorInput.ownerDocument || document;
+    if (!doc || typeof doc.createElement !== "function") return false;
+    var sel = null;
+    try {
+      sel = window.getSelection && window.getSelection();
+    } catch (_err) {
+      sel = null;
+    }
+    if (!sel) return false;
+    var range = null;
+    if (sel.rangeCount > 0) {
+      range = sel.getRangeAt(0);
+    }
+    if (!range || !editorInput.contains(range.startContainer)) {
+      range = doc.createRange();
+      range.selectNodeContents(editorInput);
+      range.collapse(false);
+    }
+    range.deleteContents();
+    var lineBreak = doc.createElement("br");
+    var caretHost = doc.createElement("br");
+    var frag = doc.createDocumentFragment();
+    frag.appendChild(lineBreak);
+    frag.appendChild(caretHost);
+    range.insertNode(frag);
+    var caretRange = doc.createRange();
+    caretRange.setStartBefore(caretHost);
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
     return true;
   }
 
@@ -425,6 +555,11 @@
     logTraceBound(debugTrace, editorInput, "editor-bind");
 
     editorInput.addEventListener("focus", function () {
+      debugTrace.logEvent("focus", null, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+        source: "bubble",
+      });
       if (!window.__WAYWORD_DEV_VISUAL_PROFILE) {
         input.setFocusMode(true);
       }
@@ -434,6 +569,11 @@
     });
 
     editorInput.addEventListener("blur", function (e) {
+      debugTrace.logEvent("blur", e, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+        source: "bubble",
+      });
       if (
         !input.mobileEditorFocusGuard ||
         typeof input.mobileEditorFocusGuard.handleEditorBlur !== "function"
@@ -622,6 +762,24 @@
       var inputType = String(e && e.inputType ? e.inputType : "");
       if (inputType !== "insertLineBreak" && inputType !== "insertParagraph") return;
       if (e.isComposing || input.getEditorSurfaceComposing()) return;
+      preventDefaultCalled = true;
+      if (e && typeof e.preventDefault === "function") {
+        e.preventDefault();
+      }
+      var inserted = false;
+      if (typeof input.insertMobileEditorLineBreak === "function") {
+        inserted = Boolean(input.insertMobileEditorLineBreak(editorInput, e));
+      } else {
+        inserted = defaultInsertMobileEditorLineBreak(editorInput);
+      }
+      if (inserted) {
+        runPostEditorInputRefresh(input, editorInput);
+      }
+      debugTrace.logEvent("mobile-newline-inserted", e, {
+        submitAttempted: false,
+        preventDefaultCalled: preventDefaultCalled,
+        source: inserted ? "manual-mobile-newline" : "manual-mobile-newline-failed",
+      });
       return;
     });
 
@@ -642,6 +800,11 @@
     if (selectionDoc && editorInput.dataset.appEditorSelectionRevealBound !== "1") {
       editorInput.dataset.appEditorSelectionRevealBound = "1";
       selectionDoc.addEventListener("selectionchange", function () {
+        debugTrace.logEvent("selectionchange", null, {
+          submitAttempted: false,
+          preventDefaultCalled: false,
+          source: "bubble",
+        });
         if (selectionDoc.activeElement !== editorInput) {
           return;
         }
