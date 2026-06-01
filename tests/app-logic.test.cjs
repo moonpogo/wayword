@@ -3937,7 +3937,12 @@ test("analysis runtime analyzes text with repeat, banned, and sentence signals",
     exerciseWords: ["glass"],
     banned: ["just"],
     targetWords: 6,
-    exemptWords: new Set(["the"]),
+    repetitionThresholds: {
+      contentMinCount: 2,
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      structuralWords: new Set(["the"]),
+    },
     tokenize(text) {
       return String(text || "")
         .split(/\s+/)
@@ -3989,7 +3994,7 @@ test("analysis runtime analyzes text with repeat, banned, and sentence signals",
 
   assert.equal(result.totalWords, 9);
   assert.equal(result.uniqueCount, 5);
-  assert.deepEqual(result.repeated, [["i", 2], ["just", 2], ["saw", 2], ["hallway", 2]]);
+  assert.deepEqual(result.repeated, [["just", 2], ["saw", 2], ["hallway", 2]]);
   assert.deepEqual(JSON.parse(JSON.stringify(result.bannedHits)), [
     { word: "just", count: 2, isExercise: false },
     { word: "glass", count: 1, isExercise: true },
@@ -4000,6 +4005,206 @@ test("analysis runtime analyzes text with repeat, banned, and sentence signals",
   assert.equal(result.avgSentenceLength, 4.5);
   assert.deepEqual(result.perspective, { first: 2, second: 0, third: 0 });
   assert.deepEqual(result.punctuation, { commas: 0 });
+});
+
+test("analysis runtime repetition includes repeated 'the' when over limit", () => {
+  const context = loadAnalysisRuntimeContext();
+  const input = {
+    repeatLimit: 2,
+    exerciseWords: [],
+    banned: [],
+    targetWords: 6,
+    repetitionThresholds: {
+      contentMinCount: 3,
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      structuralWords: new Set(["the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by"]),
+    },
+    tokenize(text) {
+      return String(text || "")
+        .split(/\s+/)
+        .map((word) => word.toLowerCase().replace(/[^a-z']/g, ""))
+        .filter(Boolean);
+    },
+    countWords(tokens) {
+      const counts = {};
+      tokens.forEach((token) => {
+        counts[token] = (counts[token] || 0) + 1;
+      });
+      return counts;
+    },
+    sentenceStarters() {
+      return [];
+    },
+    sentenceStarterExamples() {
+      return [];
+    },
+    countPerspective() {
+      return {};
+    },
+    countPunctuation() {
+      return {};
+    },
+  };
+
+  const result = context.waywordAnalysisRuntime.analyze(
+    input,
+    "the the the. the. they like. the"
+  );
+
+  assert.ok(
+    result.repeated.some(([word, count]) => word === "the" && count === 5),
+    `expected repeated bucket to include the x5, got ${JSON.stringify(result.repeated)}`
+  );
+});
+
+test("analysis runtime does not flag normal sentence use of structural 'the'", () => {
+  const context = loadAnalysisRuntimeContext();
+  const input = {
+    repeatLimit: 2,
+    exerciseWords: [],
+    banned: [],
+    targetWords: 6,
+    repetitionThresholds: {
+      contentMinCount: 3,
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      structuralWords: new Set(["the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by"]),
+    },
+    tokenize(text) {
+      return String(text || "")
+        .split(/\s+/)
+        .map((word) => word.toLowerCase().replace(/[^a-z']/g, ""))
+        .filter(Boolean);
+    },
+    countWords(tokens) {
+      const counts = {};
+      tokens.forEach((token) => {
+        counts[token] = (counts[token] || 0) + 1;
+      });
+      return counts;
+    },
+    sentenceStarters() {
+      return [];
+    },
+    sentenceStarterExamples() {
+      return [];
+    },
+    countPerspective() {
+      return {};
+    },
+    countPunctuation() {
+      return {};
+    },
+  };
+  const result = context.waywordAnalysisRuntime.analyze(
+    input,
+    "the flower was on the table by the window"
+  );
+  assert.equal(
+    result.repeated.some(([word]) => word === "the"),
+    false,
+    `expected the not to repeat at normal use threshold, got ${JSON.stringify(result.repeated)}`
+  );
+});
+
+test("analysis runtime content repetition still flags at lower threshold", () => {
+  const context = loadAnalysisRuntimeContext();
+  const input = {
+    repeatLimit: 2,
+    exerciseWords: [],
+    banned: [],
+    targetWords: 6,
+    repetitionThresholds: {
+      contentMinCount: 3,
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      structuralWords: new Set(["the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by"]),
+    },
+    tokenize(text) {
+      return String(text || "")
+        .split(/\s+/)
+        .map((word) => word.toLowerCase().replace(/[^a-z']/g, ""))
+        .filter(Boolean);
+    },
+    countWords(tokens) {
+      const counts = {};
+      tokens.forEach((token) => {
+        counts[token] = (counts[token] || 0) + 1;
+      });
+      return counts;
+    },
+    sentenceStarters() {
+      return [];
+    },
+    sentenceStarterExamples() {
+      return [];
+    },
+    countPerspective() {
+      return {};
+    },
+    countPunctuation() {
+      return {};
+    },
+  };
+  const result = context.waywordAnalysisRuntime.analyze(
+    input,
+    "echo echo echo. steady."
+  );
+  assert.ok(
+    result.repeated.some(([word, count]) => word === "echo" && count === 3),
+    `expected content-word echo x3 repetition, got ${JSON.stringify(result.repeated)}`
+  );
+});
+
+test("analysis runtime single-letter structural word 'a' does not flag too early", () => {
+  const context = loadAnalysisRuntimeContext();
+  const input = {
+    repeatLimit: 2,
+    exerciseWords: [],
+    banned: [],
+    targetWords: 6,
+    repetitionThresholds: {
+      contentMinCount: 3,
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      structuralWords: new Set(["the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by"]),
+    },
+    tokenize(text) {
+      return String(text || "")
+        .split(/\s+/)
+        .map((word) => word.toLowerCase().replace(/[^a-z']/g, ""))
+        .filter(Boolean);
+    },
+    countWords(tokens) {
+      const counts = {};
+      tokens.forEach((token) => {
+        counts[token] = (counts[token] || 0) + 1;
+      });
+      return counts;
+    },
+    sentenceStarters() {
+      return [];
+    },
+    sentenceStarterExamples() {
+      return [];
+    },
+    countPerspective() {
+      return {};
+    },
+    countPunctuation() {
+      return {};
+    },
+  };
+  const result = context.waywordAnalysisRuntime.analyze(
+    input,
+    "a a a a a a a"
+  );
+  assert.equal(
+    result.repeated.some(([word]) => word === "a"),
+    false,
+    `expected single-letter a to stay below threshold, got ${JSON.stringify(result.repeated)}`
+  );
 });
 
 test("prompt runtime generates prompt and updates prompt history state", () => {

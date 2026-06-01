@@ -1,4 +1,33 @@
 (function () {
+  function parseCountThreshold(value, fallback) {
+    var n = Number(value);
+    return Number.isFinite(n) ? Math.max(1, Math.floor(n)) : fallback;
+  }
+
+  function repetitionThresholdForWord(input, word) {
+    var w = String(word || "").toLowerCase();
+    var thresholds = input && input.repetitionThresholds ? input.repetitionThresholds : null;
+    var structuralWords = thresholds && thresholds.structuralWords ? thresholds.structuralWords : null;
+    var contentMinCount = parseCountThreshold(
+      thresholds && thresholds.contentMinCount,
+      Math.max(1, (Number(input && input.repeatLimit) || 1) + 1)
+    );
+    var structuralMinCount = parseCountThreshold(
+      thresholds && thresholds.structuralMinCount,
+      5
+    );
+    var singleLetterMinCount = parseCountThreshold(
+      thresholds && thresholds.singleLetterMinCount,
+      8
+    );
+
+    if (w.length <= 1) return singleLetterMinCount;
+    if (structuralWords && typeof structuralWords.has === "function" && structuralWords.has(w)) {
+      return structuralMinCount;
+    }
+    return contentMinCount;
+  }
+
   function scoreDeductionFromIncidentCount(n) {
     var c = Math.max(0, Math.floor(Number(n)) || 0);
     if (c <= 0) return 25;
@@ -73,7 +102,12 @@
 
     var repeated = Object.entries(counts)
       .filter(function (entry) {
-        return !input.exemptWords.has(entry[0]) && entry[1] > input.repeatLimit;
+        var word = entry[0];
+        var count = Number(entry[1]) || 0;
+        if (input.exemptWords && typeof input.exemptWords.has === "function" && input.exemptWords.has(word)) {
+          return false;
+        }
+        return count >= repetitionThresholdForWord(input, word);
       })
       .sort(function (a, b) {
         return b[1] - a[1];

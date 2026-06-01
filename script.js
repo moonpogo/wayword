@@ -72,7 +72,10 @@ const bannedSets = [
 ];
 
 const exemptWords = new Set([
-  "a","an","the","to","of","in","on","at","by","with","as","is","be","am","are","was","were","and","or","but","for"
+  "a","an","to","of","in","on","at","by","with","as","is","be","am","are","was","were","and","or","but","for"
+]);
+const repetitionStructuralWords = new Set([
+  "the","a","an","of","to","in","on","and","but","or","is","are","was","were","be","been","it","that","this","with","for","as","at","by"
 ]);
 
 const firstPersonWords = new Set(["i","me","my","mine","we","us","our","ours"]);
@@ -2451,6 +2454,12 @@ function buildAnalysisRuntimeInput() {
     banned: state.banned,
     targetWords: state.targetWords,
     exemptWords,
+    repetitionThresholds: {
+      contentMinCount: Math.max(2, Number(state.repeatLimit) + 1 || 3),
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      structuralWords: repetitionStructuralWords
+    },
     tokenize,
     countWords,
     sentenceStarters,
