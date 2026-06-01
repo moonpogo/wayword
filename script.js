@@ -1271,6 +1271,20 @@ function flushEditorSurfaceIntoWriteDocOnce() {
   flushEditorDotOverlaySync();
 }
 
+function insertMobileEditorTextNewline() {
+  if (!editorInput || !state.active || state.submitted) return false;
+  const { anchor, focus } = getSelectionOffsetsForEditorRoot(editorInput);
+  const raw = getEditorSurfaceRawText(editorInput);
+  const start = Math.max(0, Math.min(anchor, focus));
+  const end = Math.max(0, Math.max(anchor, focus));
+  const nextRaw = `${raw.slice(0, start)}\n${raw.slice(end)}`;
+  const previousWriteDoc = state.writeDoc;
+  state.writeDoc = parseRawToWriteDoc(nextRaw, previousWriteDoc);
+  applyWriteDocSemanticFlagsFromAnalysis();
+  projectWriteDocToEditorFromState(start + 1, start + 1, false);
+  return true;
+}
+
 function captureEditorSurfaceIntoWriteDocForSubmit() {
   if (!editorInput || !state.active || state.submitted) return getEditorText();
 
@@ -6931,6 +6945,7 @@ function bindEditorInputEvents() {
     scheduleSemanticPickerFromSelection,
     syncScroll,
     scheduleEditorDotOverlaySync,
+    insertMobileEditorTextNewline,
     completedUiRestartInteractions: window.waywordCompletedUiRestartInteractions,
     runPostSubmitAutoNewRunNow,
     getEditorText,

@@ -715,44 +715,6 @@
     }
   }
 
-  function defaultInsertMobileEditorLineBreak(editorInput) {
-    if (!editorInput) return false;
-    var doc = editorInput.ownerDocument || document;
-    if (!doc || typeof doc.createElement !== "function") return false;
-    var sel = null;
-    try {
-      sel = window.getSelection && window.getSelection();
-    } catch (_err) {
-      sel = null;
-    }
-    if (!sel) return false;
-    var range = null;
-    if (sel.rangeCount > 0) {
-      range = sel.getRangeAt(0);
-    }
-    if (!range || !editorInput.contains(range.startContainer)) {
-      range = doc.createRange();
-      range.selectNodeContents(editorInput);
-      range.collapse(false);
-    }
-    range.deleteContents();
-    var lineBreak = doc.createElement("br");
-    var caretHost = doc.createElement("span");
-    caretHost.setAttribute("data-wayword-caret-host", "true");
-    var caretHostText = doc.createTextNode("\u200B");
-    caretHost.appendChild(caretHostText);
-    var frag = doc.createDocumentFragment();
-    frag.appendChild(lineBreak);
-    frag.appendChild(caretHost);
-    range.insertNode(frag);
-    var caretRange = doc.createRange();
-    caretRange.setStart(caretHostText, caretHostText.textContent ? caretHostText.textContent.length : 1);
-    caretRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(caretRange);
-    return true;
-  }
-
   function insertMobileEditorNewlineAndRefresh(input, editorInput, e, debugTrace, sourceLabel) {
     var preventDefaultCalled = false;
     if (e && typeof e.preventDefault === "function") {
@@ -766,10 +728,10 @@
       source: "app-handler",
     });
     var inserted = false;
-    if (typeof input.insertMobileEditorLineBreak === "function") {
+    if (typeof input.insertMobileEditorTextNewline === "function") {
+      inserted = Boolean(input.insertMobileEditorTextNewline(editorInput, e));
+    } else if (typeof input.insertMobileEditorLineBreak === "function") {
       inserted = Boolean(input.insertMobileEditorLineBreak(editorInput, e));
-    } else {
-      inserted = defaultInsertMobileEditorLineBreak(editorInput);
     }
     if (inserted) {
       debugTrace.logEvent("mobile-newline-after-dom-insert", e, {

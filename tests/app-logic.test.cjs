@@ -145,6 +145,35 @@ function loadEditorSurfaceTextContext(overrides = {}) {
   return context;
 }
 
+function loadInsertMobileEditorTextNewlineContext(overrides = {}) {
+  const source = fs.readFileSync("script.js", "utf8");
+  const start = source.indexOf("function insertMobileEditorTextNewline() {");
+  const end = source.indexOf("function captureEditorSurfaceIntoWriteDocForSubmit() {", start);
+  if (start < 0 || end < 0 || end <= start) {
+    throw new Error("unable to extract insertMobileEditorTextNewline from script.js");
+  }
+  const block = source.slice(start, end).trim();
+  const context = loadBrowserScripts([], {
+    console: silentConsole(),
+    state: { active: true, submitted: false, writeDoc: { lines: [] } },
+    editorInput: {},
+    getSelectionOffsetsForEditorRoot() {
+      return { anchor: 3, focus: 3 };
+    },
+    getEditorSurfaceRawText() {
+      return "abc";
+    },
+    parseRawToWriteDoc(raw) {
+      return { raw };
+    },
+    applyWriteDocSemanticFlagsFromAnalysis() {},
+    projectWriteDocToEditorFromState() {},
+    ...overrides,
+  });
+  require("vm").runInContext(block, context, { filename: "script.js:insert-mobile-newline" });
+  return context;
+}
+
 function loadAccountSurfaceRendererContext(overrides = {}) {
   const source = fs.readFileSync("script.js", "utf8");
   const start = source.indexOf("function isAccountEnvConfigured()");
@@ -2377,8 +2406,8 @@ test("app boot runtime binds viewport listeners and initial render sequence", ()
     scheduleEditorDotOverlaySync() {
       calls.push("scheduleEditorDotOverlaySync");
     },
-    insertMobileEditorLineBreak() {
-      calls.push("insertMobileEditorLineBreak");
+    insertMobileEditorTextNewline() {
+      calls.push("insertMobileEditorTextNewline");
       return true;
     },
     renderSidebar() {
@@ -2611,6 +2640,42 @@ test("editor surface text reader preserves single newline for br plus caret-host
   assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
 });
 
+test("mobile text newline helper inserts literal newline and restores caret offset", () => {
+  const calls = [];
+  const context = loadInsertMobileEditorTextNewlineContext({
+    getSelectionOffsetsForEditorRoot() {
+      return { anchor: 3, focus: 3 };
+    },
+    getEditorSurfaceRawText() {
+      return "abc";
+    },
+    parseRawToWriteDoc(raw, previous) {
+      calls.push(["parseRawToWriteDoc", raw, previous]);
+      return { raw };
+    },
+    applyWriteDocSemanticFlagsFromAnalysis() {
+      calls.push("applyWriteDocSemanticFlagsFromAnalysis");
+    },
+    projectWriteDocToEditorFromState(anchor, focus, backward) {
+      calls.push(["projectWriteDocToEditorFromState", anchor, focus, backward]);
+    },
+  });
+  const inserted = context.insertMobileEditorTextNewline();
+  assert.equal(inserted, true);
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "parseRawToWriteDoc" && entry[1] === "abc\n"));
+  assert.ok(calls.includes("applyWriteDocSemanticFlagsFromAnalysis"));
+  assert.ok(
+    calls.some(
+      (entry) =>
+        Array.isArray(entry) &&
+        entry[0] === "projectWriteDocToEditorFromState" &&
+        entry[1] === 4 &&
+        entry[2] === 4 &&
+        entry[3] === false
+    )
+  );
+});
+
 test("app events runtime binds editor input events once, syncs scroll, and keeps mobile Enter/newline as writing", () => {
   const context = loadAppEventsRuntimeContext();
   const listeners = new Map();
@@ -2692,8 +2757,8 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
     scheduleEditorDotOverlaySync() {
       calls.push("scheduleEditorDotOverlaySync");
     },
-    insertMobileEditorLineBreak() {
-      calls.push("insertMobileEditorLineBreak");
+    insertMobileEditorTextNewline() {
+      calls.push("insertMobileEditorTextNewline");
       return true;
     },
     completedUiRestartInteractions: null,
@@ -2728,7 +2793,7 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
   assert.ok(calls.includes("syncScroll"));
   assert.ok(calls.includes("picker"));
   assert.equal(calls.includes("preventDefault"), true);
-  assert.equal(calls.includes("insertMobileEditorLineBreak"), true);
+  assert.equal(calls.includes("insertMobileEditorTextNewline"), true);
   assert.equal(calls.includes("flush"), true);
   assert.equal(
     calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false),
@@ -2745,7 +2810,7 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
     },
   });
   assert.equal(calls.includes("beforeinputPreventDefault"), true);
-  assert.equal(calls.includes("insertMobileEditorLineBreak"), true);
+  assert.equal(calls.includes("insertMobileEditorTextNewline"), true);
   assert.equal(calls.includes("flush"), true);
   assert.equal(
     calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false),
@@ -2783,11 +2848,11 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
   assert.ok(calls.includes("entryDelayFocus"), "expected editor focus to arm pre-entry hint timer");
 });
 
-test("mobile newline default insertion uses br plus caret-host span strategy", () => {
+test("mobile newline runtime uses text newline helper and no caret-host br insertion fallback", () => {
   const source = fs.readFileSync("src/app/app-events-runtime.js", "utf8");
-  assert.match(source, /caretHost\.setAttribute\("data-wayword-caret-host",\s*"true"\)/);
-  assert.match(source, /var lineBreak = doc\.createElement\("br"\)/);
-  assert.doesNotMatch(source, /var caretHost = doc\.createElement\("br"\)/);
+  assert.match(source, /insertMobileEditorTextNewline/);
+  assert.doesNotMatch(source, /data-wayword-caret-host/);
+  assert.doesNotMatch(source, /createElement\("br"\)/);
 });
 
 test("app events runtime treats 430px viewport as mobile even when runtime mobile helper reports false", () => {
@@ -2832,8 +2897,8 @@ test("app events runtime treats 430px viewport as mobile even when runtime mobil
     scheduleSemanticPickerFromSelection() {},
     syncScroll() {},
     scheduleEditorDotOverlaySync() {},
-    insertMobileEditorLineBreak() {
-      calls.push("insertMobileEditorLineBreak");
+    insertMobileEditorTextNewline() {
+      calls.push("insertMobileEditorTextNewline");
       return true;
     },
     setEditorSurfaceComposing() {},
@@ -2854,7 +2919,7 @@ test("app events runtime treats 430px viewport as mobile even when runtime mobil
     },
   });
   assert.equal(calls.includes("preventDefault"), true);
-  assert.equal(calls.includes("insertMobileEditorLineBreak"), true);
+  assert.equal(calls.includes("insertMobileEditorTextNewline"), true);
   assert.equal(
     calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting"),
     false,
@@ -2927,8 +2992,8 @@ test("app events runtime capture keydown Enter inserts mobile newline when edito
     scheduleSemanticPickerFromSelection() {},
     syncScroll() {},
     scheduleEditorDotOverlaySync() {},
-    insertMobileEditorLineBreak() {
-      calls.push("insertMobileEditorLineBreak");
+    insertMobileEditorTextNewline() {
+      calls.push("insertMobileEditorTextNewline");
       return true;
     },
     setEditorSurfaceComposing() {},
@@ -2951,7 +3016,7 @@ test("app events runtime capture keydown Enter inserts mobile newline when edito
   };
   captureListeners.get("keydown")(keyEvent);
   assert.equal(calls.includes("preventDefault"), true);
-  assert.equal(calls.includes("insertMobileEditorLineBreak"), true);
+  assert.equal(calls.includes("insertMobileEditorTextNewline"), true);
   assert.equal(calls.includes("flush"), true);
   assert.equal(
     calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting"),
