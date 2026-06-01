@@ -2558,6 +2558,59 @@ test("editor surface text reader preserves block structure newline boundaries", 
   assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
 });
 
+test("editor surface text reader strips zero-width caret placeholder characters", () => {
+  const context = loadEditorSurfaceTextContext();
+  const root = {
+    nodeType: 1,
+    tagName: "DIV",
+    childNodes: [
+      { nodeType: 3, textContent: "abc" },
+      { nodeType: 1, tagName: "BR", childNodes: [] },
+      { nodeType: 3, textContent: "\u200B" },
+      { nodeType: 3, textContent: "def" },
+    ],
+  };
+  assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
+});
+
+test("editor surface text reader strips zero-width caret host inside inline element", () => {
+  const context = loadEditorSurfaceTextContext();
+  const root = {
+    nodeType: 1,
+    tagName: "DIV",
+    childNodes: [
+      { nodeType: 3, textContent: "abc" },
+      { nodeType: 1, tagName: "BR", childNodes: [] },
+      {
+        nodeType: 1,
+        tagName: "SPAN",
+        childNodes: [{ nodeType: 3, textContent: "\u200B" }],
+      },
+    ],
+  };
+  assert.equal(context.getEditorSurfaceRawText(root), "abc\n");
+});
+
+test("editor surface text reader preserves single newline for br plus caret-host span", () => {
+  const context = loadEditorSurfaceTextContext();
+  const root = {
+    nodeType: 1,
+    tagName: "DIV",
+    childNodes: [
+      { nodeType: 3, textContent: "abc" },
+      { nodeType: 1, tagName: "BR", childNodes: [] },
+      {
+        nodeType: 1,
+        tagName: "SPAN",
+        attributes: { "data-wayword-caret-host": "true" },
+        childNodes: [{ nodeType: 3, textContent: "\u200B" }],
+      },
+      { nodeType: 3, textContent: "def" },
+    ],
+  };
+  assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
+});
+
 test("app events runtime binds editor input events once, syncs scroll, and keeps mobile Enter/newline as writing", () => {
   const context = loadAppEventsRuntimeContext();
   const listeners = new Map();
@@ -2728,6 +2781,13 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
   calls.length = 0;
   listeners.get("focus")();
   assert.ok(calls.includes("entryDelayFocus"), "expected editor focus to arm pre-entry hint timer");
+});
+
+test("mobile newline default insertion uses br plus caret-host span strategy", () => {
+  const source = fs.readFileSync("src/app/app-events-runtime.js", "utf8");
+  assert.match(source, /caretHost\.setAttribute\("data-wayword-caret-host",\s*"true"\)/);
+  assert.match(source, /var lineBreak = doc\.createElement\("br"\)/);
+  assert.doesNotMatch(source, /var caretHost = doc\.createElement\("br"\)/);
 });
 
 test("app events runtime treats 430px viewport as mobile even when runtime mobile helper reports false", () => {

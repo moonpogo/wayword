@@ -1101,6 +1101,7 @@ const EDITOR_BLOCK_TAGS = new Set([
   "H4", "H5", "H6", "HEADER", "HR", "LI", "MAIN", "NAV", "OL", "P", "PRE",
   "SECTION", "TABLE", "TR", "TD", "TH", "UL"
 ]);
+const EDITOR_CARET_PLACEHOLDER_CHARS = /[\u200B\u200C\u200D\uFEFF]/g;
 
 function pushEditorBreak(out) {
   if (!out.length || out[out.length - 1] !== "\n") out.push("\n");
@@ -1114,7 +1115,7 @@ function readEditorSurfaceNodeText(node, out, options) {
   if (!node) return;
   const opts = options || { isRoot: false, isLastSibling: true };
   if (node.nodeType === Node.TEXT_NODE) {
-    out.push(String(node.textContent || ""));
+    out.push(String(node.textContent || "").replace(EDITOR_CARET_PLACEHOLDER_CHARS, ""));
     return;
   }
   if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {

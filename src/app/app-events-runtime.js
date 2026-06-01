@@ -390,7 +390,12 @@
 
     function shouldPersistLastEnterEvent(entry) {
       if (!entry) return false;
-      if (entry.eventType === "mobile-newline-before") return true;
+      if (entry.eventType === "mobile-newline-before-dom-insert") return true;
+      if (entry.eventType === "mobile-newline-after-dom-insert") return true;
+      if (entry.eventType === "mobile-newline-after-flush") return true;
+      if (entry.eventType === "mobile-newline-after-render") return true;
+      if (entry.eventType === "mobile-newline-after-highlight") return true;
+      if (entry.eventType === "mobile-newline-after-sync") return true;
       if (entry.eventType === "mobile-newline-inserted") return true;
       if (entry.eventType === "mobile-newline-after-refresh") return true;
       if (entry.submitAttempted === true) return true;
@@ -651,9 +656,17 @@
     return true;
   }
 
-  function runPostEditorInputRefresh(input, editorInput) {
+  function runPostEditorInputRefresh(input, editorInput, debugTrace, traceSourceEvent) {
     if (!input.isActiveAndEditable()) return;
     input.flushEditorSurfaceIntoWriteDocOnce();
+    if (debugTrace && debugTrace.enabled) {
+      debugTrace.logEvent("mobile-newline-after-flush", traceSourceEvent || null, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+        helperCalled: true,
+        source: "app-handler",
+      });
+    }
     if (typeof input.onEditorInputForEntryDelayHint === "function") {
       input.onEditorInputForEntryDelayHint();
     }
@@ -663,12 +676,36 @@
     input.tryStartTimerOnFirstMeaningfulInput();
     input.pulseWordmark();
     input.renderHighlight();
+    if (debugTrace && debugTrace.enabled) {
+      debugTrace.logEvent("mobile-newline-after-highlight", traceSourceEvent || null, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+        helperCalled: true,
+        source: "app-handler",
+      });
+    }
     input.renderSidebar();
     input.updateWordProgress();
     input.updateEnterButtonVisibility();
     input.scheduleSemanticPickerFromSelection();
     if (typeof input.renderMeta === "function") {
       input.renderMeta();
+    }
+    if (debugTrace && debugTrace.enabled) {
+      debugTrace.logEvent("mobile-newline-after-render", traceSourceEvent || null, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+        helperCalled: true,
+        source: "app-handler",
+      });
+    }
+    if (debugTrace && debugTrace.enabled) {
+      debugTrace.logEvent("mobile-newline-after-sync", traceSourceEvent || null, {
+        submitAttempted: false,
+        preventDefaultCalled: false,
+        helperCalled: true,
+        source: "app-handler",
+      });
     }
     if (
       window.waywordMobileEditorCaretReveal &&
@@ -700,13 +737,16 @@
     }
     range.deleteContents();
     var lineBreak = doc.createElement("br");
-    var caretHost = doc.createElement("br");
+    var caretHost = doc.createElement("span");
+    caretHost.setAttribute("data-wayword-caret-host", "true");
+    var caretHostText = doc.createTextNode("\u200B");
+    caretHost.appendChild(caretHostText);
     var frag = doc.createDocumentFragment();
     frag.appendChild(lineBreak);
     frag.appendChild(caretHost);
     range.insertNode(frag);
     var caretRange = doc.createRange();
-    caretRange.setStartBefore(caretHost);
+    caretRange.setStart(caretHostText, caretHostText.textContent ? caretHostText.textContent.length : 1);
     caretRange.collapse(true);
     sel.removeAllRanges();
     sel.addRange(caretRange);
@@ -719,6 +759,12 @@
       e.preventDefault();
       preventDefaultCalled = true;
     }
+    debugTrace.logEvent("mobile-newline-before-dom-insert", e, {
+      submitAttempted: false,
+      preventDefaultCalled: preventDefaultCalled,
+      helperCalled: true,
+      source: "app-handler",
+    });
     var inserted = false;
     if (typeof input.insertMobileEditorLineBreak === "function") {
       inserted = Boolean(input.insertMobileEditorLineBreak(editorInput, e));
@@ -726,14 +772,14 @@
       inserted = defaultInsertMobileEditorLineBreak(editorInput);
     }
     if (inserted) {
-      runPostEditorInputRefresh(input, editorInput);
+      debugTrace.logEvent("mobile-newline-after-dom-insert", e, {
+        submitAttempted: false,
+        preventDefaultCalled: preventDefaultCalled,
+        helperCalled: true,
+        source: "app-handler",
+      });
+      runPostEditorInputRefresh(input, editorInput, debugTrace, e);
     }
-    debugTrace.logEvent("mobile-newline-before", e, {
-      submitAttempted: false,
-      preventDefaultCalled: preventDefaultCalled,
-      helperCalled: true,
-      source: "app-handler",
-    });
     debugTrace.logEvent("mobile-newline-inserted", e, {
       submitAttempted: false,
       preventDefaultCalled: preventDefaultCalled,
