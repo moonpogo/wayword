@@ -92,6 +92,16 @@
       title.style.fontWeight = "600";
       title.style.marginBottom = "6px";
       panel.appendChild(title);
+      var counters = doc.createElement("div");
+      counters.id = "debugInputPanelCounters";
+      counters.style.marginBottom = "6px";
+      counters.textContent = "Enter events seen: 0 | Newline helpers called: 0 | Submit attempts from Enter: 0";
+      panel.appendChild(counters);
+      var lastEnter = doc.createElement("div");
+      lastEnter.id = "debugInputPanelLastEnter";
+      lastEnter.style.marginBottom = "6px";
+      lastEnter.textContent = "Last Enter / Newline Event: none";
+      panel.appendChild(lastEnter);
       var list = doc.createElement("div");
       list.id = "debugInputPanelEvents";
       list.textContent = "Waiting for editor event trace...";
@@ -135,15 +145,29 @@
     try {
       state = input.document.__WAYWORD_INPUT_DEBUG_TRACE_STATE;
       if (!state) {
-        state = { events: [] };
+        state = {
+          events: [],
+          lastEnterEvent: null,
+          enterEventsSeen: 0,
+          newlineHelpersCalled: 0,
+          submitAttemptsFromEnter: 0
+        };
         input.document.__WAYWORD_INPUT_DEBUG_TRACE_STATE = state;
       }
     } catch (_err) {
-      state = { events: [] };
+      state = {
+        events: [],
+        lastEnterEvent: null,
+        enterEventsSeen: 0,
+        newlineHelpersCalled: 0,
+        submitAttemptsFromEnter: 0
+      };
     }
     var badge = null;
     var panel = null;
     var panelList = null;
+    var panelCounters = null;
+    var panelLastEnter = null;
     var events = state.events;
 
     function ensureBadge() {
@@ -180,9 +204,29 @@
       var existingPanel = input.document.getElementById("debugInputPanel");
       if (existingPanel) {
         panel = existingPanel;
+        panelCounters =
+          input.document.getElementById("debugInputPanelCounters") ||
+          existingPanel.querySelector("#debugInputPanelCounters");
+        panelLastEnter =
+          input.document.getElementById("debugInputPanelLastEnter") ||
+          existingPanel.querySelector("#debugInputPanelLastEnter");
         panelList =
           input.document.getElementById("debugInputPanelEvents") ||
           existingPanel.querySelector("div:last-child");
+        if (!panelCounters && typeof input.document.createElement === "function") {
+          panelCounters = input.document.createElement("div");
+          panelCounters.id = "debugInputPanelCounters";
+          panelCounters.style.marginBottom = "6px";
+          panelCounters.textContent = "Enter events seen: 0 | Newline helpers called: 0 | Submit attempts from Enter: 0";
+          existingPanel.insertBefore(panelCounters, panelList || null);
+        }
+        if (!panelLastEnter && typeof input.document.createElement === "function") {
+          panelLastEnter = input.document.createElement("div");
+          panelLastEnter.id = "debugInputPanelLastEnter";
+          panelLastEnter.style.marginBottom = "6px";
+          panelLastEnter.textContent = "Last Enter / Newline Event: none";
+          existingPanel.insertBefore(panelLastEnter, panelList || null);
+        }
         return;
       }
       panel = input.document.createElement("div");
@@ -207,6 +251,15 @@
       title.style.fontWeight = "600";
       title.style.marginBottom = "6px";
       panel.appendChild(title);
+      panelCounters = input.document.createElement("div");
+      panelCounters.id = "debugInputPanelCounters";
+      panelCounters.style.marginBottom = "6px";
+      panel.appendChild(panelCounters);
+      panelLastEnter = input.document.createElement("div");
+      panelLastEnter.id = "debugInputPanelLastEnter";
+      panelLastEnter.style.marginBottom = "6px";
+      panelLastEnter.textContent = "Last Enter / Newline Event: none";
+      panel.appendChild(panelLastEnter);
       panelList = input.document.createElement("div");
       panelList.id = "debugInputPanelEvents";
       panel.appendChild(panelList);
@@ -261,8 +314,137 @@
       }
     }
 
+    function collapseWhitespace(value) {
+      return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    function shortEditorInnerHtml() {
+      try {
+        if (!editorInput) return "";
+        var html = collapseWhitespace(editorInput.innerHTML || "");
+        if (html.length <= 180) return html;
+        return html.slice(0, 177) + "...";
+      } catch (_err) {
+        return "";
+      }
+    }
+
+    function safeEditorInnerText() {
+      try {
+        if (!editorInput) return "";
+        return String(editorInput.innerText || "");
+      } catch (_err) {
+        return "";
+      }
+    }
+
+    function editorChildNodesCount() {
+      try {
+        if (!editorInput || !editorInput.childNodes) return 0;
+        return Number(editorInput.childNodes.length) || 0;
+      } catch (_err) {
+        return 0;
+      }
+    }
+
+    function selectionSummary() {
+      try {
+        var sel = window.getSelection && window.getSelection();
+        if (!sel) return "none";
+        return [
+          "anchorNode=" + String(sel.anchorNode && sel.anchorNode.nodeName ? sel.anchorNode.nodeName : ""),
+          "anchorOffset=" + String(Number(sel.anchorOffset) || 0),
+          "focusNode=" + String(sel.focusNode && sel.focusNode.nodeName ? sel.focusNode.nodeName : ""),
+          "focusOffset=" + String(Number(sel.focusOffset) || 0),
+          "isCollapsed=" + String(Boolean(sel.isCollapsed))
+        ].join(", ");
+      } catch (_err) {
+        return "none";
+      }
+    }
+
+    function eventTargetInsideEditor(event) {
+      try {
+        var target = event && event.target;
+        if (!target || !editorInput || typeof editorInput.contains !== "function") return false;
+        return Boolean(target === editorInput || editorInput.contains(target));
+      } catch (_err) {
+        return false;
+      }
+    }
+
+    function shouldPersistLastEnterEvent(entry) {
+      if (!entry) return false;
+      if (entry.eventType === "mobile-newline-before") return true;
+      if (entry.eventType === "mobile-newline-inserted") return true;
+      if (entry.eventType === "mobile-newline-after-refresh") return true;
+      if (entry.submitAttempted === true) return true;
+      if ((entry.eventType === "keydown" || entry.eventType === "keyup") && entry.key === "Enter") return true;
+      if ((entry.eventType === "beforeinput" || entry.eventType === "input") && (entry.inputType === "insertParagraph" || entry.inputType === "insertLineBreak")) return true;
+      return false;
+    }
+
+    function ensureSourceLabel(eventType, source, targetInsideEditor) {
+      if (source === "capture") return "document-capture";
+      if (source === "bubble") return "document-bubble";
+      if (source === "app-handler") return "app-handler";
+      if (source === "editor-capture" || source === "editor-bubble") return source;
+      if (String(eventType || "").indexOf("document-") === 0) {
+        return source === "capture" ? "document-capture" : "document-bubble";
+      }
+      return targetInsideEditor ? "editor-bubble" : "app-handler";
+    }
+
+    function renderPersistentPanelState() {
+      if (!panelEnabled) return;
+      if (panelCounters) {
+        panelCounters.textContent =
+          "Enter events seen: " +
+          String(Number(state.enterEventsSeen) || 0) +
+          " | Newline helpers called: " +
+          String(Number(state.newlineHelpersCalled) || 0) +
+          " | Submit attempts from Enter: " +
+          String(Number(state.submitAttemptsFromEnter) || 0);
+      }
+      if (panelLastEnter) {
+        var last = state.lastEnterEvent;
+        if (!last) {
+          panelLastEnter.textContent = "Last Enter / Newline Event: none";
+        } else {
+          panelLastEnter.textContent = [
+            "Last Enter / Newline Event",
+            "eventType=" + last.eventType,
+            last.key ? "key=" + last.key : "",
+            last.code ? "code=" + last.code : "",
+            last.inputType ? "inputType=" + last.inputType : "",
+            "source=" + last.source,
+            "mobile=" + String(last.mobileDetected),
+            "editorFocused=" + String(last.editorFocused),
+            last.activeElement ? "active=" + last.activeElement : "",
+            last.activeElementId ? "activeId=" + last.activeElementId : "",
+            last.activeElementClassName ? "activeClass=" + last.activeElementClassName : "",
+            last.targetTagName ? "target=" + last.targetTagName : "",
+            last.targetId ? "targetId=" + last.targetId : "",
+            last.targetClassName ? "targetClass=" + last.targetClassName : "",
+            "preventDefault=" + String(last.preventDefaultCalled),
+            "defaultPrevented=" + String(last.defaultPrevented),
+            "submit=" + String(last.submitAttempted),
+            "helperCalled=" + String(last.helperCalled),
+            "editorHtml=" + JSON.stringify(last.editorInnerHTMLShort),
+            "editorText=" + JSON.stringify(last.editorInnerTextValue),
+            "childNodes=" + String(last.editorChildNodeCount),
+            "selection=" + last.selectionSummary,
+            "timestamp=" + String(last.timestamp)
+          ]
+            .filter(Boolean)
+            .join(" | ");
+        }
+      }
+    }
+
     function renderPanel() {
       if (!panelEnabled || !panelList) return;
+      renderPersistentPanelState();
       panelList.textContent = events
         .map(function (entry) {
           return [
@@ -283,6 +465,8 @@
             entry.editorId ? "editorId=" + entry.editorId : "",
             entry.editorClassName ? "editorClass=" + entry.editorClassName : "",
             entry.source ? "source=" + entry.source : "",
+            "defaultPrevented=" + String(entry.defaultPrevented),
+            "helperCalled=" + String(entry.helperCalled),
             "vw=" + String(entry.viewportWidth),
             "mobile=" + String(entry.mobileDetected),
             "submit=" + String(entry.submitAttempted),
@@ -340,11 +524,32 @@
           mobileDetected: mobileDetected,
           submitAttempted: Boolean(details.submitAttempted),
           preventDefaultCalled: Boolean(details.preventDefaultCalled),
+          defaultPrevented: Boolean(event && event.defaultPrevented),
+          helperCalled: Boolean(details.helperCalled),
           editorTagName: String(details.editorTagName || ""),
           editorId: String(details.editorId || ""),
           editorClassName: String(details.editorClassName || ""),
-          source: String(details.source || ""),
+          source: "",
+          targetInsideEditor: eventTargetInsideEditor(event),
+          editorInnerHTMLShort: shortEditorInnerHtml(),
+          editorInnerTextValue: safeEditorInnerText(),
+          editorChildNodeCount: editorChildNodesCount(),
+          selectionSummary: selectionSummary(),
+          timestamp: new Date().toISOString()
         };
+        entry.source = ensureSourceLabel(entry.eventType, String(details.source || ""), entry.targetInsideEditor);
+        if ((entry.eventType === "keydown" || entry.eventType === "keyup") && entry.key === "Enter") {
+          state.enterEventsSeen = (Number(state.enterEventsSeen) || 0) + 1;
+        }
+        if (entry.helperCalled) {
+          state.newlineHelpersCalled = (Number(state.newlineHelpersCalled) || 0) + 1;
+        }
+        if (entry.submitAttempted && entry.key === "Enter") {
+          state.submitAttemptsFromEnter = (Number(state.submitAttemptsFromEnter) || 0) + 1;
+        }
+        if (shouldPersistLastEnterEvent(entry)) {
+          state.lastEnterEvent = entry;
+        }
         events.push(entry);
         if (events.length > 20) events.splice(0, events.length - 20);
         try {
@@ -382,7 +587,7 @@
     var root = input.document.documentElement;
     if (root.dataset.appDebugDocumentTraceBound === "1") return;
     root.dataset.appDebugDocumentTraceBound = "1";
-    ["beforeinput", "input", "keydown"].forEach(function (eventType) {
+    ["beforeinput", "input", "keydown", "keyup"].forEach(function (eventType) {
       input.document.addEventListener(eventType, function (e) {
         debugTrace.logEvent("document-" + eventType, e, {
           submitAttempted: false,
@@ -508,11 +713,26 @@
     if (inserted) {
       runPostEditorInputRefresh(input, editorInput);
     }
+    debugTrace.logEvent("mobile-newline-before", e, {
+      submitAttempted: false,
+      preventDefaultCalled: preventDefaultCalled,
+      helperCalled: true,
+      source: "app-handler",
+    });
     debugTrace.logEvent("mobile-newline-inserted", e, {
       submitAttempted: false,
       preventDefaultCalled: preventDefaultCalled,
+      helperCalled: true,
       source: sourceLabel || (inserted ? "manual-mobile-newline" : "manual-mobile-newline-failed"),
     });
+    if (inserted) {
+      debugTrace.logEvent("mobile-newline-after-refresh", e, {
+        submitAttempted: false,
+        preventDefaultCalled: preventDefaultCalled,
+        helperCalled: true,
+        source: "app-handler",
+      });
+    }
     return { inserted: inserted, preventDefaultCalled: preventDefaultCalled };
   }
 
@@ -597,7 +817,7 @@
       debugTrace.logEvent("focus", null, {
         submitAttempted: false,
         preventDefaultCalled: false,
-        source: "bubble",
+        source: "editor-bubble",
       });
       if (!window.__WAYWORD_DEV_VISUAL_PROFILE) {
         input.setFocusMode(true);
@@ -611,7 +831,7 @@
       debugTrace.logEvent("blur", e, {
         submitAttempted: false,
         preventDefaultCalled: false,
-        source: "bubble",
+        source: "editor-bubble",
       });
       if (
         !input.mobileEditorFocusGuard ||
@@ -678,6 +898,7 @@
       debugTrace.logEvent("input", e, {
         submitAttempted: false,
         preventDefaultCalled: false,
+        source: "editor-bubble",
       });
       if (!input.isActiveAndEditable()) return;
       if (input.getEditorSurfaceComposing()) {
@@ -764,6 +985,8 @@
           debugTrace.logEvent("keydown", e, {
             submitAttempted: false,
             preventDefaultCalled: preventDefaultCalled,
+            helperCalled: true,
+            source: "app-handler",
           });
           return;
         }
@@ -776,6 +999,7 @@
       debugTrace.logEvent("keydown", e, {
         submitAttempted: submitAttempted,
         preventDefaultCalled: preventDefaultCalled,
+        source: "app-handler",
       });
 
       var moveCaretKeys = {
@@ -803,6 +1027,7 @@
       debugTrace.logEvent("keyup", e, {
         submitAttempted: false,
         preventDefaultCalled: false,
+        source: "editor-bubble",
       });
     });
 
@@ -812,6 +1037,7 @@
       debugTrace.logEvent("beforeinput", e, {
         submitAttempted: submitAttempted,
         preventDefaultCalled: preventDefaultCalled,
+        source: "editor-bubble",
       });
       if (!detectMobileEditorContext(input)) return;
       var inputType = String(e && e.inputType ? e.inputType : "");
@@ -837,6 +1063,11 @@
       captureDoc.addEventListener(
         "keydown",
         function (e) {
+          debugTrace.logEvent("keydown", e, {
+            submitAttempted: false,
+            preventDefaultCalled: false,
+            source: "document-capture",
+          });
           if (!shouldHandleMobileEnterAsNewline(input, editorInput, e)) return;
           if (e.__waywordMobileNewlineHandled === true) return;
           e.__waywordMobileNewlineHandled = true;
@@ -866,7 +1097,7 @@
         debugTrace.logEvent("selectionchange", null, {
           submitAttempted: false,
           preventDefaultCalled: false,
-          source: "bubble",
+          source: "document-bubble",
         });
         if (selectionDoc.activeElement !== editorInput) {
           return;
