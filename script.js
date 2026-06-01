@@ -77,6 +77,14 @@ const exemptWords = new Set([
 const repetitionStructuralWords = new Set([
   "the","a","an","of","to","in","on","and","but","or","is","are","was","were","be","been","it","that","this","with","for","as","at","by"
 ]);
+const repetitionPronounWords = new Set([
+  "i","me","my","mine","myself",
+  "you","your","yours","yourself",
+  "he","him","his","himself",
+  "she","her","hers","herself",
+  "we","us","our","ours","ourselves",
+  "they","them","their","theirs","themselves"
+]);
 
 const firstPersonWords = new Set(["i","me","my","mine","we","us","our","ours"]);
 const secondPersonWords = new Set(["you","your","yours"]);
@@ -2456,8 +2464,10 @@ function buildAnalysisRuntimeInput() {
     exemptWords,
     repetitionThresholds: {
       contentMinCount: Math.max(2, Number(state.repeatLimit) + 1 || 3),
+      pronounMinCount: 4,
       structuralMinCount: 5,
       singleLetterMinCount: 8,
+      pronounWords: repetitionPronounWords,
       structuralWords: repetitionStructuralWords
     },
     tokenize,

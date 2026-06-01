@@ -4007,6 +4007,18 @@ test("analysis runtime analyzes text with repeat, banned, and sentence signals",
   assert.deepEqual(result.punctuation, { commas: 0 });
 });
 
+const repetitionStructuralWordsFixture = new Set([
+  "the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by",
+]);
+const repetitionPronounWordsFixture = new Set([
+  "i", "me", "my", "mine", "myself",
+  "you", "your", "yours", "yourself",
+  "he", "him", "his", "himself",
+  "she", "her", "hers", "herself",
+  "we", "us", "our", "ours", "ourselves",
+  "they", "them", "their", "theirs", "themselves",
+]);
+
 test("analysis runtime repetition includes repeated 'the' when over limit", () => {
   const context = loadAnalysisRuntimeContext();
   const input = {
@@ -4016,9 +4028,11 @@ test("analysis runtime repetition includes repeated 'the' when over limit", () =
     targetWords: 6,
     repetitionThresholds: {
       contentMinCount: 3,
+      pronounMinCount: 4,
       structuralMinCount: 5,
       singleLetterMinCount: 8,
-      structuralWords: new Set(["the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by"]),
+      pronounWords: repetitionPronounWordsFixture,
+      structuralWords: repetitionStructuralWordsFixture,
     },
     tokenize(text) {
       return String(text || "")
@@ -4067,9 +4081,11 @@ test("analysis runtime does not flag normal sentence use of structural 'the'", (
     targetWords: 6,
     repetitionThresholds: {
       contentMinCount: 3,
+      pronounMinCount: 4,
       structuralMinCount: 5,
       singleLetterMinCount: 8,
-      structuralWords: new Set(["the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by"]),
+      pronounWords: repetitionPronounWordsFixture,
+      structuralWords: repetitionStructuralWordsFixture,
     },
     tokenize(text) {
       return String(text || "")
@@ -4117,9 +4133,11 @@ test("analysis runtime content repetition still flags at lower threshold", () =>
     targetWords: 6,
     repetitionThresholds: {
       contentMinCount: 3,
+      pronounMinCount: 4,
       structuralMinCount: 5,
       singleLetterMinCount: 8,
-      structuralWords: new Set(["the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by"]),
+      pronounWords: repetitionPronounWordsFixture,
+      structuralWords: repetitionStructuralWordsFixture,
     },
     tokenize(text) {
       return String(text || "")
@@ -4166,9 +4184,11 @@ test("analysis runtime single-letter structural word 'a' does not flag too early
     targetWords: 6,
     repetitionThresholds: {
       contentMinCount: 3,
+      pronounMinCount: 4,
       structuralMinCount: 5,
       singleLetterMinCount: 8,
-      structuralWords: new Set(["the", "a", "an", "of", "to", "in", "on", "and", "but", "or", "is", "are", "was", "were", "be", "been", "it", "that", "this", "with", "for", "as", "at", "by"]),
+      pronounWords: repetitionPronounWordsFixture,
+      structuralWords: repetitionStructuralWordsFixture,
     },
     tokenize(text) {
       return String(text || "")
@@ -4205,6 +4225,87 @@ test("analysis runtime single-letter structural word 'a' does not flag too early
     false,
     `expected single-letter a to stay below threshold, got ${JSON.stringify(result.repeated)}`
   );
+});
+
+test("analysis runtime pronoun repetition does not flag 'you' at three", () => {
+  const context = loadAnalysisRuntimeContext();
+  const input = {
+    repeatLimit: 2,
+    exerciseWords: [],
+    banned: [],
+    targetWords: 6,
+    repetitionThresholds: {
+      contentMinCount: 3,
+      pronounMinCount: 4,
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      pronounWords: repetitionPronounWordsFixture,
+      structuralWords: repetitionStructuralWordsFixture,
+    },
+    tokenize: (text) => String(text || "").split(/\s+/).map((word) => word.toLowerCase().replace(/[^a-z']/g, "")).filter(Boolean),
+    countWords(tokens) { const counts = {}; tokens.forEach((token) => { counts[token] = (counts[token] || 0) + 1; }); return counts; },
+    sentenceStarters() { return []; },
+    sentenceStarterExamples() { return []; },
+    countPerspective() { return {}; },
+    countPunctuation() { return {}; },
+  };
+  const result = context.waywordAnalysisRuntime.analyze(input, "you you you");
+  assert.equal(result.repeated.some(([word]) => word === "you"), false);
+});
+
+test("analysis runtime pronoun repetition flags 'you' and 'they' at four", () => {
+  const context = loadAnalysisRuntimeContext();
+  const input = {
+    repeatLimit: 2,
+    exerciseWords: [],
+    banned: [],
+    targetWords: 6,
+    repetitionThresholds: {
+      contentMinCount: 3,
+      pronounMinCount: 4,
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      pronounWords: repetitionPronounWordsFixture,
+      structuralWords: repetitionStructuralWordsFixture,
+    },
+    tokenize: (text) => String(text || "").split(/\s+/).map((word) => word.toLowerCase().replace(/[^a-z']/g, "")).filter(Boolean),
+    countWords(tokens) { const counts = {}; tokens.forEach((token) => { counts[token] = (counts[token] || 0) + 1; }); return counts; },
+    sentenceStarters() { return []; },
+    sentenceStarterExamples() { return []; },
+    countPerspective() { return {}; },
+    countPunctuation() { return {}; },
+  };
+  const result = context.waywordAnalysisRuntime.analyze(input, "you you you you. they they they they.");
+  assert.ok(result.repeated.some(([word, count]) => word === "you" && count === 4));
+  assert.ok(result.repeated.some(([word, count]) => word === "they" && count === 4));
+});
+
+test("analysis runtime single-letter pronoun 'i' still requires eight", () => {
+  const context = loadAnalysisRuntimeContext();
+  const input = {
+    repeatLimit: 2,
+    exerciseWords: [],
+    banned: [],
+    targetWords: 6,
+    repetitionThresholds: {
+      contentMinCount: 3,
+      pronounMinCount: 4,
+      structuralMinCount: 5,
+      singleLetterMinCount: 8,
+      pronounWords: repetitionPronounWordsFixture,
+      structuralWords: repetitionStructuralWordsFixture,
+    },
+    tokenize: (text) => String(text || "").split(/\s+/).map((word) => word.toLowerCase().replace(/[^a-z']/g, "")).filter(Boolean),
+    countWords(tokens) { const counts = {}; tokens.forEach((token) => { counts[token] = (counts[token] || 0) + 1; }); return counts; },
+    sentenceStarters() { return []; },
+    sentenceStarterExamples() { return []; },
+    countPerspective() { return {}; },
+    countPunctuation() { return {}; },
+  };
+  const seven = context.waywordAnalysisRuntime.analyze(input, "i i i i i i i");
+  assert.equal(seven.repeated.some(([word]) => word === "i"), false);
+  const eight = context.waywordAnalysisRuntime.analyze(input, "i i i i i i i i");
+  assert.ok(eight.repeated.some(([word, count]) => word === "i" && count === 8));
 });
 
 test("prompt runtime generates prompt and updates prompt history state", () => {

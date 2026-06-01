@@ -8,9 +8,14 @@
     var w = String(word || "").toLowerCase();
     var thresholds = input && input.repetitionThresholds ? input.repetitionThresholds : null;
     var structuralWords = thresholds && thresholds.structuralWords ? thresholds.structuralWords : null;
+    var pronounWords = thresholds && thresholds.pronounWords ? thresholds.pronounWords : null;
     var contentMinCount = parseCountThreshold(
       thresholds && thresholds.contentMinCount,
       Math.max(1, (Number(input && input.repeatLimit) || 1) + 1)
+    );
+    var pronounMinCount = parseCountThreshold(
+      thresholds && thresholds.pronounMinCount,
+      4
     );
     var structuralMinCount = parseCountThreshold(
       thresholds && thresholds.structuralMinCount,
@@ -22,6 +27,9 @@
     );
 
     if (w.length <= 1) return singleLetterMinCount;
+    if (pronounWords && typeof pronounWords.has === "function" && pronounWords.has(w)) {
+      return pronounMinCount;
+    }
     if (structuralWords && typeof structuralWords.has === "function" && structuralWords.has(w)) {
       return structuralMinCount;
     }
