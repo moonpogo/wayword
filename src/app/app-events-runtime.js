@@ -76,8 +76,8 @@
       panel.style.position = "fixed";
       panel.style.left = "8px";
       panel.style.right = "8px";
-      panel.style.bottom = "8px";
-      panel.style.maxHeight = "40vh";
+      panel.style.bottom = "max(8px, env(safe-area-inset-bottom))";
+      panel.style.maxHeight = "35vh";
       panel.style.overflow = "auto";
       panel.style.padding = "8px";
       panel.style.border = "1px solid rgba(255,255,255,0.24)";
@@ -88,24 +88,6 @@
       panel.style.zIndex = "99999";
       panel.style.whiteSpace = "pre-wrap";
       panel.style.pointerEvents = "none";
-      panel.dataset.debugCollapsed = "1";
-
-      var toggle = doc.createElement("button");
-      toggle.id = "debugInputPanelToggle";
-      toggle.type = "button";
-      toggle.textContent = "Show input debug";
-      toggle.style.position = "fixed";
-      toggle.style.left = "8px";
-      toggle.style.right = "8px";
-      toggle.style.bottom = "8px";
-      toggle.style.zIndex = "100001";
-      toggle.style.padding = "8px 10px";
-      toggle.style.borderRadius = "999px";
-      toggle.style.border = "1px solid rgba(255,255,255,0.35)";
-      toggle.style.background = "rgba(8,9,13,0.95)";
-      toggle.style.color = "#e6dccb";
-      toggle.style.font = "600 11px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial";
-      toggle.style.pointerEvents = "auto";
 
       var title = doc.createElement("div");
       title.textContent = "Input debug active";
@@ -127,22 +109,8 @@
       list.id = "debugInputPanelEvents";
       list.textContent = "Waiting for editor event trace...";
       panel.appendChild(list);
-      var applyCollapsedState = function (collapsed) {
-        var isCollapsed = collapsed !== false;
-        panel.dataset.debugCollapsed = isCollapsed ? "1" : "0";
-        counters.style.display = isCollapsed ? "none" : "";
-        lastEnter.style.display = isCollapsed ? "none" : "";
-        list.style.display = isCollapsed ? "none" : "";
-        title.style.marginBottom = isCollapsed ? "0" : "6px";
-        panel.style.pointerEvents = isCollapsed ? "none" : "auto";
-        toggle.textContent = isCollapsed ? "Show input debug" : "Hide input debug";
-      };
-      toggle.addEventListener("click", function () {
-        applyCollapsedState(panel.dataset.debugCollapsed !== "1");
-      });
-      applyCollapsedState(true);
       doc.body.appendChild(panel);
-      doc.body.appendChild(toggle);
+      doc.body.style.paddingBottom = "max(34vh, calc(24px + env(safe-area-inset-bottom)))";
     }
   }
 
@@ -204,7 +172,6 @@
     var panelList = null;
     var panelCounters = null;
     var panelLastEnter = null;
-    var panelToggle = null;
     var events = state.events;
 
     function ensureBadge() {
@@ -241,7 +208,6 @@
       var existingPanel = input.document.getElementById("debugInputPanel");
       if (existingPanel) {
         panel = existingPanel;
-        panelToggle = input.document.getElementById("debugInputPanelToggle");
         panelCounters =
           input.document.getElementById("debugInputPanelCounters") ||
           existingPanel.querySelector("#debugInputPanelCounters");
@@ -265,44 +231,11 @@
           panelLastEnter.textContent = "Last Enter / Newline Event: none";
           existingPanel.insertBefore(panelLastEnter, panelList || null);
         }
-        if (!panelToggle && typeof input.document.createElement === "function" && input.document.body) {
-          panelToggle = input.document.createElement("button");
-          panelToggle.id = "debugInputPanelToggle";
-          panelToggle.type = "button";
-          panelToggle.style.position = "fixed";
-          panelToggle.style.left = "8px";
-          panelToggle.style.right = "8px";
-          panelToggle.style.bottom = "8px";
-          panelToggle.style.zIndex = "100001";
-          panelToggle.style.padding = "8px 10px";
-          panelToggle.style.borderRadius = "999px";
-          panelToggle.style.border = "1px solid rgba(255,255,255,0.35)";
-          panelToggle.style.background = "rgba(8,9,13,0.95)";
-          panelToggle.style.color = "#e6dccb";
-          panelToggle.style.font = "600 11px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial";
-          panelToggle.style.pointerEvents = "auto";
-          panelToggle.textContent = "Show input debug";
-          input.document.body.appendChild(panelToggle);
-        }
-        var panelTitle = existingPanel.querySelector("#debugInputPanelTitle") || existingPanel.querySelector("div");
-        var applyCollapsedState = function (collapsed) {
-          var isCollapsed = collapsed !== false;
-          existingPanel.dataset.debugCollapsed = isCollapsed ? "1" : "0";
-          if (panelCounters) panelCounters.style.display = isCollapsed ? "none" : "";
-          if (panelLastEnter) panelLastEnter.style.display = isCollapsed ? "none" : "";
-          if (panelList) panelList.style.display = isCollapsed ? "none" : "";
-          if (panelTitle) panelTitle.style.marginBottom = isCollapsed ? "0" : "6px";
-          existingPanel.style.pointerEvents = isCollapsed ? "none" : "auto";
-          if (panelToggle) panelToggle.textContent = isCollapsed ? "Show input debug" : "Hide input debug";
-        };
-        if (panelToggle && panelToggle.dataset.debugToggleBound !== "1") {
-          panelToggle.dataset.debugToggleBound = "1";
-          panelToggle.addEventListener("click", function () {
-            applyCollapsedState(existingPanel.dataset.debugCollapsed !== "1");
-          });
-        }
-        if (existingPanel.dataset.debugCollapsed !== "0") {
-          applyCollapsedState(true);
+        existingPanel.style.pointerEvents = "none";
+        existingPanel.style.bottom = "max(8px, env(safe-area-inset-bottom))";
+        existingPanel.style.maxHeight = "35vh";
+        if (input.document && input.document.body) {
+          input.document.body.style.paddingBottom = "max(34vh, calc(24px + env(safe-area-inset-bottom)))";
         }
         return;
       }
@@ -312,8 +245,8 @@
       panel.style.position = "fixed";
       panel.style.left = "8px";
       panel.style.right = "8px";
-      panel.style.bottom = "8px";
-      panel.style.maxHeight = "40vh";
+      panel.style.bottom = "max(8px, env(safe-area-inset-bottom))";
+      panel.style.maxHeight = "35vh";
       panel.style.overflow = "auto";
       panel.style.padding = "8px";
       panel.style.border = "1px solid rgba(255,255,255,0.24)";
@@ -324,23 +257,6 @@
       panel.style.zIndex = "99999";
       panel.style.whiteSpace = "pre-wrap";
       panel.style.pointerEvents = "none";
-      panel.dataset.debugCollapsed = "1";
-      panelToggle = input.document.createElement("button");
-      panelToggle.id = "debugInputPanelToggle";
-      panelToggle.type = "button";
-      panelToggle.style.position = "fixed";
-      panelToggle.style.left = "8px";
-      panelToggle.style.right = "8px";
-      panelToggle.style.bottom = "8px";
-      panelToggle.style.zIndex = "100001";
-      panelToggle.style.padding = "8px 10px";
-      panelToggle.style.borderRadius = "999px";
-      panelToggle.style.border = "1px solid rgba(255,255,255,0.35)";
-      panelToggle.style.background = "rgba(8,9,13,0.95)";
-      panelToggle.style.color = "#e6dccb";
-      panelToggle.style.font = "600 11px/1.2 ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial";
-      panelToggle.style.pointerEvents = "auto";
-      panelToggle.textContent = "Show input debug";
       var title = input.document.createElement("div");
       title.textContent = "Input debug active";
       title.id = "debugInputPanelTitle";
@@ -359,22 +275,10 @@
       panelList = input.document.createElement("div");
       panelList.id = "debugInputPanelEvents";
       panel.appendChild(panelList);
-      var applyCollapsedState = function (collapsed) {
-        var isCollapsed = collapsed !== false;
-        panel.dataset.debugCollapsed = isCollapsed ? "1" : "0";
-        panelCounters.style.display = isCollapsed ? "none" : "";
-        panelLastEnter.style.display = isCollapsed ? "none" : "";
-        panelList.style.display = isCollapsed ? "none" : "";
-        title.style.marginBottom = isCollapsed ? "0" : "6px";
-        panel.style.pointerEvents = isCollapsed ? "none" : "auto";
-        panelToggle.textContent = isCollapsed ? "Show input debug" : "Hide input debug";
-      };
-      panelToggle.addEventListener("click", function () {
-        applyCollapsedState(panel.dataset.debugCollapsed !== "1");
-      });
-      applyCollapsedState(true);
       input.document.body.appendChild(panel);
-      input.document.body.appendChild(panelToggle);
+      if (input.document && input.document.body) {
+        input.document.body.style.paddingBottom = "max(34vh, calc(24px + env(safe-area-inset-bottom)))";
+      }
     }
 
     function activeTagName() {
