@@ -6837,6 +6837,10 @@ function bindEditorInputEvents() {
   getAppEventsRuntime().bindEditorInputEvents({
     editorInputScrollport,
     editorInput,
+    resolveEditorInput() {
+      return document.getElementById("editorInput");
+    },
+    document,
     state,
     setFocusMode,
     mobileEditorFocusGuard: window.waywordMobileEditorFocusGuard,
@@ -6956,6 +6960,7 @@ function bindPrimaryEventControls() {
     triggerShuffle,
     cycleRepeatLimit,
     editorInput,
+    bindEditorInputEvents,
     getEditorText,
     submitWriting,
     saveBannedInline,

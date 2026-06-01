@@ -106,10 +106,20 @@
     }
 
     var panelEnabled = hasDebugFlag;
+    var state = null;
+    try {
+      state = input.document.__WAYWORD_INPUT_DEBUG_TRACE_STATE;
+      if (!state) {
+        state = { events: [] };
+        input.document.__WAYWORD_INPUT_DEBUG_TRACE_STATE = state;
+      }
+    } catch (_err) {
+      state = { events: [] };
+    }
     var badge = null;
     var panel = null;
     var panelList = null;
-    var events = [];
+    var events = state.events;
 
     function ensureBadge() {
       if (!panelEnabled || badge) return;
@@ -205,6 +215,10 @@
             "composing=" + String(entry.isComposing),
             entry.targetTagName ? "target=" + entry.targetTagName : "",
             entry.activeElement ? "active=" + entry.activeElement : "",
+            entry.editorTagName ? "editorTag=" + entry.editorTagName : "",
+            entry.editorId ? "editorId=" + entry.editorId : "",
+            entry.editorClassName ? "editorClass=" + entry.editorClassName : "",
+            entry.source ? "source=" + entry.source : "",
             "vw=" + String(entry.viewportWidth),
             "mobile=" + String(entry.mobileDetected),
             "submit=" + String(entry.submitAttempted),
@@ -231,6 +245,7 @@
 
     return {
       enabled: true,
+      hasDebugFlag: hasDebugFlag,
       logEvent: function (eventType, event, meta) {
         var details = meta && typeof meta === "object" ? meta : {};
         var mobileDetected = false;
@@ -261,6 +276,10 @@
           mobileDetected: mobileDetected,
           submitAttempted: Boolean(details.submitAttempted),
           preventDefaultCalled: Boolean(details.preventDefaultCalled),
+          editorTagName: String(details.editorTagName || ""),
+          editorId: String(details.editorId || ""),
+          editorClassName: String(details.editorClassName || ""),
+          source: String(details.source || ""),
         };
         events.push(entry);
         if (events.length > 20) events.splice(0, events.length - 20);
@@ -281,6 +300,35 @@
     };
   }
 
+  function logTraceBound(debugTrace, editorInput, source) {
+    if (!debugTrace || !debugTrace.enabled) return;
+    debugTrace.logEvent("trace-bound", null, {
+      submitAttempted: false,
+      preventDefaultCalled: false,
+      editorTagName: editorInput && editorInput.tagName ? String(editorInput.tagName) : "",
+      editorId: editorInput && editorInput.id ? String(editorInput.id) : "",
+      editorClassName: editorInput && editorInput.className ? String(editorInput.className) : "",
+      source: source || "unknown",
+    });
+  }
+
+  function ensureDocumentLevelDebugFallback(input, debugTrace) {
+    if (!debugTrace || !debugTrace.enabled || !debugTrace.hasDebugFlag) return;
+    if (!input || !input.document || !input.document.documentElement) return;
+    var root = input.document.documentElement;
+    if (root.dataset.appDebugDocumentTraceBound === "1") return;
+    root.dataset.appDebugDocumentTraceBound = "1";
+    ["beforeinput", "input", "keydown"].forEach(function (eventType) {
+      input.document.addEventListener(eventType, function (e) {
+        debugTrace.logEvent("document-" + eventType, e, {
+          submitAttempted: false,
+          preventDefaultCalled: false,
+          source: "document-fallback",
+        });
+      });
+    });
+  }
+
   function trySubmitFromEditor(input) {
     if (!input || !input.state) return false;
     if (input.state.submitted) {
@@ -297,9 +345,64 @@
 
   function bindEditorInputEvents(input) {
     var editorInput = input.editorInput;
-    if (!editorInput || editorInput.dataset.appEventsBound === "1") return;
-    editorInput.dataset.appEventsBound = "1";
+    if (!editorInput && typeof input.resolveEditorInput === "function") {
+      editorInput = input.resolveEditorInput();
+    }
     var debugTrace = createEditorInputDebugTrace(input, editorInput);
+    ensureDocumentLevelDebugFallback(input, debugTrace);
+    if (!editorInput) {
+      if (!input || !input.document || !input.document.documentElement) return;
+      var root = input.document.documentElement;
+      if (root.dataset.appEditorInputRetryBound === "1") return;
+      root.dataset.appEditorInputRetryBound = "1";
+      var tryBindLater = function (source) {
+        var resolved = typeof input.resolveEditorInput === "function" ? input.resolveEditorInput() : null;
+        if (!resolved) return;
+        bindEditorInputEvents({
+          editorInput: resolved,
+          editorInputScrollport: input.editorInputScrollport,
+          resolveEditorInput: input.resolveEditorInput,
+          document: input.document,
+          state: input.state,
+          setFocusMode: input.setFocusMode,
+          mobileEditorFocusGuard: input.mobileEditorFocusGuard,
+          hideEditorSemanticPicker: input.hideEditorSemanticPicker,
+          queueViewportSync: input.queueViewportSync,
+          getSuppressFocusExitUntil: input.getSuppressFocusExitUntil,
+          isMobilePatternsVisible: input.isMobilePatternsVisible,
+          syncViewportHeightVar: input.syncViewportHeightVar,
+          syncKeyboardOpenClass: input.syncKeyboardOpenClass,
+          setEditorSurfaceComposing: input.setEditorSurfaceComposing,
+          getEditorSurfaceComposing: input.getEditorSurfaceComposing,
+          isActiveAndEditable: input.isActiveAndEditable,
+          flushEditorSurfaceIntoWriteDocOnce: input.flushEditorSurfaceIntoWriteDocOnce,
+          captureEditorSurfaceIntoWriteDocForSubmit: input.captureEditorSurfaceIntoWriteDocForSubmit,
+          tryStartTimerOnFirstMeaningfulInput: input.tryStartTimerOnFirstMeaningfulInput,
+          pulseWordmark: input.pulseWordmark,
+          renderHighlight: input.renderHighlight,
+          renderSidebar: input.renderSidebar,
+          updateWordProgress: input.updateWordProgress,
+          updateEnterButtonVisibility: input.updateEnterButtonVisibility,
+          scheduleSemanticPickerFromSelection: input.scheduleSemanticPickerFromSelection,
+          syncScroll: input.syncScroll,
+          scheduleEditorDotOverlaySync: input.scheduleEditorDotOverlaySync,
+          completedUiRestartInteractions: input.completedUiRestartInteractions,
+          runPostSubmitAutoNewRunNow: input.runPostSubmitAutoNewRunNow,
+          getEditorText: input.getEditorText,
+          submitWriting: input.submitWriting,
+          renderMeta: input.renderMeta,
+          onEditorFocusForEntryDelayHint: input.onEditorFocusForEntryDelayHint,
+          onEditorInputForEntryDelayHint: input.onEditorInputForEntryDelayHint,
+          onEditorInputForTelemetry: input.onEditorInputForTelemetry,
+        });
+      };
+      input.document.addEventListener("focusin", function () { tryBindLater("focusin"); }, true);
+      input.document.addEventListener("pointerdown", function () { tryBindLater("pointerdown"); }, true);
+      return;
+    }
+    if (editorInput.dataset.appEventsBound === "1") return;
+    editorInput.dataset.appEventsBound = "1";
+    logTraceBound(debugTrace, editorInput, "editor-bind");
 
     editorInput.addEventListener("focus", function () {
       if (!window.__WAYWORD_DEV_VISUAL_PROFILE) {
@@ -616,6 +719,9 @@
           input.setFocusMode(true);
         }
         input.startWriting({ deferEditorFocus: true });
+        if (typeof input.bindEditorInputEvents === "function") {
+          input.bindEditorInputEvents("begin-click");
+        }
         if (typeof input.onBeginClicked === "function") {
           input.onBeginClicked({ source: "begin_button" });
         }
