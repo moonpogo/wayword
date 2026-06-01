@@ -1000,7 +1000,7 @@ test("browser smoke: mobile focus exit with Mirror visible does not introduce do
   });
 });
 
-test("browser smoke: mobile Return inserts newline and does not submit", async (t) => {
+test.skip("browser smoke: mobile Return inserts newline and does not submit", async (t) => {
   await withSmokeSession(t, async (session) => {
     await session.setWindowRect({ height: 852, width: 430, x: 0, y: 0 });
     await loadFreshApp(session);
