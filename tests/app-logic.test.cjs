@@ -2495,6 +2495,69 @@ test("editor surface text reader preserves newline for block + br contenteditabl
   assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
 });
 
+test("editor surface text reader preserves plain text contenteditable", () => {
+  const context = loadEditorSurfaceTextContext();
+  const root = {
+    nodeType: 1,
+    tagName: "DIV",
+    childNodes: [{ nodeType: 3, textContent: "abc" }],
+  };
+  assert.equal(context.getEditorSurfaceRawText(root), "abc");
+});
+
+test("editor surface text reader preserves inline br line break", () => {
+  const context = loadEditorSurfaceTextContext();
+  const root = {
+    nodeType: 1,
+    tagName: "DIV",
+    childNodes: [
+      { nodeType: 3, textContent: "abc" },
+      { nodeType: 1, tagName: "BR", childNodes: [] },
+      { nodeType: 3, textContent: "def" },
+    ],
+  };
+  assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
+});
+
+test("editor surface text reader preserves trailing br-br caret host newline pattern", () => {
+  const context = loadEditorSurfaceTextContext();
+  const root = {
+    nodeType: 1,
+    tagName: "DIV",
+    childNodes: [
+      { nodeType: 3, textContent: "abc" },
+      { nodeType: 1, tagName: "BR", childNodes: [] },
+      { nodeType: 1, tagName: "BR", childNodes: [] },
+    ],
+  };
+  const extracted = context.getEditorSurfaceRawText(root);
+  assert.ok(
+    extracted === "abc\n" || extracted === "abc\n\n",
+    `expected trailing newline for br-br caret host pattern, got ${JSON.stringify(extracted)}`
+  );
+});
+
+test("editor surface text reader preserves block structure newline boundaries", () => {
+  const context = loadEditorSurfaceTextContext();
+  const root = {
+    nodeType: 1,
+    tagName: "DIV",
+    childNodes: [
+      {
+        nodeType: 1,
+        tagName: "DIV",
+        childNodes: [{ nodeType: 3, textContent: "abc" }],
+      },
+      {
+        nodeType: 1,
+        tagName: "DIV",
+        childNodes: [{ nodeType: 3, textContent: "def" }],
+      },
+    ],
+  };
+  assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
+});
+
 test("app events runtime binds editor input events once, syncs scroll, and keeps mobile Enter/newline as writing", () => {
   const context = loadAppEventsRuntimeContext();
   const listeners = new Map();

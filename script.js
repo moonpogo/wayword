@@ -1095,10 +1095,70 @@ function verifyWriteDocCanonicalMappingSelfTest() {
   return true;
 }
 
-/** DOM read for flush: must match actual text nodes (preserves trailing spaces). `innerText` strips trailing whitespace and breaks the token round-trip. */
+const EDITOR_BLOCK_TAGS = new Set([
+  "ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "DIV", "DL", "DT", "DD",
+  "FIELDSET", "FIGCAPTION", "FIGURE", "FOOTER", "FORM", "H1", "H2", "H3",
+  "H4", "H5", "H6", "HEADER", "HR", "LI", "MAIN", "NAV", "OL", "P", "PRE",
+  "SECTION", "TABLE", "TR", "TD", "TH", "UL"
+]);
+
+function pushEditorBreak(out) {
+  if (!out.length || out[out.length - 1] !== "\n") out.push("\n");
+}
+
+function editorNodeTagNameUpper(node) {
+  return String((node && node.tagName) || "").toUpperCase();
+}
+
+function readEditorSurfaceNodeText(node, out, options) {
+  if (!node) return;
+  const opts = options || { isRoot: false, isLastSibling: true };
+  if (node.nodeType === Node.TEXT_NODE) {
+    out.push(String(node.textContent || ""));
+    return;
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
+    return;
+  }
+  const tag = editorNodeTagNameUpper(node);
+  if (tag === "BR") {
+    // Preserve explicit consecutive `<br><br>` caret-host patterns while still
+    // deduping common block-boundary + `<br>` layouts.
+    if (opts.previousSiblingTag === "BR") {
+      out.push("\n");
+      return;
+    }
+    pushEditorBreak(out);
+    return;
+  }
+  const isBlock = node.nodeType === Node.ELEMENT_NODE && !opts.isRoot && EDITOR_BLOCK_TAGS.has(tag);
+  const children = Array.from(node.childNodes || []);
+  const beforeLen = out.length;
+  for (let i = 0; i < children.length; i++) {
+    const prevSiblingTag = i > 0 ? editorNodeTagNameUpper(children[i - 1]) : "";
+    readEditorSurfaceNodeText(children[i], out, {
+      isRoot: false,
+      isLastSibling: i === children.length - 1,
+      previousSiblingTag: prevSiblingTag,
+    });
+  }
+  if (!isBlock) return;
+  const producedAny = out.length > beforeLen;
+  if (!producedAny) {
+    pushEditorBreak(out);
+    return;
+  }
+  if (!opts.isLastSibling) {
+    pushEditorBreak(out);
+  }
+}
+
+/** DOM read for flush: preserves contenteditable visual line breaks (`<br>`, block wrappers) plus trailing spaces. */
 function getEditorSurfaceRawText(root) {
   if (!root) return "";
-  return String(root.textContent ?? "").replace(/\r/g, "");
+  const out = [];
+  readEditorSurfaceNodeText(root, out, { isRoot: true, isLastSibling: true });
+  return out.join("").replace(/\r/g, "");
 }
 
 /** When `previousWriteDoc` is provided (flush path), copies flags for tokens where line index, token index, and text all match the previous doc — keeps flags across re-parse without changing canonical text. */
@@ -1130,24 +1190,16 @@ function parseRawToWriteDoc(raw, previousWriteDoc) {
 }
 
 function getOffsetInEditorRoot(root, node, offsetInNode) {
-  if (!root) return 0;
-  if (node === root) {
-    let total = 0;
-    for (let i = 0; i < Math.min(offsetInNode, root.childNodes.length); i++) {
-      const c = root.childNodes[i];
-      if (c && c.nodeType === Node.TEXT_NODE) total += c.textContent.length;
-    }
-    return total;
+  if (!root || !node) return 0;
+  try {
+    const range = document.createRange();
+    range.setStart(root, 0);
+    range.setEnd(node, Math.max(0, Number(offsetInNode) || 0));
+    const fragment = range.cloneContents();
+    return getEditorSurfaceRawText(fragment).length;
+  } catch (_err) {
+    return getEditorSurfaceRawText(root).length;
   }
-  let total = 0;
-  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-  let n;
-  while ((n = walk.nextNode())) {
-    const len = n.textContent.length;
-    if (n === node) return total + Math.min(Math.max(0, offsetInNode), len);
-    total += len;
-  }
-  return total;
 }
 
 function getSelectionOffsetsForEditorRoot(root) {
