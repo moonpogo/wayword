@@ -41,6 +41,14 @@ class PlaywrightSession {
     await this.page.click(selector, { timeout: 15000, ...options });
   }
 
+  async type(text, options = {}) {
+    await this.page.keyboard.type(String(text ?? ""), options);
+  }
+
+  async press(key, options = {}) {
+    await this.page.keyboard.press(String(key ?? ""), options);
+  }
+
   async waitFor(label, predicate, options = {}) {
     const timeoutMs = Number(options.timeoutMs) || 10000;
     const intervalMs = Number(options.intervalMs) || 100;
