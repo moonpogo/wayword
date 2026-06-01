@@ -1654,6 +1654,22 @@ html[data-theme="dark"] .theme-moon{
   cursor:default;
 }
 
+/* iOS contenteditable can emit paragraph wrappers on Return; neutralize wrapper metrics so
+   empty/newline lines keep the same caret height and line box as normal text lines. */
+.editor-input > div,
+.editor-input > p{
+  margin:0;
+  padding:0;
+  line-height:inherit;
+  font:inherit;
+}
+
+.editor-input > div > br:only-child,
+.editor-input > p > br:only-child{
+  line-height:inherit;
+  font:inherit;
+}
+
 /* Post-submit annotated runs use the same editor/highlight typography as live (no alternate metrics). */
 /* `.editor-shell--submitted-annotated-spacing` is toggled in JS only for dot-overlay geometry (see script). */
 

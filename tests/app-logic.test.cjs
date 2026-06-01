@@ -3154,6 +3154,14 @@ test("mobile editor focus guard tolerates non-element pointer targets", () => {
   assert.equal(blurred, false);
 });
 
+test("editor input CSS neutralizes newline wrapper block metrics for iOS contenteditable", () => {
+  const source = fs.readFileSync("style.css", "utf8");
+  assert.match(source, /\.editor-input\s*>\s*div,\s*\n\.editor-input\s*>\s*p\{/);
+  assert.match(source, /line-height:inherit;/);
+  assert.match(source, /font:inherit;/);
+  assert.match(source, /margin:0;/);
+});
+
 test("behavioral telemetry logs pre-entry and writing events locally only", () => {
   const context = loadBehavioralTelemetryRuntimeContext();
   const telemetry = context.waywordBehavioralTelemetry;
