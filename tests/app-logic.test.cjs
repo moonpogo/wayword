@@ -2739,6 +2739,104 @@ test("app events runtime treats 430px viewport as mobile even when runtime mobil
   );
 });
 
+test("app events runtime capture keydown Enter inserts mobile newline when editor keydown path is bypassed", () => {
+  const captureListeners = new Map();
+  const context = loadAppEventsRuntimeContext({
+    innerWidth: 430,
+    navigator: { maxTouchPoints: 0, userAgent: "" },
+    matchMedia() {
+      return { matches: false };
+    },
+    document: {
+      addEventListener(name, handler, opts) {
+        if (name === "keydown" && opts === true) {
+          captureListeners.set(name, handler);
+        }
+      },
+      activeElement: null,
+      documentElement: { dataset: {} },
+      body: { setAttribute() {} },
+      getElementById() {
+        return null;
+      },
+      createElement() {
+        return { style: {}, setAttribute() {}, appendChild() {} };
+      },
+    },
+  });
+  const listeners = new Map();
+  const calls = [];
+  const editorInput = {
+    dataset: {},
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+    contains(node) {
+      return node === this;
+    },
+  };
+  const input = {
+    document: context.document,
+    editorInput,
+    state: { active: true, submitted: false, completedUiActive: false, optionsOpen: false },
+    isMobileViewport() {
+      return true;
+    },
+    getEditorSurfaceComposing() {
+      return false;
+    },
+    isActiveAndEditable() {
+      return true;
+    },
+    flushEditorSurfaceIntoWriteDocOnce() {
+      calls.push("flush");
+    },
+    tryStartTimerOnFirstMeaningfulInput() {},
+    pulseWordmark() {},
+    renderHighlight() {},
+    renderSidebar() {},
+    updateWordProgress() {},
+    updateEnterButtonVisibility() {},
+    renderMeta() {},
+    onEditorFocusForEntryDelayHint() {},
+    onEditorInputForEntryDelayHint() {},
+    onEditorInputForTelemetry() {},
+    scheduleSemanticPickerFromSelection() {},
+    syncScroll() {},
+    scheduleEditorDotOverlaySync() {},
+    insertMobileEditorLineBreak() {
+      calls.push("insertMobileEditorLineBreak");
+      return true;
+    },
+    setEditorSurfaceComposing() {},
+    completedUiRestartInteractions: null,
+    submitWriting(value) {
+      calls.push(["submitWriting", value]);
+    },
+    getEditorText() {
+      return "mobile text";
+    },
+  };
+  context.waywordAppEventsRuntime.bindEditorInputEvents(input);
+  assert.equal(captureListeners.has("keydown"), true);
+  const keyEvent = {
+    key: "Enter",
+    target: editorInput,
+    preventDefault() {
+      calls.push("preventDefault");
+    },
+  };
+  captureListeners.get("keydown")(keyEvent);
+  assert.equal(calls.includes("preventDefault"), true);
+  assert.equal(calls.includes("insertMobileEditorLineBreak"), true);
+  assert.equal(calls.includes("flush"), true);
+  assert.equal(
+    calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting"),
+    false,
+    "capture keydown mobile newline path should not submit"
+  );
+});
+
 test("app events runtime submits on desktop Enter when not composing", () => {
   const context = loadAppEventsRuntimeContext();
   const listeners = new Map();

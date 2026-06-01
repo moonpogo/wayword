@@ -516,6 +516,22 @@
     return { inserted: inserted, preventDefaultCalled: preventDefaultCalled };
   }
 
+  function shouldHandleMobileEnterAsNewline(input, editorInput, e, options) {
+    if (!e || e.key !== "Enter") return false;
+    if (Boolean(e.shiftKey || e.metaKey || e.ctrlKey || e.altKey)) return false;
+    if (e.isComposing || (input.getEditorSurfaceComposing && input.getEditorSurfaceComposing())) return false;
+    if (!detectMobileEditorContext(input)) return false;
+    var opts = options || {};
+    var target = e.target || null;
+    if (!target && opts.assumeEditorWhenTargetMissing) {
+      return true;
+    }
+    var targetIsEditor =
+      Boolean(target && target === editorInput) ||
+      Boolean(target && editorInput && typeof editorInput.contains === "function" && editorInput.contains(target));
+    return targetIsEditor;
+  }
+
   function bindEditorInputEvents(input) {
     var editorInput = input.editorInput;
     if (!editorInput && typeof input.resolveEditorInput === "function") {
@@ -734,9 +750,9 @@
       }
 
       if (e.key === "Enter" && !e.shiftKey) {
-        if (e.isComposing || input.getEditorSurfaceComposing()) return;
-        var hasModifier = Boolean(e.metaKey || e.ctrlKey || e.altKey || e.shiftKey);
-        if (detectMobileEditorContext(input) && !hasModifier) {
+        if (shouldHandleMobileEnterAsNewline(input, editorInput, e, { assumeEditorWhenTargetMissing: true })) {
+          if (e.__waywordMobileNewlineHandled === true) return;
+          e.__waywordMobileNewlineHandled = true;
           var mobileInsertResult = insertMobileEditorNewlineAndRefresh(
             input,
             editorInput,
@@ -751,6 +767,7 @@
           });
           return;
         }
+        if (e.isComposing || input.getEditorSurfaceComposing()) return;
         markPreventDefault();
         submitAttempted = true;
         trySubmitFromEditor(input);
@@ -809,6 +826,25 @@
       ).preventDefaultCalled;
       return;
     });
+
+    var captureDoc =
+      (input.document && typeof input.document.addEventListener === "function" ? input.document : null) ||
+      (editorInput.ownerDocument && typeof editorInput.ownerDocument.addEventListener === "function"
+        ? editorInput.ownerDocument
+        : null);
+    if (captureDoc && editorInput.dataset.appMobileKeydownCaptureBound !== "1") {
+      editorInput.dataset.appMobileKeydownCaptureBound = "1";
+      captureDoc.addEventListener(
+        "keydown",
+        function (e) {
+          if (!shouldHandleMobileEnterAsNewline(input, editorInput, e)) return;
+          if (e.__waywordMobileNewlineHandled === true) return;
+          e.__waywordMobileNewlineHandled = true;
+          insertMobileEditorNewlineAndRefresh(input, editorInput, e, debugTrace, "keydown-capture-mobile");
+        },
+        true
+      );
+    }
 
     editorInput.addEventListener("pointerup", function () {
       if (
