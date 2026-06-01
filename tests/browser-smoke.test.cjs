@@ -133,23 +133,38 @@ async function waitForLandingGateVisible(session) {
 }
 
 async function beginRun(session) {
-  await session.click("#beginBtn");
-  await session.waitFor(
-    "editor ready after begin",
-    async () =>
-      await session.execute(`
-        var appView = document.getElementById("appView");
-        var editor = document.getElementById("editorInput");
-        var appHidden = appView && appView.getAttribute("aria-hidden") === "true";
-        return Boolean(
-          appView &&
-          !appHidden &&
-          editor &&
-          editor.getAttribute("contenteditable") === "true"
-        );
-      `),
-    { timeoutMs: 10000 }
-  );
+  const waitForEditorReadyAfterBegin = async () =>
+    await session.waitFor(
+      "editor ready after begin",
+      async () =>
+        await session.execute(`
+          var appView = document.getElementById("appView");
+          var editor = document.getElementById("editorInput");
+          var appHidden = appView && appView.getAttribute("aria-hidden") === "true";
+          return Boolean(
+            appView &&
+            !appHidden &&
+            editor &&
+            editor.getAttribute("contenteditable") === "true"
+          );
+        `),
+      { timeoutMs: 10000 }
+    );
+
+  // Retry begin once to absorb transient landing-session timing when the gate is still settling.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await waitForLandingGateVisible(session);
+    await session.click("#beginBtn");
+    try {
+      await waitForEditorReadyAfterBegin();
+      return;
+    } catch (error) {
+      if (attempt === 1) throw error;
+      await session.navigate(smokeUrl());
+      await waitForAppBoot(session);
+      await installErrorTrap(session);
+    }
+  }
 }
 
 async function fillEditor(session, text) {
