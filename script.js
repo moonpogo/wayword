@@ -352,6 +352,12 @@ function syncKeyboardOpenClass() {
 }
 
 function isMobileViewport() {
+  if (
+    window.waywordMobileDetection &&
+    typeof window.waywordMobileDetection.isLikelyMobileViewport === "function"
+  ) {
+    return Boolean(window.waywordMobileDetection.isLikelyMobileViewport(window));
+  }
   return window.matchMedia("(max-width: 720px)").matches;
 }
 

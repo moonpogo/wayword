@@ -1,4 +1,29 @@
 (function () {
+  function detectMobileEditorContext(input) {
+    try {
+      if (input && typeof input.isMobileViewport === "function" && input.isMobileViewport()) {
+        return true;
+      }
+    } catch (_err) {
+      // no-op
+    }
+    try {
+      if (
+        window.waywordMobileDetection &&
+        typeof window.waywordMobileDetection.isLikelyMobileViewport === "function"
+      ) {
+        return Boolean(window.waywordMobileDetection.isLikelyMobileViewport(window));
+      }
+    } catch (_err) {
+      // no-op
+    }
+    try {
+      return Number(window && window.innerWidth) > 0 && Number(window && window.innerWidth) <= 768;
+    } catch (_err) {
+      return false;
+    }
+  }
+
   function hasDebugInputFlag(search) {
     var rawSearch = typeof search === "string" ? search : "";
     try {
@@ -248,12 +273,7 @@
       hasDebugFlag: hasDebugFlag,
       logEvent: function (eventType, event, meta) {
         var details = meta && typeof meta === "object" ? meta : {};
-        var mobileDetected = false;
-        try {
-          mobileDetected = Boolean(input.isMobileViewport && input.isMobileViewport());
-        } catch (_err) {
-          mobileDetected = false;
-        }
+        var mobileDetected = detectMobileEditorContext(input);
         var viewportWidth = 0;
         try {
           viewportWidth = Number(window && window.innerWidth) || 0;
@@ -552,7 +572,7 @@
 
       if (e.key === "Enter" && !e.shiftKey) {
         if (e.isComposing || input.getEditorSurfaceComposing()) return;
-        if (input.isMobileViewport && input.isMobileViewport()) return;
+        if (detectMobileEditorContext(input)) return;
         markPreventDefault();
         submitAttempted = true;
         trySubmitFromEditor(input);
@@ -598,7 +618,7 @@
         submitAttempted: submitAttempted,
         preventDefaultCalled: preventDefaultCalled,
       });
-      if (!input.isMobileViewport || !input.isMobileViewport()) return;
+      if (!detectMobileEditorContext(input)) return;
       var inputType = String(e && e.inputType ? e.inputType : "");
       if (inputType !== "insertLineBreak" && inputType !== "insertParagraph") return;
       if (e.isComposing || input.getEditorSurfaceComposing()) return;

@@ -194,7 +194,14 @@ function loadAppBootRuntimeContext(overrides = {}) {
 }
 
 function loadAppEventsRuntimeContext(overrides = {}) {
-  return loadBrowserScripts(["src/app/app-events-runtime.js"], {
+  return loadBrowserScripts(["src/features/writing/mobile-detection.js", "src/app/app-events-runtime.js"], {
+    console: silentConsole(),
+    ...overrides,
+  });
+}
+
+function loadMobileDetectionContext(overrides = {}) {
+  return loadBrowserScripts(["src/features/writing/mobile-detection.js"], {
     console: silentConsole(),
     ...overrides,
   });
@@ -2415,6 +2422,28 @@ test("app boot runtime resize observers stay inert when targets are missing", ()
   assert.equal(overlayResult, null);
 });
 
+test("mobile detection flags 430px viewport as mobile", () => {
+  const context = loadMobileDetectionContext({
+    innerWidth: 430,
+    navigator: { maxTouchPoints: 0, userAgent: "" },
+    matchMedia() {
+      return { matches: false };
+    },
+  });
+  assert.equal(context.waywordMobileDetection.isLikelyMobileViewport(context.window), true);
+});
+
+test("mobile detection keeps desktop viewport without touch as non-mobile", () => {
+  const context = loadMobileDetectionContext({
+    innerWidth: 1280,
+    navigator: { maxTouchPoints: 0, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)" },
+    matchMedia() {
+      return { matches: false };
+    },
+  });
+  assert.equal(context.waywordMobileDetection.isLikelyMobileViewport(context.window), false);
+});
+
 test("app events runtime binds editor input events once, syncs scroll, and keeps mobile Enter/newline as writing", () => {
   const context = loadAppEventsRuntimeContext();
   const listeners = new Map();
@@ -2577,6 +2606,73 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
   calls.length = 0;
   listeners.get("focus")();
   assert.ok(calls.includes("entryDelayFocus"), "expected editor focus to arm pre-entry hint timer");
+});
+
+test("app events runtime treats 430px viewport as mobile even when runtime mobile helper reports false", () => {
+  const context = loadAppEventsRuntimeContext({
+    innerWidth: 430,
+    navigator: { maxTouchPoints: 0, userAgent: "" },
+    matchMedia() {
+      return { matches: false };
+    },
+  });
+  const listeners = new Map();
+  const calls = [];
+  const editorInput = {
+    dataset: {},
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+  };
+  const input = {
+    editorInput,
+    state: { active: true, submitted: false, completedUiActive: false, optionsOpen: false },
+    isMobileViewport() {
+      return false;
+    },
+    getEditorSurfaceComposing() {
+      return false;
+    },
+    isActiveAndEditable() {
+      return true;
+    },
+    flushEditorSurfaceIntoWriteDocOnce() {},
+    tryStartTimerOnFirstMeaningfulInput() {},
+    pulseWordmark() {},
+    renderHighlight() {},
+    renderSidebar() {},
+    updateWordProgress() {},
+    updateEnterButtonVisibility() {},
+    renderMeta() {},
+    onEditorFocusForEntryDelayHint() {},
+    onEditorInputForEntryDelayHint() {},
+    onEditorInputForTelemetry() {},
+    scheduleSemanticPickerFromSelection() {},
+    syncScroll() {},
+    scheduleEditorDotOverlaySync() {},
+    setEditorSurfaceComposing() {},
+    completedUiRestartInteractions: null,
+    submitWriting(value) {
+      calls.push(["submitWriting", value]);
+    },
+    getEditorText() {
+      return "mobile text";
+    },
+  };
+  context.waywordAppEventsRuntime.bindEditorInputEvents(input);
+  listeners.get("keydown")({
+    key: "Enter",
+    shiftKey: false,
+    preventDefault() {
+      calls.push("preventDefault");
+    },
+  });
+  assert.equal(calls.includes("preventDefault"), false);
+  assert.equal(
+    calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting"),
+    false,
+    "430px viewport should keep Enter as newline path"
+  );
 });
 
 test("app events runtime submits on desktop Enter when not composing", () => {
