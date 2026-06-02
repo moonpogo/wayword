@@ -2608,6 +2608,7 @@ test("editor display projection adds stripped caret anchor for trailing newline"
     `({
       plain: editorDisplayTextForCanonical("abc"),
       trailing: editorDisplayTextForCanonical("abc\\n"),
+      canonicalFromDisplay: editorCanonicalTextFromDisplayText("abc\\n\\u200B"),
       endOffset: editorDisplayOffsetForCanonicalOffset("abc\\n", 4),
       middleOffset: editorDisplayOffsetForCanonicalOffset("abc\\n", 2)
     })`,
@@ -2616,9 +2617,24 @@ test("editor display projection adds stripped caret anchor for trailing newline"
   assert.deepEqual(JSON.parse(JSON.stringify(result)), {
     plain: "abc",
     trailing: "abc\n\u200B",
+    canonicalFromDisplay: "abc\n",
     endOffset: 5,
     middleOffset: 2,
   });
+});
+
+test("editor dot overlay tolerates trailing caret placeholder display text", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  assert.match(
+    script,
+    /editorCanonicalTextFromDisplayText\(live\) !== canon/,
+    "dot overlay should compare canonicalized display text so trailing caret anchors do not clear dots"
+  );
+  assert.doesNotMatch(
+    script,
+    /if \(live !== canon\)/,
+    "dot overlay should not raw-compare display text with canonical text"
+  );
 });
 
 test("editor surface text reader strips zero-width caret host inside inline element", () => {

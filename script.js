@@ -1120,6 +1120,10 @@ function editorDisplayTextForCanonical(canonical) {
   return text.endsWith("\n") ? `${text}${EDITOR_TRAILING_NEWLINE_PLACEHOLDER}` : text;
 }
 
+function editorCanonicalTextFromDisplayText(displayText) {
+  return String(displayText || "").replace(EDITOR_CARET_PLACEHOLDER_CHARS, "");
+}
+
 function editorDisplayOffsetForCanonicalOffset(canonical, offset) {
   const text = String(canonical || "");
   const n = Math.max(0, Math.min(Number(offset) || 0, text.length));
@@ -2740,7 +2744,7 @@ function syncEditorDotOverlay() {
 
   const live = tn.textContent;
   const canon = serializeWriteDoc(state.writeDoc);
-  if (live !== canon) {
+  if (editorCanonicalTextFromDisplayText(live) !== canon) {
     overlay.replaceChildren();
     return;
   }
@@ -2775,7 +2779,7 @@ function syncEditorDotOverlay() {
       if (!sems.length) continue;
 
       const range = tokenCanonicalCharRangeHalfOpen(state.writeDoc, li, ti);
-      if (!range || range.end > live.length) continue;
+      if (!range || range.end > canon.length) continue;
 
       try {
         const domRange = document.createRange();
@@ -2945,7 +2949,7 @@ function updateEditorSemanticPickerFromSelection() {
     return;
   }
 
-  if (tn.textContent !== serializeWriteDoc(state.writeDoc)) {
+  if (editorCanonicalTextFromDisplayText(tn.textContent) !== serializeWriteDoc(state.writeDoc)) {
     picker.classList.add("hidden");
     return;
   }
