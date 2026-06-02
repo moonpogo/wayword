@@ -1113,6 +1113,18 @@ const EDITOR_BLOCK_TAGS = new Set([
   "SECTION", "TABLE", "TR", "TD", "TH", "UL"
 ]);
 const EDITOR_CARET_PLACEHOLDER_CHARS = /[\u200B\u200C\u200D\uFEFF]/g;
+const EDITOR_TRAILING_NEWLINE_PLACEHOLDER = "\u200B";
+
+function editorDisplayTextForCanonical(canonical) {
+  const text = String(canonical || "");
+  return text.endsWith("\n") ? `${text}${EDITOR_TRAILING_NEWLINE_PLACEHOLDER}` : text;
+}
+
+function editorDisplayOffsetForCanonicalOffset(canonical, offset) {
+  const text = String(canonical || "");
+  const n = Math.max(0, Math.min(Number(offset) || 0, text.length));
+  return text.endsWith("\n") && n === text.length ? n + EDITOR_TRAILING_NEWLINE_PLACEHOLDER.length : n;
+}
 
 function pushEditorBreak(out) {
   if (!out.length || out[out.length - 1] !== "\n") out.push("\n");
@@ -1249,9 +1261,14 @@ function setSelectionOffsetsForEditorRoot(root, anchor, focus, backward) {
 function projectWriteDocToEditorFromState(anchor, focus, backward) {
   if (!editorInput) return;
   const canonical = serializeWriteDoc(state.writeDoc);
-  editorInput.replaceChildren(document.createTextNode(canonical));
+  editorInput.replaceChildren(document.createTextNode(editorDisplayTextForCanonical(canonical)));
   if (typeof anchor === "number" && typeof focus === "number") {
-    setSelectionOffsetsForEditorRoot(editorInput, anchor, focus, Boolean(backward));
+    setSelectionOffsetsForEditorRoot(
+      editorInput,
+      editorDisplayOffsetForCanonicalOffset(canonical, anchor),
+      editorDisplayOffsetForCanonicalOffset(canonical, focus),
+      Boolean(backward)
+    );
   }
   if (
     window.waywordEditorStatePresentation &&

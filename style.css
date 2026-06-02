@@ -6227,12 +6227,12 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   .editor-shell .editor-input{
     /* Bottom inset clears in-shell chrome (gear + word progress + “words” caption). */
     padding:16px var(--wayword-editor-pad-inline) 58px var(--wayword-editor-pad-inline);
-    font:17px/1.82 Georgia,"Times New Roman",serif;
+    font:17px/1.52 Georgia,"Times New Roman",serif;
     min-height:100%;
   }
 
   .editor-shell .editor-permission-phrase{
-    font:17px/1.82 Georgia,"Times New Roman",serif;
+    font:17px/1.52 Georgia,"Times New Roman",serif;
     font-style:italic;
   }
 
@@ -6816,11 +6816,11 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   body.focus-mode .editor-shell .highlight-layer,
   body.focus-mode .editor-shell .editor-input{
     padding:12px var(--wayword-editor-pad-inline) 40px var(--wayword-editor-pad-inline);
-    font:16px/1.70 Georgia,"Times New Roman",serif;
+    font:16px/1.50 Georgia,"Times New Roman",serif;
   }
 
   body.focus-mode .editor-shell .editor-permission-phrase{
-    font:16px/1.70 Georgia,"Times New Roman",serif;
+    font:16px/1.50 Georgia,"Times New Roman",serif;
     font-style:italic;
   }
 
@@ -6905,11 +6905,11 @@ html[data-theme="dark"] .editor-options-panel .theme-toggle--editorial .theme-su
   body.focus-mode .editor-shell .highlight-layer,
   body.focus-mode .editor-shell .editor-input{
     padding:10px var(--wayword-editor-pad-inline) 34px var(--wayword-editor-pad-inline);
-    font:15px/1.60 Georgia,"Times New Roman",serif;
+    font:15px/1.48 Georgia,"Times New Roman",serif;
   }
 
   body.focus-mode .editor-shell .editor-permission-phrase{
-    font:15px/1.60 Georgia,"Times New Roman",serif;
+    font:15px/1.48 Georgia,"Times New Roman",serif;
     font-style:italic;
   }
 

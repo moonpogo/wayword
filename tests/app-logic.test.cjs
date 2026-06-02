@@ -2602,6 +2602,25 @@ test("editor surface text reader strips zero-width caret placeholder characters"
   assert.equal(context.getEditorSurfaceRawText(root), "abc\ndef");
 });
 
+test("editor display projection adds stripped caret anchor for trailing newline", () => {
+  const context = loadEditorSurfaceTextContext();
+  const result = require("vm").runInContext(
+    `({
+      plain: editorDisplayTextForCanonical("abc"),
+      trailing: editorDisplayTextForCanonical("abc\\n"),
+      endOffset: editorDisplayOffsetForCanonicalOffset("abc\\n", 4),
+      middleOffset: editorDisplayOffsetForCanonicalOffset("abc\\n", 2)
+    })`,
+    context
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    plain: "abc",
+    trailing: "abc\n\u200B",
+    endOffset: 5,
+    middleOffset: 2,
+  });
+});
+
 test("editor surface text reader strips zero-width caret host inside inline element", () => {
   const context = loadEditorSurfaceTextContext();
   const root = {
@@ -3164,6 +3183,9 @@ test("editor input CSS neutralizes newline wrapper block metrics for iOS content
     source,
     /\.editor-input\s+\.token,\s*\n\.editor-input\s+\.token-plain,\s*\n\.editor-input\s+\.token-text,\s*\n\.editor-input\s+\[data-token\],\s*\n\.editor-input\s+\[data-token-index\]\{/
   );
+  assert.match(source, /font:17px\/1\.52 Georgia,"Times New Roman",serif;/);
+  assert.match(source, /font:16px\/1\.50 Georgia,"Times New Roman",serif;/);
+  assert.match(source, /font:15px\/1\.48 Georgia,"Times New Roman",serif;/);
 });
 
 test("behavioral telemetry logs pre-entry and writing events locally only", () => {
