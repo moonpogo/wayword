@@ -3126,6 +3126,94 @@ test("app events runtime submits on desktop Enter when not composing", () => {
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false));
 });
 
+test("app events runtime inserts desktop newline on Shift+Enter without submitting", () => {
+  const context = loadAppEventsRuntimeContext();
+  const listeners = new Map();
+  const calls = [];
+  const editorInput = {
+    dataset: {},
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+  };
+  const input = {
+    editorInput,
+    state: { active: true, submitted: false, completedUiActive: false, optionsOpen: false },
+    isMobileViewport() {
+      return false;
+    },
+    getEditorSurfaceComposing() {
+      return false;
+    },
+    isActiveAndEditable() {
+      return true;
+    },
+    flushEditorSurfaceIntoWriteDocOnce() {
+      calls.push("flush");
+    },
+    tryStartTimerOnFirstMeaningfulInput() {
+      calls.push("timer");
+    },
+    pulseWordmark() {
+      calls.push("pulse");
+    },
+    renderHighlight() {
+      calls.push("highlight");
+    },
+    renderSidebar() {
+      calls.push("sidebar");
+    },
+    updateWordProgress() {
+      calls.push("progress");
+    },
+    updateEnterButtonVisibility() {
+      calls.push("button");
+    },
+    renderMeta() {
+      calls.push("renderMeta");
+    },
+    onEditorFocusForEntryDelayHint() {},
+    onEditorInputForEntryDelayHint() {},
+    onEditorInputForTelemetry() {},
+    scheduleSemanticPickerFromSelection() {
+      calls.push("picker");
+    },
+    syncScroll() {},
+    scheduleEditorDotOverlaySync() {},
+    insertMobileEditorTextNewline() {
+      calls.push("insertMobileEditorTextNewline");
+      return true;
+    },
+    setEditorSurfaceComposing() {},
+    completedUiRestartInteractions: null,
+    submitWriting(value) {
+      calls.push(["submitWriting", value]);
+    },
+    getEditorText() {
+      return "desktop text";
+    },
+  };
+
+  context.waywordAppEventsRuntime.bindEditorInputEvents(input);
+  listeners.get("keydown")({
+    key: "Enter",
+    shiftKey: true,
+    preventDefault() {
+      calls.push("preventDefault");
+    },
+  });
+
+  assert.ok(calls.includes("preventDefault"));
+  assert.ok(calls.includes("insertMobileEditorTextNewline"));
+  assert.ok(calls.includes("flush"));
+  assert.ok(calls.includes("highlight"));
+  assert.equal(
+    calls.some((entry) => Array.isArray(entry) && entry[0] === "submitWriting" && entry[1] === false),
+    false,
+    "desktop Shift+Enter should not submit"
+  );
+});
+
 test("app events runtime blocks submit click while composing or already submitted", () => {
   const context = loadAppEventsRuntimeContext();
   const listeners = new Map();

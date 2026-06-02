@@ -291,6 +291,13 @@
         return;
       }
 
+      if (e.key === "Enter" && e.shiftKey) {
+        if (e.isComposing || input.getEditorSurfaceComposing()) return;
+        var desktopShiftInsertResult = insertMobileEditorNewlineAndRefresh(input, editorInput, e);
+        preventDefaultCalled = desktopShiftInsertResult.preventDefaultCalled;
+        return;
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         if (shouldHandleMobileEnterAsNewline(input, editorInput, e, { assumeEditorWhenTargetMissing: true })) {
           if (e.__waywordMobileNewlineHandled === true) return;
