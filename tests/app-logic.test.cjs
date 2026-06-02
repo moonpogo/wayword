@@ -3160,6 +3160,10 @@ test("editor input CSS neutralizes newline wrapper block metrics for iOS content
   assert.match(source, /line-height:inherit;/);
   assert.match(source, /font:inherit;/);
   assert.match(source, /margin:0;/);
+  assert.match(
+    source,
+    /\.editor-input\s+\.token,\s*\n\.editor-input\s+\.token-plain,\s*\n\.editor-input\s+\.token-text,\s*\n\.editor-input\s+\[data-token\],\s*\n\.editor-input\s+\[data-token-index\]\{/
+  );
 });
 
 test("behavioral telemetry logs pre-entry and writing events locally only", () => {
