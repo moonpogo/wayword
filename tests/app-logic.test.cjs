@@ -2637,6 +2637,13 @@ test("editor dot overlay tolerates trailing caret placeholder display text", () 
   );
 });
 
+test("app events runtime no longer ships temporary input debug UI or trace plumbing", () => {
+  const runtime = fs.readFileSync("src/app/app-events-runtime.js", "utf8");
+  assert.doesNotMatch(runtime, /debugInputBadge|debugInputPanel|Last Enter \/ Newline Event|wayword-input-debug|__WAYWORD_INPUT_DEBUG_TRACE_STATE/);
+  const indexHtml = fs.readFileSync("index.html", "utf8");
+  assert.doesNotMatch(indexHtml, /debug-input-trace/);
+});
+
 test("editor surface text reader strips zero-width caret host inside inline element", () => {
   const context = loadEditorSurfaceTextContext();
   const root = {
