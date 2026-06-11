@@ -261,6 +261,11 @@
         wordCount: analysis.totalWords,
       });
     }
+    try {
+      window.waywordRetentionEvents?.markRunSubmitted();
+    } catch (_) {
+      /* ignore */
+    }
 
     let timeRemainingSnapshot;
     let timerConfigured;

@@ -60,6 +60,22 @@
     return { ok: true, payload: source ? { source: source } : {} };
   }
 
+  function sanitizeLandingViewed(payload) {
+    var clean = sanitizeObject(payload);
+    var keyCheck = rejectUnknownKeys(clean, ["source"]);
+    if (!keyCheck.ok) return keyCheck;
+    var source = safeString(clean.source);
+    return { ok: true, payload: source ? { source: source } : {} };
+  }
+
+  function sanitizeWritingStarted(payload) {
+    var clean = sanitizeObject(payload);
+    var keyCheck = rejectUnknownKeys(clean, ["source"]);
+    if (!keyCheck.ok) return keyCheck;
+    var source = safeString(clean.source);
+    return { ok: true, payload: source ? { source: source } : {} };
+  }
+
   function sanitizeRunSaved(payload) {
     var clean = sanitizeObject(payload);
     var keyCheck = rejectUnknownKeys(clean, ["sync_status", "is_authenticated"]);
@@ -121,6 +137,23 @@
     return { ok: true, payload: reason ? { reason: reason } : {} };
   }
 
+  function sanitizeRecentRunsOpened(payload) {
+    var clean = sanitizeObject(payload);
+    var keyCheck = rejectUnknownKeys(clean, ["surface_name"]);
+    if (!keyCheck.ok) return keyCheck;
+    var surfaceName = safeString(clean.surface_name);
+    return { ok: true, payload: surfaceName ? { surface_name: surfaceName } : {} };
+  }
+
+  function sanitizeAlphaPulseFeedback(payload) {
+    var clean = sanitizeObject(payload);
+    var keyCheck = rejectUnknownKeys(clean, ["response"]);
+    if (!keyCheck.ok) return keyCheck;
+    var response = safeString(clean.response);
+    if (!response) return { ok: false, reason: "missing_response" };
+    return { ok: true, payload: { response: response } };
+  }
+
   function sanitizeEmptyPayloadEvent(payload) {
     var clean = sanitizeObject(payload);
     var keyCheck = rejectUnknownKeys(clean, []);
@@ -129,6 +162,11 @@
   }
 
   var SANITIZERS = {
+    landing_viewed: sanitizeLandingViewed,
+    writing_started: sanitizeWritingStarted,
+    run_submitted: sanitizeEmptyPayloadEvent,
+    recent_runs_opened: sanitizeRecentRunsOpened,
+    alpha_pulse_feedback: sanitizeAlphaPulseFeedback,
     onboarding_completed: sanitizeOnboardingCompleted,
     run_saved: sanitizeRunSaved,
     meaningful_session_completed: sanitizeMeaningfulSessionCompleted,

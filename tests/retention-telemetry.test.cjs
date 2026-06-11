@@ -128,3 +128,16 @@ test("telemetry runtime forwards persisted retention events", async () => {
   assert.equal(persisted.length, 1);
   assert.equal(persisted[0].eventName, "return_session_detected");
 });
+
+test("event registry accepts alpha pulse funnel events and rejects empty feedback", () => {
+  const context = makeContext();
+  loadScripts(context, ["src/infrastructure/telemetry/event-registry.js"]);
+  const registry = context.window.waywordTelemetryEventRegistry;
+
+  assert.equal(registry.sanitizePayload("landing_viewed", { source: "landing_screen" }).ok, true);
+  assert.equal(registry.sanitizePayload("writing_started", { source: "begin_button" }).ok, true);
+  assert.equal(registry.sanitizePayload("run_submitted", {}).ok, true);
+  assert.equal(registry.sanitizePayload("recent_runs_opened", { surface_name: "drawer" }).ok, true);
+  assert.equal(registry.sanitizePayload("alpha_pulse_feedback", { response: "useful" }).ok, true);
+  assert.equal(registry.sanitizePayload("alpha_pulse_feedback", { response: "" }).ok, false);
+});
