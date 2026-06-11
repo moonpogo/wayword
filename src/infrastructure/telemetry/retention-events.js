@@ -160,6 +160,21 @@
     },
     flushPending: flushPending,
     persistTelemetryEvent: persistEvent,
+    markLandingViewed: function (payload) {
+      fireAndForget("landing_viewed", payload || {});
+    },
+    markWritingStarted: function (payload) {
+      fireAndForget("writing_started", payload || {});
+    },
+    markRunSubmitted: function () {
+      fireAndForget("run_submitted", {});
+    },
+    markRecentRunsOpened: function (payload) {
+      fireAndForget("recent_runs_opened", payload || {});
+    },
+    markAlphaPulseFeedback: function (payload) {
+      fireAndForget("alpha_pulse_feedback", payload || {});
+    },
     markOnboardingCompleted: function (payload) {
       fireAndForget("onboarding_completed", payload || {});
     },

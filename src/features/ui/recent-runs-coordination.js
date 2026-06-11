@@ -73,6 +73,11 @@
             e.preventDefault();
             e.stopPropagation();
             setRecentDrawerOpen(true);
+            try {
+              window.waywordRetentionEvents?.markRecentRunsOpened({ surface_name: "drawer" });
+            } catch (_) {
+              /* ignore */
+            }
             suppressRecentTriggerClickOpen = true;
           },
           true
@@ -85,6 +90,11 @@
           }
           e.stopPropagation();
           setRecentDrawerOpen(true);
+          try {
+            window.waywordRetentionEvents?.markRecentRunsOpened({ surface_name: "drawer" });
+          } catch (_) {
+            /* ignore */
+          }
         });
       }
 

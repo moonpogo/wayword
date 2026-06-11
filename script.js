@@ -7076,6 +7076,9 @@ function bindPrimaryEventControls() {
         window.waywordRetentionEvents?.markOnboardingCompleted({
           source: payload && payload.source ? payload.source : "begin_button",
         });
+        window.waywordRetentionEvents?.markWritingStarted({
+          source: payload && payload.source ? payload.source : "begin_button",
+        });
       } catch (_) {
         /* ignore */
       }
@@ -7567,6 +7570,11 @@ function initPersistenceContinuityRuntime() {
 }
 
 function initRetentionInstrumentationRuntime() {
+  try {
+    window.waywordRetentionEvents?.markLandingViewed({ source: "landing_screen" });
+  } catch (_) {
+    /* ignore */
+  }
   try {
     window.waywordTelemetryRuntime?.detectReturnSession({ thresholdHours: 12 });
   } catch (_) {
