@@ -56,17 +56,33 @@ async function startStaticServer(options = {}) {
     });
   });
 
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen({ host, port }, () => resolve());
-  });
+  async function listenWithHost(bindHost) {
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen({ host: bindHost, port }, () => resolve());
+    });
+  }
+
+  let boundHost = host;
+  try {
+    await listenWithHost(host);
+  } catch (error) {
+    const code = error && error.code ? String(error.code) : "";
+    if (host && code === "EPERM") {
+      boundHost = "";
+      await listenWithHost(undefined);
+    } else {
+      throw error;
+    }
+  }
 
   const address = server.address();
   const actualPort = address && typeof address === "object" ? address.port : port;
+  const originHost = boundHost || "127.0.0.1";
 
   return {
-    host,
-    origin: `http://${host}:${actualPort}`,
+    host: originHost,
+    origin: `http://${originHost}:${actualPort}`,
     port: actualPort,
     close() {
       return new Promise((resolve, reject) => {
