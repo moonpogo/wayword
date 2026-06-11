@@ -57,6 +57,10 @@ Key docs:
 - `docs/PATTERNS_OBSERVATORY_BRIEF.md`
 - `src/app/README.md`
 
+Default Codex orientation:
+
+- `docs/ops/current-state.md`
+
 ## Run Locally
 
 ```sh
@@ -86,9 +90,12 @@ npm run verify:alpha
 Additional checks:
 
 ```sh
+npm run check:maintenance
 npm run test:smoke
 npm run test:regression
 ```
+
+`check:maintenance` reports low-risk repository hygiene findings and exits `0` while the baseline is being established.
 
 Additional evaluation commands:
 
