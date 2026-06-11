@@ -5672,13 +5672,6 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     const radiusRatio = runStart / 1440;
     runHitTargets += `<line x1="${sx.toFixed(2)}" y1="${sy.toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="transparent" stroke-opacity="0" stroke-width="${Math.max(26, coreWidth + 10).toFixed(2)}" stroke-linecap="round" class="sw-run-hit${runCountChunk > 1 ? " is-cluster" : ""}" data-run-id="${runOrdinal}" data-day-index="${runDayIndex}" data-date-label="${dateLabel}" data-start-minute="${runStart}" data-duration-minutes="${runDuration}" data-word-count="${runWords}" data-integrity="${runIntegrity}" data-time-label="${timeLabel}" data-run-count="${runCountChunk}" data-complete-runs="${completeRuns}" data-partial-runs="${partialRuns}" data-interrupted-runs="${interruptedRuns}" data-abandoned-runs="${abandonedRuns}" data-radius-ratio="${radiusRatio.toFixed(6)}" data-clustered="${runCountChunk > 1 ? "true" : "false"}"/>`;
 
-    if (runCountChunk > 1) {
-      const badgeR = Math.max(16, Math.min(24, coreWidth * 2.05));
-      const badgeX = mx;
-      const badgeY = my;
-      runClusterBadges += `<g class="sw-run-cluster-badge" data-cluster-count="${runCountChunk}" data-day-index="${runDayIndex}"><circle cx="${badgeX.toFixed(2)}" cy="${badgeY.toFixed(2)}" r="${badgeR.toFixed(2)}" fill="${capsuleColor}" fill-opacity="0.18" stroke="${capsuleColor}" stroke-opacity="0.54" stroke-width="1.4"/><text x="${badgeX.toFixed(2)}" y="${(badgeY + 5.5).toFixed(2)}" text-anchor="middle" font-size="15" font-weight="600" letter-spacing="0.3" fill="${accentColor}" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial">${runCountChunk}</text></g>`;
-    }
-
     const segmentCountFromChunk = runCountChunk > 1
       ? Math.max(2, Math.min(14, runCountChunk))
       : (style.dash ? Math.max(2, Math.min(5, Math.floor(runLen / 26))) : 1);

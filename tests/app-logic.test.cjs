@@ -1575,7 +1575,7 @@ test("season wheel full-ring output preserves clustered10rapid run count in summ
   assert.equal(svg.includes('data-total-runs="10"'), true);
   assert.equal(svg.includes('data-run-count="10"'), true);
   assert.equal(svg.includes('data-clustered="true"'), true);
-  assert.equal(svg.includes('data-cluster-count="10"'), true);
+  assert.equal(svg.includes('sw-run-cluster-badge'), false);
 });
 
 test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
