@@ -2,6 +2,7 @@
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
+const { createAlphaPulseSummaryHandler } = require("../api/alpha-pulse-summary.js");
 const { loadAlphaPulseDashboardSummary } = require("./alpha-pulse-summary.js");
 
 const HOST = process.env.HOST || "127.0.0.1";
@@ -92,7 +93,15 @@ function injectRuntimeEnvHtml(htmlText) {
   return injection + htmlText;
 }
 
-function createServer() {
+function createServer(options = {}) {
+  const alphaPulseSummaryHandler =
+    typeof options.alphaPulseSummaryHandler === "function"
+      ? options.alphaPulseSummaryHandler
+      : createAlphaPulseSummaryHandler({
+          loadAlphaPulseDashboardSummary,
+          env: options.env || process.env,
+        });
+
   return http.createServer((req, res) => {
     const requestUrl = new URL(req.url || "/", `http://${HOST}`);
     if (requestUrl.pathname === "/__health") {
@@ -101,22 +110,18 @@ function createServer() {
     }
     if (requestUrl.pathname === "/api/alpha-pulse-summary") {
       const rawDays = requestUrl.searchParams.get("days");
-      const days = rawDays == null ? 7 : rawDays;
-      loadAlphaPulseDashboardSummary({ days })
-        .then((summary) => {
-          sendResponse(res, 200, JSON.stringify(summary), "application/json; charset=utf-8");
-        })
-        .catch((error) => {
-          sendResponse(
-            res,
-            500,
-            JSON.stringify({
-              ok: false,
-              error: error && error.message ? String(error.message) : "alpha_pulse_summary_failed",
-            }),
-            "application/json; charset=utf-8"
-          );
-        });
+      req.query = rawDays == null ? {} : { days: rawDays };
+      Promise.resolve(alphaPulseSummaryHandler(req, res)).catch(() => {
+        sendResponse(
+          res,
+          500,
+          JSON.stringify({
+            ok: false,
+            error: "alpha_pulse_summary_unavailable",
+          }),
+          "application/json; charset=utf-8"
+        );
+      });
       return;
     }
     let targetPath = resolveRequestPath(requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname);
@@ -170,4 +175,16 @@ function startServer(startPort) {
   });
 }
 
-startServer(DEFAULT_PORT);
+if (require.main === module) {
+  startServer(DEFAULT_PORT);
+}
+
+module.exports = {
+  createServer,
+  getBrowserEnvPayload,
+  injectRuntimeEnvHtml,
+  parseDotEnvFile,
+  resolveRequestPath,
+  sendResponse,
+  startServer,
+};

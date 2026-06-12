@@ -157,6 +157,22 @@ test("migration executor is gated when RLS verification is not enabled", async (
   assert.equal(localStorage.getItem("wayword-migration-status"), "skipped_unverified_rls");
 });
 
+test("migration preview stays local-only when RLS verification is not enabled", async () => {
+  const { windowObj } = buildContext({
+    env: { SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon", SUPABASE_RLS_VERIFIED: false },
+    localHistory: [{ runId: "r1", originalText: "hello", savedAt: 1710000000000, wordCount: 1 }],
+    sessionUserId: "user-a",
+  });
+
+  windowObj.waywordPersistenceRuntime.init({ onStatus() {} });
+  const preview = await windowObj.waywordPersistenceRuntime.previewMigration({ storage: windowObj.waywordStorage });
+
+  assert.equal(preview.status, "preview_ready");
+  assert.equal(preview.gated, true);
+  assert.equal(preview.reason, "rls_not_verified");
+  assert.equal(preview.serverRunCount, 0);
+});
+
 test("migration executor fails when unauthenticated", async () => {
   const { windowObj } = buildContext({
     env: { SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon", SUPABASE_RLS_VERIFIED: true },
@@ -208,6 +224,18 @@ test("exportOwnedRuns scopes query to authenticated ownership", async () => {
   assert.equal(exportOp.filters.some(([field, value]) => field === "user_id" && value === "user-a"), true);
 });
 
+test("exportOwnedRuns is blocked until RLS verification is enabled", async () => {
+  const { windowObj, opLog } = buildContext({
+    env: { SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon", SUPABASE_RLS_VERIFIED: false },
+    sessionUserId: "user-a",
+  });
+  windowObj.waywordPersistenceRuntime.init({ onStatus() {} });
+  const result = await windowObj.waywordPersistenceRuntime.exportOwnedRuns();
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "rls_not_verified");
+  assert.equal(opLog.length, 0);
+});
+
 test("deleteOwnedRun scopes delete query to authenticated ownership", async () => {
   const { windowObj, opLog } = buildContext({
     env: { SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon", SUPABASE_RLS_VERIFIED: true },
@@ -220,4 +248,16 @@ test("deleteOwnedRun scopes delete query to authenticated ownership", async () =
   assert.ok(deleteOp);
   assert.equal(deleteOp.filters.some(([field, value]) => field === "user_id" && value === "user-a"), true);
   assert.equal(deleteOp.filters.some(([field, value]) => field === "id" && value === "run-1"), true);
+});
+
+test("deleteOwnedRun is blocked until RLS verification is enabled", async () => {
+  const { windowObj, opLog } = buildContext({
+    env: { SUPABASE_URL: "https://x.supabase.co", SUPABASE_ANON_KEY: "anon", SUPABASE_RLS_VERIFIED: false },
+    sessionUserId: "user-a",
+  });
+  windowObj.waywordPersistenceRuntime.init({ onStatus() {} });
+  const result = await windowObj.waywordPersistenceRuntime.deleteOwnedRun("run-1");
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "rls_not_verified");
+  assert.equal(opLog.length, 0);
 });
