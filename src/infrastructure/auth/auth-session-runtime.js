@@ -1,5 +1,6 @@
 (function () {
   var DRAFT_SNAPSHOT_KEY = "wayword-auth-draft-snapshot";
+  var DRAFT_SNAPSHOT_USER_KEY = "wayword-auth-draft-snapshot-user";
   var initialized = false;
   var currentSession = null;
 
@@ -11,22 +12,40 @@
     }
   }
 
-  function writeDraftSnapshot(getDraftText) {
+  function writeDraftSnapshot(getDraftText, session) {
     if (typeof getDraftText !== "function") return;
     var text = String(getDraftText() || "");
     if (!text.trim()) return;
+    var userId = session && session.user && session.user.id ? String(session.user.id) : "";
     safeCall(function () {
       localStorage.setItem(DRAFT_SNAPSHOT_KEY, text);
+      if (userId) {
+        localStorage.setItem(DRAFT_SNAPSHOT_USER_KEY, userId);
+      } else {
+        localStorage.removeItem(DRAFT_SNAPSHOT_USER_KEY);
+      }
     });
   }
 
-  function consumeDraftSnapshot() {
+  function clearDraftSnapshot() {
+    safeCall(function () {
+      localStorage.removeItem(DRAFT_SNAPSHOT_KEY);
+      localStorage.removeItem(DRAFT_SNAPSHOT_USER_KEY);
+    });
+  }
+
+  function consumeDraftSnapshot(session) {
+    var currentUserId = session && session.user && session.user.id ? String(session.user.id) : "";
+    var snapshotUserId = safeCall(function () {
+      return localStorage.getItem(DRAFT_SNAPSHOT_USER_KEY) || "";
+    }, "");
     var snapshot = safeCall(function () {
       return localStorage.getItem(DRAFT_SNAPSHOT_KEY) || "";
     }, "");
-    safeCall(function () {
-      localStorage.removeItem(DRAFT_SNAPSHOT_KEY);
-    });
+    clearDraftSnapshot();
+    if (snapshotUserId && currentUserId && snapshotUserId !== currentUserId) {
+      return "";
+    }
     return String(snapshot || "");
   }
 
@@ -153,7 +172,7 @@
 
     function handleAuthError(err) {
       if (!err) return;
-      writeDraftSnapshot(getDraftText);
+      writeDraftSnapshot(getDraftText, currentSession);
       console.warn("wayword: auth runtime encountered an error", err);
       if (typeof input.onAuthError === "function") input.onAuthError(err);
     }
@@ -186,11 +205,11 @@
       }
 
       if (event === "SIGNED_OUT") {
-        writeDraftSnapshot(getDraftText);
+        writeDraftSnapshot(getDraftText, session);
       }
 
       if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && typeof setDraftText === "function") {
-        var snapshot = consumeDraftSnapshot();
+        var snapshot = consumeDraftSnapshot(currentSession);
         if (snapshot.trim()) {
           setDraftText(snapshot);
         }
@@ -207,7 +226,7 @@
 
     safeCall(function () {
       window.addEventListener("beforeunload", function () {
-        writeDraftSnapshot(getDraftText);
+        writeDraftSnapshot(getDraftText, currentSession);
       });
     });
   }

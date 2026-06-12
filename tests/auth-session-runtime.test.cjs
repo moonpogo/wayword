@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { loadBrowserScripts, silentConsole } = require("./helpers/browser-context.cjs");
+const { createMemoryStorage, loadBrowserScripts, silentConsole } = require("./helpers/browser-context.cjs");
 
 async function captureEmailRedirectTo(location) {
   let capturedPayload = null;
@@ -66,4 +66,64 @@ test("auth-session-runtime supports Vercel preview origins", async () => {
   assert.equal(redirect, "https://wayword-git-main-moonpogo.vercel.app/index.html");
   assert.equal(redirect.includes("localhost"), false);
   assert.equal(redirect.includes("127.0.0.1"), false);
+});
+
+test("auth-session-runtime restores a signed-out draft only for the same user", async () => {
+  const localStorage = createMemoryStorage();
+  var authStateHandler = null;
+  var latestDraft = "draft from user a";
+
+  const context = loadBrowserScripts(["src/infrastructure/auth/auth-session-runtime.js"], {
+    console: silentConsole(),
+    URLSearchParams,
+    localStorage,
+    addEventListener() {},
+    location: {
+      origin: "https://wayword.me",
+      pathname: "/index.html",
+      hostname: "wayword.me",
+      search: "",
+      hash: "",
+    },
+    waywordSupabaseClient: {
+      getClient() {
+        return {
+          auth: {
+            getSession() {
+              return Promise.resolve({ data: { session: null }, error: null });
+            },
+            onAuthStateChange(handler) {
+              authStateHandler = handler;
+            },
+          },
+        };
+      },
+    },
+  });
+
+  var restoredDraft = "";
+  context.waywordAuthSessionRuntime.init({
+    getDraftText() {
+      return latestDraft;
+    },
+    setDraftText(value) {
+      restoredDraft = value;
+    },
+  });
+
+  assert.equal(typeof authStateHandler, "function");
+
+  authStateHandler("SIGNED_OUT", { user: { id: "user-a" } });
+  assert.equal(localStorage.getItem("wayword-auth-draft-snapshot"), "draft from user a");
+  assert.equal(localStorage.getItem("wayword-auth-draft-snapshot-user"), "user-a");
+
+  authStateHandler("SIGNED_IN", { user: { id: "user-b" } });
+  assert.equal(restoredDraft, "");
+  assert.equal(localStorage.getItem("wayword-auth-draft-snapshot"), null);
+  assert.equal(localStorage.getItem("wayword-auth-draft-snapshot-user"), null);
+
+  latestDraft = "draft from user b";
+  authStateHandler("SIGNED_OUT", { user: { id: "user-b" } });
+  authStateHandler("SIGNED_IN", { user: { id: "user-b" } });
+  assert.equal(restoredDraft, "draft from user b");
 });
