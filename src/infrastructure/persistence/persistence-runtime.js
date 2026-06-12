@@ -51,6 +51,10 @@
     return new Date().toISOString();
   }
 
+  function hasVerifiedRls() {
+    return isRlsVerified();
+  }
+
   function buildExportEnvelope(userId, rows) {
     var list = Array.isArray(rows) ? rows : [];
     return {
@@ -174,6 +178,7 @@
 
   async function syncSavedRun(run) {
     if (!supabase) return { ok: false, reason: "supabase_not_configured" };
+    if (!hasVerifiedRls()) return { ok: false, reason: "rls_not_verified" };
 
     var userId = getSessionUserId();
     if (!userId) return { ok: false, reason: "no_authenticated_session" };
@@ -197,6 +202,23 @@
     var storageApi = options && options.storage ? options.storage : window.waywordStorage;
     var localRuns = getLocalRuns(storageApi);
     var userId = getSessionUserId();
+
+    if (!hasVerifiedRls()) {
+      writeLocalMigrationStatus("preview_ready");
+      emitMigrationEvent("markMigrationSkippedUnverifiedRls");
+      return {
+        status: "preview_ready",
+        gated: true,
+        reason: "rls_not_verified",
+        localRunCount: localRuns.length,
+        serverRunCount: 0,
+        exactDuplicates: [],
+        localOnly: localRuns.map(buildLocalRunMeta),
+        serverOnly: [],
+        conflicts: [],
+        estimatedUploadCount: localRuns.length,
+      };
+    }
 
     if (!supabase || !userId) {
       writeLocalMigrationStatus("preview_ready");
@@ -307,6 +329,7 @@
 
   async function exportOwnedRuns() {
     if (!supabase) return { ok: false, reason: "supabase_not_configured" };
+    if (!hasVerifiedRls()) return { ok: false, reason: "rls_not_verified" };
     var userId = getSessionUserId();
     if (!userId) return { ok: false, reason: "no_authenticated_session" };
     if (!window.waywordSupabaseRunStore || typeof window.waywordSupabaseRunStore.exportRunsForUser !== "function") {
@@ -331,6 +354,7 @@
 
   async function deleteOwnedRun(runId) {
     if (!supabase) return { ok: false, reason: "supabase_not_configured" };
+    if (!hasVerifiedRls()) return { ok: false, reason: "rls_not_verified" };
     var userId = getSessionUserId();
     if (!userId) return { ok: false, reason: "no_authenticated_session" };
     if (!window.waywordSupabaseRunStore || typeof window.waywordSupabaseRunStore.deleteRunForUser !== "function") {
@@ -347,6 +371,7 @@
 
   async function deleteAllOwnedRuns() {
     if (!supabase) return { ok: false, reason: "supabase_not_configured" };
+    if (!hasVerifiedRls()) return { ok: false, reason: "rls_not_verified" };
     var userId = getSessionUserId();
     if (!userId) return { ok: false, reason: "no_authenticated_session" };
     if (!window.waywordSupabaseRunStore || typeof window.waywordSupabaseRunStore.deleteAllRunsForUser !== "function") {

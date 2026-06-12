@@ -1,5 +1,6 @@
 (function () {
   var PENDING_KEY = "waywordRetentionEventQueueV1";
+  var OWNER_ANONYMOUS = "anonymous";
 
   function nowIso() {
     return new Date().toISOString();
@@ -40,12 +41,36 @@
     }
   }
 
-  function queueEvent(eventName, payload) {
+  function ownerKeyForUserId(userId) {
+    var safeUserId = safeString(userId);
+    return safeUserId || OWNER_ANONYMOUS;
+  }
+
+  function normalizeQueuedEntry(entry) {
+    var clean = entry && typeof entry === "object" ? entry : {};
+    return {
+      event: safeString(clean.event),
+      payload: clean.payload && typeof clean.payload === "object" ? clean.payload : {},
+      queued_at: safeString(clean.queued_at) || nowIso(),
+      owner_key: safeString(clean.owner_key) || OWNER_ANONYMOUS,
+    };
+  }
+
+  function filterEntriesForOwner(entries, ownerKey) {
+    return (Array.isArray(entries) ? entries : [])
+      .map(normalizeQueuedEntry)
+      .filter(function (entry) {
+        return entry.owner_key === ownerKey;
+      });
+  }
+
+  function queueEvent(eventName, payload, ownerKey) {
     var pending = loadPendingEvents();
     pending.push({
       event: safeString(eventName),
       payload: payload || {},
       queued_at: nowIso(),
+      owner_key: safeString(ownerKey) || OWNER_ANONYMOUS,
     });
     savePendingEvents(pending);
   }
@@ -88,7 +113,8 @@
   async function flushPending() {
     var userId = getCurrentUserId();
     if (!userId) return { ok: false, reason: "no_authenticated_session" };
-    var pending = loadPendingEvents();
+    var pending = filterEntriesForOwner(loadPendingEvents(), ownerKeyForUserId(userId));
+    savePendingEvents(pending);
     if (!pending.length) return { ok: true, count: 0 };
     var rows = pending.map(function (entry) {
       return buildInsertRow(userId, entry.event, entry.payload);
@@ -109,20 +135,21 @@
     if (!sanitized.ok) return sanitized;
 
     var userId = getCurrentUserId();
+    var ownerKey = ownerKeyForUserId(userId);
     if (!userId) {
-      queueEvent(normalizedEvent, sanitized.payload);
+      queueEvent(normalizedEvent, sanitized.payload, ownerKey);
       return { ok: false, reason: "no_authenticated_session" };
     }
 
     var pendingResult = await flushPending();
     if (!pendingResult.ok && pendingResult.reason !== "no_authenticated_session") {
-      queueEvent(normalizedEvent, sanitized.payload);
+      queueEvent(normalizedEvent, sanitized.payload, ownerKey);
       return pendingResult;
     }
 
     var insertResult = await insertRows([buildInsertRow(userId, normalizedEvent, sanitized.payload)]);
     if (!insertResult.ok) {
-      queueEvent(normalizedEvent, sanitized.payload);
+      queueEvent(normalizedEvent, sanitized.payload, ownerKey);
     }
     return insertResult;
   }
@@ -130,10 +157,10 @@
   function fireAndForget(eventName, payload) {
     try {
       Promise.resolve(persistEvent(eventName, payload)).catch(function () {
-        queueEvent(eventName, payload || {});
+        queueEvent(eventName, payload || {}, ownerKeyForUserId(getCurrentUserId()));
       });
     } catch (_) {
-      queueEvent(eventName, payload || {});
+      queueEvent(eventName, payload || {}, ownerKeyForUserId(getCurrentUserId()));
     }
   }
 

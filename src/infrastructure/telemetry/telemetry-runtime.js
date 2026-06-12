@@ -3,6 +3,7 @@
   var LAST_SEEN_KEY = "wayword-retention-last-seen-at";
   var SYNCED_COUNT_KEY = "wayword-retention-telemetry-synced-count";
   var MAX_EVENTS = 1500;
+  var OWNER_ANONYMOUS = "anonymous";
 
   function safeString(value) {
     return String(value == null ? "" : value).trim();
@@ -41,6 +42,21 @@
     }
   }
 
+  function ownerKeyForUserId(userId) {
+    var safeUserId = safeString(userId);
+    return safeUserId || OWNER_ANONYMOUS;
+  }
+
+  function normalizeEventRow(row) {
+    var clean = row && typeof row === "object" ? row : {};
+    return {
+      event: safeString(clean.event),
+      timestamp: safeString(clean.timestamp) || nowIso(),
+      payload: clean.payload && typeof clean.payload === "object" ? clean.payload : {},
+      owner_key: safeString(clean.owner_key) || OWNER_ANONYMOUS,
+    };
+  }
+
   function buildRuntime() {
     var storage = readStorage();
     var syncInFlight = false;
@@ -60,8 +76,13 @@
         ? authRuntime.getCurrentSession()
         : null;
       var userId = session && session.user && session.user.id ? String(session.user.id) : null;
+      if (!userId) return;
+      var ownerKey = ownerKeyForUserId(userId);
 
-      var events = loadEvents(storage);
+      var events = loadEvents(storage).map(normalizeEventRow).filter(function (row) {
+        return row.owner_key === ownerKey;
+      });
+      saveEvents(storage, events);
       if (!events.length) return;
       var syncedCount = 0;
       try {
@@ -113,10 +134,17 @@
       var sanitized = registry.sanitizePayload(normalizedEvent, payload || {});
       if (!sanitized.ok) return { ok: false, reason: sanitized.reason || "invalid_payload" };
 
+      var authRuntime = window.waywordAuthSessionRuntime;
+      var session = authRuntime && typeof authRuntime.getCurrentSession === "function"
+        ? authRuntime.getCurrentSession()
+        : null;
+      var userId = session && session.user && session.user.id ? String(session.user.id) : "";
+
       var eventRow = {
         event: normalizedEvent,
         timestamp: nowIso(),
         payload: sanitized.payload || {},
+        owner_key: ownerKeyForUserId(userId),
       };
 
       var events = loadEvents(storage);
