@@ -3,3 +3,8 @@ scripts/.wayword-eval.cjs
 scripts/.patterns-eval.cjs
 .DS_Store
 .env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
