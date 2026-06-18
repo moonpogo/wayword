@@ -73,8 +73,14 @@
     { id: "all", label: "All" },
   ];
 
+  var REFRESH_INTERVAL_MS = 5 * 60 * 1000;
   var booted = false;
   var currentRange = "7";
+  var refreshTimer = 0;
+  var visibilityBound = false;
+  var refreshBound = false;
+  var currentRequestId = 0;
+  var refreshInFlight = false;
 
   function safeString(value) {
     return String(value == null ? "" : value).trim();
@@ -118,9 +124,27 @@
     }
   }
 
-  function buildSummaryUrl(rangeId) {
+  function buildSummaryUrl(rangeId, requestId) {
     var range = safeString(rangeId) || "7";
-    return "/api/alpha-pulse-summary?days=" + encodeURIComponent(range);
+    var url = "/api/alpha-pulse-summary?days=" + encodeURIComponent(range);
+    if (requestId) {
+      url += "&request=" + encodeURIComponent(String(requestId));
+    }
+    return url;
+  }
+
+  function clearRefreshTimer() {
+    if (!refreshTimer || typeof global.clearTimeout !== "function") return;
+    global.clearTimeout(refreshTimer);
+    refreshTimer = 0;
+  }
+
+  function scheduleRefresh() {
+    clearRefreshTimer();
+    if (typeof global.setTimeout !== "function") return;
+    refreshTimer = global.setTimeout(function () {
+      initPage({ range: currentRange });
+    }, REFRESH_INTERVAL_MS);
   }
 
   function stageMetaById(id) {
@@ -187,7 +211,8 @@
 
   function loadDashboardData(options) {
     var range = safeString(options && options.range) || "7";
-    var summaryUrl = safeString(options && options.summaryUrl) || buildSummaryUrl(range);
+    var requestId = safeString(options && options.requestId) || String(Date.now());
+    var summaryUrl = safeString(options && options.summaryUrl) || buildSummaryUrl(range, requestId);
     if (typeof fetch !== "function") {
       return Promise.resolve(
         normalizeSummary({
@@ -357,6 +382,28 @@
     });
   }
 
+  function renderRefreshButton(doc, loading) {
+    if (!doc) return;
+    var button = doc.getElementById("alphaPulseRefreshButton");
+    if (!button) return;
+    button.disabled = Boolean(loading);
+    button.textContent = loading ? "Refreshing..." : "Refresh now";
+    button.setAttribute("aria-busy", loading ? "true" : "false");
+  }
+
+  function buildStatusText(data) {
+    if (data && data.ok && data.source && data.source.mode === "snapshot") {
+      var snapshotAt = formatTimestamp(data.source.snapshotGeneratedAt);
+      return snapshotAt
+        ? "Snapshot from " + snapshotAt + ". Retrying live automatically."
+        : "Telemetry snapshot. Retrying live automatically.";
+    }
+    if (data && data.ok) {
+      return "Live telemetry. Refreshes automatically.";
+    }
+    return "Telemetry unavailable right now. Retrying automatically.";
+  }
+
   function initAuthRuntime() {
     try {
       if (
@@ -390,13 +437,9 @@
 
     if (windowNode) windowNode.textContent = data.window && data.window.label ? data.window.label : "";
     if (statusNode) {
-      statusNode.textContent =
-        data.ok && data.source.mode === "snapshot"
-          ? "Telemetry snapshot."
-          : data.ok
-            ? "Live telemetry."
-            : "Telemetry unavailable right now.";
+      statusNode.textContent = buildStatusText(data);
     }
+    renderRefreshButton(doc, false);
   }
 
   function attachRangeControlEvents(doc) {
@@ -416,14 +459,49 @@
     });
   }
 
+  function attachVisibilityRefresh(doc) {
+    if (!doc || visibilityBound || !doc.addEventListener) return;
+    visibilityBound = true;
+    doc.addEventListener("visibilitychange", function () {
+      if (doc.visibilityState === "visible") {
+        initPage({ range: currentRange });
+      }
+    });
+  }
+
+  function attachRefreshButton(doc) {
+    var button = doc && doc.getElementById("alphaPulseRefreshButton");
+    if (!button || refreshBound) return;
+    refreshBound = true;
+    button.addEventListener("click", function () {
+      if (refreshInFlight) return;
+      initPage({ range: currentRange, manual: true });
+    });
+  }
+
   function initPage(options) {
     if (!global.document) return Promise.resolve(null);
     initAuthRuntime();
     if (options && options.range) currentRange = safeString(options.range) || currentRange;
-    return loadDashboardData({ range: currentRange }).then(function (data) {
+    currentRequestId += 1;
+    refreshInFlight = true;
+    renderRefreshButton(global.document, true);
+    if (options && options.manual) {
+      var statusNode = global.document.getElementById("alphaPulseStatus");
+      if (statusNode) statusNode.textContent = "Refreshing telemetry...";
+    }
+    return loadDashboardData({ range: currentRange, requestId: currentRequestId }).then(function (data) {
+      refreshInFlight = false;
       renderDashboard(global.document, data);
       attachRangeControlEvents(global.document);
+      attachVisibilityRefresh(global.document);
+      attachRefreshButton(global.document);
+      scheduleRefresh();
       return data;
+    }).catch(function (error) {
+      refreshInFlight = false;
+      renderRefreshButton(global.document, false);
+      throw error;
     });
   }
 
@@ -448,7 +526,9 @@
   return {
     STAGES: STAGES,
     RANGE_OPTIONS: RANGE_OPTIONS,
+    REFRESH_INTERVAL_MS: REFRESH_INTERVAL_MS,
     buildSummaryUrl: buildSummaryUrl,
+    buildStatusText: buildStatusText,
     normalizeSummary: normalizeSummary,
     loadDashboardData: loadDashboardData,
     bootPage: bootPage,

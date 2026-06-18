@@ -94,3 +94,45 @@ test("normalizeSummary preserves snapshot metadata", () => {
   assert.equal(normalized.stages.find((stage) => stage.id === "saved").source, "snapshot");
   assert.equal(normalized.stages.find((stage) => stage.id === "landed").coverage.historicallySeen, false);
 });
+
+test("buildStatusText calls out stale snapshot timestamps", () => {
+  const text = dashboard.buildStatusText({
+    ok: true,
+    source: {
+      mode: "snapshot",
+      snapshotGeneratedAt: "2026-06-15T17:25:14.840Z",
+    },
+  });
+
+  assert.match(text, /Snapshot from/i);
+  assert.match(text, /Retrying live automatically/i);
+});
+
+test("buildStatusText describes live auto refresh", () => {
+  assert.equal(
+    dashboard.buildStatusText({
+      ok: true,
+      source: { mode: "live" },
+    }),
+    "Live telemetry. Refreshes automatically."
+  );
+  assert.equal(
+    dashboard.buildStatusText({
+      ok: false,
+      source: { mode: "unavailable" },
+    }),
+    "Telemetry unavailable right now. Retrying automatically."
+  );
+  assert.equal(dashboard.REFRESH_INTERVAL_MS, 5 * 60 * 1000);
+});
+
+test("buildSummaryUrl appends a request token for fresh pulls", () => {
+  assert.equal(
+    dashboard.buildSummaryUrl("14", "manual-refresh"),
+    "/api/alpha-pulse-summary?days=14&request=manual-refresh"
+  );
+  assert.equal(
+    dashboard.buildSummaryUrl("all", ""),
+    "/api/alpha-pulse-summary?days=all"
+  );
+});
