@@ -5588,7 +5588,6 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
   let runSegmentsAccent = "";
   let runBloom = "";
   let runHitTargets = "";
-  let runClusterBadges = "";
   let runOrdinal = 0;
   for (const run of runLayout) {
     const runDayIndex = Number.isInteger(run.dayIndex) ? run.dayIndex : dayIndex;
@@ -5633,14 +5632,14 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     const light = runIntegrity === "complete" ? 62 : runIntegrity === "partial" ? 66 : 72;
     const runLen = Math.max(8, Math.hypot(ex - sx, ey - sy));
     const runMidR = (r0 + r1) * 0.5;
-    const [mx, my] = polar(runMidR, runAngle);
     const capsuleColor = `hsl(${hue} 88% ${light}%)`;
     const coreOpacity = runIntegrity === "complete" ? 0.98 : runIntegrity === "partial" ? 0.72 : style.opacity;
     const glowOpacity = runIntegrity === "abandoned" || runIntegrity === "interrupted" ? 0.14 : 0.21;
     const accentColor = `hsl(${hue} 88% ${Math.max(56, light - 6)}%)`;
 
     const addLineStack = (xA, yA, xB, yB, dashed = false) => {
-      runSegmentsGlow += `<line x1="${xA.toFixed(2)}" y1="${yA.toFixed(2)}" x2="${xB.toFixed(2)}" y2="${yB.toFixed(2)}" stroke="${capsuleColor}" stroke-opacity="${glowOpacity.toFixed(3)}" stroke-width="${glowWidth.toFixed(2)}" stroke-linecap="round" filter="url(#runGlow)"/>`;
+      const dashAttr = dashed ? ` stroke-dasharray="5 5"` : "";
+      runSegmentsGlow += `<line x1="${xA.toFixed(2)}" y1="${yA.toFixed(2)}" x2="${xB.toFixed(2)}" y2="${yB.toFixed(2)}" stroke="${capsuleColor}" stroke-opacity="${glowOpacity.toFixed(3)}" stroke-width="${glowWidth.toFixed(2)}" stroke-linecap="round"${dashAttr} filter="url(#runGlow)"/>`;
       runSegmentsCore += `<line x1="${xA.toFixed(2)}" y1="${yA.toFixed(2)}" x2="${xB.toFixed(2)}" y2="${yB.toFixed(2)}" stroke="${capsuleColor}" stroke-opacity="${coreOpacity.toFixed(3)}" stroke-width="${coreWidth.toFixed(2)}" stroke-linecap="round"${dashed ? ` stroke-dasharray="5 5"` : ""}/>`;
       if (!dashed && (runIntegrity === "complete" || runIntegrity === "partial")) {
         runSegmentsAccent += `<line x1="${xA.toFixed(2)}" y1="${yA.toFixed(2)}" x2="${xB.toFixed(2)}" y2="${yB.toFixed(2)}" stroke="${accentColor}" stroke-opacity="0.34" stroke-width="${accentWidth.toFixed(2)}" stroke-linecap="round"/>`;
@@ -5670,29 +5669,9 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
     const hour12 = hour24 % 12 || 12;
     const timeLabel = `${hour12}:${String(minute).padStart(2, "0")} ${ampm}`;
     const radiusRatio = runStart / 1440;
-    runHitTargets += `<line x1="${sx.toFixed(2)}" y1="${sy.toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="transparent" stroke-opacity="0" stroke-width="${Math.max(26, coreWidth + 10).toFixed(2)}" stroke-linecap="round" class="sw-run-hit${runCountChunk > 1 ? " is-cluster" : ""}" data-run-id="${runOrdinal}" data-day-index="${runDayIndex}" data-date-label="${dateLabel}" data-start-minute="${runStart}" data-duration-minutes="${runDuration}" data-word-count="${runWords}" data-integrity="${runIntegrity}" data-time-label="${timeLabel}" data-run-count="${runCountChunk}" data-complete-runs="${completeRuns}" data-partial-runs="${partialRuns}" data-interrupted-runs="${interruptedRuns}" data-abandoned-runs="${abandonedRuns}" data-radius-ratio="${radiusRatio.toFixed(6)}" data-clustered="${runCountChunk > 1 ? "true" : "false"}"/>`;
+    runHitTargets += `<line x1="${sx.toFixed(2)}" y1="${sy.toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="transparent" stroke-opacity="0" stroke-width="${Math.max(26, coreWidth + 10).toFixed(2)}" stroke-linecap="round" class="sw-run-hit" data-run-id="${runOrdinal}" data-day-index="${runDayIndex}" data-date-label="${dateLabel}" data-start-minute="${runStart}" data-duration-minutes="${runDuration}" data-word-count="${runWords}" data-integrity="${runIntegrity}" data-time-label="${timeLabel}" data-run-count="${runCountChunk}" data-complete-runs="${completeRuns}" data-partial-runs="${partialRuns}" data-interrupted-runs="${interruptedRuns}" data-abandoned-runs="${abandonedRuns}" data-radius-ratio="${radiusRatio.toFixed(6)}"/>`;
 
-    const segmentCountFromChunk = runCountChunk > 1
-      ? Math.max(2, Math.min(14, runCountChunk))
-      : (style.dash ? Math.max(2, Math.min(5, Math.floor(runLen / 26))) : 1);
-
-    if (segmentCountFromChunk === 1) {
-      addLineStack(sx, sy, ex, ey, false);
-    } else {
-      const count = segmentCountFromChunk;
-      const gap = runCountChunk > 1 ? 3.4 : 6;
-      const segLen = Math.max(5, (runLen - (count - 1) * gap) / count);
-      for (let i = 0; i < count; i += 1) {
-        const centerOffset = -runLen * 0.5 + segLen * 0.5 + i * (segLen + gap);
-        const segMidR = runMidR + centerOffset;
-        const segR0 = segMidR - segLen * 0.5;
-        const segR1 = segMidR + segLen * 0.5;
-        const [xA, yA] = polar(segR0, runAngle);
-        const [xB, yB] = polar(segR1, runAngle);
-        const dashed = style.dash && runCountChunk <= 1;
-        addLineStack(xA, yA, xB, yB, dashed);
-      }
-    }
+    addLineStack(sx, sy, ex, ey, Boolean(style.dash));
   }
 
   const integrityLabel = String(integrity || "partial").toUpperCase();
@@ -5756,7 +5735,6 @@ function buildSeasonWheelSingleSpokeDebugSvg(options = {}) {
   ${runSegmentsGlow}
   ${runSegmentsCore}
   ${runSegmentsAccent}
-  ${runClusterBadges}
   <g class="sw-hit-layer">${runHitTargets}</g>
   <circle cx="${cx}" cy="${cy}" r="${innerR - 34}" fill="var(--sw-bg, #08090d)" stroke="var(--sw-hub-ring, #c9a173)" stroke-opacity="0.4" stroke-width="1.2"/>
   ${mobileHeader}

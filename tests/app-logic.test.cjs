@@ -1481,12 +1481,20 @@ test("season fixture clustered10rapid yields 10 distinct same-day runs", () => {
 
   const timestamps = vm.seasonalRows.map((row) => row.timestampMs);
   assert.equal(new Set(timestamps).size, 10, "expected 10 distinct rapid timestamps");
+  const latestTimestamp = Math.max(...timestamps);
+  const latestDate = new Date(latestTimestamp);
+  const seasonStartDate = new Date(latestDate);
+  seasonStartDate.setDate(seasonStartDate.getDate() - 67);
+  seasonStartDate.setHours(0, 0, 0, 0);
+  const seasonEndDate = new Date(seasonStartDate);
+  seasonEndDate.setDate(seasonEndDate.getDate() + 92);
+  seasonEndDate.setHours(23, 59, 59, 999);
 
   const seasonModel = api.buildSeasonWheelInstrumentModel(vm.seasonalRows, {
     seasonLengthDays: 93,
-    nowDate: new Date("2026-05-26T23:59:00-07:00"),
-    seasonStartDate: new Date("2026-03-20T00:00:00-07:00"),
-    seasonEndDate: new Date("2026-06-20T23:59:59.999-07:00"),
+    nowDate: new Date(latestTimestamp + 60000),
+    seasonStartDate,
+    seasonEndDate,
   });
   assert.equal(seasonModel.clusterGapMinutes, 5);
   assert.equal(seasonModel.clusters.length, 1);
@@ -1574,8 +1582,45 @@ test("season wheel full-ring output preserves clustered10rapid run count in summ
 
   assert.equal(svg.includes('data-total-runs="10"'), true);
   assert.equal(svg.includes('data-run-count="10"'), true);
-  assert.equal(svg.includes('data-clustered="true"'), true);
+  assert.equal(svg.includes('data-clustered='), false);
+  assert.equal(svg.includes('is-cluster'), false);
   assert.equal(svg.includes('sw-run-cluster-badge'), false);
+  assert.equal((svg.match(/filter="url\(#runGlow\)"/g) || []).length, 1);
+});
+
+test("season wheel single-spoke dashed runs use one dashed line stack instead of chunked glow segments", () => {
+  const script = fs.readFileSync("script.js", "utf8");
+  const instrumentBlock = extractBetween(
+    script,
+    "/* season wheel instrument contract: begin */",
+    "/* season wheel instrument contract: end */"
+  );
+  const svgStart = script.indexOf("function formatShortMonthDay");
+  const svgEnd = script.indexOf("function buildSeasonWheelPairSpokeDebugSvg");
+  const svgBlock = script.slice(svgStart, svgEnd);
+  const calendarBlock = extractBetween(
+    script,
+    "/* season wheel calendar contract: begin */",
+    "/* season wheel calendar contract: end */"
+  );
+  const api = new Function(`${instrumentBlock}\n${calendarBlock}\n${svgBlock}\nreturn { buildSeasonWheelSingleSpokeDebugSvg, buildCurrentSeasonCalendar };`)();
+
+  const seasonCalendar = api.buildCurrentSeasonCalendar(new Date("2026-05-26T15:00:00-07:00"));
+  const svg = api.buildSeasonWheelSingleSpokeDebugSvg({
+    dayIndex: 42,
+    seasonDays: seasonCalendar.spokeCount,
+    seasonLabel: seasonCalendar.seasonLabel,
+    seasonStartDate: seasonCalendar.seasonStartLocal,
+    seasonEndDate: seasonCalendar.seasonEndLocal,
+    seasonCalendar,
+    isDesktop: true,
+    runs: [
+      { dayIndex: 42, startMinute: 1260, durationMinutes: 22, wordCount: 90, integrity: "abandoned", runCount: 5, abandonedRuns: 3, partialRuns: 2 },
+    ],
+  });
+
+  assert.equal((svg.match(/filter="url\(#runGlow\)"/g) || []).length, 1);
+  assert.equal((svg.match(/stroke-dasharray="5 5"/g) || []).length, 2);
 });
 
 test("weighted v1 catalog still honors anti-repeat reroll assumptions", () => {
