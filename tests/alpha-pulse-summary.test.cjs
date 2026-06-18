@@ -106,12 +106,18 @@ test("alpha pulse summary can build from a real-data snapshot fallback", () => {
         },
       },
     },
-    windowInfo
+    windowInfo,
+    { reason: "retention_events query failed: Unregistered API key" }
   );
 
   assert.equal(result.ok, true);
   assert.equal(result.source.mode, "snapshot");
   assert.equal(result.source.snapshotGeneratedAt, "2026-06-15T17:25:14.840Z");
+  assert.match(result.source.unavailableReason, /Unregistered API key/);
+  assert.match(
+    result.seams.find((seam) => seam.id === "local_snapshot_fallback").reason,
+    /Unregistered API key/
+  );
   assert.equal(result.seams.some((seam) => seam.label === "Landed coverage"), true);
   assert.deepEqual(
     result.stages.map((stage) => [stage.id, stage.count, stage.source]),

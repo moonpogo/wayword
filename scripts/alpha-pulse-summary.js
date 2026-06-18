@@ -305,7 +305,7 @@ function getSnapshotEntry(snapshot, days) {
   return entry && typeof entry === "object" ? entry : null;
 }
 
-function buildAlphaPulseSummaryFromSnapshot(snapshot, windowInfo) {
+function buildAlphaPulseSummaryFromSnapshot(snapshot, windowInfo, fallbackMeta) {
   const entry = getSnapshotEntry(snapshot, windowInfo.days);
   if (!entry) return null;
 
@@ -321,7 +321,7 @@ function buildAlphaPulseSummaryFromSnapshot(snapshot, windowInfo) {
       mode: "snapshot",
       snapshotGeneratedAt: safeString(snapshot.generatedAt),
       latestEventAt: safeString(snapshot.latestEventAt),
-      unavailableReason: "",
+      unavailableReason: safeString(fallbackMeta && fallbackMeta.reason),
     },
     stages: STAGES.map((stage) => ({
       id: stage.id,
@@ -335,7 +335,11 @@ function buildAlphaPulseSummaryFromSnapshot(snapshot, windowInfo) {
       {
         id: "local_snapshot_fallback",
         label: "Preview mode",
-        reason: "Using a recent telemetry snapshot because local summary access is unavailable.",
+        reason:
+          "Using a recent telemetry snapshot because live summary access is unavailable." +
+          (safeString(fallbackMeta && fallbackMeta.reason)
+            ? " " + safeString(fallbackMeta && fallbackMeta.reason)
+            : ""),
       },
     ]),
   };
@@ -354,11 +358,13 @@ async function loadAlphaPulseDashboardSummary(options) {
         mode: "live",
       });
     }
-    const snapshotSummary = buildAlphaPulseSummaryFromSnapshot(readSnapshotFile(), windowInfo);
+    const snapshotSummary = buildAlphaPulseSummaryFromSnapshot(readSnapshotFile(), windowInfo, telemetry);
     if (snapshotSummary) return snapshotSummary;
     return buildAlphaPulseSummaryFromRows(telemetry.rows, windowInfo, telemetry);
   } catch (error) {
-    const snapshotSummary = buildAlphaPulseSummaryFromSnapshot(readSnapshotFile(), windowInfo);
+    const snapshotSummary = buildAlphaPulseSummaryFromSnapshot(readSnapshotFile(), windowInfo, {
+      reason: error && error.message ? error.message : "alpha_pulse_summary_unavailable",
+    });
     if (snapshotSummary) return snapshotSummary;
     return buildAlphaPulseSummaryFromRows([], windowInfo, {
       available: false,
