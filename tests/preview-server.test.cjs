@@ -34,15 +34,27 @@ function requestJson(port, path, headers = {}) {
   });
 }
 
-test("preview server alpha pulse route fails closed without bearer token", async () => {
+test("preview server alpha pulse route returns local summary data without auth", async () => {
   const server = createServer({
-    env: { WAYWORD_ALPHA_PULSE_TOKEN: "expected-token" },
-    alphaPulseSummaryHandler: async (req, res) => {
-      const { createAlphaPulseSummaryHandler } = require("../api/alpha-pulse-summary.js");
-      return createAlphaPulseSummaryHandler({
-        env: { WAYWORD_ALPHA_PULSE_TOKEN: "expected-token" },
-        loadAlphaPulseDashboardSummary: async () => ({ ok: true }),
-      })(req, res);
+    loadAlphaPulseDashboardSummary: async ({ days }) => ({ ok: true, days, source: { mode: "live" } }),
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+
+  try {
+    const response = await requestJson(port, "/api/alpha-pulse-summary");
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body), { ok: true, days: 7, source: { mode: "live" } });
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("preview server alpha pulse route keeps internal errors generic", async () => {
+  const server = createServer({
+    loadAlphaPulseDashboardSummary: async () => {
+      throw new Error("sensitive detail");
     },
   });
 
@@ -51,34 +63,6 @@ test("preview server alpha pulse route fails closed without bearer token", async
 
   try {
     const response = await requestJson(port, "/api/alpha-pulse-summary");
-    assert.equal(response.statusCode, 404);
-    assert.deepEqual(JSON.parse(response.body), { ok: false, error: "not_found" });
-  } finally {
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
-
-test("preview server alpha pulse route keeps internal errors generic", async () => {
-  const server = createServer({
-    env: { WAYWORD_ALPHA_PULSE_TOKEN: "expected-token" },
-    alphaPulseSummaryHandler: async (req, res) => {
-      const { createAlphaPulseSummaryHandler } = require("../api/alpha-pulse-summary.js");
-      return createAlphaPulseSummaryHandler({
-        env: { WAYWORD_ALPHA_PULSE_TOKEN: "expected-token" },
-        loadAlphaPulseDashboardSummary: async () => {
-          throw new Error("sensitive detail");
-        },
-      })(req, res);
-    },
-  });
-
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const port = server.address().port;
-
-  try {
-    const response = await requestJson(port, "/api/alpha-pulse-summary", {
-      authorization: "Bearer expected-token",
-    });
     assert.equal(response.statusCode, 500);
     assert.deepEqual(JSON.parse(response.body), {
       ok: false,

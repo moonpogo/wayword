@@ -84,6 +84,10 @@
     return Array.isArray(value) ? value : [];
   }
 
+  function safeObject(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+
   function escapeHtml(value) {
     return safeString(value)
       .replace(/&/g, "&amp;")
@@ -96,6 +100,22 @@
   function formatPercent(value) {
     if (!Number.isFinite(value) || value <= 0) return "0%";
     return Math.round(value) + "%";
+  }
+
+  function formatTimestamp(value) {
+    var iso = safeString(value);
+    var ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) return "";
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(ms));
+    } catch (_) {
+      return iso;
+    }
   }
 
   function buildSummaryUrl(rangeId) {
@@ -126,22 +146,43 @@
       source: {
         available: Boolean(source.available),
         telemetryTable: safeString(source.telemetryTable),
+        mode: safeString(source.mode) || (source.available ? "live" : "unavailable"),
+        snapshotGeneratedAt: safeString(source.snapshotGeneratedAt),
+        latestEventAt: safeString(source.latestEventAt),
         unavailableReason: safeString(source.unavailableReason),
       },
       seams: safeArray(input.seams),
       stages: STAGES.map(function (stageMeta) {
         var stage = stagesById[stageMeta.id] || {};
+        var coverage = safeObject(stage.coverage);
         return {
           id: stageMeta.id,
           label: stageMeta.label,
           note: stageMeta.note,
           help: stageMeta.help,
           count: Number(stage.count) || 0,
+          coverage: {
+            total: Number(coverage.total) || 0,
+            firstSeenAt: safeString(coverage.firstSeenAt),
+            lastSeenAt: safeString(coverage.lastSeenAt),
+            historicallySeen: Boolean(coverage.historicallySeen),
+          },
           source: safeString(stage.source) || (input.ok ? "live" : "unavailable"),
           note: safeString(stage.note),
         };
       }),
     };
+  }
+
+  function describeStageCoverage(stage) {
+    var coverage = safeObject(stage && stage.coverage);
+    if (!coverage.historicallySeen) {
+      return "Not captured in the current dataset yet.";
+    }
+    if ((Number(stage && stage.count) || 0) === 0 && coverage.lastSeenAt) {
+      return "No events in this window. Last seen " + (formatTimestamp(coverage.lastSeenAt) || coverage.lastSeenAt) + ".";
+    }
+    return safeString(stage && stage.note);
   }
 
   function loadDashboardData(options) {
@@ -215,7 +256,9 @@
     container.innerHTML = safeArray(stages)
       .map(function (stage) {
         var share = maxCount > 0 ? (stage.count / maxCount) * 100 : 0;
-        var badgeLabel = stage.source === "live" ? "Live" : "Unavailable";
+        var badgeLabel = stage.source === "unavailable" ? "Unavailable" : "";
+        var stageNote = describeStageCoverage(stage);
+        var countLabel = stage.coverage && stage.coverage.historicallySeen ? String(stage.count) : "\u2014";
         return (
           '<article class="alpha-pulse-stage">' +
             "<div>" +
@@ -224,20 +267,23 @@
                   '<h3 class="alpha-pulse-stage__title">' + escapeHtml(stage.label) + "</h3>" +
                   '<button type="button" class="alpha-pulse-stage__help" data-help="' + escapeHtml(stage.help) + '" aria-label="' + escapeHtml(stage.help) + '">?</button>' +
                 "</div>" +
-                '<span class="alpha-pulse-badge alpha-pulse-badge--' + escapeHtml(stage.source) + '">' +
-                  escapeHtml(badgeLabel) +
-                "</span>" +
+                (
+                  badgeLabel
+                    ? '<span class="alpha-pulse-badge alpha-pulse-badge--' + escapeHtml(stage.source) + '">' +
+                        escapeHtml(badgeLabel) +
+                      "</span>"
+                    : ""
+                ) +
               "</div>" +
               '<div class="alpha-pulse-stage__bar"><div class="alpha-pulse-stage__fill" style="width:' +
                 formatPercent(share) +
               ';"></div></div>' +
               '<p class="alpha-pulse-stage__note">' +
-                escapeHtml(stage.note || "") +
+                escapeHtml(stageNote || "") +
               "</p>" +
             "</div>" +
             '<div class="alpha-pulse-stage__metrics">' +
-              '<div class="alpha-pulse-stage__count">' + escapeHtml(String(stage.count)) + "</div>" +
-              '<div class="alpha-pulse-stage__share">events in window</div>' +
+              '<div class="alpha-pulse-stage__count">' + escapeHtml(countLabel) + "</div>" +
             "</div>" +
           "</article>"
         );
@@ -265,13 +311,25 @@
     var items = [];
     if (source.available) {
       items.push({
-        label: "Telemetry source",
-        reason: (source.telemetryTable || "retention_events") + " via private summary endpoint.",
+        label: source.mode === "snapshot" ? "Data source" : "Live source",
+        reason:
+          source.mode === "snapshot"
+            ? (source.telemetryTable || "retention_events") +
+              " snapshot from " +
+              (formatTimestamp(source.snapshotGeneratedAt) || "recently") +
+              "."
+            : (source.telemetryTable || "retention_events") + " via the summary endpoint.",
       });
+      if (source.latestEventAt) {
+        items.push({
+          label: "Latest event",
+          reason: formatTimestamp(source.latestEventAt) || source.latestEventAt,
+        });
+      }
     } else {
       items.push({
-        label: "Live summary unavailable",
-        reason: source.unavailableReason || "Supabase summary access is not configured for this environment.",
+        label: "Data status",
+        reason: source.unavailableReason || "Summary access is not available in this environment.",
       });
     }
     safeArray(data && data.seams).forEach(function (seam) {
@@ -332,7 +390,12 @@
 
     if (windowNode) windowNode.textContent = data.window && data.window.label ? data.window.label : "";
     if (statusNode) {
-      statusNode.textContent = data.ok ? "Live retention data." : "Live data unavailable right now.";
+      statusNode.textContent =
+        data.ok && data.source.mode === "snapshot"
+          ? "Telemetry snapshot."
+          : data.ok
+            ? "Live telemetry."
+            : "Telemetry unavailable right now.";
     }
   }
 

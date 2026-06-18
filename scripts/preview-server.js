@@ -2,8 +2,7 @@
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
-const { createAlphaPulseSummaryHandler } = require("../api/alpha-pulse-summary.js");
-const { loadAlphaPulseDashboardSummary } = require("./alpha-pulse-summary.js");
+const alphaPulseSummary = require("./alpha-pulse-summary.js");
 
 const HOST = process.env.HOST || "127.0.0.1";
 const ROOT = path.resolve(__dirname, "..");
@@ -94,14 +93,10 @@ function injectRuntimeEnvHtml(htmlText) {
 }
 
 function createServer(options = {}) {
-  const alphaPulseSummaryHandler =
-    typeof options.alphaPulseSummaryHandler === "function"
-      ? options.alphaPulseSummaryHandler
-      : createAlphaPulseSummaryHandler({
-          loadAlphaPulseDashboardSummary,
-          env: options.env || process.env,
-        });
-
+  const loadSummary =
+    options && typeof options.loadAlphaPulseDashboardSummary === "function"
+      ? options.loadAlphaPulseDashboardSummary
+      : alphaPulseSummary.loadAlphaPulseDashboardSummary;
   return http.createServer((req, res) => {
     const requestUrl = new URL(req.url || "/", `http://${HOST}`);
     if (requestUrl.pathname === "/__health") {
@@ -110,8 +105,10 @@ function createServer(options = {}) {
     }
     if (requestUrl.pathname === "/api/alpha-pulse-summary") {
       const rawDays = requestUrl.searchParams.get("days");
-      req.query = rawDays == null ? {} : { days: rawDays };
-      Promise.resolve(alphaPulseSummaryHandler(req, res)).catch(() => {
+      const days = rawDays == null ? 7 : rawDays;
+      Promise.resolve(loadSummary({ days })).then((summary) => {
+        sendResponse(res, 200, JSON.stringify(summary), "application/json; charset=utf-8");
+      }).catch(() => {
         sendResponse(
           res,
           500,
