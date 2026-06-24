@@ -151,7 +151,7 @@ test("buildAlphaPulseSummaryFromRollups counts overlapping rollup days", () => {
   assert.equal(counts.opened_patterns, 2);
 });
 
-test("loadDashboardData falls back to public aggregate rollups when the private endpoint is unavailable", async () => {
+test("loadDashboardData reads public aggregate rollups without calling the private endpoint when no token is supplied", async () => {
   const priorEnv = global.waywordEnv;
   const calls = [];
   global.waywordEnv = {
@@ -162,7 +162,7 @@ test("loadDashboardData falls back to public aggregate rollups when the private 
   global.fetch = (url, options) => {
     calls.push({ url, options });
     if (String(url).startsWith("/api/")) {
-      return Promise.resolve({ ok: false, status: 404 });
+      throw new Error("private endpoint should not be called without a token");
     }
     return Promise.resolve({
       ok: true,
@@ -191,10 +191,10 @@ test("loadDashboardData falls back to public aggregate rollups when the private 
   assert.equal(result.ok, true);
   assert.equal(result.source.telemetryTable, dashboard.ALPHA_PULSE_ROLLUP_TABLE);
   assert.equal(result.stages.find((stage) => stage.id === "started_writing").count, 9);
-  assert.equal(calls[0].url, "/api/alpha-pulse-summary?days=all&request=manual");
-  assert.match(calls[1].url, /\/rest\/v1\/alpha_pulse_stage_daily_totals/);
-  assert.equal(calls[1].options.headers.apikey, "anon-key");
-  assert.equal(calls[1].options.headers.Authorization, "Bearer anon-key");
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/rest\/v1\/alpha_pulse_stage_daily_totals/);
+  assert.equal(calls[0].options.headers.apikey, "anon-key");
+  assert.equal(calls[0].options.headers.Authorization, "Bearer anon-key");
 });
 
 test("normalizeSummary preserves snapshot metadata", () => {

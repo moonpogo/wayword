@@ -329,6 +329,11 @@
     );
   }
 
+  function hasPublicRollupConfig() {
+    var env = safeObject(global.waywordEnv);
+    return Boolean(buildPublicRollupUrl(env) && safeString(env.SUPABASE_ANON_KEY));
+  }
+
   function loadPublicRollupSummary(options) {
     var env = safeObject(global.waywordEnv);
     var url = buildPublicRollupUrl(env);
@@ -430,6 +435,7 @@
     var range = safeString(options && options.range) || "7";
     var requestId = safeString(options && options.requestId) || String(Date.now());
     var summaryUrl = safeString(options && options.summaryUrl) || buildSummaryUrl(range, requestId);
+    var fetchOptions = buildFetchOptions(options);
     if (typeof fetch !== "function") {
       return Promise.resolve(
         normalizeSummary({
@@ -444,7 +450,37 @@
       );
     }
 
-    return fetch(summaryUrl, buildFetchOptions(options))
+    if (!(fetchOptions.headers && fetchOptions.headers.Authorization) && hasPublicRollupConfig()) {
+      return loadPublicRollupSummary(options)
+        .then(function (summary) {
+          if (summary) return normalizeSummary(summary);
+          throw new Error("alpha_pulse_rollup_unavailable");
+        })
+        .catch(function (error) {
+          var reason = safeString(error && error.message) || "alpha_pulse_rollup_unavailable";
+          return normalizeSummary({
+            ok: false,
+            source: {
+              available: false,
+              telemetryTable: ALPHA_PULSE_ROLLUP_TABLE,
+              unavailableReason: reason,
+            },
+            seams: [
+              {
+                id: "alpha_pulse_summary_failed",
+                label: "Live summary unavailable",
+                reason: reason,
+              },
+            ],
+            stages: STAGES.map(function (stage) {
+              return { id: stage.id, count: 0, source: "unavailable" };
+            }),
+            window: { label: range === "all" ? "All time" : "Last " + range + " days" },
+          });
+        });
+    }
+
+    return fetch(summaryUrl, fetchOptions)
       .then(function (response) {
         if (!response.ok) {
           throw new Error("alpha_pulse_summary_http_" + response.status);
