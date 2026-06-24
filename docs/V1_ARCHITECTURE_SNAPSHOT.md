@@ -143,7 +143,8 @@ Current data path:
 
 - `readSavedRunsNewestFirst()` for drawer/rail rendering
 - canonical read helper preferred when available
-- fallback to in-memory legacy history only when the canonical read helper is absent
+- fallback to in-memory legacy history when the canonical read helper is absent
+- missing canonical rows are filled from legacy history by run id
 
 Current behavior shape:
 
@@ -203,7 +204,7 @@ Current write order:
 Current read rule:
 
 - Recent Runs, Patterns, and progression prefer canonical reads when `waywordSavedRunsRead` is present
-- they do not merge legacy rows when canonical reads return empty
+- they merge legacy rows whose run ids are missing from canonical reads
 
 Boot repair behavior:
 

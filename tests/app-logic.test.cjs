@@ -5535,6 +5535,8 @@ test("saved-run persistence keeps legacy sync alive when canonical upsert fails"
     inactivityEaseRunKey: "ease-key",
     persist() {
       persistCalls += 1;
+      context.localStorage.setItem("wayword-history", JSON.stringify(history));
+      context.localStorage.setItem("wayword-runids", JSON.stringify(Array.from(savedRunIds)));
     },
   });
 
@@ -5549,9 +5551,10 @@ test("saved-run persistence keeps legacy sync alive when canonical upsert fails"
   assert.equal(innerRepo.listDocumentsParsed().length, 0, "canonical store must stay empty when upsert throws");
   assert.equal(
     context.waywordSavedRunsRead.listSavedRunsChronological().length,
-    0,
-    "savedRunsRead lists repo only; legacy row lives in memory until reload/migration"
+    1,
+    "savedRunsRead merges legacy rows that canonical is missing"
   );
+  assert.equal(context.waywordSavedRunsRead.listSavedRunsChronological()[0].runId, "run-fail");
 });
 
 test("run document repository treats corrupt envelope JSON as empty", () => {

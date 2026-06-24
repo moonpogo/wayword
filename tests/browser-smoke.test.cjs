@@ -1000,7 +1000,7 @@ test("browser smoke: mobile focus exit with Mirror visible does not introduce do
   });
 });
 
-test.skip("browser smoke: mobile Return inserts newline and does not submit", async (t) => {
+test("browser smoke: mobile Return beforeinput inserts newline and does not submit", async (t) => {
   await withSmokeSession(t, async (session) => {
     await session.setWindowRect({ height: 852, width: 430, x: 0, y: 0 });
     await loadFreshApp(session);
@@ -1008,7 +1008,28 @@ test.skip("browser smoke: mobile Return inserts newline and does not submit", as
 
     await session.click("#editorInput");
     await session.type("abc");
-    await session.press("Enter");
+    const eventSnapshot = await session.execute(`
+      var editor = document.getElementById("editorInput");
+      editor.focus();
+      var event;
+      try {
+        event = new InputEvent("beforeinput", {
+          bubbles: true,
+          cancelable: true,
+          inputType: "insertLineBreak",
+          data: null
+        });
+      } catch (_) {
+        event = new Event("beforeinput", { bubbles: true, cancelable: true });
+        Object.defineProperty(event, "inputType", { value: "insertLineBreak" });
+      }
+      editor.dispatchEvent(event);
+      var textAfterEvent = String(editor.textContent || "").replace(/\\u200B/g, "");
+      return {
+        defaultPrevented: event.defaultPrevented,
+        textAfterEvent: textAfterEvent
+      };
+    `);
     await session.type("def");
 
     const snapshot = await session.execute(`
@@ -1025,6 +1046,8 @@ test.skip("browser smoke: mobile Return inserts newline and does not submit", as
       };
     `);
 
+    assert.equal(eventSnapshot.defaultPrevented, true, "expected mobile beforeinput newline to be handled by Wayword");
+    assert.equal(eventSnapshot.textAfterEvent, "abc\n", "expected mobile beforeinput to insert one newline");
     assert.equal(snapshot.hasNewline, true, "expected mobile Return to preserve a newline in editor text");
     assert.equal(snapshot.submitted, false, "expected mobile Return not to submit run");
     assert.equal(snapshot.submitVisible, true, "expected submit button to remain available after mobile newline");

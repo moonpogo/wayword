@@ -24,4 +24,4 @@ Phase 0 snapshot for Wayword V1 structural stabilization. This records current b
 
 - Exact DOM/class snapshots for calibration run 1 overlay, calibration run 5 handoff, and low-signal Mirror.
 - Mobile keyboard/focus behavior on Safari-specific `visualViewport` timing.
-- Same-session UI after canonical upsert failure with legacy fallback persistence.
+- Same-session UI after canonical upsert failure continues to show the legacy-saved run.

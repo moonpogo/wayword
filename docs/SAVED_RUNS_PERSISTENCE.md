@@ -6,7 +6,7 @@ Normative reference for how Wayword V1 stores and reads saved runs. Product beha
 
 | Store | Key / location | Role |
 |--------|------------------|------|
-| **Canonical run documents** | `wayword-run-documents-v1` (see `WAYWORD_RUN_DOCUMENTS_STORAGE_KEY`) | JSON envelope of markdown-serialized run documents. Source of truth for **read** paths used by Recent Runs, Patterns digests, and progression when `waywordSavedRunsRead` is present. |
+| **Canonical run documents** | `wayword-run-documents-v1` (see `WAYWORD_RUN_DOCUMENTS_STORAGE_KEY`) | JSON envelope of markdown-serialized run documents. Preferred source for **read** paths used by Recent Runs, Patterns digests, and progression when `waywordSavedRunsRead` is present. |
 | **Legacy history** | `wayword-history` (and related `waywordStorage` helpers) | Array-shaped run rows + `savedRunIds` set. **Still written on every successful save** for backward compatibility, refresh rehydration, and migration. |
 
 Legacy rows are **not** deleted when canonical writes succeed. Both stores are intentionally maintained until a future version explicitly migrates users off legacy-only reads.
@@ -24,8 +24,8 @@ Implemented by `waywordSavedRunPersistence.persistSuccessfulSavedRun` (`src/data
 
 ## Read path (UI + analysis)
 
-- **`waywordSavedRunsRead`** (`src/data/runs/savedRunsCanonicalRead.js`): lists runs by parsing the **canonical** envelope only. Rows are adapted to the legacy shape (`text` filled from `body`) so renderers stay unchanged.
-- **`readSavedRunsChronological` / `readSavedRunsNewestFirst`** in `script.js`: if `waywordSavedRunsRead` is **missing** (failed script load), fall back to **`state.history`** in memory. They do **not** merge legacy when the module is present but the canonical list is empty.
+- **`waywordSavedRunsRead`** (`src/data/runs/savedRunsCanonicalRead.js`): lists runs by parsing the **canonical** envelope, then merges legacy `wayword-history` rows whose `runId` is missing from canonical. Canonical rows win when both stores contain the same run. Rows are adapted to the legacy shape (`text` filled from `body`) so renderers stay unchanged.
+- **`readSavedRunsChronological` / `readSavedRunsNewestFirst`** in `script.js`: if `waywordSavedRunsRead` is **missing** (failed script load), fall back to **`state.history`** in memory.
 
 **Chronological** = oldest → newest (progression, digests walk order). **Newest-first** = drawer/rail and mirror family recency.
 
@@ -34,7 +34,7 @@ Implemented by `waywordSavedRunPersistence.persistSuccessfulSavedRun` (`src/data
 1. `waywordStorage.loadHistory()` (and related) rehydrates `state.history` and `savedRunIds` from legacy keys.
 2. `runDocumentInit` creates `waywordRunDocumentRepo` and runs **`mergeLegacyHistoryMissingIntoCanonicalStore`**: for each legacy row whose `runId` is absent from the canonical store, `upsertFromLegacyRun` backfills the canonical envelope. Legacy `wayword-history` is **read-only** for migration; it is not cleared here.
 
-After a normal save, both stores match. After a **canonical upsert failure**, legacy still receives the new row on disk on next `persist()`, but the canonical envelope lacks that run until a later successful write or migration backfill—**same-session `waywordSavedRunsRead` can therefore return fewer runs than `state.history`**. Full reload runs migration and usually heals gaps for rows that exist only in legacy.
+After a normal save, both stores match. After a **canonical upsert failure**, legacy still receives the new row on disk on next `persist()`. Same-session `waywordSavedRunsRead` keeps that run visible by merging missing legacy rows. Full reload runs migration and usually heals canonical gaps for rows that exist only in legacy.
 
 ## Malformed canonical storage
 
