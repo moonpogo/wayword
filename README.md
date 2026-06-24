@@ -115,13 +115,6 @@ npm run verify:patterns-surface
 
 Brand lock: `assets/brand/wayword-logo.svg` is hash-locked to the canonical logo asset. Redraw/replacement must be explicitly approved and intentionally updated.
 
-Social asset generation is available as a dev-only utility:
-
-```sh
-npm run generate:social-assets
-```
-Implementation details and output structure live in `scripts/generate-social-assets.js` and `scripts/helpers/social-state-seeds.js`.
-
 ## Status
 
 Wayword is in active V1 development. The current focus is preserving the core writing loop while reducing orchestration risk, keeping Mirror output restrained, and improving the reliability of local saved-run flows.
