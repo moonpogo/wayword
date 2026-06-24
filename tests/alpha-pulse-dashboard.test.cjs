@@ -109,6 +109,94 @@ test("dashboard auth can come from a URL hash without sending the token in the q
   assert.equal(stored[dashboard.AUTH_TOKEN_STORAGE_KEY], "hash-token");
 });
 
+test("buildAlphaPulseSummaryFromRollups counts overlapping rollup days", () => {
+  const result = dashboard.buildAlphaPulseSummaryFromRollups(
+    [
+      {
+        day: "2026-06-10",
+        stage_id: "saved",
+        event_count: 8,
+        first_event_at: "2026-06-10T12:00:00.000Z",
+        last_event_at: "2026-06-10T13:00:00.000Z",
+      },
+      {
+        day: "2026-06-11",
+        stage_id: "saved",
+        event_count: 3,
+        first_event_at: "2026-06-11T19:00:00.000Z",
+        last_event_at: "2026-06-11T20:00:00.000Z",
+      },
+      {
+        day: "2026-06-18",
+        stage_id: "opened_patterns",
+        event_count: 2,
+        first_event_at: "2026-06-18T16:00:00.000Z",
+        last_event_at: "2026-06-18T17:00:00.000Z",
+      },
+      {
+        day: "2026-06-19",
+        stage_id: "opened_patterns",
+        event_count: 5,
+        first_event_at: "2026-06-19T16:00:00.000Z",
+        last_event_at: "2026-06-19T17:00:00.000Z",
+      },
+    ],
+    "7",
+    new Date("2026-06-18T18:00:00.000Z")
+  );
+
+  const counts = Object.fromEntries(result.stages.map((stage) => [stage.id, stage.count]));
+  assert.equal(result.source.telemetryTable, dashboard.ALPHA_PULSE_ROLLUP_TABLE);
+  assert.equal(counts.saved, 3);
+  assert.equal(counts.opened_patterns, 2);
+});
+
+test("loadDashboardData falls back to public aggregate rollups when the private endpoint is unavailable", async () => {
+  const priorEnv = global.waywordEnv;
+  const calls = [];
+  global.waywordEnv = {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_ANON_KEY: "anon-key",
+    isSupabaseConfigured: true,
+  };
+  global.fetch = (url, options) => {
+    calls.push({ url, options });
+    if (String(url).startsWith("/api/")) {
+      return Promise.resolve({ ok: false, status: 404 });
+    }
+    return Promise.resolve({
+      ok: true,
+      json: () =>
+        Promise.resolve([
+          {
+            day: "2026-06-18",
+            stage_id: "started_writing",
+            event_count: 9,
+            first_event_at: "2026-06-18T20:00:00.000Z",
+            last_event_at: "2026-06-18T21:00:00.000Z",
+          },
+        ]),
+    });
+  };
+
+  const result = await dashboard.loadDashboardData({
+    range: "all",
+    requestId: "manual",
+    now: new Date("2026-06-19T00:00:00.000Z"),
+  });
+
+  global.waywordEnv = priorEnv;
+  delete global.fetch;
+
+  assert.equal(result.ok, true);
+  assert.equal(result.source.telemetryTable, dashboard.ALPHA_PULSE_ROLLUP_TABLE);
+  assert.equal(result.stages.find((stage) => stage.id === "started_writing").count, 9);
+  assert.equal(calls[0].url, "/api/alpha-pulse-summary?days=all&request=manual");
+  assert.match(calls[1].url, /\/rest\/v1\/alpha_pulse_stage_daily_totals/);
+  assert.equal(calls[1].options.headers.apikey, "anon-key");
+  assert.equal(calls[1].options.headers.Authorization, "Bearer anon-key");
+});
+
 test("normalizeSummary preserves snapshot metadata", () => {
   const normalized = dashboard.normalizeSummary({
     ok: true,

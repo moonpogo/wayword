@@ -75,6 +75,7 @@
 
   var REFRESH_INTERVAL_MS = 5 * 60 * 1000;
   var AUTH_TOKEN_STORAGE_KEY = "wayword-alpha-pulse-token";
+  var ALPHA_PULSE_ROLLUP_TABLE = "alpha_pulse_stage_daily_totals";
   var booted = false;
   var currentRange = "7";
   var refreshTimer = 0;
@@ -199,6 +200,156 @@
     return fetchOptions;
   }
 
+  function buildWindow(rangeId, now) {
+    var range = safeString(rangeId) || "7";
+    var end = now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date();
+    if (range === "all") {
+      return {
+        label: "All time",
+        startAt: "1970-01-01T00:00:00.000Z",
+        endAt: end.toISOString(),
+      };
+    }
+    var days = Math.max(1, Number(range) || 7);
+    var start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+    return {
+      label: "Last " + days + " days",
+      startAt: start.toISOString(),
+      endAt: end.toISOString(),
+    };
+  }
+
+  function pickRollupTimestamp(row, fieldName) {
+    return row && typeof row === "object" ? safeString(row[fieldName]) : "";
+  }
+
+  function isRollupDayWithinWindow(dayIso, windowInfo) {
+    var day = safeString(dayIso);
+    var dayStartMs = Date.parse(day ? day + "T00:00:00.000Z" : "");
+    var dayEndMs = Date.parse(day ? day + "T23:59:59.999Z" : "");
+    var startMs = Date.parse(windowInfo.startAt);
+    var endMs = Date.parse(windowInfo.endAt);
+    return (
+      Number.isFinite(dayStartMs) &&
+      Number.isFinite(dayEndMs) &&
+      Number.isFinite(startMs) &&
+      Number.isFinite(endMs) &&
+      dayEndMs >= startMs &&
+      dayStartMs <= endMs
+    );
+  }
+
+  function buildCoverageMapFromRollups(rows) {
+    var map = {};
+    STAGES.forEach(function (stage) {
+      map[stage.id] = {
+        total: 0,
+        firstSeenAt: "",
+        lastSeenAt: "",
+        historicallySeen: false,
+      };
+    });
+
+    safeArray(rows).forEach(function (row) {
+      var stageId = safeString(row && row.stage_id);
+      if (!stageId || !map[stageId]) return;
+      var coverage = map[stageId];
+      var count = Math.max(0, Number(row && row.event_count) || 0);
+      var firstSeenAt = pickRollupTimestamp(row, "first_event_at");
+      var lastSeenAt = pickRollupTimestamp(row, "last_event_at");
+      coverage.total += count;
+      coverage.historicallySeen = coverage.total > 0;
+      if (firstSeenAt && (!coverage.firstSeenAt || Date.parse(firstSeenAt) < Date.parse(coverage.firstSeenAt))) {
+        coverage.firstSeenAt = firstSeenAt;
+      }
+      if (lastSeenAt && (!coverage.lastSeenAt || Date.parse(lastSeenAt) > Date.parse(coverage.lastSeenAt))) {
+        coverage.lastSeenAt = lastSeenAt;
+      }
+    });
+
+    return map;
+  }
+
+  function buildAlphaPulseSummaryFromRollups(rows, rangeId, now) {
+    var windowInfo = buildWindow(rangeId, now);
+    var coverageMap = buildCoverageMapFromRollups(rows);
+    var stageCounts = {};
+    var latestEventAt = "";
+
+    STAGES.forEach(function (stage) {
+      stageCounts[stage.id] = 0;
+    });
+
+    safeArray(rows).forEach(function (row) {
+      var stageId = safeString(row && row.stage_id);
+      if (!stageId || !Object.prototype.hasOwnProperty.call(stageCounts, stageId)) return;
+      if (isRollupDayWithinWindow(row && row.day, windowInfo)) {
+        stageCounts[stageId] += Math.max(0, Number(row && row.event_count) || 0);
+      }
+      var rowLastEventAt = pickRollupTimestamp(row, "last_event_at");
+      if (rowLastEventAt && (!latestEventAt || Date.parse(rowLastEventAt) > Date.parse(latestEventAt))) {
+        latestEventAt = rowLastEventAt;
+      }
+    });
+
+    return {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      window: windowInfo,
+      source: {
+        available: true,
+        telemetryTable: ALPHA_PULSE_ROLLUP_TABLE,
+        mode: "live",
+        snapshotGeneratedAt: "",
+        latestEventAt: latestEventAt,
+        unavailableReason: "",
+      },
+      seams: [],
+      stages: STAGES.map(function (stage) {
+        return {
+          id: stage.id,
+          label: stage.label,
+          count: stageCounts[stage.id] || 0,
+          coverage: coverageMap[stage.id] || null,
+          source: "live",
+          note: "",
+        };
+      }),
+    };
+  }
+
+  function buildPublicRollupUrl(env) {
+    var url = safeString(env && env.SUPABASE_URL).replace(/\/$/, "");
+    if (!url) return "";
+    return (
+      url +
+      "/rest/v1/" +
+      ALPHA_PULSE_ROLLUP_TABLE +
+      "?select=day,stage_id,event_count,first_event_at,last_event_at&order=day.asc&limit=5000"
+    );
+  }
+
+  function loadPublicRollupSummary(options) {
+    var env = safeObject(global.waywordEnv);
+    var url = buildPublicRollupUrl(env);
+    var anonKey = safeString(env.SUPABASE_ANON_KEY);
+    if (!url || !anonKey || typeof fetch !== "function") return Promise.resolve(null);
+    return fetch(url, {
+      cache: "no-store",
+      headers: {
+        apikey: anonKey,
+        Authorization: "Bearer " + anonKey,
+      },
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error("alpha_pulse_rollup_http_" + response.status);
+        return response.json();
+      })
+      .then(function (rows) {
+        return buildAlphaPulseSummaryFromRollups(rows, options && options.range, options && options.now);
+      });
+  }
+
   function clearRefreshTimer() {
     if (!refreshTimer || typeof global.clearTimeout !== "function") return;
     global.clearTimeout(refreshTimer);
@@ -302,25 +453,52 @@
       })
       .then(normalizeSummary)
       .catch(function (error) {
-        return normalizeSummary({
-          ok: false,
-          source: {
-            available: false,
-            telemetryTable: "",
-            unavailableReason: safeString(error && error.message) || "alpha_pulse_summary_failed",
-          },
-          seams: [
-            {
-              id: "alpha_pulse_summary_failed",
-              label: "Live summary unavailable",
-              reason: safeString(error && error.message) || "Alpha Pulse summary request failed.",
-            },
-          ],
-          stages: STAGES.map(function (stage) {
-            return { id: stage.id, count: 0, source: "unavailable" };
-          }),
-          window: { label: range === "all" ? "All time" : "Last " + range + " days" },
-        });
+        var summaryError = safeString(error && error.message) || "alpha_pulse_summary_failed";
+        return loadPublicRollupSummary(options)
+          .then(function (fallbackSummary) {
+            if (fallbackSummary) return normalizeSummary(fallbackSummary);
+            return normalizeSummary({
+              ok: false,
+              source: {
+                available: false,
+                telemetryTable: "",
+                unavailableReason: summaryError,
+              },
+              seams: [
+                {
+                  id: "alpha_pulse_summary_failed",
+                  label: "Live summary unavailable",
+                  reason: summaryError || "Alpha Pulse summary request failed.",
+                },
+              ],
+              stages: STAGES.map(function (stage) {
+                return { id: stage.id, count: 0, source: "unavailable" };
+              }),
+              window: { label: range === "all" ? "All time" : "Last " + range + " days" },
+            });
+          })
+          .catch(function (fallbackError) {
+            var reason = safeString(fallbackError && fallbackError.message) || summaryError;
+            return normalizeSummary({
+              ok: false,
+              source: {
+                available: false,
+                telemetryTable: ALPHA_PULSE_ROLLUP_TABLE,
+                unavailableReason: reason,
+              },
+              seams: [
+                {
+                  id: "alpha_pulse_summary_failed",
+                  label: "Live summary unavailable",
+                  reason: reason,
+                },
+              ],
+              stages: STAGES.map(function (stage) {
+                return { id: stage.id, count: 0, source: "unavailable" };
+              }),
+              window: { label: range === "all" ? "All time" : "Last " + range + " days" },
+            });
+          });
       });
   }
 
@@ -409,7 +587,9 @@
               " snapshot from " +
               (formatTimestamp(source.snapshotGeneratedAt) || "recently") +
               "."
-            : (source.telemetryTable || "retention_events") + " via the summary endpoint.",
+            : source.telemetryTable === ALPHA_PULSE_ROLLUP_TABLE
+              ? "Aggregate daily rollups from " + ALPHA_PULSE_ROLLUP_TABLE + "."
+              : (source.telemetryTable || "retention_events") + " via the summary endpoint.",
       });
       if (source.latestEventAt) {
         items.push({
@@ -594,6 +774,8 @@
     RANGE_OPTIONS: RANGE_OPTIONS,
     REFRESH_INTERVAL_MS: REFRESH_INTERVAL_MS,
     AUTH_TOKEN_STORAGE_KEY: AUTH_TOKEN_STORAGE_KEY,
+    ALPHA_PULSE_ROLLUP_TABLE: ALPHA_PULSE_ROLLUP_TABLE,
+    buildAlphaPulseSummaryFromRollups: buildAlphaPulseSummaryFromRollups,
     buildSummaryUrl: buildSummaryUrl,
     buildFetchOptions: buildFetchOptions,
     buildStatusText: buildStatusText,
