@@ -2,22 +2,25 @@
 
 Editorial doctrine (private): `docs/EDITORIAL_DOCTRINE.md`.
 
-## Families
+## Runtime Truth
 
-| Family | Posture |
-|--------|---------|
-| **Scene** | Outward notice: place, residue, concrete scene, objects, and physical staging. |
-| **Relation** | Between people: unsaid, kindness, avoidance, trace. |
-| **Pressure** | Pressure, withholding, edge, cost, forks, and near-misses. |
-| **Constraint** | Explicit rule on the sentence (withholding channels/categories). |
-| **Calibration** | Separate onboarding/calibration prompt family; not part of main random family order. |
+The current alpha runtime is **Entry / Torsion first**.
+
+| Layer / family | Runtime status | Posture |
+|--------|---------|---------|
+| **Entry** | Active default | Low-stakes initiation: nearby perception, concrete footholds, first-language motion. |
+| **Torsion** | Active, conservatively weighted after readiness | Constraint/variation: contrast, relation, re-description, productive pressure. |
+| **Resonance** | Data scaffold only; zero runtime weight | Paradox/depth prompts exist in the corpus but are not selected by the alpha runtime. |
+| **Scene / Relation / Pressure / Constraint** | Legacy fallback only | Older prompt families remain loaded so the app has a safe fallback if the layered prompt catalog is unavailable. |
 
 Source of truth:
 
-- Main family order and prompt corpus: `src/features/prompts/prompt-library.js`
-- Calibration family and prompt corpus: `src/features/prompts/calibration-prompts.js`
+- Active layered prompt corpus: `src/features/prompts/layered-prompts.js`
+- Layer routing / runtime catalog builder: `src/features/prompts/prompt-system-mode.js`
+- Selection / reroll mechanics: `src/features/writing/prompt-selection.js` and `src/app/prompt-runtime.js`
+- Legacy fallback corpus: `src/features/prompts/prompt-library.js`
 
-Removed as runtime families: **Indirection**, **Social**, **Object**, **Observation**, **Tension**, **Possibility** (material redistributed).
+There is no separate `calibration-prompts.js` runtime source. The early first-session entry flow uses the Entry layer, restricted by `FIRST_SESSION_ENTRY_PROMPT_IDS` in `src/features/prompts/prompt-system-mode.js`.
 
 ## History (compact)
 
@@ -29,7 +32,8 @@ Removed as runtime families: **Indirection**, **Social**, **Object**, **Observat
 
 - Default: weighted family pick among families with eligible prompts, then uniform random among eligible in that family.
 - Reroll: **in-family first** (`familyKey: state.promptFamily`); relax near-duplicate; then **one** cross-family sweep if still empty.
-- Calibration: while saved runs are below the calibration threshold, prompt generation uses the separate **Calibration** pool instead of the main family order.
+- First run / first-session entry: prompt generation is forced to **Entry** and narrowed to `FIRST_SESSION_ENTRY_PROMPT_IDS`.
+- Readiness routing: `entry_support` and `entry_stable` expose only Entry; `torsion_ready` and `resonance_candidate` include Torsion with conservative weighting. Resonance remains unweighted.
 
 ## Constants
 
@@ -37,4 +41,4 @@ See `src/config/constants.js`: `PROMPT_RECENT_ID_WINDOW`, `PROMPT_NEAR_DUPLICATE
 
 ## Non-goals
 
-No ranking engine, personalization, or extra prompt surface variants.
+No prompt generation, ranking engine, personalization, user-facing layer chooser, or extra prompt surface variants.

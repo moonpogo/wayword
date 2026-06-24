@@ -668,18 +668,32 @@ test("extracted prompt data preserves family names, counts, and deterministic se
   assert.equal(chosen.entry.id, "observation_kitchen_left");
 });
 
-test("prompt system docs list the runtime prompt families", () => {
-  const context = loadPromptDataContext();
-  const familyOrder = Array.from(context.waywordPromptLibrary.PROMPT_FAMILIES_ORDER);
+test("prompt system docs match the layered alpha runtime contract", () => {
+  const context = loadBrowserScripts(
+    ["src/features/prompts/layered-prompts.js", "src/features/prompts/prompt-system-mode.js"],
+    { console: silentConsole() }
+  );
+  const layered = context.waywordLayeredPrompts;
+  const mode = context.waywordPromptSystemMode;
+  const catalog = mode.buildStrataWeightedPromptCatalog({
+    readinessBand: "resonance_candidate",
+    entryPrompts: layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.ENTRY),
+    torsionPrompts: layered.getLayeredPromptsByLayer(layered.PROMPT_LAYERS.TORSION),
+  });
   const doc = fs.readFileSync("docs/PROMPT_SYSTEM_V1_1.md", "utf8");
-  const documentedFamilies = doc
-    .split(/\r?\n/)
-    .map((line) => line.match(/^\| \*\*([^*]+)\*\* \|/))
-    .filter(Boolean)
-    .map((match) => match[1]);
 
-  assert.deepEqual(documentedFamilies.slice(0, familyOrder.length), familyOrder);
+  assert.equal(catalog.promptFamiliesOrder.includes("Entry"), true);
+  assert.equal(catalog.promptFamiliesOrder.includes("Torsion"), true);
+  assert.equal(catalog.promptFamiliesOrder.includes("Resonance"), false);
+  assert.match(doc, /\*\*Entry\*\*/);
+  assert.match(doc, /\*\*Torsion\*\*/);
+  assert.match(doc, /\*\*Resonance\*\* \| Data scaffold only; zero runtime weight/);
+  assert.match(doc, /Scene \/ Relation \/ Pressure \/ Constraint\*\* \| Legacy fallback only/);
+  assert.match(doc, /src\/features\/prompts\/layered-prompts\.js/);
+  assert.match(doc, /src\/features\/prompts\/prompt-system-mode\.js/);
   assert.match(doc, /src\/features\/prompts\/prompt-library\.js/);
+  assert.match(doc, /FIRST_SESSION_ENTRY_PROMPT_IDS/);
+  assert.doesNotMatch(doc, /src\/features\/prompts\/calibration-prompts\.js/);
 });
 
 test("layered prompts v1 scaffold has required foundation prompt integrity", () => {

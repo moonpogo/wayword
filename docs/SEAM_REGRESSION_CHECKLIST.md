@@ -2,16 +2,16 @@
 
 Use this compact checklist before and after any selected-seam migration. It supplements `docs/QA_REGRESSION_CHECKLIST.md`.
 
-## Post-Submit / Calibration
+## Post-Submit / First-Session Entry
 
 - [ ] Submit locks editor and sets post-submit UI active.
-- [ ] Calibration baseline runs suppress below-editor Mirror card.
-- [ ] Insufficient calibration submit does not count as a full saved run.
+- [ ] First-session entry runs keep post-submit reflection calm and non-diagnostic.
+- [ ] Low-signal first-session submit does not count as a full saved run.
 - [ ] Threshold handoff appears once when expected.
 - [ ] Handoff blocks completed-run restart shortcuts.
 - [ ] Continue starts a fresh run.
 - [ ] View Patterns opens Patterns and acknowledges handoff.
-- [ ] Normal post-calibration submit shows statement-only Mirror.
+- [ ] Normal post-first-session submit shows statement-only Mirror.
 - [ ] Next-pass nudge starts a fresh run and clears post-submit surfaces.
 
 ## Prompt / Reroll
@@ -22,7 +22,7 @@ Use this compact checklist before and after any selected-seam migration. It supp
 - [ ] Reroll remains unavailable after submit.
 - [ ] Same-family reroll is preferred before cross-family fallback.
 - [ ] Recent-id and near-duplicate suppression still apply.
-- [ ] Calibration prompts remain separate from main prompt history.
+- [ ] First-session prompt selection is restricted to Entry prompts.
 
 ## Recent Runs
 

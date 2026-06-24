@@ -1,7 +1,14 @@
 # Prompt System V1 Implementation Plan
 
-## Scope Of This Pass
-This pass adds Prompt System V1 scaffold data only.
+## Current Status
+This file is historical. It records the scaffold plan that introduced layered prompt data.
+
+The current alpha runtime now loads the layered prompt catalog by default through `script.js`, `src/features/prompts/layered-prompts.js`, and `src/features/prompts/prompt-system-mode.js`.
+
+For current runtime truth, use `docs/PROMPT_SYSTEM_V1_1.md`.
+
+## Original Scope Of This Pass
+This pass added Prompt System V1 scaffold data only.
 
 Included now:
 - a V1 layered prompt data module
@@ -16,17 +23,11 @@ Not included now:
 - adaptive layer routing
 
 ## Runtime Status
-V0 prompt runtime remains active in production paths.
+This section is superseded.
 
-This pass does not change live prompt selection, family weighting, calibration routing, reroll logic, or render behavior.
+V0 Scene / Relation / Pressure / Constraint prompts remain in `src/features/prompts/prompt-library.js`, but they are legacy fallback material rather than the normal alpha prompt source.
 
-Local/dev testing for V1 Entry can be enabled only in local contexts (`localhost`, `127.0.0.1`, or `file:`) using either:
-- URL query: `?promptSystem=v1`
-- localStorage: `waywordPromptSystem = v1`
-
-Default remains V0 when no local override is present.
-
-The local/dev V1 flag is still the only activation path. Production/default runtime remains V0.
+The active alpha path builds an Entry / Torsion catalog from `src/features/prompts/layered-prompts.js`. Resonance prompts are scaffolded but not selected because `src/features/prompts/prompt-system-mode.js` assigns Resonance zero runtime weight.
 
 ## Layer Roadmap
 Prompt System V1 scaffold now contains all three foundation layers:
@@ -35,20 +36,16 @@ Prompt System V1 scaffold now contains all three foundation layers:
 - Torsion: 25 prompts
 - Resonance: 25 prompts
 
-V1 runtime currently means Entry/Layer 1 only. Torsion and Resonance are data-scaffolded but not routed.
-
-There is no adaptive layer routing yet.
-
-The next phase is primitive movement logic / strata design.
+V1 runtime currently means Entry-first with conservative Torsion exposure after readiness signals. Resonance is data-scaffolded but not routed.
 
 ## Integration Strategy
-Future runtime integration should be introduced behind a safe switch or development flag before replacing V0 behavior.
+Runtime integration has already happened. Future changes should avoid broad replacement and instead adjust the narrow seams below.
 
 Recommended integration stages:
-1. load V1 data in parallel with V0
-2. add non-default gated selection path for V1
-3. run integrity and regression checks against both paths
-4. switch default only after behavior and quality signoff
+1. keep `layered-prompts.js` as the prompt corpus source for active alpha prompts
+2. adjust readiness weights in `prompt-system-mode.js` only when alpha evidence supports it
+3. keep Resonance at zero runtime weight until the founder explicitly decides to expose paradox/depth prompts
+4. leave `prompt-library.js` as fallback until a dedicated deletion/archive pass removes it safely
 
 There is no public UI toggle for prompt-system mode at this stage.
 

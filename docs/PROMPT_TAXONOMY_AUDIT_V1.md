@@ -1,6 +1,8 @@
 # Prompt Taxonomy Audit V1
 
-This audit extracts the current visible prompt corpus from runtime code. It does not rewrite prompts, implement layers, or change prompt behavior.
+Historical snapshot. This audit extracted the then-current visible prompt corpus from runtime code. It does not describe the current alpha runtime.
+
+For current runtime truth, use `docs/PROMPT_SYSTEM_V1_1.md`: active prompts come from `src/features/prompts/layered-prompts.js` through `src/features/prompts/prompt-system-mode.js`; old Scene / Relation / Pressure / Constraint prompts are legacy fallback; there is no active `calibration-prompts.js` source.
 
 ## Prompt Inventory
 

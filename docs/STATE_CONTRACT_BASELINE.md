@@ -24,24 +24,19 @@ Phase 2 routes only narrow post-submit render flags and completed-restart gating
 | --- | --- |
 | `idle` | No active writing session. |
 | `drafting` | Active session is not in completed post-submit UI. |
-| `submitted_calibration_baseline` | Submitted/completed state has a non-insufficient `calibrationPostRun`. |
-| `submitted_calibration_insufficient` | Submitted/completed state has `calibrationPostRun.insufficient`. |
-| `submitted_calibration_handoff` | `calibrationHandoffVisible` is true; this takes precedence over baseline payload. |
 | `submitted_mirror_low_signal` | Mirror result is low-signal, or caller supplies the current renderer's low-signal predicate result. |
 | `submitted_mirror_ready` | Submitted/completed state reaches normal Mirror rendering. |
 | `submitted_mirror_unavailable` | Last Mirror load/API call failed. |
 
 Invariant: `submitted=true` plus `completedUiActive=true` plus `active=false` is invalid-by-design for post-submit UI. Current phase derivation treats it as `idle`, and completed-restart handlers must not restart from it.
 
-## Calibration Flags
+## First-Session Entry Flags
 
 | State / key | Current meaning |
 | --- | --- |
-| `CALIBRATION_THRESHOLD` | `5`; Patterns unlock and handoff logic key off saved run count. |
-| `state.calibrationPostRun` | Calibration post-submit overlay payload: `{ step, observation, insufficient }`, or `null`. |
-| `state.calibrationHandoffVisible` | Threshold handoff owns post-submit surface and blocks normal restart shortcuts. |
-| `state.lastSubmitCalibrationShortMirror` | Last calibration submit was short/low-signal and uses micro-reflection copy. |
-| `wayword-calibration-handoff-ack` | localStorage ack that suppresses repeat threshold handoff. |
+| `FIRST_SESSION_ENTRY_THRESHOLD` | `5`; Patterns unlock and handoff logic key off saved run count. |
+| `state.lastSubmitFirstSessionEntryShortMirror` | Last first-session entry submit was short/low-signal and uses micro-reflection copy. |
+| `wayword-firstSessionEntry-handoff-ack` | localStorage ack that suppresses repeat threshold handoff. |
 
 ## Saved-Run Storage Keys
 
@@ -72,18 +67,15 @@ Invariant: `submitted=true` plus `completedUiActive=true` plus `active=false` is
 | `clear-saved-runs-confirm-open` | `body` | Clear Saved Runs confirmation modal is open. |
 | `focus-mode-layout-snap` | `html` | Temporary layout snap during focus-mode transitions. |
 
-## Prompt Families
+## Prompt Runtime
 
-Current runtime main prompt families in `src/features/prompts/prompt-library.js`:
+Current alpha prompt catalog is built from `src/features/prompts/layered-prompts.js` via `src/features/prompts/prompt-system-mode.js`:
 
-- `Scene`
-- `Relation`
-- `Pressure`
-- `Constraint`
+- `Entry` is the default and first-session entry layer.
+- `Torsion` is active only after readiness bands allow conservative exposure.
+- `Resonance` exists as data but has zero runtime weight.
 
-Current calibration family:
-
-- `Calibration`
+The older `Scene` / `Relation` / `Pressure` / `Constraint` family corpus remains in `src/features/prompts/prompt-library.js` as fallback if layered catalog assembly is unavailable.
 
 ## Canonical + Legacy Persistence
 

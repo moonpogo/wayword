@@ -10,16 +10,22 @@ Plain map of where behavior lives today. No code changes implied.
 
 **Primary files**
 
-- `script.js` — `promptFamilies`, `generatePrompt()`, reroll limits, `state.prompt` / `state.promptFamily` / `state.promptRerollsUsed`, reprompt vs field-toggle handlers (`promptRerollBtn`, field expand), sync of prompt text into the DOM.
+- `src/features/prompts/layered-prompts.js` — active Entry / Torsion / Resonance prompt corpus. Resonance exists as data but is not selected by the alpha runtime.
+- `src/features/prompts/prompt-system-mode.js` — first-session Entry narrowing, readiness weights, and layered runtime catalog assembly.
+- `src/app/prompt-runtime.js` — prompt generation/reroll runtime bridge and state updates.
+- `src/features/writing/prompt-selection.js` — weighted family selection, near-duplicate avoidance, and reroll selection rules.
+- `src/features/prompts/prompt-library.js` — legacy Scene / Relation / Pressure / Constraint fallback corpus.
+- `script.js` — app orchestration around generated prompts, `getV1EntryPromptCatalogForRuntime()`, reroll limits, prompt DOM sync, and button handlers.
 - `index.html` — `#promptCard`, `#promptText`, `#promptFamilyLabel`, `#promptRerollBtn`, field-expand control in the prompt meta row.
 
 **Responsibility**
 
-- Chooses a family and random prompt string, tracks rerolls, renders the prompt card, and wires mobile/desktop interaction so reroll is not confused with other controls.
+- Builds the active alpha prompt catalog from Entry / Torsion layers, keeps first-session prompts low-friction, tracks rerolls, renders the prompt card, and wires mobile/desktop interaction so reroll is not confused with other controls.
 
 **Duplication / ambiguity / split ownership**
 
-- Prompt **strings** live only in `script.js` (`promptFamilies`). **Layout and chrome** for the same UX are split between `index.html` (structure) and `style.css` (`.prompt-*`). No separate prompt module.
+- Active prompt **strings** live in `src/features/prompts/layered-prompts.js`; legacy fallback strings live in `src/features/prompts/prompt-library.js`. **Layout and chrome** for the same UX are split between `index.html` (structure) and `style.css` (`.prompt-*`).
+- The old Scene / Relation / Pressure / Constraint taxonomy remains present as fallback, so docs should call it legacy unless the founder intentionally reactivates it.
 
 ---
 
