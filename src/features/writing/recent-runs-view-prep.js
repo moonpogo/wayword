@@ -283,6 +283,14 @@
    * }} deps
    */
   function bindRecentRunsExpandDismissUi(deps) {
+    function markRecentRunsOpened(surfaceName) {
+      try {
+        global.window?.waywordRetentionEvents?.markRecentRunsOpened({ surface_name: surfaceName });
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
     const $ = deps.$;
     const drawerBtn = $("recentDrawerMoreBtn");
     if (drawerBtn && drawerBtn.dataset.recentRunsExpandBound !== "1") {
@@ -290,6 +298,7 @@
       drawerBtn.addEventListener("click", (e) => {
         e.preventDefault();
         deps.state.recentRunsHistoryExpanded = !deps.state.recentRunsHistoryExpanded;
+        if (deps.state.recentRunsHistoryExpanded) markRecentRunsOpened("drawer_expanded");
         deps.renderHistory();
       });
     }
@@ -299,6 +308,7 @@
       railBtn.addEventListener("click", (e) => {
         e.preventDefault();
         deps.state.recentRunsHistoryExpanded = !deps.state.recentRunsHistoryExpanded;
+        if (deps.state.recentRunsHistoryExpanded) markRecentRunsOpened("rail_expanded");
         deps.renderHistory();
       });
     }

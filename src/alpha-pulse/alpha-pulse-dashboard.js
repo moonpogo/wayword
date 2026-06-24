@@ -37,6 +37,13 @@
         "This counts save events after submission. It includes local-only saves as well as synced ones, so it reflects whether writing was preserved, not only whether it reached the server cleanly.",
     },
     {
+      id: "onboarding_abandoned",
+      label: "Onboarding abandoned",
+      note: "Landing visits that ended before writing started.",
+      help:
+        "This fires only when the landing surface was reached and the page was left before a writing session began. It helps separate landing curiosity from actual writing starts without collecting writing content.",
+    },
+    {
       id: "returned",
       label: "Returned",
       note: "Return-session events after a gap from the prior visit.",

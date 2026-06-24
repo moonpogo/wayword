@@ -7,7 +7,9 @@ const childProcess = require("node:child_process");
 
 const TELEMETRY_EVENTS = new Set([
   "onboarding_completed",
+  "onboarding_abandoned",
   "run_saved",
+  "alpha_error",
   "meaningful_session_completed",
   "observatory_revisited",
   "return_session_detected",

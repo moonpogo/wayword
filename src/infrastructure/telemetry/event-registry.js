@@ -60,6 +60,21 @@
     return { ok: true, payload: source ? { source: source } : {} };
   }
 
+  function sanitizeOnboardingAbandoned(payload) {
+    var clean = sanitizeObject(payload);
+    var keyCheck = rejectUnknownKeys(clean, ["source", "reason"]);
+    if (!keyCheck.ok) return keyCheck;
+    var source = safeString(clean.source);
+    var reason = safeString(clean.reason);
+    return {
+      ok: true,
+      payload: {
+        source: source || "page_exit",
+        reason: reason || "left_before_writing_started",
+      },
+    };
+  }
+
   function sanitizeLandingViewed(payload) {
     var clean = sanitizeObject(payload);
     var keyCheck = rejectUnknownKeys(clean, ["source"]);
@@ -137,6 +152,22 @@
     return { ok: true, payload: reason ? { reason: reason } : {} };
   }
 
+  function sanitizeAlphaError(payload) {
+    var clean = sanitizeObject(payload);
+    var keyCheck = rejectUnknownKeys(clean, ["area", "reason"]);
+    if (!keyCheck.ok) return keyCheck;
+    var area = safeString(clean.area);
+    var reason = safeString(clean.reason);
+    if (!area) return { ok: false, reason: "missing_area" };
+    return {
+      ok: true,
+      payload: {
+        area: area,
+        reason: reason || "unknown",
+      },
+    };
+  }
+
   function sanitizeRecentRunsOpened(payload) {
     var clean = sanitizeObject(payload);
     var keyCheck = rejectUnknownKeys(clean, ["surface_name"]);
@@ -168,7 +199,9 @@
     recent_runs_opened: sanitizeRecentRunsOpened,
     alpha_pulse_feedback: sanitizeAlphaPulseFeedback,
     onboarding_completed: sanitizeOnboardingCompleted,
+    onboarding_abandoned: sanitizeOnboardingAbandoned,
     run_saved: sanitizeRunSaved,
+    alpha_error: sanitizeAlphaError,
     meaningful_session_completed: sanitizeMeaningfulSessionCompleted,
     observatory_revisited: sanitizeObservatoryRevisited,
     return_session_detected: sanitizeReturnSessionDetected,

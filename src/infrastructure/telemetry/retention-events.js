@@ -223,8 +223,14 @@
     markOnboardingCompleted: function (payload) {
       fireAndForget("onboarding_completed", payload || {});
     },
+    markOnboardingAbandoned: function (payload) {
+      fireAndForget("onboarding_abandoned", payload || {});
+    },
     markRunSaved: function (payload) {
       fireAndForget("run_saved", normalizeRunSavedPayload(payload));
+    },
+    markAlphaError: function (payload) {
+      fireAndForget("alpha_error", payload || {});
     },
     markMeaningfulSessionCompleted: function () {
       fireAndForget("meaningful_session_completed", {});

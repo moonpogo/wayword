@@ -236,6 +236,7 @@ function noteTelemetryEditorInput() {
 }
 
 let editorSurfaceComposing = false;
+let onboardingStartedForTelemetry = false;
 
 function normalizeExerciseWords(words) {
   const list = Array.isArray(words) ? words : [];
@@ -7050,6 +7051,7 @@ function bindPrimaryEventControls() {
     submitWriting,
     saveBannedInline,
     onBeginClicked(payload) {
+      onboardingStartedForTelemetry = true;
       try {
         window.waywordRetentionEvents?.markOnboardingCompleted({
           source: payload && payload.source ? payload.source : "begin_button",
@@ -7522,6 +7524,14 @@ function initAccountContinuityAuthScaffold() {
       renderAccountSurface();
     },
     onAuthError() {
+      try {
+        window.waywordRetentionEvents?.markAlphaError({
+          area: "auth",
+          reason: "auth_unavailable",
+        });
+      } catch (_) {
+        /* ignore */
+      }
       // Draft preservation is handled inside the runtime; keep UX steady here.
       setAccountMessage("Account sign-in is not available right now. Your writing is still here.");
     },
@@ -7549,12 +7559,30 @@ function initPersistenceContinuityRuntime() {
 
 function initRetentionInstrumentationRuntime() {
   try {
+    onboardingStartedForTelemetry = Boolean(
+      window.localStorage && window.localStorage.getItem("wayword-onboarding-started-at")
+    );
+  } catch (_) {
+    onboardingStartedForTelemetry = false;
+  }
+  try {
     window.waywordRetentionEvents?.markLandingViewed({ source: "landing_screen" });
   } catch (_) {
     /* ignore */
   }
   try {
     window.waywordTelemetryRuntime?.detectReturnSession({ thresholdHours: 12 });
+  } catch (_) {
+    /* ignore */
+  }
+  try {
+    window.addEventListener("pagehide", function () {
+      if (onboardingStartedForTelemetry || state.active || completedRuns() > 0) return;
+      window.waywordRetentionEvents?.markOnboardingAbandoned({
+        source: "landing_screen",
+        reason: "left_before_writing_started",
+      });
+    }, { once: true });
   } catch (_) {
     /* ignore */
   }

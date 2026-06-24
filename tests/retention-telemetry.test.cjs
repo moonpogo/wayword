@@ -320,6 +320,15 @@ test("event registry accepts alpha pulse funnel events and rejects empty feedbac
   assert.equal(registry.sanitizePayload("writing_started", { source: "begin_button" }).ok, true);
   assert.equal(registry.sanitizePayload("run_submitted", {}).ok, true);
   assert.equal(registry.sanitizePayload("recent_runs_opened", { surface_name: "drawer" }).ok, true);
+  assert.equal(
+    registry.sanitizePayload("onboarding_abandoned", {
+      source: "landing_screen",
+      reason: "left_before_writing_started",
+    }).ok,
+    true
+  );
+  assert.equal(registry.sanitizePayload("alpha_error", { area: "sync", reason: "sync_failed" }).ok, true);
+  assert.equal(registry.sanitizePayload("alpha_error", { reason: "missing_area" }).ok, false);
   assert.equal(registry.sanitizePayload("alpha_pulse_feedback", { response: "useful" }).ok, true);
   assert.equal(registry.sanitizePayload("alpha_pulse_feedback", { response: "" }).ok, false);
 });

@@ -142,6 +142,10 @@
 
     if (!locallyDurable) {
       console.error("wayword: saved run was not durably written to local storage; skipping remote sync");
+      markRetentionEvent("markAlphaError", {
+        area: "save",
+        reason: "local_durability_failed",
+      });
       return {
         canonicalDoc: canonicalDoc,
         legacyRow: legacyRow,
@@ -171,6 +175,12 @@
                   : "local_only_sync_failed",
               is_authenticated: synced || !noSession,
             });
+            if (!synced && !noSession) {
+              markRetentionEvent("markAlphaError", {
+                area: "sync",
+                reason: reason || "sync_failed",
+              });
+            }
             markRetentionEvent("markMeaningfulSessionCompleted");
             if (!synced) {
               console.warn("wayword: persistence runtime sync failed; local continuity remains authoritative", syncResult);
@@ -180,6 +190,10 @@
             markRetentionEvent("markRunSaved", {
               sync_status: "local_only_sync_failed",
               is_authenticated: true,
+            });
+            markRetentionEvent("markAlphaError", {
+              area: "sync",
+              reason: "sync_exception",
             });
             markRetentionEvent("markMeaningfulSessionCompleted");
             console.warn("wayword: persistence runtime sync failed; local continuity remains authoritative", err);
@@ -195,6 +209,10 @@
       markRetentionEvent("markRunSaved", {
         sync_status: "local_only_sync_failed",
         is_authenticated: true,
+      });
+      markRetentionEvent("markAlphaError", {
+        area: "sync",
+        reason: "sync_exception",
       });
       markRetentionEvent("markMeaningfulSessionCompleted");
       console.warn("wayword: persistence runtime sync threw synchronously; local continuity remains authoritative", persistSyncErr);

@@ -16,6 +16,8 @@ const TELEMETRY_EVENTS = new Set([
   "writing_started",
   "run_submitted",
   "run_saved",
+  "onboarding_abandoned",
+  "alpha_error",
   "return_session_detected",
   "recent_runs_opened",
   "observatory_revisited",
@@ -35,6 +37,7 @@ const STAGES = [
   { id: "started_writing", label: "Started writing" },
   { id: "submitted", label: "Submitted" },
   { id: "saved", label: "Saved" },
+  { id: "onboarding_abandoned", label: "Onboarding abandoned" },
   { id: "returned", label: "Returned" },
   { id: "opened_recent_runs", label: "Opened Recent Runs" },
   { id: "opened_patterns", label: "Opened Patterns" },
@@ -46,6 +49,7 @@ const EVENT_BY_STAGE = {
   started_writing: "writing_started",
   submitted: "run_submitted",
   saved: "run_saved",
+  onboarding_abandoned: "onboarding_abandoned",
   returned: "return_session_detected",
   opened_recent_runs: "recent_runs_opened",
   opened_patterns: "observatory_revisited",
@@ -179,9 +183,10 @@ function buildCoverageMap(rows) {
     if (eventName === "writing_started") stageId = "started_writing";
     if (eventName === "run_submitted") stageId = "submitted";
     if (eventName === "run_saved") stageId = "saved";
+    if (eventName === "onboarding_abandoned") stageId = "onboarding_abandoned";
     if (eventName === "return_session_detected") stageId = "returned";
     if (eventName === "recent_runs_opened") stageId = "opened_recent_runs";
-    if (eventName === "migration_failed") stageId = "errors";
+    if (eventName === "migration_failed" || eventName === "alpha_error") stageId = "errors";
     if (eventName === "observatory_revisited") {
       const payload = row && row.payload && typeof row.payload === "object" ? row.payload : {};
       const surfaceName = safeString(payload.surface_name);
@@ -313,6 +318,7 @@ function buildAlphaPulseSummaryFromRows(rows, windowInfo, meta) {
     started_writing: countEvents(list, (row) => safeString(row.event) === "writing_started"),
     submitted: countEvents(list, (row) => safeString(row.event) === "run_submitted"),
     saved: countEvents(list, (row) => safeString(row.event) === "run_saved"),
+    onboarding_abandoned: countEvents(list, (row) => safeString(row.event) === "onboarding_abandoned"),
     returned: countEvents(list, (row) => safeString(row.event) === "return_session_detected"),
     opened_recent_runs: countEvents(list, (row) => safeString(row.event) === "recent_runs_opened"),
     opened_patterns: countEvents(list, (row) => {
@@ -323,7 +329,7 @@ function buildAlphaPulseSummaryFromRows(rows, windowInfo, meta) {
     }),
     errors: countEvents(list, (row) => {
       const eventName = safeString(row.event);
-      if (eventName === "migration_failed") return true;
+      if (eventName === "migration_failed" || eventName === "alpha_error") return true;
       if (eventName !== "run_saved") return false;
       const payload = row && row.payload && typeof row.payload === "object" ? row.payload : {};
       return safeString(payload.sync_status) === "local_only_sync_failed";

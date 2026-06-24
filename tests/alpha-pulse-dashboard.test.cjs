@@ -13,6 +13,7 @@ test("normalizeSummary preserves live stage counts from the private summary endp
       { id: "started_writing", count: 7, source: "live" },
       { id: "submitted", count: 5, source: "live" },
       { id: "saved", count: 4, source: "live" },
+      { id: "onboarding_abandoned", count: 2, source: "live" },
       { id: "returned", count: 2, source: "live" },
       { id: "opened_recent_runs", count: 3, source: "live" },
       { id: "opened_patterns", count: 2, source: "live" },
@@ -21,8 +22,9 @@ test("normalizeSummary preserves live stage counts from the private summary endp
   });
 
   assert.equal(normalized.ok, true);
-  assert.equal(normalized.stages.length, 8);
+  assert.equal(normalized.stages.length, 9);
   assert.equal(normalized.stages.find((stage) => stage.id === "landed").count, 9);
+  assert.equal(normalized.stages.find((stage) => stage.id === "onboarding_abandoned").count, 2);
   assert.equal(normalized.stages.find((stage) => stage.id === "opened_recent_runs").count, 3);
   assert.equal(normalized.source.mode, "live");
 });
@@ -35,7 +37,7 @@ test("normalizeSummary fills missing stage rows as unavailable zeroes", () => {
     seams: [{ id: "missing_env", label: "Live summary unavailable", reason: "missing_env" }],
   });
 
-  assert.equal(normalized.stages.length, 8);
+  assert.equal(normalized.stages.length, 9);
   assert.equal(normalized.stages.find((stage) => stage.id === "saved").count, 4);
   assert.equal(normalized.stages.find((stage) => stage.id === "landed").count, 0);
   assert.equal(normalized.stages.find((stage) => stage.id === "landed").source, "unavailable");
@@ -47,7 +49,7 @@ test("loadDashboardData falls back to unavailable summary when fetch fails", asy
   delete global.fetch;
 
   assert.equal(result.ok, false);
-  assert.equal(result.stages.length, 8);
+  assert.equal(result.stages.length, 9);
   assert.equal(result.source.unavailableReason, "network_down");
   assert.equal(result.window.label, "All time");
 });

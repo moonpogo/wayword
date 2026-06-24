@@ -5027,6 +5027,50 @@ test("recent runs render coordinator honors empty and expanded footer contracts"
   assert.deepEqual(expandedCase.calls, [["expandedBody", true], ["railChrome"]]);
 });
 
+test("recent runs expanded drawer and rail emit content-free reach telemetry", () => {
+  const context = loadRecentRunsPrepContext();
+  const events = [];
+  context.waywordRetentionEvents = {
+    markRecentRunsOpened(payload) {
+      events.push(payload);
+    },
+  };
+  const listeners = {};
+  const makeButton = (id) => ({
+    id,
+    dataset: {},
+    addEventListener(type, handler) {
+      listeners[id] = handler;
+    },
+  });
+  const drawerBtn = makeButton("recentDrawerMoreBtn");
+  const railBtn = makeButton("recentRailMoreBtn");
+  const state = { recentRunsHistoryExpanded: false };
+  let renderCount = 0;
+  const deps = {
+    state,
+    renderHistory() {
+      renderCount += 1;
+    },
+    $(id) {
+      if (id === "recentDrawerMoreBtn") return drawerBtn;
+      if (id === "recentRailMoreBtn") return railBtn;
+      return null;
+    },
+  };
+
+  context.waywordRecentRunsTransition.bindRecentRunsExpandDismissUi(deps);
+  listeners.recentDrawerMoreBtn({ preventDefault() {} });
+  listeners.recentRailMoreBtn({ preventDefault() {} });
+  listeners.recentRailMoreBtn({ preventDefault() {} });
+
+  assert.deepEqual(
+    events.map((event) => event.surface_name),
+    ["drawer_expanded", "rail_expanded"],
+  );
+  assert.equal(renderCount, 3);
+});
+
 test("recent runs row expansion keeps a single open entry and toggles aria-expanded", () => {
   function makeRecentEntry() {
     const expanded = { hidden: true };
