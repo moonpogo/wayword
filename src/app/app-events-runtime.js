@@ -66,6 +66,9 @@
   }
 
   function insertMobileEditorNewlineAndRefresh(input, editorInput, e) {
+    if (!input || typeof input.isActiveAndEditable !== "function" || !input.isActiveAndEditable()) {
+      return { inserted: false, preventDefaultCalled: false };
+    }
     var preventDefaultCalled = false;
     if (e && typeof e.preventDefault === "function") {
       e.preventDefault();

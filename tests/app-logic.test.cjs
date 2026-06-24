@@ -2999,6 +2999,103 @@ test("app events runtime binds editor input events once, syncs scroll, and keeps
   assert.ok(calls.includes("entryDelayFocus"), "expected editor focus to arm pre-entry hint timer");
 });
 
+test("app events runtime does not swallow mobile newline events after submit lock", () => {
+  const context = loadAppEventsRuntimeContext();
+  const listeners = new Map();
+  const editorInput = {
+    dataset: {},
+    addEventListener(name, handler) {
+      listeners.set(name, handler);
+    },
+  };
+  const calls = [];
+  const input = {
+    editorInput,
+    state: { active: true, submitted: true, completedUiActive: true, optionsOpen: false },
+    isMobileViewport() {
+      return true;
+    },
+    setFocusMode() {},
+    mobileEditorFocusGuard: null,
+    hideEditorSemanticPicker() {},
+    queueViewportSync() {},
+    getSuppressFocusExitUntil() {
+      return 0;
+    },
+    isMobilePatternsVisible() {
+      return false;
+    },
+    syncViewportHeightVar() {},
+    syncKeyboardOpenClass() {},
+    setEditorSurfaceComposing() {},
+    getEditorSurfaceComposing() {
+      return false;
+    },
+    isActiveAndEditable() {
+      return false;
+    },
+    flushEditorSurfaceIntoWriteDocOnce() {
+      calls.push("flush");
+    },
+    tryStartTimerOnFirstMeaningfulInput() {
+      calls.push("timer");
+    },
+    pulseWordmark() {
+      calls.push("pulse");
+    },
+    renderHighlight() {
+      calls.push("highlight");
+    },
+    renderSidebar() {
+      calls.push("sidebar");
+    },
+    updateWordProgress() {
+      calls.push("progress");
+    },
+    updateEnterButtonVisibility() {
+      calls.push("button");
+    },
+    renderMeta() {
+      calls.push("renderMeta");
+    },
+    onEditorFocusForEntryDelayHint() {},
+    onEditorInputForEntryDelayHint() {
+      calls.push("entryDelayInput");
+    },
+    onEditorInputForTelemetry() {
+      calls.push("telemetryInput");
+    },
+    scheduleSemanticPickerFromSelection() {
+      calls.push("picker");
+    },
+    syncScroll() {},
+    scheduleEditorDotOverlaySync() {},
+    insertMobileEditorTextNewline() {
+      calls.push("insertMobileEditorTextNewline");
+      return true;
+    },
+    completedUiRestartInteractions: null,
+    runPostSubmitAutoNewRunNow() {},
+    getEditorText() {
+      return "locked text";
+    },
+    submitWriting() {
+      calls.push("submitWriting");
+    },
+  };
+
+  context.waywordAppEventsRuntime.bindEditorInputEvents(input);
+  listeners.get("beforeinput")({
+    inputType: "insertLineBreak",
+    isComposing: false,
+    preventDefault() {
+      calls.push("preventDefault");
+    },
+  });
+
+  assert.deepEqual(calls, [], "locked mobile newline events should not be consumed or mutate editor state");
+});
+
 test("mobile newline runtime uses text newline helper and no caret-host br insertion fallback", () => {
   const source = fs.readFileSync("src/app/app-events-runtime.js", "utf8");
   assert.match(source, /insertMobileEditorTextNewline/);
