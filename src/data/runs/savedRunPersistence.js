@@ -66,6 +66,9 @@
       throw new Error("waywordSavedRunPersistence.syncLegacySavedRunState: savedRunIds set is required");
     }
 
+    var previousHistoryLength = history.length;
+    var hadRunId = savedRunIds.has(runId);
+
     history.push(Object.assign({}, legacyRow));
     savedRunIds.add(runId);
 
@@ -78,8 +81,25 @@
     }
 
     if (typeof input.persist === "function") {
-      input.persist();
+      try {
+        input.persist();
+        return true;
+      } catch (persistErr) {
+        console.error("wayword: legacy saved-run persist failed", persistErr);
+        if (input.rollbackOnPersistFailure) {
+          history.splice(previousHistoryLength);
+          if (!hadRunId) savedRunIds.delete(runId);
+        }
+        return false;
+      }
     }
+
+    console.warn("wayword: legacy saved-run persist callback missing");
+    if (input.rollbackOnPersistFailure) {
+      history.splice(previousHistoryLength);
+      if (!hadRunId) savedRunIds.delete(runId);
+    }
+    return false;
   }
 
   function markRetentionEvent(methodName, payload) {
@@ -109,14 +129,27 @@
     var legacyRow = projectLegacyHistoryRow(canonicalDoc, fallbackRun);
     var canonicalPersisted = upsertCanonicalDocument(canonicalDoc);
 
-    syncLegacySavedRunState({
+    var legacyPersisted = syncLegacySavedRunState({
       history: input && input.history,
       savedRunIds: input && input.savedRunIds,
       runId: String(fallbackRun.runId || ""),
       legacyRow: legacyRow,
       inactivityEaseRunKey: input && input.inactivityEaseRunKey,
       persist: input && input.persist,
+      rollbackOnPersistFailure: !canonicalPersisted,
     });
+    var locallyDurable = Boolean(canonicalPersisted || legacyPersisted);
+
+    if (!locallyDurable) {
+      console.error("wayword: saved run was not durably written to local storage; skipping remote sync");
+      return {
+        canonicalDoc: canonicalDoc,
+        legacyRow: legacyRow,
+        canonicalPersisted: canonicalPersisted,
+        legacyPersisted: legacyPersisted,
+        locallyDurable: false,
+      };
+    }
 
     // Track 3 start: best-effort authenticated persistence path.
     // Local continuity remains canonical fallback if this fails or is unavailable.
@@ -171,7 +204,8 @@
       canonicalDoc: canonicalDoc,
       legacyRow: legacyRow,
       canonicalPersisted: canonicalPersisted,
-      legacyPersisted: true,
+      legacyPersisted: legacyPersisted,
+      locallyDurable: locallyDurable,
     };
   }
 

@@ -1751,8 +1751,8 @@ function toggleTheme() {
 /**
  * Saved runs for UI/analysis (progression, Patterns digests, chronological walks).
  * Uses canonical documents via `waywordSavedRunsRead` when present; else copies `state.history`
- * (oldest → newest, same index order as legacy push). Does not merge legacy when the read module
- * exists but the canonical store is empty—see `docs/SAVED_RUNS_PERSISTENCE.md`.
+ * (oldest → newest, same index order as legacy push). The read module also merges missing
+ * legacy rows so a canonical write failure does not hide a locally saved run.
  */
 function readSavedRunsChronological() {
   if (window.waywordSavedRunsRead && typeof window.waywordSavedRunsRead.listSavedRunsChronological === "function") {

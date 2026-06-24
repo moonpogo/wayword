@@ -90,9 +90,10 @@ Current calibration family:
 - Successful save attempts canonical document assembly and `waywordRunDocumentRepo.upsertDocument()` first.
 - Legacy state sync still runs afterward and writes `wayword-history` plus `wayword-runids`.
 - `readSavedRunsChronological()` and `readSavedRunsNewestFirst()` prefer `waywordSavedRunsRead` canonical reads when present.
-- If canonical read helper exists but canonical storage is empty, reads do not merge legacy rows.
+- If canonical read helper exists, reads merge legacy rows missing from canonical so canonical write failures do not hide locally persisted saves.
 - Boot migration backfills canonical docs from legacy `wayword-history` rows missing from canonical.
 - Malformed canonical envelope is treated as empty; invalid individual docs are skipped.
+- If both canonical and legacy disk writes fail, save persistence reports `locallyDurable: false` and Recent Runs auto-expansion is skipped.
 
 ## Needs Browser Verification
 

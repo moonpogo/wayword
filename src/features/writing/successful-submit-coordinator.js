@@ -113,7 +113,19 @@
     var persistenceResult = persistSuccessfulSavedRun(input);
     persistStrataSummaryForSuccessfulRun(input);
 
-    input.state.pendingRecentDrawerExpand = true;
+    var locallyDurable = Boolean(
+      persistenceResult &&
+        (persistenceResult.locallyDurable ||
+          persistenceResult.canonicalPersisted ||
+          persistenceResult.legacyPersisted)
+    );
+
+    if (locallyDurable) {
+      input.state.pendingRecentDrawerExpand = true;
+    } else {
+      console.error("wayword: saved run was not durable locally; recent-run expansion skipped");
+    }
+
     input.renderHistory();
     input.renderProfileSummaryStrip();
 

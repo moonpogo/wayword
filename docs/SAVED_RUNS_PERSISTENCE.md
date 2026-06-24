@@ -18,7 +18,9 @@ Implemented by `waywordSavedRunPersistence.persistSuccessfulSavedRun` (`src/data
 1. Assemble a canonical document from the save payload (`assembleRunDocumentForSuccessfulSave`), or skip if model/helpers are unavailable.
 2. Project that document to a **legacy-shaped row** for `state.history` when possible (`legacyHistoryRowFromCanonicalDocument`); otherwise clone the in-memory run row.
 3. **Attempt** `waywordRunDocumentRepo.upsertDocument(canonicalDoc)` before legacy sync. On failure, log and set `canonicalPersisted: false`; **legacy sync still runs** (see below).
-4. `syncLegacySavedRunState`: append legacy row to `state.history`, add `runId` to `savedRunIds`, clear inactivity-ease marker when configured, then call `persist()` → `waywordStorage.saveHistoryAndRunIds`.
+4. `syncLegacySavedRunState`: append legacy row to `state.history`, add `runId` to `savedRunIds`, clear inactivity-ease marker when configured, then call `persist()` → `waywordStorage.saveHistoryAndRunIds`. If this legacy disk write fails, the result reports `legacyPersisted: false`.
+
+If the canonical write already succeeded, a legacy persist failure must not block post-submit UI because the run is still durable in the canonical store. If both canonical and legacy writes fail, the legacy in-memory append is rolled back and the result reports `locallyDurable: false`; the submit coordinator skips Recent Runs auto-expansion so the app does not imply the run is safely saved.
 
 `waywordSuccessfulSubmitCoordinator` delegates to step 1–4 when `persistSuccessfulSavedRun` exists; if that entry point is missing but `syncLegacySavedRunState` exists, it calls the same legacy sync helper so push/remove/persist order stays identical.
 
@@ -34,7 +36,7 @@ Implemented by `waywordSavedRunPersistence.persistSuccessfulSavedRun` (`src/data
 1. `waywordStorage.loadHistory()` (and related) rehydrates `state.history` and `savedRunIds` from legacy keys.
 2. `runDocumentInit` creates `waywordRunDocumentRepo` and runs **`mergeLegacyHistoryMissingIntoCanonicalStore`**: for each legacy row whose `runId` is absent from the canonical store, `upsertFromLegacyRun` backfills the canonical envelope. Legacy `wayword-history` is **read-only** for migration; it is not cleared here.
 
-After a normal save, both stores match. After a **canonical upsert failure**, legacy still receives the new row on disk on next `persist()`. Same-session `waywordSavedRunsRead` keeps that run visible by merging missing legacy rows. Full reload runs migration and usually heals canonical gaps for rows that exist only in legacy.
+After a normal save, both stores match. After a **canonical upsert failure**, legacy still receives the new row on disk on next `persist()`. Same-session `waywordSavedRunsRead` keeps that run visible by merging missing legacy rows. Full reload runs migration and usually heals canonical gaps for rows that exist only in legacy. If both stores reject the write, the run is not treated as locally durable.
 
 ## Malformed canonical storage
 

@@ -2046,6 +2046,70 @@ test("successful submit coordinator persists strata summaries without prompt mod
   assert.equal(saved.recentRuns[0].totalSessionDurationMs, 4000);
 });
 
+test("successful submit coordinator skips recent-run expansion when local save is not durable", () => {
+  const context = loadSuccessfulSubmitCoordinatorContext({
+    waywordRunModel: {
+      attachMirrorSnapshotToRun() {},
+    },
+    waywordMirrorController: {
+      assignMirrorSessionDigestToRunIfAvailable() {},
+    },
+    waywordSavedRunPersistence: {
+      persistSuccessfulSavedRun() {
+        return { canonicalPersisted: false, legacyPersisted: false, locallyDurable: false };
+      },
+    },
+  });
+  const calls = [];
+  const state = {
+    history: [],
+    savedRunIds: new Set(),
+    lastMirrorPipelineResult: null,
+    lastMirrorLoadFailed: false,
+    pendingRecentDrawerExpand: false,
+  };
+
+  const result = context.waywordSuccessfulSubmitCoordinator.coordinateSuccessfulSavedRunSubmit({
+    state,
+    run: { runId: "run-not-durable", savedAt: 100, timestamp: 100 },
+    currentText: "not durable",
+    completionDecision: { runWasSaved: true },
+    canonicalSaveInput: makeCanonicalSaveInput({
+      runId: "run-not-durable",
+      savedAt: 100,
+      timestamp: 100,
+      body: "not durable",
+    }),
+    inactivityEaseRunKey: "ease-key",
+    persist() {},
+    renderHistory() {
+      calls.push("renderHistory");
+    },
+    renderProfileSummaryStrip() {
+      calls.push("renderProfileSummaryStrip");
+    },
+    recomputeProgressionLevel() {
+      calls.push("recomputeProgressionLevel");
+    },
+    applyProgressionToState() {
+      calls.push("applyProgressionToState");
+    },
+    renderProfile() {
+      calls.push("renderProfile");
+    },
+  });
+
+  assert.equal(result.locallyDurable, false);
+  assert.equal(state.pendingRecentDrawerExpand, false);
+  assert.deepEqual(calls, [
+    "renderHistory",
+    "renderProfileSummaryStrip",
+    "recomputeProgressionLevel",
+    "applyProgressionToState",
+    "renderProfile",
+  ]);
+});
+
 test("prompt runtime can select from v1 entry catalog without changing selection core", () => {
   const selection = loadPromptSelectionContext().waywordPromptSelection;
   const context = loadBrowserScripts(
@@ -5555,6 +5619,95 @@ test("saved-run persistence keeps legacy sync alive when canonical upsert fails"
     "savedRunsRead merges legacy rows that canonical is missing"
   );
   assert.equal(context.waywordSavedRunsRead.listSavedRunsChronological()[0].runId, "run-fail");
+});
+
+test("saved-run persistence stays visible when canonical saves but legacy disk write fails", () => {
+  const context = loadSavedRunsContext();
+  context.waywordRunDocumentRepo =
+    context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+      storage: context.localStorage,
+    });
+  context.waywordStorage = {
+    removeInactivityEaseRun() {},
+  };
+
+  const history = [];
+  const savedRunIds = new Set();
+  const result = context.waywordSavedRunPersistence.persistSuccessfulSavedRun({
+    run: { runId: "run-canonical-only" },
+    canonicalSaveInput: makeCanonicalSaveInput({
+      runId: "run-canonical-only",
+      savedAt: 100,
+      timestamp: 100,
+      body: "canonical body survives",
+    }),
+    history,
+    savedRunIds,
+    inactivityEaseRunKey: "ease-key",
+    persist() {
+      throw new Error("legacy quota");
+    },
+  });
+
+  assert.equal(result.canonicalPersisted, true);
+  assert.equal(result.legacyPersisted, false);
+  assert.equal(result.locallyDurable, true);
+  assert.equal(history.length, 1);
+  assert.ok(savedRunIds.has("run-canonical-only"));
+  assert.deepEqual(
+    Array.from(context.waywordSavedRunsRead.listSavedRunsChronological(), (row) => row.runId),
+    ["run-canonical-only"]
+  );
+  assert.equal(context.localStorage.getItem("wayword-history"), null);
+});
+
+test("saved-run persistence rolls back same-session visibility when both local stores fail", () => {
+  const context = loadSavedRunsContext();
+  const innerRepo = context.waywordRunDocumentRepository.createLocalStorageRunDocumentRepository({
+    storage: context.localStorage,
+  });
+  context.waywordRunDocumentRepo = {
+    upsertDocument() {
+      throw new Error("canonical quota");
+    },
+    listDocumentsParsed() {
+      return innerRepo.listDocumentsParsed();
+    },
+    getDocumentByRunId(id) {
+      return innerRepo.getDocumentByRunId(id);
+    },
+    clearAllDocuments() {
+      return innerRepo.clearAllDocuments();
+    },
+  };
+  context.waywordStorage = {
+    removeInactivityEaseRun() {},
+  };
+
+  const history = [];
+  const savedRunIds = new Set();
+  const result = context.waywordSavedRunPersistence.persistSuccessfulSavedRun({
+    run: { runId: "run-lost" },
+    canonicalSaveInput: makeCanonicalSaveInput({
+      runId: "run-lost",
+      savedAt: 100,
+      timestamp: 100,
+      body: "not durable",
+    }),
+    history,
+    savedRunIds,
+    inactivityEaseRunKey: "ease-key",
+    persist() {
+      throw new Error("legacy quota");
+    },
+  });
+
+  assert.equal(result.canonicalPersisted, false);
+  assert.equal(result.legacyPersisted, false);
+  assert.equal(result.locallyDurable, false);
+  assert.equal(history.length, 0);
+  assert.equal(savedRunIds.has("run-lost"), false);
+  assert.deepEqual(context.waywordSavedRunsRead.listSavedRunsChronological(), []);
 });
 
 test("run document repository treats corrupt envelope JSON as empty", () => {
