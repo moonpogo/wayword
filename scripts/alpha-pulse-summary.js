@@ -28,6 +28,7 @@ const TELEMETRY_TABLE_CANDIDATES = [
   "retention_events",
   "telemetry_events",
 ];
+const ALPHA_PULSE_ROLLUP_TABLE = "alpha_pulse_stage_daily_totals";
 
 const STAGES = [
   { id: "landed", label: "Landed" },
@@ -94,6 +95,10 @@ function pickEventTimestamp(row) {
   return row.timestamp || row.created_at || (row.payload && row.payload.timestamp) || "";
 }
 
+function pickRollupTimestamp(row, fieldName) {
+  return row && typeof row === "object" ? row[fieldName] || "" : "";
+}
+
 async function loadTelemetryRows(supabase) {
   const failures = [];
   for (const table of TELEMETRY_TABLE_CANDIDATES) {
@@ -120,6 +125,29 @@ async function loadTelemetryRows(supabase) {
     rows: [],
     reason: failures.join(" | "),
   };
+}
+
+async function loadAlphaPulseRollupRows(supabase) {
+  try {
+    const rows = await fetchTableRows(supabase, ALPHA_PULSE_ROLLUP_TABLE, {
+      select: "day,stage_id,event_count,first_event_at,last_event_at",
+      order: "day.asc",
+      limit: "5000",
+    });
+    return {
+      available: true,
+      table: ALPHA_PULSE_ROLLUP_TABLE,
+      rows: Array.isArray(rows) ? rows : [],
+      reason: "",
+    };
+  } catch (error) {
+    return {
+      available: false,
+      table: ALPHA_PULSE_ROLLUP_TABLE,
+      rows: [],
+      reason: `${ALPHA_PULSE_ROLLUP_TABLE}: ${error.message}`,
+    };
+  }
 }
 
 function countEvents(rows, predicate) {
@@ -228,6 +256,54 @@ function buildCoverageSeams(coverageMap) {
   return seams;
 }
 
+function buildCoverageMapFromRollups(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const map = {};
+  for (const stage of STAGES) {
+    map[stage.id] = {
+      total: 0,
+      firstSeenAt: "",
+      lastSeenAt: "",
+      historicallySeen: false,
+    };
+  }
+
+  for (const row of list) {
+    const stageId = safeString(row && row.stage_id);
+    if (!stageId || !map[stageId]) continue;
+    const coverage = map[stageId];
+    const count = Math.max(0, Number(row && row.event_count) || 0);
+    const firstSeenAt = pickRollupTimestamp(row, "first_event_at");
+    const lastSeenAt = pickRollupTimestamp(row, "last_event_at");
+    coverage.total += count;
+    coverage.historicallySeen = coverage.total > 0;
+    if (firstSeenAt && (!coverage.firstSeenAt || Date.parse(firstSeenAt) < Date.parse(coverage.firstSeenAt))) {
+      coverage.firstSeenAt = firstSeenAt;
+    }
+    if (lastSeenAt && (!coverage.lastSeenAt || Date.parse(lastSeenAt) > Date.parse(coverage.lastSeenAt))) {
+      coverage.lastSeenAt = lastSeenAt;
+    }
+  }
+
+  return map;
+}
+
+function isRollupDayWithinWindow(dayIso, windowInfo) {
+  const day = safeString(dayIso);
+  const dayStartMs = Date.parse(day ? `${day}T00:00:00.000Z` : "");
+  const dayEndMs = Date.parse(day ? `${day}T23:59:59.999Z` : "");
+  const startMs = Date.parse(windowInfo.startAt);
+  const endMs = Date.parse(windowInfo.endAt);
+  return (
+    Number.isFinite(dayStartMs) &&
+    Number.isFinite(dayEndMs) &&
+    Number.isFinite(startMs) &&
+    Number.isFinite(endMs) &&
+    dayEndMs >= startMs &&
+    dayStartMs <= endMs
+  );
+}
+
 function buildAlphaPulseSummaryFromRows(rows, windowInfo, meta) {
   const list = (Array.isArray(rows) ? rows : []).filter((row) => isWithinWindow(pickEventTimestamp(row), windowInfo));
   const coverageMap = buildCoverageMap(rows);
@@ -285,6 +361,52 @@ function buildAlphaPulseSummaryFromRows(rows, windowInfo, meta) {
               "Supabase summary access is not configured for this environment.",
           },
         ],
+  };
+}
+
+function buildAlphaPulseSummaryFromRollups(rows, windowInfo, meta) {
+  const list = Array.isArray(rows) ? rows : [];
+  const coverageMap = buildCoverageMapFromRollups(list);
+  const stageCounts = {};
+  let latestEventAt = "";
+
+  for (const stage of STAGES) {
+    stageCounts[stage.id] = 0;
+  }
+
+  for (const row of list) {
+    const stageId = safeString(row && row.stage_id);
+    if (!stageId || !Object.prototype.hasOwnProperty.call(stageCounts, stageId)) continue;
+    if (isRollupDayWithinWindow(row && row.day, windowInfo)) {
+      stageCounts[stageId] += Math.max(0, Number(row && row.event_count) || 0);
+    }
+    const rowLastEventAt = pickRollupTimestamp(row, "last_event_at");
+    if (rowLastEventAt && (!latestEventAt || Date.parse(rowLastEventAt) > Date.parse(latestEventAt))) {
+      latestEventAt = rowLastEventAt;
+    }
+  }
+
+  return {
+    ok: Boolean(meta && meta.available),
+    generatedAt: new Date().toISOString(),
+    window: windowInfo,
+    source: {
+      telemetryTable: safeString(meta && meta.table),
+      available: Boolean(meta && meta.available),
+      mode: "live",
+      snapshotGeneratedAt: "",
+      latestEventAt,
+      unavailableReason: safeString(meta && meta.reason),
+    },
+    stages: STAGES.map((stage) => ({
+      id: stage.id,
+      label: stage.label,
+      count: stageCounts[stage.id] || 0,
+      coverage: coverageMap[stage.id] || null,
+      source: "live",
+      note: "",
+    })),
+    seams: buildCoverageSeams(coverageMap),
   };
 }
 
@@ -349,6 +471,22 @@ async function loadAlphaPulseDashboardSummary(options) {
   loadDotEnv();
   const windowInfo = buildWindow(options && options.now, options && options.days);
   try {
+    const url = String(process.env.SUPABASE_URL || "").trim();
+    const anonKey = String(process.env.SUPABASE_ANON_KEY || "").trim();
+    if (url && anonKey) {
+      const publicClient = createSupabaseRestClient({ url, serviceRole: anonKey });
+      const rollups = await loadAlphaPulseRollupRows(publicClient);
+      if (rollups.available && rollups.rows.length > 0) {
+        return buildAlphaPulseSummaryFromRollups(rollups.rows, windowInfo, {
+          ...rollups,
+          mode: "live",
+        });
+      }
+    }
+  } catch (_) {
+    /* fall through to service-role and snapshot paths */
+  }
+  try {
     const { url, serviceRole } = ensureSupabaseEnv();
     const supabase = createSupabaseRestClient({ url, serviceRole });
     const telemetry = await loadTelemetryRows(supabase);
@@ -377,6 +515,8 @@ async function loadAlphaPulseDashboardSummary(options) {
 
 module.exports = {
   SNAPSHOT_PATH,
+  ALPHA_PULSE_ROLLUP_TABLE,
+  buildAlphaPulseSummaryFromRollups,
   STAGES,
   buildAlphaPulseSummaryFromRows,
   buildAlphaPulseSummaryFromSnapshot,
@@ -384,6 +524,7 @@ module.exports = {
   buildCoverageSeams,
   buildWindow,
   loadAlphaPulseDashboardSummary,
+  loadAlphaPulseRollupRows,
   loadTelemetryRows,
   readSnapshotFile,
 };

@@ -42,6 +42,121 @@ test("alpha pulse summary maps persisted telemetry rows into all funnel stages",
   );
 });
 
+test("alpha pulse summary can build from aggregate rollup rows", () => {
+  const windowInfo = {
+    label: "Last 7 days",
+    startAt: "2026-06-11T00:00:00.000Z",
+    endAt: "2026-06-19T00:00:00.000Z",
+  };
+
+  const result = summary.buildAlphaPulseSummaryFromRollups(
+    [
+      {
+        day: "2026-06-12",
+        stage_id: "started_writing",
+        event_count: 2,
+        first_event_at: "2026-06-12T20:41:24.639Z",
+        last_event_at: "2026-06-12T20:44:47.665Z",
+      },
+      {
+        day: "2026-06-16",
+        stage_id: "saved",
+        event_count: 1,
+        first_event_at: "2026-06-16T03:26:35.240512Z",
+        last_event_at: "2026-06-16T03:26:35.240512Z",
+      },
+      {
+        day: "2026-06-18",
+        stage_id: "opened_recent_runs",
+        event_count: 1,
+        first_event_at: "2026-06-18T21:18:52.448653Z",
+        last_event_at: "2026-06-18T21:18:52.448653Z",
+      },
+      {
+        day: "2026-06-18",
+        stage_id: "opened_patterns",
+        event_count: 1,
+        first_event_at: "2026-06-18T21:18:12.914512Z",
+        last_event_at: "2026-06-18T21:18:12.914512Z",
+      },
+      {
+        day: "2026-06-18",
+        stage_id: "returned",
+        event_count: 1,
+        first_event_at: "2026-06-18T20:50:29.958375Z",
+        last_event_at: "2026-06-18T20:50:29.958375Z",
+      },
+    ],
+    windowInfo,
+    { available: true, table: "alpha_pulse_stage_daily_totals", reason: "" }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.source.telemetryTable, "alpha_pulse_stage_daily_totals");
+  assert.equal(result.source.mode, "live");
+  assert.equal(result.source.latestEventAt, "2026-06-18T21:18:52.448653Z");
+  assert.deepEqual(
+    result.stages.map((stage) => [stage.id, stage.count]),
+    [
+      ["landed", 0],
+      ["started_writing", 2],
+      ["submitted", 0],
+      ["saved", 1],
+      ["returned", 1],
+      ["opened_recent_runs", 1],
+      ["opened_patterns", 1],
+      ["errors", 0],
+    ]
+  );
+});
+
+test("alpha pulse summary includes rollup days that overlap non-midnight windows", () => {
+  const windowInfo = {
+    label: "Last 7 days",
+    startAt: "2026-06-11T18:00:00.000Z",
+    endAt: "2026-06-18T18:00:00.000Z",
+  };
+
+  const result = summary.buildAlphaPulseSummaryFromRollups(
+    [
+      {
+        day: "2026-06-10",
+        stage_id: "landed",
+        event_count: 4,
+        first_event_at: "2026-06-10T19:00:00.000Z",
+        last_event_at: "2026-06-10T20:00:00.000Z",
+      },
+      {
+        day: "2026-06-11",
+        stage_id: "landed",
+        event_count: 3,
+        first_event_at: "2026-06-11T19:00:00.000Z",
+        last_event_at: "2026-06-11T20:00:00.000Z",
+      },
+      {
+        day: "2026-06-18",
+        stage_id: "saved",
+        event_count: 2,
+        first_event_at: "2026-06-18T16:00:00.000Z",
+        last_event_at: "2026-06-18T17:00:00.000Z",
+      },
+      {
+        day: "2026-06-19",
+        stage_id: "saved",
+        event_count: 5,
+        first_event_at: "2026-06-19T16:00:00.000Z",
+        last_event_at: "2026-06-19T17:00:00.000Z",
+      },
+    ],
+    windowInfo,
+    { available: true, table: "alpha_pulse_stage_daily_totals", reason: "" }
+  );
+
+  const counts = Object.fromEntries(result.stages.map((stage) => [stage.id, stage.count]));
+  assert.equal(counts.landed, 3);
+  assert.equal(counts.saved, 2);
+});
+
 test("buildWindow supports all time", () => {
   const windowInfo = summary.buildWindow(new Date("2026-06-10T00:00:00.000Z"), "all");
   assert.equal(windowInfo.label, "All time");

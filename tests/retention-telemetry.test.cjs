@@ -98,11 +98,13 @@ test("retention events queue before auth and flush after auth", async () => {
   currentSession = { user: { id: "user-1" } };
   const flushResult = await context.window.waywordRetentionEvents.flushPending();
   assert.equal(flushResult.ok, true);
-  assert.equal(flushResult.count, 0);
-  assert.equal(insertCalls.length, 0);
+  assert.equal(flushResult.count, 1);
+  assert.equal(insertCalls.length, 1);
+  assert.equal(insertCalls[0][0].user_id, "user-1");
+  assert.equal(insertCalls[0][0].event, "onboarding_completed");
 });
 
-test("retention events flush matching-user queued telemetry and drop mismatched entries", async () => {
+test("retention events flush matching-user and anonymous queued telemetry while preserving mismatched entries", async () => {
   const insertCalls = [];
   const context = makeContext();
   context.window.waywordSupabaseClient = {
@@ -160,8 +162,15 @@ test("retention events flush matching-user queued telemetry and drop mismatched 
   assert.equal(insertCalls.length, 1);
   assert.equal(insertCalls[0][0].event, "onboarding_completed");
   assert.equal(insertCalls[0][0].user_id, "user-b");
-  assert.equal(insertCalls[0].length, 1);
-  assert.deepEqual(JSON.parse(context.window.localStorage.getItem("waywordRetentionEventQueueV1") || "[]"), []);
+  assert.equal(insertCalls[0].length, 2);
+  assert.deepEqual(JSON.parse(context.window.localStorage.getItem("waywordRetentionEventQueueV1") || "[]"), [
+    {
+      event: "onboarding_completed",
+      payload: { source: "landing" },
+      queued_at: "2026-06-11T00:00:00.000Z",
+      owner_key: "user-a",
+    },
+  ]);
 });
 
 test("retention events queue same-user failures and flush them correctly later", async () => {

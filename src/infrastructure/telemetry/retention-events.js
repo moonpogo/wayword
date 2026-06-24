@@ -64,6 +64,22 @@
       });
   }
 
+  function partitionEntriesForFlush(entries, ownerKey) {
+    var flushable = [];
+    var remaining = [];
+    (Array.isArray(entries) ? entries : []).map(normalizeQueuedEntry).forEach(function (entry) {
+      if (entry.owner_key === ownerKey || entry.owner_key === OWNER_ANONYMOUS) {
+        flushable.push(entry);
+        return;
+      }
+      remaining.push(entry);
+    });
+    return {
+      flushable: flushable,
+      remaining: remaining,
+    };
+  }
+
   function queueEvent(eventName, payload, ownerKey) {
     var pending = loadPendingEvents();
     pending.push({
@@ -113,14 +129,16 @@
   async function flushPending() {
     var userId = getCurrentUserId();
     if (!userId) return { ok: false, reason: "no_authenticated_session" };
-    var pending = filterEntriesForOwner(loadPendingEvents(), ownerKeyForUserId(userId));
-    savePendingEvents(pending);
-    if (!pending.length) return { ok: true, count: 0 };
-    var rows = pending.map(function (entry) {
+    var partitioned = partitionEntriesForFlush(loadPendingEvents(), ownerKeyForUserId(userId));
+    savePendingEvents(partitioned.remaining);
+    if (!partitioned.flushable.length) return { ok: true, count: 0 };
+    var rows = partitioned.flushable.map(function (entry) {
       return buildInsertRow(userId, entry.event, entry.payload);
     });
     var result = await insertRows(rows);
-    if (result.ok) savePendingEvents([]);
+    if (!result.ok) {
+      savePendingEvents(partitioned.flushable.concat(partitioned.remaining));
+    }
     return result;
   }
 
