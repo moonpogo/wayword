@@ -20,7 +20,7 @@
     const cfg = window.waywordConfig;
     const wc = Math.max(0, Number(run.wordCount) || Number(run.words) || 0);
     if (wc < cfg.REVIEW_RUN_MIN_WORDS) {
-      return ["No strong patterns surfaced in this run."];
+      return ["No stable patterns surfaced in this run."];
     }
 
     const repeated = Array.isArray(run.repeatedWords) ? run.repeatedWords : [];
@@ -87,7 +87,7 @@
     }
 
     if (out.length === 0) {
-      return ["No strong patterns surfaced in this run."];
+      return ["No stable patterns surfaced in this run."];
     }
     return out;
   }
@@ -96,7 +96,7 @@
     const pfx = String(idPrefix || "mirror-review");
     const safe = Array.isArray(lines) ? lines.map((s) => String(s || "").trim()).filter(Boolean) : [];
     const bodyLines =
-      safe.length > 0 ? safe : ["No strong patterns surfaced in this run."];
+      safe.length > 0 ? safe : ["No stable patterns surfaced in this run."];
     const primary = bodyLines[0];
     const moreCount = bodyLines.length - 1;
     const depth =
@@ -132,60 +132,15 @@
     return formatReviewRunReflectionGlanceHtml(buildReviewRunReflectionLines(run), pfx);
   }
 
-  function recentEntryScoreMeterHtml(label, value, max, explainerKey) {
-    const v = Math.max(0, Math.min(max, Math.round(Number(value) || 0)));
-    const dash = Math.round((v / max) * 1000) / 10;
-    const d = "M 4 16 A 16 16 0 0 1 36 16";
-    const aria = `${label}, ${v} out of ${max}`;
-    const maxClass = v === max ? " recent-entry-meter--max" : "";
-    const keys = window.waywordConfig.METRIC_EXPLAINER_KEYS;
-    const categoryClass =
-      explainerKey && keys.has(explainerKey) ? ` recent-entry-meter--${explainerKey}` : "";
-    const explainerAttr =
-      explainerKey && keys.has(explainerKey)
-        ? ` data-metric-explainer="${explainerKey}" tabindex="0"`
-        : "";
-    return `
-    <div class="recent-entry-meter${maxClass}${categoryClass}" role="img" aria-label="${escapeHtml(aria)}" title="${escapeHtml(`${label} ${v} / ${max}`)}"${explainerAttr}>
-      <svg class="recent-entry-meter-svg" viewBox="-4 -6 48 28" aria-hidden="true" focusable="false">
-        <path class="recent-entry-meter-track" pathLength="100" d="${d}" fill="none" stroke-linecap="round" />
-        <path
-          class="recent-entry-meter-fill"
-          pathLength="100"
-          d="${d}"
-          fill="none"
-          stroke-linecap="round"
-          stroke-dasharray="${dash} 100"
-        />
-      </svg>
-      <span class="recent-entry-meter-value">${escapeHtml(String(v))}</span>
-      <span class="recent-entry-meter-label">${escapeHtml(label)}</span>
-    </div>
-  `;
-  }
-
   function formatRecentEntryScoreBlock(item) {
-    const total = item.runScore ?? item.score ?? 0;
     const words = item.wordCount ?? item.words ?? 0;
     const wordsLabel = Number(words) === 1 ? "word" : "words";
-    const sb = item.scoreBreakdown;
-    let html = `<div class="recent-entry-stats recent-entry-stats--demoted">
-    <div class="recent-entry-stats-label">Numbers for this run</div>
+    return `<div class="recent-entry-stats recent-entry-stats--demoted">
+    <div class="recent-entry-stats-label">Run length</div>
     <div class="recent-entry-stats-row">
-      <span class="recent-entry-stats-score">${escapeHtml(String(total))}</span>
       <span class="recent-entry-stats-words">${escapeHtml(String(words))} ${wordsLabel}</span>
     </div>
   </div>`;
-    if (sb && typeof sb === "object") {
-      const v = (k) => (typeof sb[k] === "number" && Number.isFinite(sb[k]) ? sb[k] : 0);
-      html += `<div class="recent-entry-score-meters">`;
-      html += recentEntryScoreMeterHtml("Completion", v("completion"), 25, null);
-      html += recentEntryScoreMeterHtml("Filler", v("filler"), 25, "filler");
-      html += recentEntryScoreMeterHtml("Repetition", v("repetition"), 25, "repetition");
-      html += recentEntryScoreMeterHtml("Openings", v("openings"), 25, "openings");
-      html += "</div>";
-    }
-    return html;
   }
 
   function promptExcerpt(prompt, maxLen) {
@@ -283,7 +238,7 @@
     <div class="recent-run-detail recent-run-detail--compact">
       <div class="recent-run-detail-inline">
         <span class="recent-run-inline-cluster" data-metric-explainer="filler" tabindex="0">
-          <span class="recent-run-inline-kicker">Filler</span>
+          <span class="recent-run-inline-kicker">Softeners</span>
           <span class="word-list word-list--inline">${bannedHtml}</span>
         </span>
         <span class="recent-run-inline-cluster" data-metric-explainer="repetition" tabindex="0">
@@ -355,7 +310,6 @@
     buildReviewRunReflectionLines,
     formatReviewRunReflectionGlanceHtml,
     formatRecentEntryMirrorHtml,
-    recentEntryScoreMeterHtml,
     formatRecentEntryScoreBlock,
     promptExcerpt,
     formatRelativeTime,

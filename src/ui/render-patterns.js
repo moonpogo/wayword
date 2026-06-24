@@ -161,8 +161,8 @@
 
     if (avgFiller > 2) {
       return {
-        headline: "Filler pads the motion.",
-        support: "Movement shows on the page, but softeners carry part of it.",
+        headline: "Softeners carry part of the motion.",
+        support: "Movement shows on the page, with cushioning words doing some of the work.",
         direction: "Try a tighter run and let pause surface the next word.",
         suggestedExerciseWord: "",
       };
@@ -233,15 +233,15 @@
             })
             .join("")}
          </div>`
-      : `<p class="patterns-repeated-empty">No strong repeat targets yet.</p>`;
+      : `<p class="patterns-repeated-empty">No repeat words surfaced yet.</p>`;
 
     const challengeHtml = safeDraft.length
       ? `<div class="patterns-challenge-block">
-          <div class="patterns-challenge-label">Challenge from your repeats</div>
+          <div class="patterns-challenge-label">Variation from your repeats</div>
           <div class="challenge-copy">${buildChallengeCopy(safeDraft)}</div>
           <button id="startExerciseBtn" class="exercise-btn" type="button">
             <span class="exercise-dot"></span>
-            Begin challenge
+            Start this run
           </button>
         </div>`
       : gatedPairs.length
@@ -249,7 +249,7 @@
         : "";
 
     return `
-      <div class="section-title card-section-title patterns-repeated-challenge__title">PRACTICE FROM REPEATS</div>
+      <div class="section-title card-section-title patterns-repeated-challenge__title">REPEAT VARIATION</div>
       ${wordsHtml}
       ${gatedPairs.length ? '<p class="patterns-repeated-tool-note">Try one run without one repeated word.</p>' : ""}
       ${challengeHtml}

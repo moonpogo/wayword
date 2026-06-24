@@ -3574,7 +3574,7 @@ body.recent-drawer-open.recent-drawer-runs-expanded .recent-drawer-list{
   text-align:center;
 }
 
-/* Demoted run score: quiet metadata under Mirror (Recent Writing drawer / rail) */
+/* Quiet run metadata under Mirror (Recent Writing drawer / rail). */
 .recent-entry-stats.recent-entry-stats--demoted{
   max-width:18.5rem;
   padding-top:0;
@@ -3583,7 +3583,7 @@ body.recent-drawer-open.recent-drawer-runs-expanded .recent-drawer-list{
   opacity:1;
 }
 
-/* Score strip is always first inside `.recent-entry-results` (reflection + prompt live above). */
+/* Metadata strip is always first inside `.recent-entry-results` (reflection + prompt live above). */
 .recent-entry-results > .recent-entry-stats.recent-entry-stats--demoted{
   margin-top:0;
   padding-top:12px;
@@ -3599,14 +3599,6 @@ body.recent-drawer-open.recent-drawer-runs-expanded .recent-drawer-list{
   line-height:1.25;
 }
 
-.recent-entry-stats--demoted .recent-entry-stats-score{
-  font-size:clamp(15px, 3.6vw, 19px);
-  font-weight:600;
-  letter-spacing:-0.015em;
-  line-height:1.05;
-  color:color-mix(in srgb, var(--muted) 58%, var(--ink));
-}
-
 .recent-entry-stats--demoted .recent-entry-stats-words{
   font-size:10px;
   font-weight:400;
@@ -3618,81 +3610,6 @@ body.recent-drawer-open.recent-drawer-runs-expanded .recent-drawer-list{
 .recent-entry-stats--demoted .recent-entry-stats-row{
   gap:5px 10px;
   margin-top:1px;
-}
-
-.recent-entry-stats--demoted .recent-entry-score-meters{
-  max-width:16.75rem;
-  gap:5px 6px;
-  margin-top:1px;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter{
-  gap:0;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter-svg{
-  max-width:30px;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter-track{
-  stroke-width:2.1;
-  stroke-opacity:0.58;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter-fill{
-  stroke-width:2.1;
-  stroke:color-mix(in srgb, var(--muted) 35%, var(--ink));
-  stroke-opacity:0.32;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter--max .recent-entry-meter-fill{
-  stroke:color-mix(in srgb, var(--success) 52%, var(--muted));
-  stroke-opacity:0.44;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter-value{
-  font-size:9px;
-  font-weight:500;
-  font-variant-numeric:tabular-nums;
-  color:color-mix(in srgb, var(--muted) 48%, var(--ink));
-  line-height:1.1;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter-label{
-  font-size:7.5px;
-  letter-spacing:0.03em;
-  color:color-mix(in srgb, var(--muted) 88%, var(--ink));
-  opacity:0.78;
-  line-height:1.12;
-}
-
-/* Softer category arcs: less saturation than default meters */
-.recent-entry-stats--demoted .recent-entry-meter--filler .recent-entry-meter-fill{
-  stroke:color-mix(in srgb, var(--color-filler) 38%, var(--muted));
-  stroke-opacity:0.48;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter--repetition .recent-entry-meter-fill{
-  stroke:color-mix(in srgb, var(--color-repetition) 38%, var(--muted));
-  stroke-opacity:0.48;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter--openings .recent-entry-meter-fill{
-  stroke:color-mix(in srgb, var(--color-openings) 38%, var(--muted));
-  stroke-opacity:0.48;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter--filler.recent-entry-meter--max .recent-entry-meter-fill,
-.recent-entry-stats--demoted .recent-entry-meter--repetition.recent-entry-meter--max .recent-entry-meter-fill,
-.recent-entry-stats--demoted .recent-entry-meter--openings.recent-entry-meter--max .recent-entry-meter-fill{
-  stroke-opacity:0.54;
-}
-
-.recent-entry-stats--demoted .recent-entry-meter--filler .recent-entry-meter-label,
-.recent-entry-stats--demoted .recent-entry-meter--repetition .recent-entry-meter-label,
-.recent-entry-stats--demoted .recent-entry-meter--openings .recent-entry-meter-label{
-  color:color-mix(in srgb, var(--muted) 90%, var(--ink));
-  opacity:0.76;
 }
 
 .recent-entry-stats-label{
@@ -3713,17 +3630,6 @@ body.recent-drawer-open.recent-drawer-runs-expanded .recent-drawer-list{
   width:100%;
 }
 
-.recent-entry-stats-score{
-  font-size:clamp(30px, 7.5vw, 40px);
-  font-weight:700;
-  font-variant-numeric:tabular-nums;
-  letter-spacing:-0.035em;
-  line-height:1;
-  color:var(--ink);
-  flex:0 1 auto;
-  min-width:0;
-}
-
 .recent-entry-stats-words{
   font-size:12px;
   font-weight:400;
@@ -3731,133 +3637,6 @@ body.recent-drawer-open.recent-drawer-runs-expanded .recent-drawer-list{
   line-height:1.3;
   flex-shrink:0;
   white-space:nowrap;
-}
-
-.recent-entry-score-meters{
-  margin-top:0;
-  padding-top:0;
-  display:flex;
-  flex-direction:row;
-  flex-wrap:wrap;
-  align-items:flex-end;
-  justify-content:center;
-  gap:8px 10px;
-  width:100%;
-  max-width:20.5rem;
-  margin-left:auto;
-  margin-right:auto;
-  overflow:visible;
-}
-
-.recent-entry-meter{
-  flex:1 1 0;
-  min-width:0;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:1px;
-  text-align:center;
-  overflow:visible;
-}
-
-.recent-entry-meter-svg{
-  display:block;
-  width:100%;
-  max-width:44px;
-  height:auto;
-  aspect-ratio:48 / 28;
-  overflow:visible;
-}
-
-.recent-entry-meter-track{
-  stroke:var(--line);
-  stroke-width:2.5;
-  stroke-opacity:0.95;
-}
-
-.recent-entry-meter-fill{
-  stroke:var(--ink);
-  stroke-width:2.5;
-  stroke-opacity:0.58;
-}
-
-.recent-entry-meter--max .recent-entry-meter-fill{
-  stroke:var(--success);
-  stroke-opacity:0.72;
-}
-
-.recent-entry-meter--filler .recent-entry-meter-fill{
-  stroke:var(--color-filler);
-  stroke-opacity:0.9;
-}
-
-.recent-entry-meter--repetition .recent-entry-meter-fill{
-  stroke:var(--color-repetition);
-  stroke-opacity:0.9;
-}
-
-.recent-entry-meter--openings .recent-entry-meter-fill{
-  stroke:var(--color-openings);
-  stroke-opacity:0.9;
-}
-
-.recent-entry-meter--filler.recent-entry-meter--max .recent-entry-meter-fill{
-  stroke:var(--color-filler);
-  stroke-opacity:0.88;
-}
-
-.recent-entry-meter--repetition.recent-entry-meter--max .recent-entry-meter-fill{
-  stroke:var(--color-repetition);
-  stroke-opacity:0.88;
-}
-
-.recent-entry-meter--openings.recent-entry-meter--max .recent-entry-meter-fill{
-  stroke:var(--color-openings);
-  stroke-opacity:0.88;
-}
-
-.recent-entry-meter--filler .recent-entry-meter-label{
-  color:color-mix(in srgb, var(--color-filler) 78%, var(--ink));
-}
-
-.recent-entry-meter--repetition .recent-entry-meter-label{
-  color:color-mix(in srgb, var(--color-repetition) 78%, var(--ink));
-}
-
-.recent-entry-meter--openings .recent-entry-meter-label{
-  color:color-mix(in srgb, var(--color-openings) 78%, var(--ink));
-}
-
-.recent-entry-meter-value{
-  font-size:12px;
-  font-weight:600;
-  font-variant-numeric:tabular-nums;
-  color:var(--ink);
-  line-height:1.15;
-}
-
-.recent-entry-meter-label{
-  font-size:9px;
-  letter-spacing:0.02em;
-  color:var(--muted);
-  line-height:1.15;
-  max-width:100%;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-
-@media (max-width:340px){
-  .recent-entry-score-meters{
-    flex-wrap:wrap;
-    justify-content:center;
-    row-gap:8px;
-  }
-
-  .recent-entry-meter{
-    flex:0 0 calc(50% - 4px);
-    max-width:calc(50% - 4px);
-  }
 }
 
 .recent-entry-detail{
@@ -4660,7 +4439,7 @@ html[data-theme="light"] .season-wheel-debug-svg{
   color:var(--muted);
 }
 
-/* Patterns-only: “Begin challenge” reads smaller than the global `.exercise-btn` default (same id/class only in repeated-words card). */
+/* Patterns-only: variation button reads smaller than the global `.exercise-btn` default (same id/class only in repeated-words card). */
 .patterns-challenge-block .exercise-btn{
   margin-top:14px;
   gap:5px;

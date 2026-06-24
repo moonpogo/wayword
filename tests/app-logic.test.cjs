@@ -363,6 +363,38 @@ function loadPatternsRendererContext(overrides = {}) {
   );
 }
 
+function loadHistoryRendererContext(overrides = {}) {
+  const escapeHtmlForTest = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  return loadBrowserScripts(["src/ui/render-history.js"], {
+    console: silentConsole(),
+    escapeHtml: escapeHtmlForTest,
+    escapeHtmlMirror: escapeHtmlForTest,
+    normalizeWord(value) {
+      return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    },
+    WaywordMirrorDom: {
+      mirrorPipelineResultHasEvidenceCards() {
+        return false;
+      },
+      buildReviewRunsMirrorGlanceBodyHtml() {
+        return "";
+      },
+    },
+    waywordConfig: {
+      METRIC_EXPLAINER_KEYS: new Set(["filler", "repetition", "openings"]),
+      REVIEW_RUN_DULL_REPEATS: new Set(["that", "with", "this"]),
+      REVIEW_RUN_MIN_WORDS: 25,
+      REVIEW_RUN_REFLECTION_MAX: 2,
+    },
+    ...overrides,
+  });
+}
+
 function loadPostSubmitPhaseContext() {
   return loadBrowserScripts(["src/features/writing/post-submit-phase.js"], {
     console: silentConsole(),
@@ -5150,7 +5182,40 @@ test("patterns renderer preserves mirror hero path selection contracts", () => {
   assert.doesNotMatch(html, /mirror-card__evidence-toggle/);
 });
 
-test("patterns repeated-word challenge rendering preserves selection and begin gating", () => {
+test("recent runs renderer keeps saved-run metadata non-scoring", () => {
+  const context = loadHistoryRendererContext();
+  const renderer = context.waywordHistoryRenderer;
+  const html = renderer.buildRecentEntriesHtml(
+    [
+      {
+        runId: "doctrine-run",
+        prompt: "Write from the closest sound.",
+        text: "A short saved draft.",
+        words: 12,
+        wordCount: 12,
+        runScore: 88,
+        score: 88,
+        scoreBreakdown: { completion: 25, filler: 25, repetition: 25, openings: 13 },
+        bannedHits: [{ word: "just", count: 2 }],
+        repeatedWords: [],
+        repeatedStarters: [],
+        mirrorLoadFailed: false,
+      },
+    ],
+    "draw"
+  );
+
+  assert.match(html, /Run length/);
+  assert.match(html, /12 words/);
+  assert.match(html, /Softeners/);
+  assert.match(html, /No stable patterns surfaced in this run/);
+  assert.doesNotMatch(html, /Numbers for this run/);
+  assert.doesNotMatch(html, /recent-entry-stats-score/);
+  assert.doesNotMatch(html, /recent-entry-score-meters/);
+  assert.doesNotMatch(html, />Filler</);
+});
+
+test("patterns repeated-word variation rendering preserves selection and begin gating", () => {
   const context = loadPatternsRendererContext();
   const renderer = context.waywordPatternsRenderer;
 
@@ -5167,7 +5232,9 @@ test("patterns repeated-word challenge rendering preserves selection and begin g
   assert.match(selectedHtml, /data-challenge-word="threshold"/);
   assert.doesNotMatch(selectedHtml, /data-challenge-word="the"/);
   assert.doesNotMatch(selectedHtml, /missing/);
-  assert.match(selectedHtml, /Begin challenge/);
+  assert.match(selectedHtml, /Start this run/);
+  assert.match(selectedHtml, /Variation from your repeats/);
+  assert.match(selectedHtml, /REPEAT VARIATION/);
   assert.match(selectedHtml, /without using the word <strong>threshold<\/strong>/);
 
   const unselectedHtml = renderer.buildPatternsRepeatedChallengeRootInnerHtml({
@@ -5176,14 +5243,14 @@ test("patterns repeated-word challenge rendering preserves selection and begin g
     draftChallengeWords: [],
   });
   assert.match(unselectedHtml, /Try one run without one repeated word/);
-  assert.doesNotMatch(unselectedHtml, /Begin challenge/);
+  assert.doesNotMatch(unselectedHtml, /Start this run/);
 
   const emptyHtml = renderer.buildPatternsRepeatedChallengeRootInnerHtml({
     topWords: [["the", 99]],
     selectedChallengeSet: new Set(),
     draftChallengeWords: [],
   });
-  assert.match(emptyHtml, /No strong repeat targets yet/);
+  assert.match(emptyHtml, /No repeat words surfaced yet/);
 });
 
 test("patterns renderer escapes user-derived repeated words in attributes and legacy HTML", () => {

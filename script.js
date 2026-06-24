@@ -4349,8 +4349,8 @@ function renderMirrorReflectionPanel(precomputedParts) {
 
 const METRIC_EXPLAINER_COPY = {
   filler: {
-    title: "Filler",
-    body: "Common words or phrases used unnecessarily.",
+    title: "Softeners",
+    body: "Small words or phrases that cushion a sentence.",
     example: 'Example: "like, just, really"'
   },
   repetition: {
