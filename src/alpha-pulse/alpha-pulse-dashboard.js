@@ -74,6 +74,7 @@
   ];
 
   var REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+  var AUTH_TOKEN_STORAGE_KEY = "wayword-alpha-pulse-token";
   var booted = false;
   var currentRange = "7";
   var refreshTimer = 0;
@@ -131,6 +132,71 @@
       url += "&request=" + encodeURIComponent(String(requestId));
     }
     return url;
+  }
+
+  function readStoredAuthToken() {
+    try {
+      if (!global.sessionStorage) return "";
+      return safeString(global.sessionStorage.getItem(AUTH_TOKEN_STORAGE_KEY));
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function storeAuthToken(token) {
+    var value = safeString(token);
+    if (!value) return;
+    try {
+      if (global.sessionStorage) {
+        global.sessionStorage.setItem(AUTH_TOKEN_STORAGE_KEY, value);
+      }
+    } catch (_) {
+      /* Token storage is convenience-only; the request can still use this token once. */
+    }
+  }
+
+  function clearTokenHash() {
+    try {
+      if (!global.location || !global.history || typeof global.history.replaceState !== "function") return;
+      if (!safeString(global.location.hash)) return;
+      global.history.replaceState(null, "", global.location.pathname + global.location.search);
+    } catch (_) {
+      /* Leave the hash alone if the browser blocks history changes. */
+    }
+  }
+
+  function readHashAuthToken() {
+    try {
+      var hash = safeString(global.location && global.location.hash).replace(/^#/, "");
+      if (!hash) return "";
+      var params = new URLSearchParams(hash);
+      return safeString(params.get("token") || params.get("alphaPulseToken"));
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function resolveAuthToken(options) {
+    var explicitToken = safeString(options && options.authToken);
+    if (explicitToken) return explicitToken;
+    var hashToken = readHashAuthToken();
+    if (hashToken) {
+      storeAuthToken(hashToken);
+      clearTokenHash();
+      return hashToken;
+    }
+    return readStoredAuthToken();
+  }
+
+  function buildFetchOptions(options) {
+    var token = resolveAuthToken(options);
+    var fetchOptions = { cache: "no-store" };
+    if (token) {
+      fetchOptions.headers = {
+        Authorization: "Bearer " + token,
+      };
+    }
+    return fetchOptions;
   }
 
   function clearRefreshTimer() {
@@ -227,7 +293,7 @@
       );
     }
 
-    return fetch(summaryUrl, { cache: "no-store" })
+    return fetch(summaryUrl, buildFetchOptions(options))
       .then(function (response) {
         if (!response.ok) {
           throw new Error("alpha_pulse_summary_http_" + response.status);
@@ -527,7 +593,9 @@
     STAGES: STAGES,
     RANGE_OPTIONS: RANGE_OPTIONS,
     REFRESH_INTERVAL_MS: REFRESH_INTERVAL_MS,
+    AUTH_TOKEN_STORAGE_KEY: AUTH_TOKEN_STORAGE_KEY,
     buildSummaryUrl: buildSummaryUrl,
+    buildFetchOptions: buildFetchOptions,
     buildStatusText: buildStatusText,
     normalizeSummary: normalizeSummary,
     loadDashboardData: loadDashboardData,

@@ -52,6 +52,63 @@ test("loadDashboardData falls back to unavailable summary when fetch fails", asy
   assert.equal(result.window.label, "All time");
 });
 
+test("loadDashboardData sends a bearer token when dashboard auth is supplied", async () => {
+  let capturedUrl = "";
+  let capturedOptions = null;
+  global.fetch = (url, options) => {
+    capturedUrl = url;
+    capturedOptions = options;
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, source: { available: true, mode: "live" }, stages: [] }),
+    });
+  };
+
+  const result = await dashboard.loadDashboardData({ range: "14", requestId: "manual", authToken: "founder-token" });
+  delete global.fetch;
+
+  assert.equal(result.ok, true);
+  assert.equal(capturedUrl, "/api/alpha-pulse-summary?days=14&request=manual");
+  assert.equal(capturedOptions.cache, "no-store");
+  assert.deepEqual(capturedOptions.headers, { Authorization: "Bearer founder-token" });
+});
+
+test("dashboard auth can come from a URL hash without sending the token in the query", () => {
+  const priorLocation = global.location;
+  const priorHistory = global.history;
+  const priorSessionStorage = global.sessionStorage;
+  const stored = {};
+
+  global.location = {
+    hash: "#token=hash-token",
+    pathname: "/alpha-pulse/",
+    search: "",
+  };
+  global.history = {
+    replacedWith: "",
+    replaceState(_state, _title, path) {
+      this.replacedWith = path;
+    },
+  };
+  global.sessionStorage = {
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(stored, key) ? stored[key] : null;
+    },
+    setItem(key, value) {
+      stored[key] = String(value);
+    },
+  };
+
+  const options = dashboard.buildFetchOptions({});
+
+  global.location = priorLocation;
+  global.history = priorHistory;
+  global.sessionStorage = priorSessionStorage;
+
+  assert.deepEqual(options.headers, { Authorization: "Bearer hash-token" });
+  assert.equal(stored[dashboard.AUTH_TOKEN_STORAGE_KEY], "hash-token");
+});
+
 test("normalizeSummary preserves snapshot metadata", () => {
   const normalized = dashboard.normalizeSummary({
     ok: true,
