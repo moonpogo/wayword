@@ -167,7 +167,7 @@ This pass is a working-tree stabilization pass, not a released commit.
 
 ### Files changed in this pass
 
-- `docs/BUILD_LOG.md`
+- `docs/archive/BUILD_LOG.md`
 - `docs/MIRROR_V1_DOCTRINE.md`
 - `README.md`
 - `docs/STRUCTURAL_AUDIT.md`

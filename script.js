@@ -106,7 +106,6 @@ const punctuationMarks = {
 const {
   FIRST_SESSION_ENTRY_THRESHOLD,
   FIRST_SESSION_ENTRY_INSUFFICIENT_COPY,
-  ZEN_GARDEN_OPENABLE,
   PROMPT_REROLL_LIMIT,
   PROMPT_RECENT_ID_WINDOW,
   PROMPT_NEAR_DUPLICATE_WINDOW,
@@ -6879,34 +6878,6 @@ function showProfile(show = true) {
 }
 
 /* -----------------------------
-   zen hooks
------------------------------ */
-
-function initZenGarden() {
-  const overlay = $("zenGarden");
-  const closeBtn = $("zenCloseBtn");
-  const wordmarkEl = $("wordmark");
-  if (!overlay || !closeBtn || !wordmarkEl) return;
-
-  function closeGarden() {
-    overlay.classList.add("hidden");
-  }
-
-  if (ZEN_GARDEN_OPENABLE) {
-    wordmarkEl.addEventListener("click", () => {
-      if (overlay.classList.contains("hidden")) overlay.classList.remove("hidden");
-      else closeGarden();
-    });
-  }
-
-  closeBtn.addEventListener("click", closeGarden);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeGarden();
-  });
-
-}
-
-/* -----------------------------
    events
 ----------------------------- */
 
@@ -7894,7 +7865,6 @@ try {
 }
 
 enterLandingState();
-initZenGarden();
 initEditorCompletedFlow();
 bindAnnotationRowFlagInteraction();
 bindEditorSemanticPicker();

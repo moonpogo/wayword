@@ -14,7 +14,6 @@
     FIRST_SESSION_ENTRY_MIN_WORDS: 40,
     FIRST_SESSION_ENTRY_MIN_SENTENCE_UNITS: 3,
     FIRST_SESSION_ENTRY_INSUFFICIENT_COPY: "Add enough writing for the next save to register.",
-    ZEN_GARDEN_OPENABLE: false,
     PROMPT_REROLL_LIMIT: 2,
     /** Last N picked prompt ids: same id cannot repeat while still in this window. */
     PROMPT_RECENT_ID_WINDOW: 8,

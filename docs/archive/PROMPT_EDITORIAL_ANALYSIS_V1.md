@@ -1,6 +1,6 @@
 # Prompt Editorial Analysis V1
 
-Source of truth: `docs/PROMPT_TAXONOMY_AUDIT_V1.md`.
+Source snapshot: `docs/archive/PROMPT_TAXONOMY_AUDIT_V1.md`.
 
 This is an editorial synthesis of the current prompt system. It does not rewrite prompts, generate new prompt batches, implement layers, or change runtime behavior.
 

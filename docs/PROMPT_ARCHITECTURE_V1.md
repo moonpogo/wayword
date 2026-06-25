@@ -167,8 +167,8 @@ Seasonality should not be loudly announced. Influence should emerge through prom
 ## 11. Relationship to Existing Docs
 This document is aligned with and extends the following internal references:
 
-- [PROMPT_TAXONOMY_AUDIT_V1.md](./PROMPT_TAXONOMY_AUDIT_V1.md)
-- [PROMPT_EDITORIAL_ANALYSIS_V1.md](./PROMPT_EDITORIAL_ANALYSIS_V1.md)
+- [PROMPT_TAXONOMY_AUDIT_V1.md](./archive/PROMPT_TAXONOMY_AUDIT_V1.md)
+- [PROMPT_EDITORIAL_ANALYSIS_V1.md](./archive/PROMPT_EDITORIAL_ANALYSIS_V1.md)
 - [PROMPT_SYSTEM_V1_1.md](./PROMPT_SYSTEM_V1_1.md)
 - [EDITORIAL_DOCTRINE.md](./EDITORIAL_DOCTRINE.md)
 - [PATTERNS_OBSERVATORY_BRIEF.md](./PATTERNS_OBSERVATORY_BRIEF.md)

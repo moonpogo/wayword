@@ -7,8 +7,8 @@
 | `docs/PROMPT_ARCHITECTURE_V1.md` | Canonical prompt doctrine for layered model and anti-patterns | **Canonical** | Entry/Torsion/Resonance, creative latency, progressive architecture, seasonal overlay, measurement boundaries |
 | `docs/PROMPT_SYSTEM_V1_IMPLEMENTATION_PLAN.md` | Execution status for V1 prompt rollout | Supporting | V1 scaffold scope, local flag policy, V0 default, integration staging |
 | `docs/PROMPT_SYSTEM_V1_1.md` | Current V0 prompt runtime family contract | Implementation-only (active runtime) | Scene/Relation/Pressure/Constraint/Calibration families, selection/reroll windows |
-| `docs/PROMPT_TAXONOMY_AUDIT_V1.md` | Extraction and classification of existing runtime prompts | Supporting | Prompt inventory, Layer fit assessment, reject list |
-| `docs/PROMPT_EDITORIAL_ANALYSIS_V1.md` | Editorial synthesis of taxonomy findings | Supporting | Failure modes, mechanical strengths, tonal drift, salvage analysis |
+| `docs/archive/PROMPT_TAXONOMY_AUDIT_V1.md` | Extraction and classification of existing runtime prompts | Archived supporting snapshot | Prompt inventory, Layer fit assessment, reject list |
+| `docs/archive/PROMPT_EDITORIAL_ANALYSIS_V1.md` | Editorial synthesis of taxonomy findings | Archived supporting snapshot | Failure modes, mechanical strengths, tonal drift, salvage analysis |
 | `docs/EDITORIAL_DOCTRINE.md` | High-level editorial posture | **Canonical** | Encounter instrument, recognition over help, anti-therapy/productivity/guru voice |
 | `docs/MIRROR_V1_DOCTRINE.md` | Mirror generation/selection doctrine | **Canonical** (Mirror domain) | Reflection scope/categories, suppression, non-diagnostic language rules |
 | `docs/MIRROR_EVAL_SPEC.md` | Mirror evaluation protocol | Supporting | Pass/fail criteria, low-signal restraint, category evaluation |
@@ -28,7 +28,7 @@
 | `docs/STRUCTURAL_AUDIT.md` | Maintainability risk analysis | Supporting, partially historical | Coupling risks, script.js monolith risk, cleanup plan |
 | `docs/V1_CHANGE_GUARDRAILS.md` | Pre-change risk guardrails | Supporting | Do-not-touch seams, verification requirements |
 | `docs/V1_LAUNCH_CHECKLIST.md` | Manual launch readiness checklist | Supporting | Final pre-launch UX and trust checks |
-| `docs/BUILD_LOG.md` | Chronological implementation log | Historical | Decisions, passes, regressions, structural changes |
+| `docs/archive/BUILD_LOG.md` | Chronological implementation log | Archived historical snapshot | Decisions, passes, regressions, structural changes |
 | `README.md` | External-facing repo and product summary | Supporting | Public framing, architecture summary |
 
 ## 2. Canonical Doctrine Hierarchy
@@ -121,8 +121,8 @@ Mark deprecated (after replacement docs exist):
 
 Historical-only (retain, clearly labeled):
 
-- `docs/BUILD_LOG.md`
-- prior prompt taxonomy/editorial audit snapshots once migration is complete (`PROMPT_TAXONOMY_AUDIT_V1.md`, `PROMPT_EDITORIAL_ANALYSIS_V1.md`)
+- `docs/archive/BUILD_LOG.md`
+- prior prompt taxonomy/editorial audit snapshots once migration is complete (`docs/archive/PROMPT_TAXONOMY_AUDIT_V1.md`, `docs/archive/PROMPT_EDITORIAL_ANALYSIS_V1.md`)
 
 ## 6. Reflection System Gap
 
@@ -156,17 +156,17 @@ Inspected docs:
 - `README.md`
 - `docs/BASELINE_BEHAVIOR.md`
 - `docs/BOOT_DEPENDENCY_MAP.md`
-- `docs/BUILD_LOG.md`
+- `docs/archive/BUILD_LOG.md`
 - `docs/EDITORIAL_DOCTRINE.md`
 - `docs/MIRROR_EVAL_SPEC.md`
 - `docs/MIRROR_V1_DOCTRINE.md`
 - `docs/MIRROR_V1_EVAL_CORPUS.md`
 - `docs/PATTERNS_OBSERVATORY_BRIEF.md`
 - `docs/PROMPT_ARCHITECTURE_V1.md`
-- `docs/PROMPT_EDITORIAL_ANALYSIS_V1.md`
+- `docs/archive/PROMPT_EDITORIAL_ANALYSIS_V1.md`
 - `docs/PROMPT_SYSTEM_V1_1.md`
 - `docs/PROMPT_SYSTEM_V1_IMPLEMENTATION_PLAN.md`
-- `docs/PROMPT_TAXONOMY_AUDIT_V1.md`
+- `docs/archive/PROMPT_TAXONOMY_AUDIT_V1.md`
 - `docs/QA_REGRESSION_CHECKLIST.md`
 - `docs/RITUAL_LOOP_V1_SPEC.md`
 - `docs/SAVED_RUNS_PERSISTENCE.md`
