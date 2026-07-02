@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This grammar defines the minimum shape needed for the first V2 expression-loop prototype. It is intentionally small. It supports three experimental mechanics before any production saved-run architecture is decided.
+This grammar defines the minimum shared shape needed for the V2 Expression Loop. It is intentionally small and platform-neutral. It supports three experimental mechanics before any production saved-run architecture is decided.
 
 ## Units
 
@@ -84,21 +84,21 @@ Example:
 Choose one line to keep.
 ```
 
-## Visible Prototype Surfaces
+## Shared Sequence
 
-The prototype preserves the internal grammar but compresses it into three visible surfaces:
+The canonical shared sequence is:
 
 ```text
-initiation and expression
-encounter, selection, movement, and shaping
-reflection and final artifact
+opener -> expression -> encounter -> selection -> movement -> second expression -> artifact
 ```
 
-Selection is no longer only a closure gesture. In these experiments, selection is the hinge between the first expression and the movement:
+Selection is the hinge between the first expression and the movement:
 
 ```text
 opener -> first expression -> select a line -> movement from selected line -> second expression -> final artifact
 ```
+
+Platform renderers may present the sequence differently. The mobile reference compresses it into three visible surfaces. The desktop experiment should keep more of the expression in view and use inline selection, hover, and keyboard-focus affordances.
 
 ## Valid Early Forms
 
@@ -150,7 +150,7 @@ PrototypeSessionState
 - preludeStatus
 ```
 
-`prelude`, `selectionGranularity`, `selectionPurpose`, `questionOnly`, and `finalArtifact` are local prototype fields. The fixture is content and prototype data only. It is not a production schema and must not be treated as the saved-run contract.
+`prelude`, `selectionGranularity`, `selectionPurpose`, `questionOnly`, and `finalArtifact` are local prototype fields. The fixture is shared content and prototype data only. It is not a production schema and must not be treated as the saved-run contract.
 
 ## Content Families
 

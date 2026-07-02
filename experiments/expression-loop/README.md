@@ -1,6 +1,10 @@
-# Expression Loop Prototype
+# Expression Loop Mobile Reference
 
-This is an isolated V2 prototype. It does not change the V1 app runtime, production persistence, Mirror, Recent Runs, Patterns, telemetry, or saved-run schemas.
+This experiment is now the mobile-first interaction reference for Wayword V2.
+
+It is an isolated prototype. It does not change the V1 app runtime, production persistence, Mirror, Recent Runs, Patterns, telemetry, authentication, Supabase behavior, or saved-run schemas.
+
+This reference is not the canonical desktop interface. Desktop work should reuse the shared Expression Loop grammar and session fixture, not reproduce this mobile UI literally.
 
 ## Run
 
@@ -15,6 +19,17 @@ Open:
 ```text
 http://127.0.0.1:3001/experiments/expression-loop/
 ```
+
+## What This Reference Established
+
+- Voice-forward initiation can make the opener feel like the beginning of a practice rather than a form.
+- Sequential three-surface interaction can hold expression, encounter, movement, and artifact in a small mobile frame.
+- The blob can act as a ritual speech control when browser speech is available.
+- Timed silence can work as a mobile-native condition before expression.
+- Touch-oriented selection can make the user's own language become the hinge into movement.
+- Memory-only prototype state is sufficient for testing the interaction without implying a saved-run schema.
+- Browser speech support is uneven enough that operating-system dictation and typing must remain available.
+- First-class mobile voice likely requires native iOS and Android speech spikes rather than relying on mobile browser speech recognition alone.
 
 ## Interaction Paths
 
@@ -86,6 +101,7 @@ Preview access may be public depending on the Vercel project settings. Use non-s
 
 ## Does Not Prove
 
+- The canonical desktop interface.
 - Production saved-run shape.
 - Mirror behavior for V2 runs.
 - Recent Runs or Patterns representation.
@@ -94,3 +110,19 @@ Preview access may be public depending on the Vercel project settings. Use non-s
 - Long-term retention or analytics value.
 - Whether selected lines should train or personalize any future system.
 - Production content strategy, personalization, or saved-run architecture.
+
+## Desktop Carry-Forward
+
+Desktop should carry forward the shared grammar:
+
+```text
+opener -> expression -> encounter -> selection -> movement -> second expression -> artifact
+```
+
+Desktop should not inherit these mobile-specific implementation details as universal requirements:
+
+- mobile card or surface flow
+- blob-centered input
+- browser `SpeechRecognition`
+- touch-specific selection
+- transcript hiding or reveal patterns designed only for a single-focus mobile screen

@@ -27,10 +27,10 @@ The V2 direction separates the session into smaller acts. A run can begin throug
 The canonical V2 loop is:
 
 ```text
-invitation -> expression -> encounter -> movement -> closure
+opener -> expression -> encounter -> selection -> movement -> second expression -> artifact
 ```
 
-Not every session needs every phase, but the first prototype should test the complete sequence.
+Some future sessions may compress or omit phases, but the shared model treats this sequence as the complete expression loop. Platform renderers may present it differently.
 
 ## Principles
 
@@ -63,18 +63,19 @@ Language play is worthwhile without professional, educational, therapeutic, or c
 - **Opener**: an instruction that begins expression.
 - **Expression**: language produced by the user through speech, typing, or a mixture of both.
 - **Encounter**: the moment the user sees, hears, selects, or otherwise faces what was expressed.
-- **Movement**: an operation applied to existing expression.
-- **Closure**: a deliberate end state for the run.
+- **Selection**: a committed choice of material from an earlier expression.
+- **Movement**: an operation applied to existing expression or selected material.
+- **Artifact**: the deliberate end state for the run.
 
 ## Prototype Contract
 
-The first prototype should prove one complete run without changing production behavior:
+The first prototype track should prove one complete run without changing production behavior:
 
 ```text
-opener -> expression -> transcript reveal -> movement -> second expression -> line selection -> closure
+opener -> expression -> encounter -> selection -> movement -> second expression -> artifact
 ```
 
-The prototype should be isolated under `experiments/expression-loop/` and should not write to local storage, Supabase, canonical run documents, legacy history, Mirror digests, Recent Runs, Patterns, or telemetry.
+The mobile-first prototype is isolated under `experiments/expression-loop/`. Desktop experiments should live separately and consume the same shared grammar rather than copying mobile UI assumptions. V2 prototypes should not write to local storage, Supabase, canonical run documents, legacy history, Mirror digests, Recent Runs, Patterns, or telemetry.
 
 ## Future Architecture Direction
 
