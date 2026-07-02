@@ -1,0 +1,177 @@
+[
+  {
+    "id": "certainty-memory-01",
+    "title": "Certainty",
+    "mechanic": "epistemic",
+    "opener": {
+      "id": "opener-certainty-memory",
+      "family": "memory",
+      "text": "Tell a memory as if you are certain.",
+      "supportedModalities": ["speech", "typing"]
+    },
+    "steps": [
+      {
+        "id": "first-expression",
+        "type": "expression",
+        "instruction": "Speak or type the first version.",
+        "allowedModalities": ["speech", "typing"]
+      },
+      {
+        "id": "selected-line",
+        "type": "selection",
+        "instruction": "Choose the sentence you trust least.",
+        "allowedModalities": ["typing"],
+        "sourceStepId": "first-expression",
+        "selectionGranularity": "sentence",
+        "selectionPurpose": "movement-source"
+      },
+      {
+        "id": "selected-line-movement",
+        "type": "movement",
+        "instruction": "Begin from that sentence. Describe what could be wrong about it.",
+        "allowedModalities": ["speech", "typing"],
+        "sourceStepId": "selected-line"
+      },
+      {
+        "id": "second-expression",
+        "type": "expression",
+        "instruction": "Shape the selected sentence through speech or typing.",
+        "allowedModalities": ["speech", "typing"],
+        "sourceStepId": "selected-line-movement"
+      }
+    ],
+    "closure": {
+      "id": "certainty-result",
+      "type": "reflection",
+      "instruction": "Let the selected sentence and what followed stand as the result."
+    },
+    "finalArtifact": {
+      "result": "The selected sentence became the source for the second response."
+    },
+    "privacyNotes": [
+      "Wayword does not intentionally record, upload, retain, or play back audio.",
+      "Browser speech recognition may temporarily process audio through the browser, operating system, or speech provider.",
+      "Prototype text and state remain in memory only and disappear when the session ends or the page reloads."
+    ]
+  },
+  {
+    "id": "attention-sounds-01",
+    "title": "Attention",
+    "mechanic": "perceptual",
+    "opener": {
+      "id": "opener-attention-sounds",
+      "family": "sound",
+      "text": "Wait in silence for ten seconds.",
+      "supportedModalities": ["speech", "typing"]
+    },
+    "prelude": {
+      "id": "silent-attention",
+      "type": "timed-silence",
+      "durationSeconds": 10,
+      "condition": "Wait in silence for ten seconds.",
+      "afterInstruction": "Name five sounds you noticed."
+    },
+    "steps": [
+      {
+        "id": "first-expression",
+        "type": "expression",
+        "instruction": "Name five sounds you noticed.",
+        "allowedModalities": ["speech", "typing"]
+      },
+      {
+        "id": "selected-line",
+        "type": "selection",
+        "instruction": "Choose the sound you noticed last.",
+        "allowedModalities": ["typing"],
+        "sourceStepId": "first-expression",
+        "selectionGranularity": "item",
+        "selectionPurpose": "movement-source"
+      },
+      {
+        "id": "selected-line-movement",
+        "type": "movement",
+        "instruction": "Describe where it seems to come from without naming its source.",
+        "allowedModalities": ["speech", "typing"],
+        "sourceStepId": "selected-line"
+      },
+      {
+        "id": "second-expression",
+        "type": "expression",
+        "instruction": "Shape the chosen sound through speech or typing.",
+        "allowedModalities": ["speech", "typing"],
+        "sourceStepId": "selected-line-movement"
+      }
+    ],
+    "closure": {
+      "id": "attention-result",
+      "type": "reflection",
+      "instruction": "Let the chosen sound and what followed stand as the result."
+    },
+    "finalArtifact": {
+      "result": "The chosen sound became the source for the second response."
+    },
+    "privacyNotes": [
+      "Wayword does not intentionally record, upload, retain, or play back audio.",
+      "Browser speech recognition may temporarily process audio through the browser, operating system, or speech provider.",
+      "Prototype text and state remain in memory only and disappear when the session ends or the page reloads."
+    ]
+  },
+  {
+    "id": "question-threshold-01",
+    "title": "Question",
+    "mechanic": "structural",
+    "opener": {
+      "id": "opener-question-threshold",
+      "family": "question",
+      "text": "Speak until you reach a question you do not already know how to answer.",
+      "supportedModalities": ["speech", "typing"]
+    },
+    "steps": [
+      {
+        "id": "first-expression",
+        "type": "expression",
+        "instruction": "Speak until a real question appears. Typing is still available.",
+        "allowedModalities": ["speech", "typing"],
+        "preferredModality": "speech"
+      },
+      {
+        "id": "selected-line",
+        "type": "selection",
+        "instruction": "Choose the question.",
+        "allowedModalities": ["typing"],
+        "sourceStepId": "first-expression",
+        "selectionGranularity": "sentence",
+        "selectionPurpose": "movement-source",
+        "questionOnly": true,
+        "fallbackInstruction": "No question mark was detected, so choose the segment that carries the question."
+      },
+      {
+        "id": "selected-line-movement",
+        "type": "movement",
+        "instruction": "Answer it in writing without trying to resolve it.",
+        "allowedModalities": ["typing"],
+        "sourceStepId": "selected-line"
+      },
+      {
+        "id": "second-expression",
+        "type": "expression",
+        "instruction": "Write from the question without trying to resolve it.",
+        "allowedModalities": ["typing"],
+        "sourceStepId": "selected-line-movement"
+      }
+    ],
+    "closure": {
+      "id": "question-result",
+      "type": "reflection",
+      "instruction": "Let the selected question and written response stand as the result."
+    },
+    "finalArtifact": {
+      "result": "The selected question became the source for the written response."
+    },
+    "privacyNotes": [
+      "Wayword does not intentionally record, upload, retain, or play back audio.",
+      "Browser speech recognition may temporarily process audio through the browser, operating system, or speech provider.",
+      "Prototype text and state remain in memory only and disappear when the session ends or the page reloads."
+    ]
+  }
+]

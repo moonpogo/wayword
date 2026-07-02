@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wayword Desktop V2 Experiment</title>
+  <link rel="icon" href="/assets/icons/favicon.ico?v=7" sizes="any" />
+  <link rel="stylesheet" href="/experiments/expression-loop-desktop/style.css" />
+</head>
+<body>
+  <main class="desktop-shell" aria-label="Wayword desktop V2 experiment">
+    <header class="masthead">
+      <img class="brand-mark" src="/assets/brand/wayword-logo.svg?v=20260526-hotfix1" alt="Wayword" />
+      <div>
+        <p class="kicker">Desktop V2 experiment</p>
+        <h1>Expression Loop desktop scaffold</h1>
+      </div>
+    </header>
+
+    <section class="workspace" aria-label="Desktop expression loop workspace">
+      <section class="writing-plane" aria-label="First expression">
+        <div class="section-heading">
+          <p class="kicker">Opener</p>
+          <h2 id="openerText">Tell a memory as if you are certain.</h2>
+        </div>
+
+        <textarea
+          class="expression-field"
+          aria-label="First expression text"
+          placeholder="Write here, or use operating-system dictation."
+        ></textarea>
+
+        <div class="selection-preview" aria-label="Selection preview">
+          <p class="kicker">Selection model</p>
+          <p>
+            Inline sentence hover and keyboard focus will preview selectable material. A committed sentence stays bolded in its original context.
+          </p>
+        </div>
+      </section>
+
+      <aside class="movement-rail" aria-label="Movement preview">
+        <div class="rail-section">
+          <p class="kicker">Shared fixture</p>
+          <p id="fixtureStatus">Loading shared session fixture...</p>
+        </div>
+
+        <div class="rail-section">
+          <p class="kicker">Committed selection</p>
+          <p class="selected-line">The selected sentence will repeat here as active movement material.</p>
+        </div>
+
+        <div class="rail-section">
+          <p class="kicker">Movement</p>
+          <p id="movementText">Begin from that sentence. Describe what could be wrong about it.</p>
+        </div>
+
+        <textarea
+          class="second-field"
+          aria-label="Second expression text"
+          placeholder="The second writing field will appear progressively after selection."
+        ></textarea>
+      </aside>
+    </section>
+  </main>
+
+  <script src="/experiments/expression-loop-desktop/prototype.js"></script>
+</body>
+</html>
