@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Wayword Expression Loop Prototype</title>
+  <link rel="icon" href="/assets/icons/favicon.ico?v=7" sizes="any" />
+  <link rel="stylesheet" href="/experiments/expression-loop/style.css" />
+</head>
+<body>
+  <main class="prototype-shell" aria-label="Wayword expression loop prototype">
+    <section class="session-stage" aria-live="polite">
+      <div class="brand-row">
+        <img class="brand-mark" src="/assets/brand/wayword-logo.svg?v=20260526-hotfix1" alt="Wayword" />
+        <p class="prototype-kicker">Expression loop prototype</p>
+      </div>
+
+      <div class="surface-track" aria-label="Visible surface progress" role="list">
+        <span class="surface-dot is-active" data-surface-dot="expression" role="listitem" aria-current="step">
+          <span class="sr-only">Initiation and expression</span>
+        </span>
+        <span class="surface-dot" data-surface-dot="shaping" role="listitem">
+          <span class="sr-only">Encounter, selection, movement, and shaping</span>
+        </span>
+        <span class="surface-dot" data-surface-dot="reflection" role="listitem">
+          <span class="sr-only">Reflection and final artifact</span>
+        </span>
+      </div>
+
+      <section class="surface-panel expression-surface" data-surface="expression">
+        <div class="panel-heading">
+          <p class="stage-label">Initiation and expression</p>
+          <h1 id="openerText">Tell a memory as if you are certain.</h1>
+          <p id="firstInstruction" class="surface-instruction">Speak or type the first version.</p>
+        </div>
+
+        <div id="preludePanel" class="prelude-panel hidden" aria-live="polite">
+          <p id="preludeStatus">Tap the blob to begin the silence.</p>
+          <div class="prelude-meter" aria-hidden="true">
+            <span id="preludeMeterFill"></span>
+          </div>
+        </div>
+
+        <div id="receivingState" class="receiving-state" aria-hidden="true">
+          <div class="receiving-ring"></div>
+          <p>Receiving language</p>
+        </div>
+
+        <div class="blob-control">
+          <button
+            id="primaryBlobBtn"
+            class="blob-button"
+            type="button"
+            aria-label="Start speech input"
+            aria-pressed="false"
+            aria-describedby="statusText"
+            disabled
+          >
+            <img class="blob-asset" src="/assets/icons/favicon.svg?v=7" alt="" aria-hidden="true" />
+          </button>
+          <p id="primaryBlobLabel" class="quiet-note">Tap the blob to speak. Type below anytime.</p>
+        </div>
+
+        <textarea
+            id="firstExpressionInput"
+            class="expression-input"
+            rows="8"
+            spellcheck="true"
+            aria-label="First expression text"
+            aria-describedby="statusText"
+            placeholder="Type here, or use system dictation."
+            disabled
+        ></textarea>
+
+        <div class="control-strip" aria-label="First expression controls">
+          <button id="firstContinueBtn" class="primary-action" type="button" disabled>Bring it forward</button>
+        </div>
+
+        <p id="statusText" class="status-text" role="status"></p>
+      </section>
+
+      <section class="surface-panel shaping-surface hidden" data-surface="shaping">
+        <div class="compact-opener">
+          <p class="stage-label">Original opener</p>
+          <p id="openerEcho" class="opener-echo">Tell a memory as if you are certain.</p>
+        </div>
+
+        <div class="encounter-block">
+          <p class="stage-label">Encounter</p>
+          <h2 id="encounterInstruction">Choose the sentence you trust least.</h2>
+          <div id="firstExpressionOutput" class="transcript-output"></div>
+          <div id="lineChoices" class="line-choices" aria-label="Select a line from the first expression"></div>
+        </div>
+
+        <div id="movementBlock" class="movement-block hidden">
+          <div class="selected-line-block">
+            <p class="stage-label">Selected line</p>
+            <p id="selectedLineText"></p>
+          </div>
+
+          <div class="movement-copy">
+            <p class="stage-label">Movement</p>
+            <h2 id="movementInstruction">Begin from that sentence. Describe what could be wrong about it.</h2>
+          </div>
+
+          <div id="secondReceivingState" class="receiving-state" aria-hidden="true">
+            <div class="receiving-ring"></div>
+            <p>Receiving language</p>
+          </div>
+
+          <div class="blob-control">
+            <button
+              id="secondaryBlobBtn"
+              class="blob-button"
+              type="button"
+              aria-label="Start speech input"
+              aria-pressed="false"
+              aria-describedby="secondStatusText"
+            >
+              <img class="blob-asset" src="/assets/icons/favicon.svg?v=7" alt="" aria-hidden="true" />
+            </button>
+            <p id="secondaryBlobLabel" class="quiet-note">Shape the selected line by speaking or typing.</p>
+          </div>
+
+          <textarea
+            id="secondExpressionInput"
+            class="expression-input"
+            rows="7"
+            spellcheck="true"
+            aria-label="Second response text"
+            aria-describedby="secondStatusText"
+            placeholder="Begin from the selected sentence."
+          ></textarea>
+
+          <div class="control-strip" aria-label="Second response controls">
+            <button id="finishBtn" class="primary-action" type="button">Finish the run</button>
+          </div>
+
+          <p id="secondStatusText" class="status-text" role="status"></p>
+        </div>
+      </section>
+
+      <section class="surface-panel reflection-surface hidden" data-surface="reflection">
+        <p class="stage-label">Reflection and final artifact</p>
+        <h2>What became of this run?</h2>
+
+        <div class="artifact-grid">
+          <div class="artifact-piece">
+            <p class="stage-label">Selected line</p>
+            <p id="reflectionSelectedLine"></p>
+          </div>
+          <div class="artifact-piece">
+            <p class="stage-label">Shaped response</p>
+            <p id="reflectionResponse"></p>
+          </div>
+        </div>
+
+        <div id="finalArtifact" class="final-artifact" aria-live="polite"></div>
+
+        <div class="control-strip">
+          <button id="restartBtn" class="secondary-action" type="button">Begin again</button>
+        </div>
+      </section>
+    </section>
+
+    <aside class="field-notes" aria-label="Prototype boundaries">
+      <h2>Prototype contract</h2>
+      <div class="developer-control">
+        <label for="sessionSelector">Experiment session</label>
+        <select id="sessionSelector" aria-describedby="selectorNote"></select>
+        <p id="selectorNote">Developer-only switchboard. Changing this resets memory-only prototype state.</p>
+      </div>
+      <p>Speech is optional. When browser speech recognition is unavailable, typing and operating-system dictation remain the path.</p>
+      <p>Wayword does not intentionally record, upload, retain, or play back audio here. Browser speech recognition may still involve temporary browser, operating-system, or provider processing.</p>
+      <p>Prototype text and state stay in memory only and disappear when the session ends or the page reloads.</p>
+      <dl>
+        <div>
+          <dt>Session</dt>
+          <dd id="sessionTitle">Certain Memory</dd>
+        </div>
+        <div>
+          <dt>Path</dt>
+          <dd id="modalityPath">Not started</dd>
+        </div>
+        <div>
+          <dt>Speech diagnostic</dt>
+          <dd id="speechDiagnostic">Not checked</dd>
+        </div>
+      </dl>
+    </aside>
+  </main>
+
+  <script src="/experiments/expression-loop/prototype.js"></script>
+</body>
+</html>
