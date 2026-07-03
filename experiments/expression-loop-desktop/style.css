@@ -162,6 +162,10 @@ h3 {
   line-height: 1.5;
 }
 
+.selection-status {
+  min-height: 1.4em;
+}
+
 .expression-field {
   width: 100%;
   min-height: clamp(260px, 41vh, 430px);
@@ -196,6 +200,8 @@ h3 {
 .expression-field:focus,
 .primary-action:focus-visible,
 .secondary-action:focus-visible,
+.sentence-choice:focus,
+.sentence-choice.is-focused,
 .sentence-choice:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 4px;
@@ -241,10 +247,10 @@ h3 {
 }
 
 .settled-passage {
-  max-width: 780px;
+  max-width: 760px;
   white-space: pre-wrap;
-  font-size: clamp(1.45rem, 2.7vw, 2.65rem);
-  line-height: 1.38;
+  font-size: clamp(1.4rem, 2.45vw, 2.42rem);
+  line-height: 1.42;
 }
 
 .sentence-choice {
@@ -261,6 +267,8 @@ h3 {
 }
 
 .sentence-choice:hover,
+.sentence-choice:focus,
+.sentence-choice.is-focused,
 .sentence-choice:focus-visible {
   background: var(--accent-soft);
   box-shadow: 0 0 0 3px var(--accent-soft);
@@ -278,13 +286,14 @@ h3 {
 }
 
 .flags-buffer {
-  padding: 14px 0 0;
+  padding: 9px 0 0;
   border-top: 1px solid var(--line);
 }
 
 .flags-buffer > div {
-  max-width: 640px;
-  padding: 14px 0;
+  max-width: 520px;
+  padding: 10px 0;
+  opacity: 0.78;
 }
 
 .action-column {
@@ -315,12 +324,21 @@ h3 {
   line-height: 1.46;
 }
 
+.chosen-block blockquote {
+  color: color-mix(in srgb, var(--ink) 88%, var(--muted));
+}
+
 .writing-block--second {
   padding-top: 4px;
 }
 
 .artifact-block {
-  gap: 20px;
+  gap: 18px;
+  padding-bottom: 4px;
+}
+
+.artifact-block .artifact-piece:first-of-type blockquote {
+  font-size: clamp(1rem, 1.55vw, 1.25rem);
 }
 
 .artifact-piece p:first-child {
@@ -330,14 +348,13 @@ h3 {
   line-height: 1.4;
 }
 
-#artifactResult {
-  max-width: 33rem;
-  line-height: 1.5;
-}
-
 .prototype-note {
   display: grid;
   gap: 8px;
+}
+
+body[data-phase="artifact"] .reshape-area {
+  opacity: 0.82;
 }
 
 @media (prefers-reduced-motion: reduce) {

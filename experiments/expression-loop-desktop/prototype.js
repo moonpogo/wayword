@@ -11,7 +11,7 @@
     segments: [],
     selectedIndex: -1,
     selectedSentence: "",
-    secondStarted: false,
+    selectionLocked: false,
   };
 
   var els = {
@@ -34,7 +34,6 @@
     artifactBlock: document.getElementById("artifactBlock"),
     artifactSelected: document.getElementById("artifactSelected"),
     artifactFollowed: document.getElementById("artifactFollowed"),
-    artifactResult: document.getElementById("artifactResult"),
     restartBtn: document.getElementById("restartBtn"),
     fixtureStatus: document.getElementById("fixtureStatus"),
   };
@@ -121,7 +120,7 @@
     state.segments = [];
     state.selectedIndex = -1;
     state.selectedSentence = "";
-    state.secondStarted = false;
+    state.selectionLocked = false;
 
     els.firstExpressionInput.value = "";
     els.secondExpressionInput.value = "";
@@ -129,10 +128,9 @@
     els.chosenSentenceText.textContent = "";
     els.artifactSelected.textContent = "";
     els.artifactFollowed.textContent = "";
-    els.artifactResult.textContent = "";
     setError(els.firstExpressionError, "");
     setError(els.secondExpressionError, "");
-    els.selectionStatus.textContent = "Sentences are now selectable in the original passage.";
+    els.selectionStatus.textContent = "Choose one sentence.";
 
     show(els.firstWritingBlock, true);
     show(els.settledExpressionBlock, false);
@@ -187,7 +185,7 @@
       if (state.selectedIndex === index) {
         button.dataset.selected = "true";
       }
-      if (state.secondStarted) {
+      if (state.selectionLocked) {
         button.setAttribute("aria-disabled", "true");
       }
       passage.appendChild(button);
@@ -197,6 +195,13 @@
     if (cursor < source.length) {
       passage.appendChild(document.createTextNode(source.slice(cursor)));
     }
+    syncFocusedSentenceClass();
+  }
+
+  function syncFocusedSentenceClass() {
+    els.firstExpressionPassage.querySelectorAll(".sentence-choice").forEach(function (node) {
+      node.classList.toggle("is-focused", node === document.activeElement);
+    });
   }
 
   function settleFirstExpression() {
@@ -223,12 +228,25 @@
     renderPassage();
 
     var firstSentence = els.firstExpressionPassage.querySelector(".sentence-choice");
-    if (firstSentence) firstSentence.focus();
+    if (firstSentence) {
+      firstSentence.focus();
+      syncFocusedSentenceClass();
+    }
+  }
+
+  function updateSelectionLockFromSecondInput() {
+    state.selectionLocked = state.phase === "artifact" || !!els.secondExpressionInput.value.trim();
+  }
+
+  function lockStatusText() {
+    return state.phase === "artifact" ? "Selection held." : "Selection held while shaping.";
   }
 
   function commitSelection(index) {
-    if (state.secondStarted) {
-      els.selectionStatus.textContent = "Selection is held while the second expression is underway.";
+    updateSelectionLockFromSecondInput();
+    if (state.selectionLocked) {
+      els.selectionStatus.textContent = lockStatusText();
+      renderPassage();
       return;
     }
 
@@ -238,11 +256,25 @@
     state.selectedIndex = index;
     state.selectedSentence = segment.text;
     els.chosenSentenceText.textContent = segment.text;
-    els.selectionStatus.textContent = "Selected sentence committed in context.";
+    els.selectionStatus.textContent = "Selection committed in context.";
     show(els.reshapeArea, true);
     setPhase("shaping");
     renderPassage();
     els.secondExpressionInput.focus();
+  }
+
+  function syncSelectionLock() {
+    updateSelectionLockFromSecondInput();
+
+    if (state.selectionLocked) {
+      els.selectionStatus.textContent = state.phase === "artifact" ? "Selection held." : "Selection held while shaping.";
+    } else if (state.selectedIndex >= 0) {
+      els.selectionStatus.textContent = "Selection committed in context.";
+    } else {
+      els.selectionStatus.textContent = "Choose one sentence.";
+    }
+
+    renderPassage();
   }
 
   function finishSession() {
@@ -254,12 +286,13 @@
     }
 
     state.secondExpression = value;
+    state.selectionLocked = true;
     setError(els.secondExpressionError, "");
     els.artifactSelected.textContent = state.selectedSentence;
     els.artifactFollowed.textContent = value;
-    els.artifactResult.textContent = "The selected sentence became the source for the second response.";
     show(els.artifactBlock, true);
     setPhase("artifact");
+    syncSelectionLock();
     els.artifactBlock.focus && els.artifactBlock.focus();
   }
 
@@ -284,13 +317,36 @@
       }
     });
 
-    els.secondExpressionInput.addEventListener("input", function () {
-      var hasText = !!els.secondExpressionInput.value.trim();
-      if (hasText && !state.secondStarted) {
-        state.secondStarted = true;
-        renderPassage();
+    els.firstExpressionPassage.addEventListener("focusin", function (event) {
+      var target = event.target.closest(".sentence-choice");
+      if (target) syncFocusedSentenceClass();
+    });
+
+    els.firstExpressionPassage.addEventListener("focusout", function (event) {
+      var target = event.target.closest(".sentence-choice");
+      if (target) target.classList.remove("is-focused");
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Tab") {
+        window.setTimeout(syncFocusedSentenceClass, 0);
       }
+    });
+
+    function handleSecondExpressionChange() {
+      var hasText = !!els.secondExpressionInput.value.trim();
       if (hasText) setError(els.secondExpressionError, "");
+      syncSelectionLock();
+    }
+
+    els.secondExpressionInput.addEventListener("input", handleSecondExpressionChange);
+    els.secondExpressionInput.addEventListener("change", handleSecondExpressionChange);
+    els.secondExpressionInput.addEventListener("keyup", handleSecondExpressionChange);
+    els.secondExpressionInput.addEventListener("paste", function () {
+      window.setTimeout(handleSecondExpressionChange, 0);
+    });
+    els.secondExpressionInput.addEventListener("cut", function () {
+      window.setTimeout(handleSecondExpressionChange, 0);
     });
 
     els.finishSessionBtn.addEventListener("click", finishSession);

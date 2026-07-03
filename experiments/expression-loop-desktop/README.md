@@ -1,8 +1,10 @@
 # Expression Loop Desktop Experiment
 
-This isolated desktop V2 experiment implements the first functional Expression Loop session for `certainty-memory-01`.
+This isolated desktop V2 experiment implements and refines the first functional Expression Loop session for `certainty-memory-01`.
 
 The desktop product thesis is that Wayword can keep the user's language spatially present while the practice moves through opener, expression, encounter, selection, movement, second expression, and artifact. Desktop should feel text-forward, continuous, and grounded in the current Wayword writing surface, not like the preserved mobile voice prototype.
+
+This refinement pass prepares the prototype for founder review. It does not establish production architecture, persistence, telemetry, saved-run shape, or a desktop replacement for V1.
 
 ## Shared Grammar
 
@@ -38,9 +40,13 @@ After the first expression is settled, deterministic local segmentation turns ea
 
 The selected sentence remains bolded and underlined in context so the user can see where the choice came from. Unselected sentences return to normal.
 
+Selection may change until meaningful second-expression input begins. Whitespace-only second-field input does not lock selection. Once typed, pasted, or OS-dictated text creates non-whitespace second-expression content, selection locks while shaping. If all second-field content is cleared before completion, selection unlocks again. After the final artifact state, selection remains locked.
+
 ## Point Of Action
 
 The selected sentence is repeated below the passage under `You chose`. This lower instance has a different job from the bolded sentence above: it becomes the active material for the movement.
+
+The point-of-action repeat stays synchronized with the committed selection until the selection locks.
 
 ## Flags Buffer
 
@@ -55,7 +61,21 @@ This pass does not detect, generate, score, or label flags. Inline highlight and
 
 ## Second Field
 
-The second writing field is revealed only after selection. The opener, first expression, selected sentence, and movement stay visible while the user writes. Reselection is allowed before the second expression begins; once second writing starts, the selection is held for the rest of the session.
+The second writing field is revealed only after selection. The opener, first expression, selected sentence, and movement stay visible while the user writes. Reselection is allowed before meaningful second input begins.
+
+## Final Artifact
+
+The final artifact focuses on:
+
+```text
+You selected
+"..."
+
+What followed
+"..."
+```
+
+The full first expression remains visible above as context, with the selected sentence still marked in place. It is not duplicated inside the artifact summary.
 
 ## Voice And Dictation
 
