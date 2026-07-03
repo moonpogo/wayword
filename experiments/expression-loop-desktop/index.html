@@ -9,56 +9,118 @@
 </head>
 <body>
   <main class="desktop-shell" aria-label="Wayword desktop V2 experiment">
-    <header class="masthead">
+    <header class="experiment-header">
       <img class="brand-mark" src="/assets/brand/wayword-logo.svg?v=20260526-hotfix1" alt="Wayword" />
-      <div>
+      <div class="header-copy">
         <p class="kicker">Desktop V2 experiment</p>
-        <h1>Expression Loop desktop scaffold</h1>
+        <h1>Expression Loop</h1>
       </div>
     </header>
 
-    <section class="workspace" aria-label="Desktop expression loop workspace">
-      <section class="writing-plane" aria-label="First expression">
-        <div class="section-heading">
-          <p class="kicker">Opener</p>
+    <section class="loop-composition" aria-label="Certainty expression loop">
+      <div class="primary-column">
+        <section class="opener-block" aria-labelledby="openerLabel">
+          <p id="openerLabel" class="kicker">Opener</p>
           <h2 id="openerText">Tell a memory as if you are certain.</h2>
-        </div>
+        </section>
 
-        <textarea
-          class="expression-field"
-          aria-label="First expression text"
-          placeholder="Write here, or use operating-system dictation."
-        ></textarea>
+        <section id="firstWritingBlock" class="writing-block" aria-labelledby="firstExpressionLabel">
+          <div class="block-heading">
+            <label id="firstExpressionLabel" for="firstExpressionInput">First expression</label>
+            <p>Type here, or use operating-system dictation.</p>
+          </div>
+          <textarea
+            id="firstExpressionInput"
+            class="expression-field"
+            rows="9"
+            spellcheck="true"
+            placeholder="Write the first version."
+          ></textarea>
+          <div class="action-row">
+            <p id="firstExpressionError" class="field-error" role="status"></p>
+            <button id="settleExpressionBtn" class="primary-action" type="button">Settle the expression</button>
+          </div>
+        </section>
 
-        <div class="selection-preview" aria-label="Selection preview">
-          <p class="kicker">Selection model</p>
-          <p>
-            Inline sentence hover and keyboard focus will preview selectable material. A committed sentence stays bolded in its original context.
-          </p>
-        </div>
-      </section>
+        <section id="settledExpressionBlock" class="settled-block" aria-labelledby="encounterInstruction" hidden>
+          <div class="block-heading">
+            <p class="kicker">Encounter</p>
+            <h3 id="encounterInstruction">Choose the sentence you trust least.</h3>
+            <p id="selectionStatus" class="selection-status" role="status">
+              Sentences are now selectable in the original passage.
+            </p>
+          </div>
+          <div
+            id="firstExpressionPassage"
+            class="settled-passage"
+            aria-label="First expression with selectable sentences"
+          ></div>
+        </section>
 
-      <aside class="movement-rail" aria-label="Movement preview">
-        <div class="rail-section">
-          <p class="kicker">Shared fixture</p>
+        <section id="flagsBuffer" class="flags-buffer" aria-labelledby="flagsBufferLabel" hidden>
+          <div>
+            <p id="flagsBufferLabel" class="kicker">Future flags buffer</p>
+            <p>
+              Repeaters, openings, filler, and challenge belong in a separate annotation channel.
+              This prototype does not analyze the writing.
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <aside class="action-column" aria-label="Movement and artifact">
+        <section id="reshapeArea" class="reshape-area" aria-labelledby="chosenLabel" hidden>
+          <div class="chosen-block">
+            <p id="chosenLabel" class="kicker">You chose</p>
+            <blockquote id="chosenSentenceText"></blockquote>
+          </div>
+
+          <div class="movement-block">
+            <p class="kicker">Movement</p>
+            <h3 id="movementInstruction">Begin from that sentence. Describe what could be wrong about it.</h3>
+          </div>
+
+          <div id="secondWritingBlock" class="writing-block writing-block--second" aria-labelledby="secondExpressionLabel">
+            <div class="block-heading">
+              <label id="secondExpressionLabel" for="secondExpressionInput">Second expression</label>
+              <p>Continue below. OS dictation works as text input; no browser microphone is used.</p>
+            </div>
+            <textarea
+              id="secondExpressionInput"
+              class="expression-field expression-field--second"
+              rows="7"
+              spellcheck="true"
+              placeholder="Begin from the selected sentence."
+            ></textarea>
+            <div class="action-row">
+              <p id="secondExpressionError" class="field-error" role="status"></p>
+              <button id="finishSessionBtn" class="primary-action" type="button">Finish the session</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="artifactBlock" class="artifact-block" aria-labelledby="artifactLabel" hidden>
+          <p id="artifactLabel" class="kicker">Artifact</p>
+          <div class="artifact-piece">
+            <p>You selected</p>
+            <blockquote id="artifactSelected"></blockquote>
+          </div>
+          <div class="artifact-piece">
+            <p>What followed</p>
+            <blockquote id="artifactFollowed"></blockquote>
+          </div>
+          <div class="artifact-piece">
+            <p>Session result</p>
+            <p id="artifactResult"></p>
+          </div>
+          <button id="restartBtn" class="secondary-action" type="button">Begin again</button>
+        </section>
+
+        <section class="prototype-note" aria-label="Prototype boundaries">
+          <p class="kicker">Prototype contract</p>
           <p id="fixtureStatus">Loading shared session fixture...</p>
-        </div>
-
-        <div class="rail-section">
-          <p class="kicker">Committed selection</p>
-          <p class="selected-line">The selected sentence will repeat here as active movement material.</p>
-        </div>
-
-        <div class="rail-section">
-          <p class="kicker">Movement</p>
-          <p id="movementText">Begin from that sentence. Describe what could be wrong about it.</p>
-        </div>
-
-        <textarea
-          class="second-field"
-          aria-label="Second expression text"
-          placeholder="The second writing field will appear progressively after selection."
-        ></textarea>
+          <p>State is memory-only. Reloading clears this experiment.</p>
+        </section>
       </aside>
     </section>
   </main>
