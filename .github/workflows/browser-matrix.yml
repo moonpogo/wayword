@@ -1,6 +1,7 @@
 name: Browser matrix
 
 on:
+  pull_request:
   schedule:
     - cron: "0 9 * * *"
   workflow_dispatch:

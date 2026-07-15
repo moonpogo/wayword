@@ -21,7 +21,7 @@ Pull requests and pushes to `main` run:
 - `npm run verify:merge`
 - `npm run test:smoke:chromium`
 
-The scheduled and manually dispatchable browser matrix runs the same browser smoke suite in:
+Pull requests, the nightly schedule, and manual dispatches run the same browser smoke suite in:
 
 - Chromium
 - Firefox
