@@ -92,8 +92,11 @@ Additional checks:
 ```sh
 npm run check:maintenance
 npm run test:smoke
+npm run test:smoke:cross-browser
 npm run test:regression
 ```
+
+`test:smoke` is the fast Chromium gate. `test:smoke:cross-browser` runs the same coverage in Chromium, Firefox, and WebKit. See [`docs/BROWSER_SUPPORT.md`](docs/BROWSER_SUPPORT.md) for the viewport matrix and the real-device release gate.
 
 `check:maintenance` reports low-risk repository hygiene findings and exits `0` while the baseline is being established.
 

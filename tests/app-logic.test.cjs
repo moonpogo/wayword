@@ -1473,7 +1473,8 @@ test("season fixture clustered10rapid yields 10 distinct same-day runs", () => {
   assert.equal(fixtureMap instanceof Map, true);
   assert.equal(fixtureMap.get(67), 10);
 
-  const vm = api.buildDevSeasonFixtureViewModel("clustered10rapid");
+  const fixtureNow = new Date("2026-05-26T15:00:00-07:00");
+  const vm = api.buildDevSeasonFixtureViewModel("clustered10rapid", { nowDate: fixtureNow });
   assert.equal(vm.runsCount, 10);
   assert.equal(vm.seasonalRows.length, 10);
   assert.equal(vm.dayBuckets.size, 1);
@@ -1569,14 +1570,16 @@ test("season wheel full-ring output preserves clustered10rapid run count in summ
     `${dayKeyHelper}\n${fixtureBlock}\n${instrumentBlock}\n${calendarBlock}\n${svgBlock}\n${fullRingBlock}\nreturn { buildDevSeasonFixtureViewModel, buildSeasonWheelFullRingFromSeasonalRows, buildCurrentSeasonCalendar };`
   )();
 
-  const fixtureVm = api.buildDevSeasonFixtureViewModel("clustered10rapid");
-  const seasonCalendar = api.buildCurrentSeasonCalendar(new Date("2026-05-26T15:00:00-07:00"));
+  const fixtureNow = new Date("2026-05-26T15:00:00-07:00");
+  const fixtureVm = api.buildDevSeasonFixtureViewModel("clustered10rapid", { nowDate: fixtureNow });
+  const seasonCalendar = api.buildCurrentSeasonCalendar(fixtureNow);
   const svg = api.buildSeasonWheelFullRingFromSeasonalRows(fixtureVm.seasonalRows, {
     seasonDays: seasonCalendar.spokeCount,
     seasonLabel: seasonCalendar.seasonLabel,
     seasonStartDate: seasonCalendar.seasonStartLocal,
     seasonEndDate: seasonCalendar.seasonEndLocal,
     seasonCalendar,
+    nowDate: fixtureNow,
     isDesktop: false,
   });
 
