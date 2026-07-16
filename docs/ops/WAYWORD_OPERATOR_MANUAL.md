@@ -91,6 +91,9 @@ Prefer non-runtime checks first when the task is docs-only or test-only.
 - `npm run test:smoke`
   - Browser smoke checks.
   - Use when the visible flow, mobile behavior, or interaction surfaces changed and Chromium is available.
+- `npm run test:smoke:cross-browser`
+  - Runs the browser smoke suite in Chromium, Firefox, and WebKit.
+  - Use before alpha/public releases that change viewport, focus, editor input, or panel behavior.
 - `npm run verify:alpha`
   - Strongest shipped-flow gate in package scripts.
   - Use when both merge safety and browser smoke matter.

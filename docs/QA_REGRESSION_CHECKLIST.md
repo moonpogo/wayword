@@ -41,6 +41,8 @@ Run these in order when hardening or before a V1-sensitive merge:
 2. **`node --check script.js`** — Syntax-only guard on the frozen runtime bundle.
 3. **`npm run test:smoke`** — Playwright Chromium checks for landing → begin, writing → submit → Mirror, prompt reroll gating, Recent Runs drawer/rail, Patterns, and mobile focus/patterns paths (requires devDependency install / Chromium).
 
+For cross-engine release confidence, run **`npm run test:smoke:cross-browser`**. Real iOS Safari and Android Chrome checks remain manual; see `docs/BROWSER_SUPPORT.md`.
+
 Shortcut (same three steps): **`npm run test:regression`**
 
 For a **faster gate without Playwright**, `npm run verify:merge` runs the logic tests, `node --check script.js`, and the mirror + patterns surface validators (see `package.json`).

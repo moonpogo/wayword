@@ -4902,8 +4902,10 @@ function seasonalRunsForCalendarWindow(savedRuns, seasonCalendar) {
 
 let devSeasonFixtureName = null;
 
-function seasonDayKeysLast90Local() {
-  const now = new Date();
+function seasonDayKeysLast90Local(nowDate = new Date()) {
+  const now = nowDate instanceof Date && Number.isFinite(nowDate.getTime())
+    ? new Date(nowDate)
+    : new Date();
   now.setHours(12, 0, 0, 0);
   const keys = [];
   for (let i = 89; i >= 0; i -= 1) {
@@ -4985,10 +4987,11 @@ function fixtureCountMapByName(name) {
   return null;
 }
 
-function buildDevSeasonFixtureViewModel(name) {
+function buildDevSeasonFixtureViewModel(name, options = {}) {
+  const safeOptions = options && typeof options === "object" ? options : {};
   const countMap = fixtureCountMapByName(name);
   if (!countMap) return null;
-  const dayKeys = seasonDayKeysLast90Local();
+  const dayKeys = seasonDayKeysLast90Local(safeOptions.nowDate);
   const dayBuckets = new Map();
   const seasonalRows = [];
   let runsCount = 0;
@@ -5867,21 +5870,24 @@ function buildSeasonWheelFullRingDebugSvg(options = {}) {
 }
 
 function buildSeasonWheelFullRingFromSeasonalRows(seasonalRows, options = {}) {
+  const nowDate = options.nowDate instanceof Date && Number.isFinite(options.nowDate.getTime())
+    ? new Date(options.nowDate)
+    : new Date();
   const seasonCalendar = options.seasonCalendar && typeof options.seasonCalendar === "object"
     ? options.seasonCalendar
-    : buildCurrentSeasonCalendar(new Date());
+    : buildCurrentSeasonCalendar(nowDate);
   const seasonDays = Math.max(1, Number(options.seasonDays) || Number(seasonCalendar.spokeCount) || 1);
-  const seasonLabel = String(options.seasonLabel || seasonCalendar.seasonLabel || currentMeteorologicalSeasonLabel(new Date())).toUpperCase();
+  const seasonLabel = String(options.seasonLabel || seasonCalendar.seasonLabel || currentMeteorologicalSeasonLabel(nowDate)).toUpperCase();
   const isDesktop = Boolean(options.isDesktop);
   const seasonStartDate = options.seasonStartDate instanceof Date
     ? localStartOfDay(options.seasonStartDate)
-    : localStartOfDay(seasonCalendar.seasonStartLocal || currentMeteorologicalSeasonStart(new Date()));
+    : localStartOfDay(seasonCalendar.seasonStartLocal || currentMeteorologicalSeasonStart(nowDate));
   const seasonEndDate = options.seasonEndDate instanceof Date
     ? localEndOfDay(options.seasonEndDate)
     : localEndOfDay(seasonCalendar.seasonEndLocal || addLocalDays(seasonStartDate, seasonDays - 1));
   const model = buildSeasonWheelInstrumentModel(Array.isArray(seasonalRows) ? seasonalRows : [], {
     seasonLengthDays: seasonDays,
-    nowDate: new Date(),
+    nowDate,
     seasonStartDate,
     seasonEndDate,
   });

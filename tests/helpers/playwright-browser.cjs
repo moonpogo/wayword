@@ -1,4 +1,10 @@
-const { chromium } = require("playwright");
+const { chromium, firefox, webkit } = require("playwright");
+
+const BROWSER_TYPES = {
+  chromium,
+  firefox,
+  webkit,
+};
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -17,6 +23,10 @@ class PlaywrightSession {
 
   async navigate(url) {
     await this.page.goto(url, { waitUntil: "domcontentloaded" });
+  }
+
+  async addInitScript(script, arg) {
+    await this.page.addInitScript(script, arg);
   }
 
   async execute(script, args = []) {
@@ -68,8 +78,18 @@ class PlaywrightSession {
   }
 }
 
-async function startPlaywrightChromium(options = {}) {
-  const browser = await chromium.launch({
+function normalizeBrowserName(value) {
+  const name = String(value || "chromium").trim().toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(BROWSER_TYPES, name)) {
+    throw new Error(`Unsupported Playwright browser: ${name}`);
+  }
+  return name;
+}
+
+async function startPlaywrightBrowser(options = {}) {
+  const browserName = normalizeBrowserName(options.browserName);
+  const browserType = BROWSER_TYPES[browserName];
+  const browser = await browserType.launch({
     headless: options.headless !== false,
     args: options.args,
   });
@@ -79,11 +99,14 @@ async function startPlaywrightChromium(options = {}) {
     logs() {
       return { stderr: "", stdout: "" };
     },
-    async newSession() {
+    browserName,
+    async newSession(sessionOptions = {}) {
       // Below 981px the Review runs control is `#recentWritingTrigger` (drawer). At min-width 981px
       // the trigger is `display:none` and runs live in `#recentRailList` instead.
+      const viewport = sessionOptions.viewport || { width: 960, height: 900 };
       const context = await browser.newContext({
-        viewport: { width: 960, height: 900 },
+        viewport,
+        reducedMotion: sessionOptions.reducedMotion,
       });
       const page = await context.newPage();
       const session = new PlaywrightSession(page);
@@ -101,7 +124,13 @@ async function startPlaywrightChromium(options = {}) {
   };
 }
 
+async function startPlaywrightChromium(options = {}) {
+  return await startPlaywrightBrowser({ ...options, browserName: "chromium" });
+}
+
 module.exports = {
   PlaywrightSession,
+  normalizeBrowserName,
+  startPlaywrightBrowser,
   startPlaywrightChromium,
 };

@@ -2,7 +2,17 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { ROOT } = require("./helpers/bundle-require.cjs");
 const { startStaticServer } = require("./helpers/static-server.cjs");
-const { startPlaywrightChromium } = require("./helpers/playwright-browser.cjs");
+const { startPlaywrightBrowser } = require("./helpers/playwright-browser.cjs");
+
+const SMOKE_BROWSER = process.env.WAYWORD_BROWSER || "chromium";
+const CORE_VIEWPORT_MATRIX = [
+  { height: 844, label: "mobile portrait", width: 390 },
+  { height: 800, label: "small mobile portrait", width: 360 },
+  { height: 390, label: "mobile landscape", width: 844 },
+  { height: 1024, label: "tablet portrait boundary", width: 768 },
+  { height: 768, label: "small desktop", width: 1024 },
+  { height: 720, label: "short desktop", width: 1280 },
+];
 
 const SMOKE_RUN_TEXTS = [
   "I kept returning to the window and the same streetlight, trying to explain why the room felt narrower after I spoke. I started with a careful sentence, backed away from it, then softened it again. The draft keeps circling the safer words before it reaches the sharper one.",
@@ -23,7 +33,10 @@ let smokeHarness = null;
 
 test.before(async () => {
   const server = await startStaticServer({ rootDir: ROOT });
-  const driver = await startPlaywrightChromium({ headless: true });
+  const driver = await startPlaywrightBrowser({
+    browserName: SMOKE_BROWSER,
+    headless: true,
+  });
   smokeHarness = { driver, server };
 });
 
@@ -33,15 +46,16 @@ test.after(async () => {
   await smokeHarness.server.close();
 });
 
-async function withSmokeSession(_t, callback) {
+async function withSmokeSession(_t, callback, options = {}) {
   if (!smokeHarness) {
     throw new Error("Browser smoke harness was not initialized");
   }
 
-  const sessionState = await smokeHarness.driver.newSession();
+  const sessionState = await smokeHarness.driver.newSession(options);
   const { session, close } = sessionState;
   try {
-    await session.setWindowRect({ height: 900, width: 960, x: 0, y: 0 });
+    const viewport = options.viewport || { height: 900, width: 960 };
+    await session.setWindowRect({ ...viewport, x: 0, y: 0 });
     await callback(session);
   } finally {
     await close();
@@ -742,6 +756,65 @@ test("browser smoke: landing -> begin leaves writing surface ready", async (t) =
   });
 });
 
+test("browser smoke: core writing shell stays within the supported viewport matrix", async (t) => {
+  await withSmokeSession(t, async (session) => {
+    for (const viewport of CORE_VIEWPORT_MATRIX) {
+      await session.setWindowRect({
+        height: viewport.height,
+        width: viewport.width,
+        x: 0,
+        y: 0,
+      });
+      await loadFreshApp(session);
+      await beginRun(session);
+
+      const snapshot = await session.execute(`
+        var doc = document.documentElement;
+        var shell = document.querySelector(".app-shell");
+        var editor = document.getElementById("editorInput");
+        var prompt = document.getElementById("promptText");
+        var shellRect = shell ? shell.getBoundingClientRect() : null;
+        var editorRect = editor ? editor.getBoundingClientRect() : null;
+        return {
+          clientWidth: doc.clientWidth,
+          scrollWidth: doc.scrollWidth,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+          shellInsideViewport: Boolean(
+            shellRect && shellRect.width > 0 && shellRect.left >= -1 && shellRect.right <= window.innerWidth + 1
+          ),
+          editorReady: Boolean(
+            editor &&
+            editor.getAttribute("contenteditable") === "true" &&
+            editorRect &&
+            editorRect.width > 0 &&
+            editorRect.height > 0
+          ),
+          promptVisible: Boolean(prompt && prompt.offsetParent !== null && String(prompt.textContent || "").trim())
+        };
+      `);
+
+      const context = `${SMOKE_BROWSER} ${viewport.label} ${viewport.width}x${viewport.height}`;
+      assert.equal(snapshot.viewportWidth, viewport.width, `expected viewport width for ${context}`);
+      assert.equal(snapshot.viewportHeight, viewport.height, `expected viewport height for ${context}`);
+      assert.ok(
+        snapshot.scrollWidth <= snapshot.clientWidth + 1,
+        `expected no horizontal document overflow for ${context}`
+      );
+      assert.equal(snapshot.shellInsideViewport, true, `expected shell inside viewport for ${context}`);
+      assert.equal(snapshot.editorReady, true, `expected usable editor for ${context}`);
+      assert.equal(snapshot.promptVisible, true, `expected visible prompt for ${context}`);
+
+      const errors = await readSmokeErrors(session);
+      assert.equal(
+        errors.length,
+        0,
+        `expected no local browser errors for ${context}, received: ${JSON.stringify(errors)}`
+      );
+    }
+  });
+});
+
 test("browser smoke: permission overlay stays inside editor chrome and suppresses native caret", async (t) => {
   await withSmokeSession(t, async (session) => {
     await loadFreshApp(session);
@@ -1238,10 +1311,21 @@ test("browser smoke: desktop rail — expanding a Recent Run does not grow the d
       };
     `);
 
-    await session.execute(`
-      var e = document.querySelector("#recentRailList .recent-entry");
-      if (e) e.click();
-    `);
+    await session.waitFor(
+      "recent rail entry ready for activation",
+      async () =>
+        await session.execute(`
+          var e = document.querySelector("#recentRailList .recent-entry");
+          return Boolean(
+            e &&
+            e.isConnected &&
+            e.offsetParent !== null &&
+            e.getAttribute("aria-expanded") === "false"
+          );
+        `),
+      { timeoutMs: 10000 }
+    );
+    await session.click("#recentRailList .recent-entry");
 
     await session.waitFor(
       "recent rail entry expanded",

@@ -45,6 +45,7 @@ For the consolidated operator manual, see [`WAYWORD_OPERATOR_MANUAL.md`](./WAYWO
 - `npm test` runs the logic suite.
 - `npm run verify:merge` is the default non-Playwright gate for merge-sensitive work.
 - `npm run test:smoke` runs browser smoke checks when Chromium is available.
+- `npm run test:smoke:cross-browser` runs the same smoke coverage in Chromium, Firefox, and WebKit.
 - `npm run verify:alpha` combines the merge gate with smoke coverage.
 - `tests/app-logic.test.cjs` is the main seam coverage file for runtime helpers, persistence, and logic contracts.
 - `tests/mirror-pipeline.test.cjs` covers the deterministic pipeline.
