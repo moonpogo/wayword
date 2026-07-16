@@ -1,3 +1,6 @@
+// Season Wheel expectations exercise Pacific local-calendar semantics explicitly.
+process.env.TZ = "America/Los_Angeles";
+
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const test = require("node:test");

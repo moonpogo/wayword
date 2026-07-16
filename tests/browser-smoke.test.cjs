@@ -1311,10 +1311,21 @@ test("browser smoke: desktop rail — expanding a Recent Run does not grow the d
       };
     `);
 
-    await session.execute(`
-      var e = document.querySelector("#recentRailList .recent-entry");
-      if (e) e.click();
-    `);
+    await session.waitFor(
+      "recent rail entry ready for activation",
+      async () =>
+        await session.execute(`
+          var e = document.querySelector("#recentRailList .recent-entry");
+          return Boolean(
+            e &&
+            e.isConnected &&
+            e.offsetParent !== null &&
+            e.getAttribute("aria-expanded") === "false"
+          );
+        `),
+      { timeoutMs: 10000 }
+    );
+    await session.click("#recentRailList .recent-entry");
 
     await session.waitFor(
       "recent rail entry expanded",
